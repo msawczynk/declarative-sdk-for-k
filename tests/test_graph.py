@@ -27,6 +27,22 @@ def test_topological_order_has_leaves_first(minimal_manifest_path: Path) -> None
     assert gateway_idx < config_idx < resource_idx
 
 
+def test_graph_places_shared_folder_before_resource(full_local_manifest_path: Path) -> None:
+    manifest = load_manifest(full_local_manifest_path)
+    graph = build_graph(manifest)
+    order = execution_order(graph)
+
+    shared_folder_idx = order.index("acme-prod-sf-resources")
+    resource_indexes = [
+        order.index(resource.uid_ref)
+        for resource in manifest.resources
+        if getattr(resource, "shared_folder", None) == "resources"
+    ]
+
+    assert resource_indexes
+    assert all(shared_folder_idx < resource_idx for resource_idx in resource_indexes)
+
+
 def test_cycle_detected() -> None:
     """execution_order must reject cycles."""
     import networkx as nx

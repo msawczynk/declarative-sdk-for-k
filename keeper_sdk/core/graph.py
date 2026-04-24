@@ -7,7 +7,8 @@ manifest is expected to be canonicalised before this stage.
 
 from __future__ import annotations
 
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 import networkx as nx
 
@@ -89,8 +90,26 @@ def build_graph(manifest: Manifest) -> nx.DiGraph:
 
     _walk_collection(data.get("gateways") or [])
     _walk_collection(data.get("pam_configurations") or [])
+    _walk_collection(data.get("projects") or [])
     _walk_collection(data.get("resources") or [])
     _walk_collection(data.get("users") or [])
+
+    shared_folders = data.get("shared_folders") or {}
+    sf_users_uid_ref = _owner_ref(shared_folders.get("users") or {})
+    sf_resources_uid_ref = _owner_ref(shared_folders.get("resources") or {})
+
+    for resource in data.get("resources") or []:
+        shared_folder = resource.get("shared_folder")
+        if shared_folder == "resources" and sf_resources_uid_ref in owners:
+            graph.add_edge(resource["uid_ref"], sf_resources_uid_ref)
+        elif shared_folder == "users" and sf_users_uid_ref in owners:
+            graph.add_edge(resource["uid_ref"], sf_users_uid_ref)
+
+    for user in data.get("users") or []:
+        if user.get("shared_folder") == "users" and sf_users_uid_ref in owners:
+            user_uid_ref = user.get("uid_ref")
+            if user_uid_ref in owners:
+                graph.add_edge(user_uid_ref, sf_users_uid_ref)
 
     # nested users inherit their parent resource as owner
     for resource in data.get("resources") or []:
