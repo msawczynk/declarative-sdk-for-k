@@ -113,15 +113,31 @@ def run_smoke(
     except Exception as exc:
         raise PreflightError(f"manifest generation failed: {exc}") from exc
 
-    argv_prefix = identity.sdktest_keeper_args()
+    # SDK apply/plan/validate must run as the tenant admin: `pam project
+    # import` is gated on a role-enforcement the smoke test user lacks
+    # ("Communication Error: This feature has been disabled by your Keeper
+    # administrator."). testuser2 still owns the sandbox share for the
+    # visibility proof further down. The admin Commander config is already
+    # authenticated by identity.admin_login().
+    admin_config_path = getattr(admin_params, "config_filename", None) or str(
+        identity.ADMIN_COMMANDER_CONFIG
+    )
+    admin_password = getattr(admin_params, "password", None)
+    if not admin_password:
+        # KeeperParams drops .password after login; re-fetch from KSM.
+        admin_password = _load_admin_password()
+    argv_prefix = ["keeper", "--config", admin_config_path]
     env = dict(os.environ)
-    env["KEEPER_CONFIG"] = ident["commander_config_path"]
+    env["KEEPER_CONFIG"] = admin_config_path
     env["KEEPER_DECLARATIVE_FOLDER"] = sf_uid
     # Commander's --batch-mode still requires the master password to unlock the
     # local key on each subprocess invocation; KEEPER_PASSWORD short-circuits
     # the prompt without hitting stdin.
-    env["KEEPER_PASSWORD"] = ident["password"]
+    env["KEEPER_PASSWORD"] = admin_password
     state["keeper_args"] = argv_prefix
+    state["admin_config_path"] = admin_config_path
+    _remove_project_tree(argv_prefix, env=env, project_name=SMOKE_PROJECT_NAME)
+    _mark(state, "project tree pre-clean complete")
 
     _sdk(["validate", str(manifest_path)], env=env)
     _mark(state, "sdk validate OK")
@@ -135,8 +151,8 @@ def run_smoke(
     _mark(state, "apply OK")
 
     prov = CommanderCliProvider(
-        config_file=ident["commander_config_path"],
-        keeper_password=ident["password"],
+        config_file=admin_config_path,
+        keeper_password=admin_password,
     )
     resolved_sf_uid = prov._resolve_project_resources_folder(SMOKE_PROJECT_NAME)
     state["managed_folder_uid"] = resolved_sf_uid
@@ -234,6 +250,9 @@ def _write_manifest(sf_uid: str) -> Path:
 
 def _write_empty_manifest(sf_uid: str) -> Path:
     document = _base_manifest(sf_uid)
+    document.pop("shared_folders", None)
+    document.pop("gateways", None)
+    document.pop("pam_configurations", None)
     document["resources"] = []
     _preflight_manifest(document)
     return _write_temp_manifest(document, suffix=".smoke-empty.yaml")
@@ -310,12 +329,24 @@ def _sdk_allow(ok_codes: list[int], args: list[str], *, env: dict[str, str]) -> 
     return result.returncode
 
 
+def _load_admin_password() -> str:
+    """Re-fetch admin master password via deploy_watcher.load_keeper_creds().
+
+    KeeperParams zeroes .password after successful login, so we can't pull
+    it off admin_params. Re-reading from KSM is cheap (~1s) and avoids
+    plumbing the raw password through identity.admin_login()'s return.
+    """
+    module_path = identity.LAB_ROOT / "scripts" / "deploy_watcher.py"
+    deploy_watcher = identity._load_lab_module("sdk_smoke_admin_creds", module_path)
+    _email, password, _totp = deploy_watcher.load_keeper_creds()
+    return password
+
+
 def _share_ksm_app_folder(admin_params: Any, *, app_uid: str, folder_uid: str) -> None:
     config_path = getattr(admin_params, "config_filename", None) or str(identity.ADMIN_COMMANDER_CONFIG)
     env = dict(os.environ)
-    password = getattr(admin_params, "password", None)
-    if password:
-        env["KEEPER_PASSWORD"] = password
+    password = getattr(admin_params, "password", None) or _load_admin_password()
+    env["KEEPER_PASSWORD"] = password
     cmd = [
         "keeper",
         "--config",
@@ -349,7 +380,7 @@ def _share_ksm_app_folder(admin_params: Any, *, app_uid: str, folder_uid: str) -
 
 
 def _remove_project_tree(argv_prefix: list[str], *, env: dict[str, str], project_name: str) -> None:
-    cmd = [*argv_prefix, "rm", f"PAM Environments/{project_name}"]
+    cmd = [*argv_prefix, "rmdir", "-f", f"PAM Environments/{project_name}"]
     result = subprocess.run(
         cmd,
         cwd=ROOT,
@@ -498,20 +529,31 @@ def main(argv: list[str] | None = None) -> int:
                     log.info("cleanup removed %d record(s): %s", len(removed), removed)
             except Exception as cleanup_exc:  # pragma: no cover - live-only path
                 print(f"cleanup failed: {cleanup_exc}", file=sys.stderr)
-            ident = state.get("ident")
-            if ident:
+            admin_config_path = state.get("admin_config_path")
+            admin_params = state.get("admin_params")
+            admin_password = None
+            if admin_params:
+                admin_password = getattr(admin_params, "password", None)
+            if admin_config_path and not admin_password:
+                try:
+                    admin_password = _load_admin_password()
+                except Exception:
+                    admin_password = None
+            if admin_config_path and admin_password and not os.environ.get("SMOKE_NO_CLEANUP"):
                 try:
                     cleanup_env = dict(os.environ)
-                    cleanup_env["KEEPER_CONFIG"] = ident["commander_config_path"]
+                    cleanup_env["KEEPER_CONFIG"] = admin_config_path
                     cleanup_env["KEEPER_DECLARATIVE_FOLDER"] = state.get("sf_uid", "")
-                    cleanup_env["KEEPER_PASSWORD"] = ident["password"]
+                    cleanup_env["KEEPER_PASSWORD"] = admin_password
                     _remove_project_tree(
-                        identity.sdktest_keeper_args(),
+                        ["keeper", "--config", admin_config_path],
                         env=cleanup_env,
                         project_name=SMOKE_PROJECT_NAME,
                     )
                 except Exception as cleanup_exc:  # pragma: no cover - live-only path
                     print(f"project cleanup failed: {cleanup_exc}", file=sys.stderr)
+            elif os.environ.get("SMOKE_NO_CLEANUP"):
+                print("SMOKE_NO_CLEANUP=1 → skipping project tree cleanup for debugging", file=sys.stderr)
 
 
 if __name__ == "__main__":

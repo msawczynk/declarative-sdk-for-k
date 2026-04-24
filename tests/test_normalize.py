@@ -34,7 +34,7 @@ def test_to_pam_import_rewrites_refs_to_titles(minimal_manifest_path: Path) -> N
     doc = manifest.model_dump(mode="python", exclude_none=True)
     converted = to_pam_import_json(doc)
 
-    resource = converted["resources"][0]
+    resource = converted["pam_data"]["resources"][0]
     assert "uid_ref" not in resource
     assert resource["pam_configuration"] == "Acme Lab Local PAM Configuration"
     connection = resource["pam_settings"]["connection"]
@@ -45,6 +45,7 @@ def test_to_pam_import_preserves_top_metadata(minimal_manifest_path: Path) -> No
     manifest = load_manifest(minimal_manifest_path)
     doc = manifest.model_dump(mode="python", exclude_none=True)
     converted = to_pam_import_json(doc)
-    assert converted["version"] == "1"
     assert converted["project"] == manifest.name
     assert "name" not in converted
+    assert "pam_configuration" in converted
+    assert "pam_data" in converted

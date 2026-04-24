@@ -268,6 +268,15 @@ _DIFF_IGNORED_FIELDS = frozenset({
     "scripts",
     "custom_fields",
     "record_uid",
+    # SDK-only placement/linkage metadata — not record fields and never
+    # observable from Commander `get`. Keep them out of the planner diff so
+    # re-plans are clean when fields match.
+    "pam_configuration",
+    "pam_configuration_uid_ref",
+    "shared_folder",
+    "users",
+    "gateway",
+    "gateway_uid_ref",
 })
 
 

@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
+import types
+from pathlib import Path
 
 import pytest
 
@@ -46,9 +49,6 @@ def _discover_provider(
 def _resolved_tree_entries(*, project_name: str = "customer-prod") -> dict[tuple[str, ...], object]:
     return {
         ("ls", "--format", "json", "PAM Environments"): [
-            {"type": "folder", "uid": "pam-env-root", "name": "PAM Environments"}
-        ],
-        ("ls", "--format", "json", "pam-env-root"): [
             {"type": "folder", "uid": "project-folder", "name": project_name}
         ],
         ("ls", "--format", "json", "project-folder"): [
@@ -57,13 +57,38 @@ def _resolved_tree_entries(*, project_name: str = "customer-prod") -> dict[tuple
     }
 
 
+def _install_fake_write_marker(monkeypatch: pytest.MonkeyPatch, calls: list[list[str]]) -> None:
+    """`_write_marker` no longer shells out to `record-update` — it uses the
+    in-process Commander vault API. Tests pre-date this, so we fake the
+    in-process helper by recording a synthetic argv in the same shape the
+    old subprocess call would have produced."""
+    from keeper_sdk.core.metadata import MARKER_FIELD_LABEL, serialize_marker
+
+    def fake_write_marker(self, keeper_uid: str, marker: dict) -> None:
+        payload = serialize_marker(marker)
+        calls.append(
+            [
+                "record-update",
+                "--record",
+                keeper_uid,
+                "-cf",
+                f"{MARKER_FIELD_LABEL}={payload}",
+            ]
+        )
+
+    monkeypatch.setattr(CommanderCliProvider, "_write_marker", fake_write_marker)
+
+
 def _apply_recorder(
     calls: list[list[str]],
     *,
     project_name: str = "customer-prod",
     discovered_entries: object | None = None,
     get_payload: object | None = None,
+    monkeypatch: pytest.MonkeyPatch | None = None,
 ):
+    if monkeypatch is not None:
+        _install_fake_write_marker(monkeypatch, calls)
     command_map = _resolved_tree_entries(project_name=project_name)
     command_map[("ls", "resources-folder", "--format", "json")] = (
         discovered_entries
@@ -93,7 +118,7 @@ def _apply_recorder(
             return json.dumps(payload) if not isinstance(payload, str) else payload
         if args[:2] == ["record-update", "--record"]:
             return ""
-        if args[:2] == ["rm", "DEL_UID"]:
+        if args[:3] == ["rm", "--force", "DEL_UID"]:
             return ""
         raise AssertionError(f"unexpected command: {args}")
 
@@ -247,7 +272,7 @@ def test_resolve_project_resources_folder_walks_pam_environments(monkeypatch: py
     monkeypatch.setattr(
         CommanderCliProvider,
         "_run_cmd",
-        _apply_recorder(calls, project_name="customer-prod", discovered_entries=[]),
+        _apply_recorder(calls, project_name="customer-prod", discovered_entries=[], monkeypatch=monkeypatch),
     )
     provider = CommanderCliProvider(folder_uid=None)
 
@@ -257,7 +282,6 @@ def test_resolve_project_resources_folder_walks_pam_environments(monkeypatch: py
     assert provider.last_resolved_folder_uid == "resources-folder"
     assert calls == [
         ["ls", "--format", "json", "PAM Environments"],
-        ["ls", "--format", "json", "pam-env-root"],
         ["ls", "--format", "json", "project-folder"],
     ]
 
@@ -280,6 +304,7 @@ def test_apply_writes_marker_after_create(monkeypatch: pytest.MonkeyPatch) -> No
                 "fields": [],
                 "custom": [],
             },
+            monkeypatch=monkeypatch
         ),
     )
     provider = CommanderCliProvider(
@@ -306,15 +331,16 @@ def test_apply_writes_marker_after_create(monkeypatch: pytest.MonkeyPatch) -> No
 
     outcomes = provider.apply_plan(plan)
 
-    assert calls[:6] == [
+    assert calls[:7] == [
         ["pam", "project", "import", "--file", calls[0][4], "--name", "customer-prod"],
         ["ls", "--format", "json", "PAM Environments"],
-        ["ls", "--format", "json", "pam-env-root"],
+        ["ls", "--format", "json", "project-folder"],
+        ["ls", "--format", "json", "PAM Environments"],
         ["ls", "--format", "json", "project-folder"],
         ["ls", "resources-folder", "--format", "json"],
         ["get", "keeper-created-uid", "--format", "json"],
     ]
-    assert calls[6][:3] == ["record-update", "--record", "keeper-created-uid"]
+    assert calls[7][:3] == ["record-update", "--record", "keeper-created-uid"]
     assert provider.last_resolved_folder_uid == "resources-folder"
     assert outcomes[0].details["marker_written"] is True
     assert outcomes[0].details["keeper_uid"] == "keeper-created-uid"
@@ -377,7 +403,7 @@ def test_apply_skips_marker_when_record_not_discoverable(monkeypatch: pytest.Mon
     monkeypatch.setattr(
         CommanderCliProvider,
         "_run_cmd",
-        _apply_recorder(calls, project_name="customer-prod", discovered_entries=[]),
+        _apply_recorder(calls, project_name="customer-prod", discovered_entries=[], monkeypatch=monkeypatch),
     )
     provider = CommanderCliProvider(
         folder_uid="folder-uid",
@@ -426,6 +452,7 @@ def test_apply_verifies_fields_match(monkeypatch: pytest.MonkeyPatch) -> None:
                 "fields": [{"type": "host", "value": [{"hostName": "db.example.com", "port": 5432}]}],
                 "custom": [],
             },
+            monkeypatch=monkeypatch
         ),
     )
     provider = CommanderCliProvider(
@@ -460,15 +487,16 @@ def test_apply_verifies_fields_match(monkeypatch: pytest.MonkeyPatch) -> None:
 
     outcomes = provider.apply_plan(plan)
 
-    assert calls[:6] == [
+    assert calls[:7] == [
         ["pam", "project", "import", "--file", calls[0][4], "--name", "customer-prod"],
         ["ls", "--format", "json", "PAM Environments"],
-        ["ls", "--format", "json", "pam-env-root"],
+        ["ls", "--format", "json", "project-folder"],
+        ["ls", "--format", "json", "PAM Environments"],
         ["ls", "--format", "json", "project-folder"],
         ["ls", "resources-folder", "--format", "json"],
         ["get", "keeper-created-uid", "--format", "json"],
     ]
-    assert calls[6][:3] == ["record-update", "--record", "keeper-created-uid"]
+    assert calls[7][:3] == ["record-update", "--record", "keeper-created-uid"]
     assert outcomes[0].details["marker_written"] is True
     assert outcomes[0].details["verified"] is True
     assert "field_drift" not in outcomes[0].details
@@ -494,6 +522,7 @@ def test_apply_reports_field_drift(monkeypatch: pytest.MonkeyPatch) -> None:
                 ],
                 "custom": [],
             },
+            monkeypatch=monkeypatch
         ),
     )
     provider = CommanderCliProvider(
@@ -556,6 +585,7 @@ def test_apply_deletes_managed_record(monkeypatch: pytest.MonkeyPatch) -> None:
                 "fields": [],
                 "custom": [],
             },
+            monkeypatch=monkeypatch
         ),
     )
     provider = CommanderCliProvider(
@@ -589,10 +619,10 @@ def test_apply_deletes_managed_record(monkeypatch: pytest.MonkeyPatch) -> None:
 
     outcomes = provider.apply_plan(plan)
 
-    rm_index = calls.index(["rm", "DEL_UID"])
+    rm_index = calls.index(["rm", "--force", "DEL_UID"])
     import_index = next(idx for idx, call in enumerate(calls) if call[:3] == ["pam", "project", "import"])
     assert rm_index > import_index
-    assert calls[-1] == ["rm", "DEL_UID"]
+    assert calls[-1] == ["rm", "--force", "DEL_UID"]
     delete_outcome = next(outcome for outcome in outcomes if outcome.action == "delete")
     assert delete_outcome.keeper_uid == "DEL_UID"
     assert delete_outcome.details["keeper_uid"] == "DEL_UID"
@@ -667,22 +697,169 @@ def test_apply_delete_without_keeper_uid_is_skipped(monkeypatch: pytest.MonkeyPa
     assert outcomes[0].details["reason"] == "no keeper_uid on delete change"
 
 
-def test_run_cmd_raises_on_rc0_pam_import_silent_fail(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_cmd_wraps_in_process_pam_import_exception(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`pam project import` now runs in-process — a CommandError raised by
+    Commander (e.g. missing --name) must surface as a CapabilityError with
+    stdout/stderr context preserved so the CLI can display it."""
     monkeypatch.setattr("keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper")
 
-    def fake_run(*args, **kwargs):
-        return subprocess.CompletedProcess(
-            args=args[0],
-            returncode=0,
-            stdout="",
-            stderr='Project name is required - JSON property: "project": "Project 1"',
-        )
+    class _FakeCmd:
+        def execute(self, params, **kwargs):
+            print("about to fail")
+            raise RuntimeError("Project name is required")
 
-    monkeypatch.setattr("keeper_sdk.providers.commander_cli.subprocess.run", fake_run)
+    fake_module = types.SimpleNamespace(PAMProjectImportCommand=_FakeCmd)
+    monkeypatch.setitem(
+        sys.modules,
+        "keepercommander.commands.pam_import.edit",
+        fake_module,
+    )
+
     provider = CommanderCliProvider(folder_uid="folder-uid")
+    provider._keeper_params = object()  # bypass real login
 
     with pytest.raises(CapabilityError) as exc_info:
         provider._run_cmd(["pam", "project", "import", "--file", "/tmp/manifest.json"])
 
-    assert "silent-fail" in exc_info.value.reason
+    assert "in-process keeper pam project import failed" in exc_info.value.reason
     assert "Project name is required" in exc_info.value.reason
+    assert "about to fail" in exc_info.value.context["stdout"]
+
+
+def test_apply_reference_existing_splits_to_extend(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper")
+    monkeypatch.setattr("keeper_sdk.providers.commander_cli._utc_now", lambda: "2026-04-24T12:34:56Z")
+
+    calls: list[list[str]] = []
+
+    def recorder(self: CommanderCliProvider, args: list[str]) -> str:
+        calls.append(args)
+        if args == ["ls", "--format", "json", "PAM Environments"]:
+            raise CapabilityError(reason="missing")
+        if args == ["mkdir", "-uf", "PAM Environments"]:
+            return ""
+        if args == ["ls", "--format", "json", "PAM Environments/customer-prod"]:
+            if ["mkdir", "-uf", "PAM Environments/customer-prod"] not in calls:
+                raise CapabilityError(reason="missing")
+            return json.dumps(
+                [
+                    {"type": "folder", "uid": "resources-folder", "name": "customer-prod - Resources"},
+                    {"type": "folder", "uid": "users-folder", "name": "customer-prod - Users"},
+                ]
+            )
+        if args == ["mkdir", "-uf", "PAM Environments/customer-prod"]:
+            return ""
+        if args == ["ls", "--format", "json", "PAM Environments/customer-prod/customer-prod - Resources"]:
+            if not any(call[:6] == ["mkdir", "-sf", "--manage-users", "--manage-records", "--can-edit", "--can-share"] and call[-1] == "PAM Environments/customer-prod/customer-prod - Resources" for call in calls):
+                raise CapabilityError(reason="missing")
+            return json.dumps([])
+        if args == ["ls", "--format", "json", "PAM Environments/customer-prod/customer-prod - Users"]:
+            if not any(call[:6] == ["mkdir", "-sf", "--manage-users", "--manage-records", "--can-edit", "--can-share"] and call[-1] == "PAM Environments/customer-prod/customer-prod - Users" for call in calls):
+                raise CapabilityError(reason="missing")
+            return json.dumps([])
+        if args[:6] == ["mkdir", "-sf", "--manage-users", "--manage-records", "--can-edit", "--can-share"]:
+            return ""
+        if args[:4] == ["secrets-manager", "share", "add", "--app"]:
+            return ""
+        if args == ["pam", "gateway", "list"]:
+            return "\n".join(
+                [
+                    "KSM Application Name (UID)  Gateway Name  Gateway UID  Status  Gateway Version",
+                    "--------------------------  ------------  -----------  ------  ---------------",
+                    "Lab GW Application (app-uid)  Lab GW Rocky  gw-uid  ONLINE  1.7.6",
+                ]
+            )
+        if args == ["pam", "config", "list"]:
+            return "\n".join(
+                [
+                    "UID  Config Name  Config Type  Shared Folder  Gateway UID  Resource Record UIDs",
+                    "---  -----------  -----------  -------------  -----------  --------------------",
+                    "cfg-uid  LW Gateway Configuration  pamNetworkConfiguration  Lab GW Folder - Resources (folder-uid)  gw-uid  none",
+                ]
+            )
+        if args[:4] == ["pam", "project", "extend", "--config"]:
+            payload = json.loads(Path(args[6]).read_text(encoding="utf-8"))
+            assert payload == {
+                "pam_data": {
+                    "resources": [
+                        {
+                            "type": "pamMachine",
+                            "title": "db-prod",
+                            "folder_path": "customer-prod - Resources",
+                        }
+                    ]
+                }
+            }
+            return ""
+        if args == ["ls", "resources-folder", "--format", "json"]:
+            return json.dumps(
+                [
+                    {
+                        "type": "record",
+                        "uid": "keeper-created-uid",
+                        "name": "db-prod",
+                        "details": "Type: pamMachine, Description: ...",
+                    }
+                ]
+            )
+        if args == ["get", "keeper-created-uid", "--format", "json"]:
+            return json.dumps(
+                {
+                    "record_uid": "keeper-created-uid",
+                    "title": "db-prod",
+                    "type": "pamMachine",
+                    "fields": [],
+                    "custom": [],
+                }
+            )
+        if args[:2] == ["record-update", "--record"]:
+            return ""
+        raise AssertionError(f"unexpected command: {args}")
+
+    monkeypatch.setattr(CommanderCliProvider, "_run_cmd", recorder)
+    _install_fake_write_marker(monkeypatch, calls)
+    provider = CommanderCliProvider(
+        folder_uid="folder-uid",
+        manifest_source={
+            "version": "1",
+            "name": "customer-prod",
+            "gateways": [{"uid_ref": "gw", "name": "Lab GW Rocky", "mode": "reference_existing"}],
+            "pam_configurations": [
+                {
+                    "uid_ref": "cfg",
+                    "title": "Lab Rocky PAM Configuration",
+                    "environment": "local",
+                    "gateway_uid_ref": "gw",
+                }
+            ],
+            "resources": [{"uid_ref": "prod-db", "type": "pamMachine", "title": "db-prod"}],
+        },
+    )
+    plan = Plan(
+        manifest_name="customer-prod",
+        changes=[
+            Change(
+                kind=ChangeKind.CREATE,
+                uid_ref="cfg",
+                resource_type="pam_configuration",
+                title="Lab Rocky PAM Configuration",
+                after={"title": "Lab Rocky PAM Configuration"},
+            ),
+            Change(
+                kind=ChangeKind.CREATE,
+                uid_ref="prod-db",
+                resource_type="pamMachine",
+                title="db-prod",
+                after={"title": "db-prod"},
+            ),
+        ],
+        order=["cfg", "prod-db"],
+    )
+
+    outcomes = provider.apply_plan(plan)
+
+    assert any(call[:4] == ["pam", "project", "extend", "--config"] for call in calls)
+    assert provider.last_resolved_folder_uid == "resources-folder"
+    assert outcomes[0].details["reused_existing"] is True
+    assert outcomes[0].details["marker_written"] is True
+    assert outcomes[1].details["marker_written"] is True

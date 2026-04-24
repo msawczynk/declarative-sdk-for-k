@@ -273,6 +273,18 @@ def apply(
     dry_run: bool,
 ) -> None:
     """Apply a manifest via the selected provider."""
+    try:
+        manifest = load_manifest(manifest_path)
+    except SchemaError as exc:
+        click.echo(f"validation failed: {exc}", err=True)
+        sys.exit(EXIT_SCHEMA)
+    except RefError as exc:
+        click.echo(f"reference error: {exc}", err=True)
+        sys.exit(EXIT_REF)
+    except CapabilityError as exc:
+        click.echo(f"capability error: {exc}", err=True)
+        sys.exit(EXIT_CAPABILITY)
+
     plan_obj = _build_plan(ctx, manifest_path, allow_delete=allow_delete)
     if dry_run:
         click.echo(ctx.obj["renderer"].render_plan(plan_obj))
@@ -287,7 +299,7 @@ def apply(
         sys.exit(EXIT_CONFLICT)
     if not auto_approve and not dry_run:
         click.confirm("Proceed?", abort=True)
-    provider = _make_provider(ctx, manifest_path)
+    provider = _make_provider(ctx, manifest_path, manifest=manifest)
     try:
         outcomes = provider.apply_plan(plan_obj, dry_run=dry_run)
     except DeleteUnsupportedError as exc:
@@ -295,6 +307,9 @@ def apply(
         sys.exit(EXIT_CAPABILITY)
     except CapabilityError as exc:
         click.echo(f"provider error: {exc}", err=True)
+        if exc.context:
+            for key, value in exc.context.items():
+                click.echo(f"  {key}: {value}", err=True)
         sys.exit(EXIT_CAPABILITY)
     click.echo(ctx.obj["renderer"].render_outcomes(outcomes))
     sys.exit(EXIT_OK)
