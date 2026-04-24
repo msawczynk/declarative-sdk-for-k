@@ -3,11 +3,26 @@ requires = ["setuptools>=68.0", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "keeper-declarative-sdk"
+name = "pamform"
 version = "1.0.0"
-description = "Declarative lifecycle (validate / export / plan / diff / apply) for Keeper PAM."
-requires-python = ">=3.10"
+description = "Declarative lifecycle (validate / export / plan / diff / apply) for PAM resources, agent- and LLM-friendly by design."
+requires-python = ">=3.11"
 readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "pamform contributors" }]
+keywords = ["pam", "declarative", "iac", "agents", "llm", "terraform-like"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+    "Topic :: System :: Systems Administration",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+]
 dependencies = [
     "click>=8.1",
     "pydantic>=2.0",
@@ -15,7 +30,13 @@ dependencies = [
     "pyyaml>=6.0",
     "rich>=13.0",
     "jsonschema>=4.21",
+    "keepercommander>=17.2.13,<18",
 ]
+
+[project.urls]
+Homepage = "https://github.com/OWNER/pamform"
+Issues = "https://github.com/OWNER/pamform/issues"
+Documentation = "https://github.com/OWNER/pamform#readme"
 
 [project.optional-dependencies]
 dev = [
@@ -26,6 +47,8 @@ dev = [
 ]
 
 [project.scripts]
+pamform = "keeper_sdk.cli:main"
+# Backwards-compat alias (pre-v1 callers / CI scripts); will be removed in v2.
 keeper-sdk = "keeper_sdk.cli:main"
 
 [tool.setuptools]
@@ -39,11 +62,11 @@ exclude = ["tests*"]
 "keeper_sdk.core.schemas" = ["*.json"]
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.11"
 ignore_missing_imports = true
 
 [tool.ruff]
-target-version = "py310"
+target-version = "py311"
 line-length = 100
 
 [tool.ruff.lint]

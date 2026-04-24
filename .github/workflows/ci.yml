@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff
+      - run: ruff check .
+      - run: ruff format --check .
+
+  typecheck:
+    name: typecheck (mypy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+      - run: mypy keeper_sdk
+
+  test:
+    name: test (py${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install -e ".[dev]"
+      - run: pytest -q --cov=keeper_sdk --cov-report=term-missing
+        env:
+          # Offline-only; live-smoke against a real tenant runs via
+          # scripts/smoke/smoke.py in a separate, credential-bearing
+          # workflow (not in public CI).
+          PAMFORM_CI: "1"
+
+  build:
+    name: build (sdist + wheel)
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck, test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install build twine
+      - run: python -m build
+      - run: twine check dist/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/*

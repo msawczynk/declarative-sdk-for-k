@@ -236,24 +236,36 @@ resources:
 # ---------------------------------------------------------------------------
 # H5: _get_keeper_params failure branches
 
-def test_get_keeper_params_missing_env_var(monkeypatch: pytest.MonkeyPatch) -> None:
-    """L806-811."""
+def test_get_keeper_params_no_helper_falls_back_to_env_helper(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When KEEPER_SDK_LOGIN_HELPER is unset the provider falls back to
+    :class:`EnvLoginHelper`, which raises a specific `missing env vars`
+    message listing KEEPER_EMAIL / KEEPER_PASSWORD / KEEPER_TOTP_SECRET.
+    Previously this path required the helper env var unconditionally
+    (v0.x behaviour) — breaking every adopter who wasn't the author.
+    """
     provider = _make_provider(monkeypatch)
     monkeypatch.delenv("KEEPER_SDK_LOGIN_HELPER", raising=False)
+    for var in ("KEEPER_EMAIL", "KEEPER_PASSWORD", "KEEPER_TOTP_SECRET"):
+        monkeypatch.delenv(var, raising=False)
     with pytest.raises(CapabilityError) as exc:
         provider._get_keeper_params()
-    assert "KEEPER_SDK_LOGIN_HELPER" in exc.value.reason
+    assert "EnvLoginHelper" in exc.value.reason
+    assert "KEEPER_EMAIL" in exc.value.reason
 
 
 def test_get_keeper_params_helper_path_missing(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
 ) -> None:
-    """L812-817."""
+    """An explicit but missing helper path is loud: we do NOT fall back
+    to ``EnvLoginHelper`` in that case — the operator clearly intended
+    to override the default."""
     provider = _make_provider(monkeypatch)
     monkeypatch.setenv("KEEPER_SDK_LOGIN_HELPER", str(tmp_path / "nope.py"))
     with pytest.raises(CapabilityError) as exc:
         provider._get_keeper_params()
-    assert "non-existent" in exc.value.reason
+    assert "login helper path not found" in exc.value.reason
 
 
 def test_get_keeper_params_after_prior_failure_refuses_retry(

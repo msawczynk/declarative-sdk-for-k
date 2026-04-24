@@ -797,35 +797,45 @@ class CommanderCliProvider(Provider):
             )
         self._keeper_login_attempted = True
 
-        # Require an explicit helper path. The helper must expose
-        # ``load_keeper_creds()`` and ``keeper_login(email, password, totp)``
-        # — see ``keeper-vault-rbi-pam-testenv/scripts/deploy_watcher.py`` in
-        # the acme lab for the canonical implementation. A prior version of
-        # this code fell back to a workstation-local path; that is unsafe as
-        # library behaviour.
+        # Resolution order:
+        # 1. If KEEPER_SDK_LOGIN_HELPER points at a Python file, use it
+        #    (custom flows — KSM, HSM-backed TOTP, device-approval queue).
+        # 2. Otherwise fall back to the in-tree EnvLoginHelper reading
+        #    KEEPER_EMAIL / KEEPER_PASSWORD / KEEPER_TOTP_SECRET.
+        # The KEEPER_SDK_LOGIN_HELPER path is validated but the env-var
+        # fallback kicks in only when the var is unset — an operator
+        # pointing at a missing file gets a loud error (the point of
+        # setting the var is to say "do not use the default").
+        from keeper_sdk.auth import EnvLoginHelper, load_helper_from_path
+
         helper_path = os.environ.get("KEEPER_SDK_LOGIN_HELPER")
-        if not helper_path:
-            raise CapabilityError(
-                reason="in-process Commander login requires KEEPER_SDK_LOGIN_HELPER to point at a Python helper exposing load_keeper_creds() + keeper_login()",
-                next_action="export KEEPER_SDK_LOGIN_HELPER=/abs/path/to/deploy_watcher.py (or equivalent) and retry",
-            )
-        candidate = Path(helper_path)
-        if not candidate.is_file():
-            raise CapabilityError(
-                reason=f"KEEPER_SDK_LOGIN_HELPER points at a non-existent file: {candidate}",
-                next_action="correct the path or remove the env var",
-            )
         try:
-            spec = importlib.util.spec_from_file_location("_sdk_deploy_watcher", candidate)
-            module = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
-            assert spec and spec.loader
-            spec.loader.exec_module(module)  # type: ignore[union-attr]
-            email, password, totp_secret = module.load_keeper_creds()
-            params = module.keeper_login(email, password, totp_secret)
+            helper = (
+                load_helper_from_path(helper_path)
+                if helper_path
+                else EnvLoginHelper()
+            )
+            creds = helper.load_keeper_creds()
+            email = creds["email"] if isinstance(creds, dict) else creds[0]
+            password = creds["password"] if isinstance(creds, dict) else creds[1]
+            totp_secret = (
+                creds["totp_secret"] if isinstance(creds, dict) else creds[2]
+            )
+            extra = {
+                k: v
+                for k, v in (creds.items() if isinstance(creds, dict) else [])
+                if k not in {"email", "password", "totp_secret"}
+            }
+            params = helper.keeper_login(email, password, totp_secret, **extra)
+        except CapabilityError:
+            raise
         except Exception as exc:
             raise CapabilityError(
                 reason=f"in-process Commander login failed: {type(exc).__name__}: {exc}",
-                next_action="verify KSM token + admin cred record are reachable",
+                next_action=(
+                    "verify credentials are reachable; see docs/LOGIN.md for the "
+                    "helper contract + a 30-line skeleton"
+                ),
             ) from exc
         self._keeper_params = params
         return params

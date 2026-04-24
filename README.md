@@ -1,17 +1,25 @@
-# keeper-declarative-sdk
+# pamform
 
-Reference implementation of the Keeper PAM declarative design shipped in
-[`keeper-pam-declarative/`](../keeper-pam-declarative/). Pure Python, no
-Commander imports, no network I/O in the core.
+Declarative lifecycle (validate / export / plan / diff / apply) for PAM
+resources — agent- and LLM-friendly by design. Pure Python core, no
+network I/O until you reach a provider.
+
+**If you are an agent or LLM**: start at [`AGENTS.md`](AGENTS.md) for
+the command table, exit-code contract, and JSON shapes. This README is
+optimised for humans.
 
 ```
-keeper_sdk/
-  core/           # pure models, schema, graph, diff, planner, metadata, redact
-    schemas/      # packaged pam-environment.v1.schema.json
-  providers/      # MockProvider, CommanderCliProvider (subprocess-backed)
-  cli/            # `keeper-sdk` (validate / export / plan / diff / apply)
-tests/            # pytest suite; reuses the authoritative fixtures in
-                  # ../keeper-pam-declarative/examples
+keeper_sdk/                          # import path stays stable in 1.x
+  core/                              # pure models, schema, graph, diff, planner, metadata, redact
+    schemas/                         # packaged pam-environment.v1.schema.json
+  providers/                         # MockProvider, CommanderCliProvider
+  auth/                              # LoginHelper protocol + EnvLoginHelper reference impl
+  cli/                               # `pamform` (validate / export / plan / diff / apply / import)
+tests/                               # 106 tests; reuses examples/ fixtures
+docs/
+  AGENTS.md                          # agent-first operating manual
+  COMMANDER.md                       # pinned Commander version + capability matrix
+  LOGIN.md                           # login helper contract + 30-line skeleton
 ```
 
 ## Install
@@ -20,24 +28,33 @@ tests/            # pytest suite; reuses the authoritative fixtures in
 pip install -e '.[dev]'
 ```
 
-Requires Python 3.10+. `jsonschema` is used when available; the core falls
-back to typed-model validation when it isn't.
+Requires Python 3.11+. `jsonschema` ships pinned. `keepercommander`
+17.2.13+ is pulled in automatically — only used when you hit the
+`commander` provider; mock provider works standalone.
 
-## Quick start
+## Quick start (offline, mock provider)
 
 ```bash
-# 1. validate (schema + typed models + semantic rules)
-keeper-sdk validate ../keeper-pam-declarative/examples/minimal/environment.yaml
-
-# 2. plan against the MockProvider (deterministic, in-memory)
-keeper-sdk plan ../keeper-pam-declarative/examples/minimal/environment.yaml
-
-# 3. apply (dry-run-first-friendly, idempotent; second apply is clean)
-keeper-sdk apply ../keeper-pam-declarative/examples/minimal/environment.yaml --auto-approve
-
-# 4. lift a Commander export into a manifest
-keeper-sdk export path/to/pam-project-export.json --output env.yaml
+pamform validate examples/minimal/environment.yaml
+pamform plan examples/minimal/environment.yaml
+pamform apply examples/minimal/environment.yaml --auto-approve
 ```
+
+## Quick start (live tenant)
+
+```bash
+export KEEPER_EMAIL='you@example.com'
+export KEEPER_PASSWORD='...'
+export KEEPER_TOTP_SECRET='JBSWY3DPEHPK3PXP'      # base32 secret, NOT a 6-digit code
+export KEEPER_DECLARATIVE_FOLDER='<shared-folder-uid>'
+
+pamform --provider commander validate examples/minimal/environment.yaml --online
+pamform --provider commander plan     examples/minimal/environment.yaml
+pamform --provider commander apply    examples/minimal/environment.yaml --auto-approve
+```
+
+See `docs/LOGIN.md` for custom login flows (KSM pull, HSM-backed TOTP,
+device-approval queues, …).
 
 ## Status (sdk-completion branch, as of 2026-04-24)
 
