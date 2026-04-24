@@ -158,12 +158,4 @@ performance smoke.
 CLI smokes exercise `validate`, `export`, `plan` exit codes (`0`/`2`/`4`),
 `apply --dry-run` equivalence to `plan`, and JSON output.
 
-## Relationship to `keeper-pam-declarative/`
 
-The sibling package is the **design of record**: schema, documentation,
-invalid fixtures, architecture, and delivery plan. This SDK implements that
-design. When the contract changes, update the sibling first, then re-copy
-the schema and marker contract (including `MANAGER_NAME =
-"keeper-pam-declarative"`), then re-copy
-`manifests/pam-environment.v1.schema.json` into
-`keeper_sdk/core/schemas/pam-environment.v1.schema.json`.
