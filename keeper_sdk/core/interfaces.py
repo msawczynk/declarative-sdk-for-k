@@ -4,10 +4,12 @@ The declarative core is I/O-free. Real providers (Commander, mock, Terraform,
 service) implement these Protocols; the core consumes them to execute plans.
 """
 
+# ruff: noqa: UP037
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Protocol, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
     from keeper_sdk.core.planner import Plan
@@ -71,6 +73,9 @@ class Renderer(Protocol):
     """Formats plans / diffs / outcomes for humans or machines."""
 
     def render_plan(self, plan: "Plan") -> str:
+        ...
+
+    def render_diff(self, plan: "Plan") -> str:
         ...
 
     def render_outcomes(self, outcomes: list[ApplyOutcome]) -> str:
