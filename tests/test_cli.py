@@ -185,3 +185,76 @@ def test_apply_dry_run_equivalent_to_plan(
     result_apply = _run(["apply", str(minimal_manifest_path), "--dry-run"])
     assert result_apply.exit_code == expected_exit, result_apply.output
     assert result_plan.output == result_apply.output
+
+
+def test_import_adopts_unmanaged_title_match(
+    minimal_manifest_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest = load_manifest(minimal_manifest_path)
+    provider = MockProvider(manifest.name)
+    provider.seed(
+        [
+            LiveRecord(
+                keeper_uid="LIVE_UID",
+                title="lab-linux-1",
+                resource_type="pamMachine",
+                payload={"title": "lab-linux-1", "host": "10.16.9.10"},
+                marker=None,
+            )
+        ]
+    )
+
+    monkeypatch.setattr(cli_main_module, "MockProvider", lambda manifest_name: provider)
+
+    result = _run(["import", str(minimal_manifest_path), "--auto-approve"])
+    assert result.exit_code == 0, result.output
+
+    adopted = next(record for record in provider.discover() if record.keeper_uid == "LIVE_UID")
+    assert adopted.marker is not None
+    assert adopted.marker["uid_ref"] == "acme-lab-linux1"
+    assert adopted.marker["manifest"] == manifest.name
+
+
+def test_import_noop_when_nothing_to_adopt(
+    minimal_manifest_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest = load_manifest(minimal_manifest_path)
+    provider = MockProvider(manifest.name)
+    graph = build_graph(manifest)
+    order = execution_order(graph)
+    provider.apply_plan(build_plan(manifest.name, compute_diff(manifest, provider.discover()), order))
+
+    monkeypatch.setattr(cli_main_module, "MockProvider", lambda manifest_name: provider)
+
+    result = _run(["import", str(minimal_manifest_path), "--auto-approve"])
+    assert result.exit_code == 0, result.output
+    assert "no records to adopt." in result.output
+
+
+def test_import_dry_run_does_not_mutate(
+    minimal_manifest_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest = load_manifest(minimal_manifest_path)
+    provider = MockProvider(manifest.name)
+    provider.seed(
+        [
+            LiveRecord(
+                keeper_uid="LIVE_UID",
+                title="lab-linux-1",
+                resource_type="pamMachine",
+                payload={"title": "lab-linux-1", "host": "10.16.9.10"},
+                marker=None,
+            )
+        ]
+    )
+
+    monkeypatch.setattr(cli_main_module, "MockProvider", lambda manifest_name: provider)
+
+    result = _run(["import", str(minimal_manifest_path), "--dry-run"])
+    assert result.exit_code == 0, result.output
+
+    live = next(record for record in provider.discover() if record.keeper_uid == "LIVE_UID")
+    assert live.marker is None

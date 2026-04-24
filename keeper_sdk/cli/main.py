@@ -4,6 +4,7 @@ Subcommands:
     validate   - schema + typed-model validation
     export     - Commander JSON export -> declarative YAML manifest
     plan       - compute and render an execution plan
+    import     - adopt unmanaged matching records and write ownership markers
     diff       - plan + field-by-field render
     apply      - execute a plan via the selected provider
 
@@ -28,6 +29,7 @@ import click
 from keeper_sdk.cli.renderer import RichRenderer
 from keeper_sdk.core import (
     CapabilityError,
+    ChangeKind,
     DeleteUnsupportedError,
     ManifestError,
     OwnershipError,
@@ -202,6 +204,58 @@ def diff(ctx: click.Context, manifest_path: Path, allow_delete: bool) -> None:
     sys.exit(_exit_from_plan(plan_obj))
 
 
+@main.command(name="import")
+@click.argument("manifest_path", type=click.Path(exists=True, path_type=Path))
+@click.option("--auto-approve", is_flag=True)
+@click.option("--dry-run", is_flag=True, help="Show what would be adopted without writing markers")
+@click.pass_context
+def import_(
+    ctx: click.Context,
+    manifest_path: Path,
+    auto_approve: bool,
+    dry_run: bool,
+) -> None:
+    """Adopt unmanaged live records matching the manifest (writes ownership markers).
+
+    Shows the adoption plan first, then writes markers only after confirmation.
+    """
+    manifest, order, live = _load_plan_context(ctx, manifest_path)
+    try:
+        changes = compute_diff(manifest, live, adopt=True)
+    except OwnershipError as exc:
+        click.echo(f"ownership error: {exc}", err=True)
+        sys.exit(EXIT_CAPABILITY)
+
+    adopt_changes = [
+        change
+        for change in changes
+        if change.kind is ChangeKind.UPDATE and "adoption" in (change.reason or "")
+    ]
+    plan_obj = build_plan(manifest.name, adopt_changes, order)
+
+    click.echo(ctx.obj["renderer"].render_plan(plan_obj))
+    if plan_obj.is_clean:
+        click.echo("no records to adopt.")
+        sys.exit(EXIT_OK)
+    if dry_run:
+        sys.exit(EXIT_OK)
+    if not auto_approve:
+        click.confirm("Proceed?", abort=True)
+
+    provider = _make_provider(ctx, manifest_path, manifest=manifest)
+    try:
+        outcomes = provider.apply_plan(plan_obj, dry_run=False)
+    except DeleteUnsupportedError as exc:
+        click.echo(f"delete unsupported: {exc}", err=True)
+        sys.exit(EXIT_CAPABILITY)
+    except CapabilityError as exc:
+        click.echo(f"provider error: {exc}", err=True)
+        sys.exit(EXIT_CAPABILITY)
+
+    click.echo(ctx.obj["renderer"].render_outcomes(outcomes))
+    sys.exit(EXIT_OK)
+
+
 # ---------------------------------------------------------------------------
 # apply
 
@@ -250,6 +304,17 @@ def apply(
 # shared helpers
 
 def _build_plan(ctx: click.Context, manifest_path: Path, *, allow_delete: bool) -> Plan:
+    manifest, order, live = _load_plan_context(ctx, manifest_path)
+    try:
+        changes = compute_diff(manifest, live, allow_delete=allow_delete)
+    except OwnershipError as exc:
+        click.echo(f"ownership error: {exc}", err=True)
+        sys.exit(EXIT_CAPABILITY)
+
+    return build_plan(manifest.name, changes, order)
+
+
+def _load_plan_context(ctx: click.Context, manifest_path: Path):
     try:
         manifest = load_manifest(manifest_path)
     except SchemaError as exc:
@@ -276,13 +341,7 @@ def _build_plan(ctx: click.Context, manifest_path: Path, *, allow_delete: bool) 
         click.echo(f"discovery failed: {exc}", err=True)
         sys.exit(EXIT_CAPABILITY)
 
-    try:
-        changes = compute_diff(manifest, live, allow_delete=allow_delete)
-    except OwnershipError as exc:
-        click.echo(f"ownership error: {exc}", err=True)
-        sys.exit(EXIT_CAPABILITY)
-
-    return build_plan(manifest.name, changes, order)
+    return manifest, order, live
 
 
 def _make_provider(ctx: click.Context, manifest_path: Path, *, manifest=None):
