@@ -1,5 +1,39 @@
 # SDK completion audit — 2026-04-24
 
+## 2026-04-24 (late) — devil's-advocate follow-through on sdk-completion @ 2517467
+
+Resolved criticals from the 2026-04-24 audit:
+
+- **C1 (README delete lie)** — README now reflects reality: deletion via
+  `keeper rm` has been wired for weeks, scoped to marker-owned records,
+  gated on `--allow-delete`. Only rotation / JIT / gateway `mode: create`
+  remain deferred and are called out as plan-surface CONFLICTs.
+- **C2 (examples hit the guard)** — examples are still valid inputs; the
+  guard no longer crashes at apply, it generates plan conflicts pointing
+  at the exact Commander hook. Operators see the gap during `plan` and
+  remove fields (or switch to `--provider mock`) before committing.
+- **C3 (plan != apply)** — `unsupported_capabilities(manifest)` is now a
+  `Provider` protocol method. `_build_plan` invokes it on every plan /
+  diff / apply, converting each gap into a `ChangeKind.CONFLICT` row.
+  `plan` / `apply --dry-run` / `apply` now produce identical
+  capability reports, as `DELIVERY_PLAN.md` L94 requires.
+
+Resolved high-priority test gaps (H-series, new file `tests/test_h_series_gaps.py`):
+
+- H1  `_run_cmd` non-zero exit → `CapabilityError` (rc/stdout/stderr preserved)
+- H1b `_run_cmd` silent-fail detector (whitelisted verbs + stderr markers)
+- H2  post-apply `CollisionError` when `discover` returns dupes
+- H3  CLI `apply` exits 4 when conflicts exist without `--allow-delete`
+- H4  `compute_diff` raises `OwnershipError` on unsupported marker version
+- H5  `_get_keeper_params`: missing env var / bad path / prior failure
+- H6  C3 contract — CONFLICT rows appear in `plan --json` + `apply --dry-run`
+
+106/106 tests green (was 97). `main` still untouched.
+
+---
+
+# SDK completion audit — 2026-04-24
+
 This document records the `sdk-completion` branch landing, 20 tasks (W1–W20),
 and the reconciliation against the design-of-record at
 `../keeper-pam-declarative/`. It is intended for reviewers and future agents
