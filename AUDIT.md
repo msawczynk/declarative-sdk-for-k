@@ -172,4 +172,13 @@ End-to-end drill against `msawczyn+lab@acme-demo.com` is **GREEN**
 - D-5: `../keeper-pam-declarative/NOTES_FROM_SDK.md` filed (7 items).
 - D-6: +13 tests → 95; plus +2 D-4-guard tests → **97 total**.
 - D-7: `docs/COMMANDER.md` pinned to release HEAD.
-- No live-smoke re-run in this pass; expected-green (refactor only).
+- **Live-smoke re-run on `sdk-completion @ 0d97ef0`: GREEN.**
+  `create → verify → destroy` cycle clean against `msawczyn+lab@acme-demo.com`.
+  Scaffold (PAM Environments / customer-prod / Resources + Users) +
+  reference-existing `lab-cfg` pam_configuration reused (`marker_written=True`,
+  `reused_existing=True`, `verified=True`) + 2 `pamMachine` records created
+  with markers; `smoke-testuser2` re-plan = 3 noop; `--allow-delete`
+  empty-manifest plan = 2 deletes; apply removed both via `rm --force`.
+  `SMOKE PASSED`. All refactoring (D-1..D-3 partial split, D-2 diff
+  decomposition, D-3 JSON migration, D-4 capability guards) ships without
+  regression against the live tenant.
