@@ -18,13 +18,22 @@ This smoke is an autonomous, no-human-input proof that the SDK can plan -> apply
 |------|---------|------------------|
 | `identity.py` | Bootstraps the live identities: admin login via KSM-backed lab helpers, plus idempotent `testuser2` TOTP provisioning and Commander config reuse. | `admin_login()`, `ensure_sdktest_identity()`, `sdktest_keeper_args()`, `main()` |
 | `sandbox.py` | Ensures the reusable shared-folder sandbox and KSM app exist, are shared correctly, and can tear down only SDK-managed records. | `ensure_sandbox()`, `record_count()`, `teardown_records()`, `teardown_sandbox()`, `main()` |
-| `smoke.py` | Orchestrates the live end-to-end smoke: pre-clean, manifest generation, validate/plan/apply, live verification, destroy, and failure cleanup. | `run_smoke()`, `main()` |
+| `scenarios.py` | Registry of resource shapes the smoke can exercise. Each `ScenarioSpec` supplies a manifest fragment builder and a post-apply verifier; the runner is resource-type-agnostic. | `get()`, `names()`, `all_scenarios()` |
+| `smoke.py` | Orchestrates the live end-to-end smoke: pre-clean, manifest generation, validate/plan/apply, live verification, destroy, and failure cleanup. Scenario-aware via `--scenario`. | `run_smoke()`, `main()` |
 
 ## One-command run
 
 ```bash
-python3 scripts/smoke/smoke.py
+python3 scripts/smoke/smoke.py                          # pamMachine (default)
+python3 scripts/smoke/smoke.py --scenario pamDatabase   # Postgres cycle
+python3 scripts/smoke/smoke.py --scenario pamDirectory  # OpenLDAP cycle
+python3 scripts/smoke/smoke.py --scenario pamRemoteBrowser
 ```
+
+Registered scenarios live in `scripts/smoke/scenarios.py`. Every scenario
+is unit-tested offline (`tests/test_smoke_scenarios.py`) — schema,
+typed-model, and planner all run without a tenant, so scenario drift
+is caught before you burn a tenant round-trip.
 
 Exit codes come from `smoke.py::main()`:
 

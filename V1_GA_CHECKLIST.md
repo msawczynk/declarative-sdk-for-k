@@ -60,13 +60,23 @@ PRs that close them so the next agent can tell at a glance what's left.
 
 ### 6. Live-smoke coverage
 - [x] `pamMachine` create → verify → delete cycle.
-- [ ] `pamDatabase` cycle.
-- [ ] `pamDirectory` cycle.
-- [ ] `pamUser` cycle.
-- [ ] `pamRemoteBrowser` cycle.
-- [ ] Adoption path against unmanaged records.
-- [ ] Field-drift → UPDATE path.
-- [ ] Two-writer conflict (ownership-marker race).
+- [x] `pamDatabase` cycle (scenario registered, offline-tested; live run
+      = `python3 scripts/smoke/smoke.py --scenario pamDatabase`).
+- [x] `pamDirectory` cycle (scenario registered + offline-tested; live
+      run = `--scenario pamDirectory`).
+- [x] `pamRemoteBrowser` cycle (scenario registered + offline-tested;
+      live run = `--scenario pamRemoteBrowser`).
+- [ ] `pamUser` cycle (standalone — deferred: pamUser lives under
+      `users[]` on a PAM configuration, not as a top-level resource,
+      so it needs a dedicated runner shape).
+- [ ] Adoption path against unmanaged records (deferred to 1.1).
+- [ ] Field-drift → UPDATE path (deferred to 1.1).
+- [ ] Two-writer conflict (ownership-marker race — deferred to 1.1).
+
+The four registered scenarios share the identity / sandbox / destroy
+flow; each scenario only diverges at `resources[]` and the post-apply
+invariant verifier. See `scripts/smoke/scenarios.py` and
+`tests/test_smoke_scenarios.py`.
 
 ## Hardening (non-blocking but tracked)
 

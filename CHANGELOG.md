@@ -7,6 +7,13 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- `scripts/smoke/scenarios.py` — registered live-smoke matrix
+  (`pamMachine`, `pamDatabase`, `pamDirectory`, `pamRemoteBrowser`).
+  `smoke.py` now accepts `--scenario NAME`; the identity / sandbox /
+  destroy flow is invariant across scenarios. Unit tests in
+  `tests/test_smoke_scenarios.py` validate each scenario against the
+  offline schema + typed-model + planner stack so drift is caught
+  without a tenant round-trip.
 - `Provider.check_tenant_bindings(manifest) -> list[str]` protocol
   method. `validate --online` stage 5 now calls it and exits
   `EXIT_CAPABILITY` (`5`) on any returned issue. Commander

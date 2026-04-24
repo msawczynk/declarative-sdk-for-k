@@ -23,6 +23,7 @@ if str(SCRIPT_DIR) not in sys.path:
 # ruff: noqa: E402 - sys.path bootstrap above must precede these imports
 import identity
 import sandbox
+import scenarios as smoke_scenarios
 
 from keeper_sdk.core.diff import compute_diff
 from keeper_sdk.core.graph import build_graph, execution_order
@@ -34,12 +35,26 @@ from keeper_sdk.providers.commander_cli import CommanderCliProvider
 
 log = logging.getLogger("sdk_smoke.smoke")
 
-RESOURCE_TITLES = ("sdk-smoke-host-1", "sdk-smoke-host-2")
 GATEWAY_UID_REF = "lab-gw"
 GATEWAY_NAME = "Lab GW Rocky"
 PAM_CONFIG_UID_REF = "lab-cfg"
 PAM_CONFIG_TITLE = "Lab Rocky PAM Configuration"
 SMOKE_PROJECT_NAME = "sdk-smoke-testuser2"
+DEFAULT_SCENARIO_NAME = "pamMachine"
+TITLE_PREFIX = "sdk-smoke"
+
+# Set by ``main`` based on ``--scenario``; default is pamMachine so the
+# legacy one-command invocation (``python3 scripts/smoke/smoke.py``)
+# continues to exercise the baseline two-host cycle unchanged.
+_ACTIVE_SCENARIO: smoke_scenarios.ScenarioSpec = smoke_scenarios.get(DEFAULT_SCENARIO_NAME)
+
+
+def _active_resources() -> list[dict[str, Any]]:
+    return _ACTIVE_SCENARIO.build_resources(PAM_CONFIG_UID_REF, TITLE_PREFIX)
+
+
+def _active_titles() -> list[str]:
+    return [str(res["title"]) for res in _active_resources()]
 
 
 class SmokeError(Exception):
@@ -173,21 +188,26 @@ def run_smoke(
         raise SmokeError("provider did not cache the resolved Resources shared-folder UID")
 
     live = prov.discover()
+    expected_titles = set(_active_titles())
+    expected_count = len(expected_titles)
     owned = [
         record
         for record in live
-        if record.resource_type == "pamMachine"
-        and record.title in RESOURCE_TITLES
+        if record.resource_type == _ACTIVE_SCENARIO.resource_type
+        and record.title in expected_titles
         and record.marker
         and record.marker.get("manager") == MANAGER_NAME
     ]
-    expected_count = 2
     if len(owned) != expected_count:
         raise SmokeError(
-            f"expected {expected_count} SDK-managed pamMachine records, found {len(owned)}; "
-            f"live={_live_summary(live)}"
+            f"expected {expected_count} SDK-managed {_ACTIVE_SCENARIO.resource_type} records, "
+            f"found {len(owned)}; live={_live_summary(live)}"
         )
-    _mark(state, "marker verification OK")
+    try:
+        _ACTIVE_SCENARIO.verify(owned)
+    except AssertionError as exc:
+        raise SmokeError(f"scenario post-apply verifier failed: {exc}") from exc
+    _mark(state, f"marker verification OK ({_ACTIVE_SCENARIO.name})")
 
     rc_plan2 = _sdk_allow([0], ["plan", str(manifest_path)], env=env)
     if rc_plan2 != 0:
@@ -225,32 +245,9 @@ def run_smoke(
 
 def _write_manifest(sf_uid: str) -> Path:
     document = _base_manifest(sf_uid)
-    document["resources"] = [
-        {
-            "uid_ref": "sdk-smoke-host-1",
-            "type": "pamMachine",
-            "title": "sdk-smoke-host-1",
-            "pam_configuration_uid_ref": PAM_CONFIG_UID_REF,
-            "shared_folder": "resources",
-            "host": "10.0.0.201",
-            "port": "22",
-            "ssl_verification": True,
-            "operating_system": "Linux",
-        },
-        {
-            "uid_ref": "sdk-smoke-host-2",
-            "type": "pamMachine",
-            "title": "sdk-smoke-host-2",
-            "pam_configuration_uid_ref": PAM_CONFIG_UID_REF,
-            "shared_folder": "resources",
-            "host": "10.0.0.202",
-            "port": "22",
-            "ssl_verification": True,
-            "operating_system": "Linux",
-        },
-    ]
+    document["resources"] = _active_resources()
     _preflight_manifest(document)
-    return _write_temp_manifest(document, suffix=".smoke.yaml")
+    return _write_temp_manifest(document, suffix=f".smoke-{_ACTIVE_SCENARIO.name}.yaml")
 
 
 def _write_empty_manifest(sf_uid: str) -> Path:
@@ -496,6 +493,17 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
         help="logger level for sdk_smoke.smoke",
     )
+    parser.add_argument(
+        "--scenario",
+        default=DEFAULT_SCENARIO_NAME,
+        choices=smoke_scenarios.names(),
+        help=(
+            "Which resource shape to exercise. Each scenario uses the "
+            "same identity+sandbox+destroy flow; only the resources[] "
+            "payload + post-apply verifier differ. See "
+            "scripts/smoke/scenarios.py for the registry."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -503,6 +511,9 @@ def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
     log.setLevel(getattr(logging, args.log_level))
+    global _ACTIVE_SCENARIO
+    _ACTIVE_SCENARIO = smoke_scenarios.get(args.scenario)
+    log.info("smoke scenario: %s — %s", _ACTIVE_SCENARIO.name, _ACTIVE_SCENARIO.description)
     state: dict[str, Any] = {"passed": []}
     exit_code = 0
     needs_cleanup = False
