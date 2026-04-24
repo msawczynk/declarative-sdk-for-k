@@ -278,6 +278,10 @@ def _extract_marker_field(item: dict[str, Any]) -> str | None:
 
 
 def _loads_json(payload: str, *, command: str) -> Any:
+    # Commander 17.x emits empty output when listing an empty folder or empty
+    # app list — treat that as [] so idempotent callers work on fresh sandboxes.
+    if not payload or not payload.strip():
+        return []
     try:
         return json.loads(payload)
     except ValueError as exc:

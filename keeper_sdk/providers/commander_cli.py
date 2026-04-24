@@ -325,6 +325,10 @@ def _port_value(value: Any) -> Any:
 
 
 def _load_json(payload: str, *, command: str) -> Any:
+    # Commander 17.x emits an empty string when listing an empty folder;
+    # treat that as an empty list so discover() on a fresh sandbox works.
+    if not payload or not payload.strip():
+        return []
     try:
         return json.loads(payload)
     except ValueError as exc:
