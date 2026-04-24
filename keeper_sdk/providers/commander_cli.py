@@ -9,16 +9,15 @@ Commands used:
     keeper pam project import --file <manifest>.pam_import.json
     keeper pam project extend --file <manifest>.pam_import.json
     keeper pam project export --folder <uid>
+    keeper rm <uid>
 
 The provider:
     1. Exports the target folder (if configured) and parses records.
     2. Decodes ownership markers from the custom field.
     3. Applies plans by writing a temp ``pam_import`` JSON document and
        invoking ``keeper pam project import`` or ``extend``.
-
-NOTE: Deletion is not yet supported end-to-end by Commander's declarative
-commands; DELETE changes will be reported back as unsupported outcomes so the
-operator can act explicitly.
+    4. Deletes records via ``keeper rm <uid>``; ``compute_diff`` restricts
+       deletes to records whose ownership marker matches ``MANAGER_NAME``.
 """
 
 from __future__ import annotations
@@ -43,6 +42,8 @@ from keeper_sdk.core.metadata import (
 )
 from keeper_sdk.core.normalize import to_pam_import_json
 from keeper_sdk.core.planner import Plan
+
+_DELETE_UNSUPPORTED_ERROR = DeleteUnsupportedError
 
 
 class CommanderCliProvider(Provider):
@@ -169,15 +170,53 @@ class CommanderCliProvider(Provider):
                     else:
                         outcome.details["verified"] = True
 
-        if deletes:
-            raise DeleteUnsupportedError(
-                reason="Commander declarative apply does not support deletion yet",
-                next_action=(
-                    "remove the records manually (e.g. `keeper record-delete <uid>`) or rerun "
-                    "without --allow-delete"
-                ),
-                context={"pending_deletes": [c.keeper_uid for c in deletes]},
+        for change in deletes:
+            if not change.keeper_uid:
+                outcomes.append(
+                    ApplyOutcome(
+                        uid_ref=change.uid_ref or "",
+                        keeper_uid="",
+                        action="delete",
+                        details={
+                            "skipped": True,
+                            "reason": "no keeper_uid on delete change",
+                            "warning": "dependency checks are enforced by Keeper CLI/server, not client-side",
+                        },
+                    )
+                )
+                continue
+
+            if dry_run:
+                outcomes.append(
+                    ApplyOutcome(
+                        uid_ref=change.uid_ref or "",
+                        keeper_uid=change.keeper_uid,
+                        action="delete",
+                        details={
+                            "dry_run": True,
+                            "keeper_uid": change.keeper_uid,
+                            "warning": "dependency checks are enforced by Keeper CLI/server, not client-side",
+                        },
+                    )
+                )
+                continue
+
+            outcome = ApplyOutcome(
+                uid_ref=change.uid_ref or "",
+                keeper_uid=change.keeper_uid,
+                action="delete",
+                details={
+                    "keeper_uid": change.keeper_uid,
+                    "removed": False,
+                    "warning": "dependency checks are enforced by Keeper CLI/server, not client-side",
+                },
             )
+            outcomes.append(outcome)
+            try:
+                self._run_cmd(["rm", change.keeper_uid])
+            except CapabilityError:
+                raise
+            outcome.details["removed"] = True
 
         for change in plan.conflicts:
             outcomes.append(

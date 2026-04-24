@@ -422,3 +422,141 @@ def test_apply_reports_field_drift(monkeypatch: pytest.MonkeyPatch) -> None:
             "observed": "db-observed.example.com",
         }
     }
+
+
+def test_apply_deletes_managed_record(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper")
+    monkeypatch.setattr("keeper_sdk.providers.commander_cli._utc_now", lambda: "2026-04-24T12:34:56Z")
+
+    calls: list[list[str]] = []
+
+    def recorder(self: CommanderCliProvider, args: list[str]) -> str:
+        calls.append(args)
+        if args[:3] == ["pam", "project", "import"]:
+            return ""
+        if args[:3] == ["pam", "project", "export"]:
+            return json.dumps(
+                {
+                    "resources": [
+                        {
+                            "record_uid": "keeper-created-uid",
+                            "title": "db-prod",
+                            "type": "pamDatabase",
+                        }
+                    ]
+                }
+            )
+        if args[:2] == ["record-update", "--record"]:
+            return ""
+        if args[:2] == ["rm", "DEL_UID"]:
+            return ""
+        raise AssertionError(f"unexpected command: {args}")
+
+    monkeypatch.setattr(CommanderCliProvider, "_run_cmd", recorder)
+    provider = CommanderCliProvider(
+        folder_uid="folder-uid",
+        manifest_source={
+            "version": "1",
+            "name": "customer-prod",
+            "resources": [{"uid_ref": "prod-db", "type": "pamDatabase", "title": "db-prod"}],
+        },
+    )
+    plan = Plan(
+        manifest_name="customer-prod",
+        changes=[
+            Change(
+                kind=ChangeKind.CREATE,
+                uid_ref="prod-db",
+                resource_type="pamDatabase",
+                title="db-prod",
+                after={"title": "db-prod"},
+            ),
+            Change(
+                kind=ChangeKind.DELETE,
+                uid_ref="old-db",
+                resource_type="pamDatabase",
+                title="old-db",
+                keeper_uid="DEL_UID",
+            ),
+        ],
+        order=["prod-db", "old-db"],
+    )
+
+    outcomes = provider.apply_plan(plan)
+
+    rm_index = calls.index(["rm", "DEL_UID"])
+    import_index = next(idx for idx, call in enumerate(calls) if call[:3] == ["pam", "project", "import"])
+    assert rm_index > import_index
+    assert calls[-1] == ["rm", "DEL_UID"]
+    delete_outcome = next(outcome for outcome in outcomes if outcome.action == "delete")
+    assert delete_outcome.keeper_uid == "DEL_UID"
+    assert delete_outcome.details["keeper_uid"] == "DEL_UID"
+    assert delete_outcome.details["removed"] is True
+
+
+def test_apply_dry_run_delete_does_not_shell(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper")
+
+    calls: list[list[str]] = []
+
+    def recorder(self: CommanderCliProvider, args: list[str]) -> str:
+        calls.append(args)
+        return ""
+
+    monkeypatch.setattr(CommanderCliProvider, "_run_cmd", recorder)
+    provider = CommanderCliProvider(folder_uid="folder-uid")
+    plan = Plan(
+        manifest_name="customer-prod",
+        changes=[
+            Change(
+                kind=ChangeKind.DELETE,
+                uid_ref="old-db",
+                resource_type="pamDatabase",
+                title="old-db",
+                keeper_uid="DEL_UID",
+            )
+        ],
+        order=["old-db"],
+    )
+
+    outcomes = provider.apply_plan(plan, dry_run=True)
+
+    assert calls == []
+    assert len(outcomes) == 1
+    assert outcomes[0].action == "delete"
+    assert outcomes[0].details["dry_run"] is True
+    assert outcomes[0].details["keeper_uid"] == "DEL_UID"
+
+
+def test_apply_delete_without_keeper_uid_is_skipped(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper")
+
+    calls: list[list[str]] = []
+
+    def recorder(self: CommanderCliProvider, args: list[str]) -> str:
+        calls.append(args)
+        return ""
+
+    monkeypatch.setattr(CommanderCliProvider, "_run_cmd", recorder)
+    provider = CommanderCliProvider(folder_uid="folder-uid")
+    plan = Plan(
+        manifest_name="customer-prod",
+        changes=[
+            Change(
+                kind=ChangeKind.DELETE,
+                uid_ref="old-db",
+                resource_type="pamDatabase",
+                title="old-db",
+                keeper_uid=None,
+            )
+        ],
+        order=["old-db"],
+    )
+
+    outcomes = provider.apply_plan(plan)
+
+    assert calls == []
+    assert outcomes[0].action == "delete"
+    assert outcomes[0].keeper_uid == ""
+    assert outcomes[0].details["skipped"] is True
+    assert outcomes[0].details["reason"] == "no keeper_uid on delete change"
