@@ -71,6 +71,9 @@ jobs:
           repository: Keeper-Security/Commander
           ref: ${{ steps.pin.outputs.sha }}
           path: Commander
+          # fetch-depth: 0 is required when `ref` is a bare commit SHA
+          # (depth=1 only works for branch/tag tips).
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
