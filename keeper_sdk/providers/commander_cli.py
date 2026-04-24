@@ -8,11 +8,12 @@ instead of re-implementing.
 Commands used:
     keeper pam project import --file <manifest>.pam_import.json
     keeper pam project extend --file <manifest>.pam_import.json
-    keeper pam project export --folder <uid>
+    keeper ls <folder_uid> --format json
+    keeper get <uid> --format json
     keeper rm <uid>
 
 The provider:
-    1. Exports the target folder (if configured) and parses records.
+    1. Lists the target folder (if configured) and fetches each record.
     2. Decodes ownership markers from the custom field.
     3. Applies plans by writing a temp ``pam_import`` JSON document and
        invoking ``keeper pam project import`` or ``extend``.
@@ -79,17 +80,26 @@ class CommanderCliProvider(Provider):
                 ),
                 next_action="set --folder-uid on the CLI or KEEPER_DECLARATIVE_FOLDER env var",
             )
-        payload = self._run_cmd(["pam", "project", "export", "--folder", self._folder_uid, "--format", "json"])
-        if not payload.strip():
-            raise CapabilityError(reason="keeper pam project export produced no output")
-        try:
-            data = json.loads(payload)
-        except ValueError as exc:
-            raise CapabilityError(
-                reason="Commander returned non-JSON from `pam project export`",
-                next_action="upgrade Commander to a version that supports --format json",
-            ) from exc
-        return list(_records_from_export(data))
+        payload = self._run_cmd(["ls", self._folder_uid, "--format", "json"])
+        entries = _load_json(payload, command="ls --format json")
+        if not isinstance(entries, list):
+            raise CapabilityError(reason="Commander returned non-array JSON from `ls --format json`")
+
+        records: list[LiveRecord] = []
+        for entry in entries:
+            if not isinstance(entry, dict) or entry.get("type") != "record":
+                continue
+            keeper_uid = entry.get("uid")
+            if not keeper_uid:
+                continue
+            item_payload = self._run_cmd(["get", keeper_uid, "--format", "json"])
+            item = _load_json(item_payload, command="get --format json")
+            if not isinstance(item, dict):
+                raise CapabilityError(reason="Commander returned non-object JSON from `get --format json`")
+            record = _record_from_get(item, listing_entry=entry)
+            if record is not None:
+                records.append(record)
+        return records
 
     def apply_plan(self, plan: Plan, *, dry_run: bool = False) -> list[ApplyOutcome]:
         outcomes: list[ApplyOutcome] = []
@@ -314,55 +324,104 @@ def _port_value(value: Any) -> Any:
     return value
 
 
-def _records_from_export(data: Any) -> list[LiveRecord]:
-    records: list[LiveRecord] = []
-    export = _unwrap_export_payload(data)
-    if not isinstance(export, dict):
-        return records
-    for collection_key in ("resources", "users", "pam_configurations", "gateways"):
-        for item in export.get(collection_key) or []:
-            if not isinstance(item, dict):
-                continue
-            keeper_uid = item.get("record_uid") or item.get("uid") or item.get("keeper_uid")
-            if not keeper_uid:
-                continue
-            title = _title_from_item(item)
-            payload = {k: v for k, v in item.items() if k not in {"record_uid"}}
-            if title == "":
-                payload["_note"] = "empty title"
-            resource_type = item.get("type")
-            if not resource_type:
-                resource_type = _kind_from_collection(collection_key)
-                if not resource_type:
-                    continue
-                payload["_legacy_type_fallback"] = True
-            marker_raw = _extract_marker_field(item)
-            marker = decode_marker(marker_raw)
-            records.append(
-                LiveRecord(
-                    keeper_uid=keeper_uid,
-                    title=title,
-                    resource_type=resource_type,
-                    payload=payload,
-                    marker=marker,
-                )
-            )
-    return records
+def _load_json(payload: str, *, command: str) -> Any:
+    try:
+        return json.loads(payload)
+    except ValueError as exc:
+        raise CapabilityError(
+            reason=f"Commander returned non-JSON from `{command}`",
+            next_action="upgrade Commander to a version that supports --format json",
+        ) from exc
 
 
-def _unwrap_export_payload(data: Any) -> Any:
-    if isinstance(data, list):
-        for item in data:
-            unwrapped = _unwrap_export_payload(item)
-            if isinstance(unwrapped, dict):
-                return unwrapped
+def _record_from_get(item: dict[str, Any], *, listing_entry: dict[str, Any]) -> LiveRecord | None:
+    keeper_uid = item.get("record_uid") or item.get("uid") or item.get("keeper_uid") or listing_entry.get("uid")
+    if not keeper_uid:
         return None
-    if not isinstance(data, dict):
+
+    title = _title_from_item(item)
+    payload = _payload_from_get(item)
+    if title == "":
+        payload["_note"] = "empty title"
+
+    resource_type, legacy_type_fallback = _resource_type_from_get(item, listing_entry=listing_entry)
+    if not resource_type:
         return None
-    project = data.get("project")
-    if isinstance(project, dict):
-        return project
-    return data
+    if legacy_type_fallback:
+        payload["_legacy_type_fallback"] = True
+
+    marker_raw = _extract_marker_field(item)
+    marker = decode_marker(marker_raw)
+    return LiveRecord(
+        keeper_uid=keeper_uid,
+        title=title,
+        resource_type=resource_type,
+        folder_uid=listing_entry.get("folder_uid"),
+        payload=payload,
+        marker=marker,
+    )
+
+
+def _payload_from_get(item: dict[str, Any]) -> dict[str, Any]:
+    payload = {k: v for k, v in item.items() if k not in {"record_uid"}}
+    for field in item.get("fields") or []:
+        if not isinstance(field, dict):
+            continue
+        payload.update(_canonical_payload_from_field(field))
+    return payload
+
+
+def _canonical_payload_from_field(field: dict[str, Any]) -> dict[str, Any]:
+    field_type = field.get("type")
+    values = field.get("value")
+    if not field_type or not isinstance(values, list):
+        return {}
+    if field_type == "host":
+        return _host_payload(values)
+    if len(values) != 1:
+        return {}
+    value = values[0]
+    if isinstance(value, (str, int, float, bool)):
+        return {field_type: value}
+    return {}
+
+
+def _host_payload(values: list[Any]) -> dict[str, Any]:
+    if len(values) != 1 or not isinstance(values[0], dict):
+        return {}
+    value = values[0]
+    payload: dict[str, Any] = {}
+    if value.get("hostName") is not None:
+        payload["host"] = value["hostName"]
+    if value.get("port") is not None:
+        payload["port"] = value["port"]
+    return payload
+
+
+def _resource_type_from_get(item: dict[str, Any], *, listing_entry: dict[str, Any]) -> tuple[str | None, bool]:
+    resource_type = item.get("type")
+    if resource_type:
+        return resource_type, False
+    resource_type = _type_from_listing_details(listing_entry.get("details"))
+    if resource_type:
+        return resource_type, False
+    resource_type = _kind_from_collection(item.get("collection", ""))
+    if resource_type:
+        item.setdefault("type", resource_type)
+        return resource_type, True
+    return None, False
+
+
+def _type_from_listing_details(details: Any) -> str | None:
+    if not isinstance(details, str):
+        return None
+    prefix = "Type:"
+    if not details.startswith(prefix):
+        return None
+    tail = details[len(prefix):].strip()
+    if not tail:
+        return None
+    return tail.split(",", 1)[0].strip() or None
 
 
 def _title_from_item(item: dict[str, Any]) -> str:

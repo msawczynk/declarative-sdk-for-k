@@ -1,4 +1,4 @@
-"""Tests for the Commander CLI provider export parsing."""
+"""Tests for the Commander CLI provider discovery and apply flows."""
 
 from __future__ import annotations
 
@@ -19,60 +19,27 @@ def _provider(monkeypatch: pytest.MonkeyPatch, stdout: str = "") -> CommanderCli
     return CommanderCliProvider(folder_uid="folder-uid")
 
 
-def _sample_payload() -> dict[str, object]:
-    return {
-        "resources": [
-            {
-                "record_uid": "res-1",
-                "title": "db-prod",
-                "type": "pamDatabase",
-                "custom_fields": {
-                    "keeper_declarative_manager": serialize_marker(
-                        encode_marker(
-                            uid_ref="db-prod",
-                            manifest="prod",
-                            resource_type="pamDatabase",
-                        )
-                    )
-                },
-            }
-        ],
-        "users": [
-            {
-                "uid": "user-1",
-                "record_title": "svc-admin",
-                "custom": [
-                    {
-                        "label": "keeper_declarative_manager",
-                        "value": serialize_marker(
-                            encode_marker(
-                                uid_ref="svc-admin",
-                                manifest="prod",
-                                resource_type="pamUser",
-                            )
-                        ),
-                    }
-                ],
-            },
-            {
-                "uid": "login-1",
-                "name": "ssh-login",
-                "type": "login",
-            },
-        ],
-        "pam_configurations": [
-            {
-                "keeper_uid": "cfg-1",
-                "title": "default config",
-            }
-        ],
-        "gateways": [
-            {
-                "record_uid": "gw-1",
-                "title": "gw-lon-1",
-            }
-        ],
-    }
+def _discover_provider(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    ls_payload: object,
+    get_payloads: dict[str, object] | None = None,
+) -> CommanderCliProvider:
+    monkeypatch.setattr("keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper")
+
+    def fake_run(self: CommanderCliProvider, args: list[str]) -> str:
+        if args[:1] == ["ls"]:
+            return json.dumps(ls_payload) if not isinstance(ls_payload, str) else ls_payload
+        if args[:1] == ["get"]:
+            uid = args[1]
+            payload = (get_payloads or {}).get(uid)
+            if payload is None:
+                raise AssertionError(f"unexpected get uid {uid}")
+            return json.dumps(payload) if not isinstance(payload, str) else payload
+        raise AssertionError(f"unexpected args {args}")
+
+    monkeypatch.setattr(CommanderCliProvider, "_run_cmd", fake_run)
+    return CommanderCliProvider(folder_uid="folder-uid")
 
 
 def test_discover_requires_folder_uid(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -86,47 +53,133 @@ def test_discover_requires_folder_uid(monkeypatch: pytest.MonkeyPatch) -> None:
     assert exc_info.value.next_action == "set --folder-uid on the CLI or KEEPER_DECLARATIVE_FOLDER env var"
 
 
-def test_discover_parses_export_payload(monkeypatch: pytest.MonkeyPatch) -> None:
-    provider = _provider(monkeypatch, json.dumps(_sample_payload()))
+def test_discover_empty_folder_returns_empty_list(monkeypatch: pytest.MonkeyPatch) -> None:
+    provider = _discover_provider(monkeypatch, ls_payload=[])
 
     records = provider.discover()
 
-    assert [(record.keeper_uid, record.title, record.resource_type) for record in records] == [
-        ("res-1", "db-prod", "pamDatabase"),
-        ("user-1", "svc-admin", "pamUser"),
-        ("login-1", "ssh-login", "login"),
-        ("cfg-1", "default config", "pam_configuration"),
-        ("gw-1", "gw-lon-1", "gateway"),
-    ]
+    assert records == []
+
+
+def test_discover_reads_one_record_without_marker(monkeypatch: pytest.MonkeyPatch) -> None:
+    provider = _discover_provider(
+        monkeypatch,
+        ls_payload=[
+            {
+                "type": "record",
+                "uid": "R1",
+                "name": "host1",
+                "details": "Type: pamMachine, Description: machine",
+            }
+        ],
+        get_payloads={
+            "R1": {
+                "record_uid": "R1",
+                "title": "host1",
+                "type": "pamMachine",
+                "fields": [{"type": "host", "value": [{"hostName": "h", "port": "22"}]}],
+                "custom": [],
+            }
+        },
+    )
+
+    records = provider.discover()
+
+    assert len(records) == 1
+    assert records[0].keeper_uid == "R1"
+    assert records[0].title == "host1"
+    assert records[0].resource_type == "pamMachine"
+    assert records[0].marker is None
+    assert records[0].payload["host"] == "h"
+    assert records[0].payload["port"] == "22"
+
+
+def test_discover_decodes_marker_from_custom_field(monkeypatch: pytest.MonkeyPatch) -> None:
+    marker = serialize_marker(
+        encode_marker(
+            uid_ref="host1",
+            manifest="prod",
+            resource_type="pamMachine",
+        )
+    )
+    provider = _discover_provider(
+        monkeypatch,
+        ls_payload=[
+            {
+                "type": "record",
+                "uid": "R1",
+                "name": "host1",
+                "details": "Type: pamMachine, Description: machine",
+            }
+        ],
+        get_payloads={
+            "R1": {
+                "record_uid": "R1",
+                "title": "host1",
+                "type": "pamMachine",
+                "fields": [],
+                "custom": [{"type": "text", "label": "keeper_declarative_manager", "value": [marker]}],
+            }
+        },
+    )
+
+    records = provider.discover()
+
     assert records[0].marker is not None
-    assert records[0].marker["uid_ref"] == "db-prod"
-    assert records[1].marker is not None
-    assert records[1].marker["uid_ref"] == "svc-admin"
-    assert records[1].payload["_legacy_type_fallback"] is True
-    assert records[2].payload.get("_legacy_type_fallback") is None
+    assert records[0].marker["uid_ref"] == "host1"
 
 
-def test_discover_unwraps_project_wrapper(monkeypatch: pytest.MonkeyPatch) -> None:
-    provider = _provider(monkeypatch, json.dumps({"project": _sample_payload()}))
+def test_discover_ignores_folder_entries(monkeypatch: pytest.MonkeyPatch) -> None:
+    provider = _discover_provider(
+        monkeypatch,
+        ls_payload=[
+            {"type": "folder", "uid": "F1", "name": "nested", "details": "Folder"},
+            {"type": "record", "uid": "R1", "name": "host1", "details": "Type: pamMachine, Description: ..."},
+        ],
+        get_payloads={
+            "R1": {
+                "record_uid": "R1",
+                "title": "host1",
+                "type": "pamMachine",
+                "fields": [],
+                "custom": [],
+            }
+        },
+    )
 
     records = provider.discover()
 
-    assert [(record.keeper_uid, record.title, record.resource_type) for record in records] == [
-        ("res-1", "db-prod", "pamDatabase"),
-        ("user-1", "svc-admin", "pamUser"),
-        ("login-1", "ssh-login", "login"),
-        ("cfg-1", "default config", "pam_configuration"),
-        ("gw-1", "gw-lon-1", "gateway"),
-    ]
+    assert [record.keeper_uid for record in records] == ["R1"]
 
 
-def test_discover_raises_on_empty_stdout(monkeypatch: pytest.MonkeyPatch) -> None:
-    provider = _provider(monkeypatch, "")
+def test_discover_uses_ls_details_when_get_type_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    provider = _discover_provider(
+        monkeypatch,
+        ls_payload=[
+            {"type": "record", "uid": "R1", "name": "svc-admin", "details": "Type: pamUser, Description: ..."}
+        ],
+        get_payloads={
+            "R1": {
+                "record_uid": "R1",
+                "title": "svc-admin",
+                "fields": [],
+                "custom": [],
+            }
+        },
+    )
+
+    records = provider.discover()
+
+    assert records[0].resource_type == "pamUser"
+
+
+def test_discover_raises_on_non_json_ls(monkeypatch: pytest.MonkeyPatch) -> None:
+    provider = _provider(monkeypatch, "not json")
 
     with pytest.raises(CapabilityError) as exc_info:
         provider.discover()
 
-    assert exc_info.value.reason == "keeper pam project export produced no output"
+    assert exc_info.value.reason == "Commander returned non-JSON from `ls --format json`"
 
 
 def test_apply_writes_marker_after_create(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -139,16 +192,25 @@ def test_apply_writes_marker_after_create(monkeypatch: pytest.MonkeyPatch) -> No
         calls.append(args)
         if args[:3] == ["pam", "project", "import"]:
             return ""
-        if args[:3] == ["pam", "project", "export"]:
+        if args[:1] == ["ls"]:
+            return json.dumps(
+                [
+                    {
+                        "type": "record",
+                        "uid": "keeper-created-uid",
+                        "name": "db-prod",
+                        "details": "Type: pamDatabase, Description: ...",
+                    }
+                ]
+            )
+        if args[:1] == ["get"]:
             return json.dumps(
                 {
-                    "resources": [
-                        {
-                            "record_uid": "keeper-created-uid",
-                            "title": "db-prod",
-                            "type": "pamDatabase",
-                        }
-                    ]
+                    "record_uid": "keeper-created-uid",
+                    "title": "db-prod",
+                    "type": "pamDatabase",
+                    "fields": [],
+                    "custom": [],
                 }
             )
         if args[:2] == ["record-update", "--record"]:
@@ -182,7 +244,8 @@ def test_apply_writes_marker_after_create(monkeypatch: pytest.MonkeyPatch) -> No
 
     assert [call[:3] for call in calls] == [
         ["pam", "project", "import"],
-        ["pam", "project", "export"],
+        ["ls", "folder-uid", "--format"],
+        ["get", "keeper-created-uid", "--format"],
         ["record-update", "--record", "keeper-created-uid"],
     ]
     assert outcomes[0].details["marker_written"] is True
@@ -236,7 +299,7 @@ def test_apply_dry_run_skips_marker_writeback(monkeypatch: pytest.MonkeyPatch) -
 
     assert outcomes[0].details == {"dry_run": True}
     assert all(call[0] != "record-update" for call in calls)
-    assert all(call[:3] != ["pam", "project", "export"] for call in calls)
+    assert all(call[:1] != ["ls"] for call in calls)
 
 
 def test_apply_skips_marker_when_record_not_discoverable(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -248,8 +311,8 @@ def test_apply_skips_marker_when_record_not_discoverable(monkeypatch: pytest.Mon
         calls.append(args)
         if args[:3] == ["pam", "project", "import"]:
             return ""
-        if args[:3] == ["pam", "project", "export"]:
-            return json.dumps({"resources": []})
+        if args[:1] == ["ls"]:
+            return json.dumps([])
         raise AssertionError(f"unexpected command: {args}")
 
     monkeypatch.setattr(CommanderCliProvider, "_run_cmd", recorder)
@@ -292,18 +355,25 @@ def test_apply_verifies_fields_match(monkeypatch: pytest.MonkeyPatch) -> None:
         calls.append(args)
         if args[:3] == ["pam", "project", "import"]:
             return ""
-        if args[:3] == ["pam", "project", "export"]:
+        if args[:1] == ["ls"]:
+            return json.dumps(
+                [
+                    {
+                        "type": "record",
+                        "uid": "keeper-created-uid",
+                        "name": "db-prod",
+                        "details": "Type: pamDatabase, Description: ...",
+                    }
+                ]
+            )
+        if args[:1] == ["get"]:
             return json.dumps(
                 {
-                    "resources": [
-                        {
-                            "record_uid": "keeper-created-uid",
-                            "title": "db-prod",
-                            "type": "pamDatabase",
-                            "host": "db.example.com",
-                            "port": 5432,
-                        }
-                    ]
+                    "record_uid": "keeper-created-uid",
+                    "title": "db-prod",
+                    "type": "pamDatabase",
+                    "fields": [{"type": "host", "value": [{"hostName": "db.example.com", "port": 5432}]}],
+                    "custom": [],
                 }
             )
         if args[:2] == ["record-update", "--record"]:
@@ -345,7 +415,8 @@ def test_apply_verifies_fields_match(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert [call[:3] for call in calls] == [
         ["pam", "project", "import"],
-        ["pam", "project", "export"],
+        ["ls", "folder-uid", "--format"],
+        ["get", "keeper-created-uid", "--format"],
         ["record-update", "--record", "keeper-created-uid"],
     ]
     assert outcomes[0].details["marker_written"] is True
@@ -363,18 +434,27 @@ def test_apply_reports_field_drift(monkeypatch: pytest.MonkeyPatch) -> None:
         calls.append(args)
         if args[:3] == ["pam", "project", "import"]:
             return ""
-        if args[:3] == ["pam", "project", "export"]:
+        if args[:1] == ["ls"]:
+            return json.dumps(
+                [
+                    {
+                        "type": "record",
+                        "uid": "keeper-created-uid",
+                        "name": "db-prod",
+                        "details": "Type: pamDatabase, Description: ...",
+                    }
+                ]
+            )
+        if args[:1] == ["get"]:
             return json.dumps(
                 {
-                    "resources": [
-                        {
-                            "record_uid": "keeper-created-uid",
-                            "title": "db-prod",
-                            "type": "pamDatabase",
-                            "host": "db-observed.example.com",
-                            "port": 5432,
-                        }
-                    ]
+                    "record_uid": "keeper-created-uid",
+                    "title": "db-prod",
+                    "type": "pamDatabase",
+                    "fields": [
+                        {"type": "host", "value": [{"hostName": "db-observed.example.com", "port": 5432}]}
+                    ],
+                    "custom": [],
                 }
             )
         if args[:2] == ["record-update", "--record"]:
@@ -434,16 +514,25 @@ def test_apply_deletes_managed_record(monkeypatch: pytest.MonkeyPatch) -> None:
         calls.append(args)
         if args[:3] == ["pam", "project", "import"]:
             return ""
-        if args[:3] == ["pam", "project", "export"]:
+        if args[:1] == ["ls"]:
+            return json.dumps(
+                [
+                    {
+                        "type": "record",
+                        "uid": "keeper-created-uid",
+                        "name": "db-prod",
+                        "details": "Type: pamDatabase, Description: ...",
+                    }
+                ]
+            )
+        if args[:1] == ["get"]:
             return json.dumps(
                 {
-                    "resources": [
-                        {
-                            "record_uid": "keeper-created-uid",
-                            "title": "db-prod",
-                            "type": "pamDatabase",
-                        }
-                    ]
+                    "record_uid": "keeper-created-uid",
+                    "title": "db-prod",
+                    "type": "pamDatabase",
+                    "fields": [],
+                    "custom": [],
                 }
             )
         if args[:2] == ["record-update", "--record"]:
