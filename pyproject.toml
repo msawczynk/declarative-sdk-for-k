@@ -54,4 +54,5 @@ ignore = ["E501"]
 testpaths = ["tests"]
 markers = [
     "integration: requires a live Keeper tenant (set KEEPER_CONFIG)",
+    "slow: perf / long tests",
 ]
