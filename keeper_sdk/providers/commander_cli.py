@@ -61,6 +61,7 @@ class CommanderCliProvider(Provider):
     ) -> None:
         self._bin = keeper_bin or os.environ.get("KEEPER_BIN", "keeper")
         self._folder_uid = folder_uid or os.environ.get("KEEPER_DECLARATIVE_FOLDER")
+        self.last_resolved_folder_uid: str | None = None
         self._config = config_file or os.environ.get("KEEPER_CONFIG")
         # Commander's persistent-login still needs the master password on
         # subprocess invocation to unlock the local key; honor --batch-mode by
@@ -80,10 +81,11 @@ class CommanderCliProvider(Provider):
         if not self._folder_uid:
             raise CapabilityError(
                 reason=(
-                    "CommanderCliProvider requires folder_uid "
-                    "(or KEEPER_DECLARATIVE_FOLDER) to discover live state"
+                    "CommanderCliProvider has no folder_uid for discover(); "
+                    "pass an explicit folder_uid or run apply_plan() first so "
+                    "the provider can resolve the project Resources folder"
                 ),
-                next_action="set --folder-uid on the CLI or KEEPER_DECLARATIVE_FOLDER env var",
+                next_action="pass --folder-uid (or KEEPER_DECLARATIVE_FOLDER), or call apply_plan() first",
             )
         payload = self._run_cmd(["ls", self._folder_uid, "--format", "json"])
         entries = _load_json(payload, command="ls --format json")
@@ -124,6 +126,8 @@ class CommanderCliProvider(Provider):
                 if dry_run:
                     cmd.append("--dry-run")
                 self._run_cmd(cmd)
+                if not dry_run:
+                    self._resolve_project_resources_folder(plan.manifest_name)
                 for change in creates_updates:
                     outcomes.append(
                         ApplyOutcome(
@@ -266,6 +270,44 @@ class CommanderCliProvider(Provider):
             ]
         )
 
+    def _resolve_project_resources_folder(self, project_name: str) -> str:
+        root_entries = _load_json(
+            self._run_cmd(["ls", "--format", "json", "PAM Environments"]),
+            command="ls --format json PAM Environments",
+        )
+        root_uid = _entry_uid_by_name(root_entries, "PAM Environments")
+        if not root_uid:
+            raise CapabilityError(
+                reason="Commander did not return the PAM Environments root folder UID",
+                next_action="re-run apply and inspect `keeper ls --format json PAM Environments`",
+            )
+
+        project_entries = _load_json(
+            self._run_cmd(["ls", "--format", "json", root_uid]),
+            command=f"ls --format json {root_uid}",
+        )
+        project_uid = _entry_uid_by_name(project_entries, project_name)
+        if not project_uid:
+            raise CapabilityError(
+                reason=f"Commander did not return project folder '{project_name}' under PAM Environments",
+                next_action=f"inspect `keeper ls --format json {root_uid}` and confirm import created the project folder",
+            )
+
+        resources_entries = _load_json(
+            self._run_cmd(["ls", "--format", "json", project_uid]),
+            command=f"ls --format json {project_uid}",
+        )
+        resources_name = f"{project_name} - Resources"
+        resources_uid = _entry_uid_by_name(resources_entries, resources_name)
+        if not resources_uid:
+            raise CapabilityError(
+                reason=f"Commander did not return resources folder '{resources_name}' under project '{project_name}'",
+                next_action=f"inspect `keeper ls --format json {project_uid}` and confirm import created the Resources folder",
+            )
+        self._folder_uid = resources_uid
+        self.last_resolved_folder_uid = resources_uid
+        return resources_uid
+
     def _run_cmd(self, args: list[str]) -> str:
         # --batch-mode suppresses interactive prompts (password, 2FA,
         # confirmations). stdin=DEVNULL is belt-and-braces — if Commander ever
@@ -349,6 +391,22 @@ def _load_json(payload: str, *, command: str) -> Any:
             reason=f"Commander returned non-JSON from `{command}`",
             next_action="upgrade Commander to a version that supports --format json",
         ) from exc
+
+
+def _entry_uid_by_name(entries: Any, name: str) -> str | None:
+    if not isinstance(entries, list):
+        raise CapabilityError(
+            reason="Commander returned non-array JSON while resolving folder entries",
+            next_action="upgrade Commander to a version that supports --format json",
+        )
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        if entry.get("name") == name or entry.get("title") == name:
+            uid = entry.get("uid") or entry.get("folder_uid") or entry.get("shared_folder_uid")
+            if uid:
+                return str(uid)
+    return None
 
 
 def _record_from_get(item: dict[str, Any], *, listing_entry: dict[str, Any]) -> LiveRecord | None:

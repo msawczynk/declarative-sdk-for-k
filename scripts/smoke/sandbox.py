@@ -54,8 +54,6 @@ def ensure_sandbox(admin_params, *, testuser_email: str) -> dict:
     else:
         log.info("KSM application %s already exists (%s)", SANDBOX_KSM_APP_NAME, existing_app["uid"])
 
-    _ensure_app_share(admin_params, sf_uid=sf_uid)
-
     return {
         "sf_uid": sf_uid,
         "ksm_app_uid": existing_app["uid"],

@@ -39,6 +39,7 @@ GATEWAY_UID_REF = "lab-gw"
 GATEWAY_NAME = "Lab GW Rocky"
 PAM_CONFIG_UID_REF = "lab-cfg"
 PAM_CONFIG_TITLE = "Lab Rocky PAM Configuration"
+SMOKE_PROJECT_NAME = "sdk-smoke-testuser2"
 
 
 class SmokeError(Exception):
@@ -135,9 +136,21 @@ def run_smoke(
 
     prov = CommanderCliProvider(
         config_file=ident["commander_config_path"],
-        folder_uid=sf_uid,
         keeper_password=ident["password"],
     )
+    resolved_sf_uid = prov._resolve_project_resources_folder(SMOKE_PROJECT_NAME)
+    state["managed_folder_uid"] = resolved_sf_uid
+    _mark(state, f"resources folder resolved ({resolved_sf_uid})")
+    _share_ksm_app_folder(
+        admin_params,
+        app_uid=sb["ksm_app_uid"],
+        folder_uid=resolved_sf_uid,
+    )
+    _mark(state, "resources folder shared to KSM app")
+
+    if prov.last_resolved_folder_uid != resolved_sf_uid:
+        raise SmokeError("provider did not cache the resolved Resources shared-folder UID")
+
     live = prov.discover()
     owned = [
         record
@@ -182,6 +195,8 @@ def run_smoke(
         raise SmokeError(
             f"destroy failed - {len(still_ours)} records still marked SDK-owned: {_live_summary(still_ours)}"
         )
+    _remove_project_tree(argv_prefix, env=env, project_name=SMOKE_PROJECT_NAME)
+    _mark(state, "project tree cleanup OK")
 
     log.info("SMOKE PASSED: create->verify->destroy cycle clean")
     return 0
@@ -225,9 +240,10 @@ def _write_empty_manifest(sf_uid: str) -> Path:
 
 
 def _base_manifest(sf_uid: str) -> dict[str, Any]:
+    del sf_uid
     return {
         "version": "1",
-        "name": "sdk-smoke-testuser2",
+        "name": SMOKE_PROJECT_NAME,
         "shared_folders": {
             "resources": {
                 "uid_ref": "smoke-sf-resources",
@@ -294,6 +310,68 @@ def _sdk_allow(ok_codes: list[int], args: list[str], *, env: dict[str, str]) -> 
     return result.returncode
 
 
+def _share_ksm_app_folder(admin_params: Any, *, app_uid: str, folder_uid: str) -> None:
+    config_path = getattr(admin_params, "config_filename", None) or str(identity.ADMIN_COMMANDER_CONFIG)
+    env = dict(os.environ)
+    password = getattr(admin_params, "password", None)
+    if password:
+        env["KEEPER_PASSWORD"] = password
+    cmd = [
+        "keeper",
+        "--config",
+        config_path,
+        "--batch-mode",
+        "secrets-manager",
+        "share",
+        "add",
+        "--app",
+        app_uid,
+        "--secret",
+        folder_uid,
+        "--editable",
+    ]
+    result = subprocess.run(
+        cmd,
+        cwd=ROOT,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+        stdin=subprocess.DEVNULL,
+    )
+    if result.returncode == 0:
+        return
+    text = "\n".join(part for part in (result.stdout, result.stderr) if part).casefold()
+    if "already" in text:
+        log.info("KSM app %s already bound to folder %s", app_uid, folder_uid)
+        return
+    raise SmokeError(f"share-add failed for app {app_uid} -> folder {folder_uid} (rc={result.returncode})")
+
+
+def _remove_project_tree(argv_prefix: list[str], *, env: dict[str, str], project_name: str) -> None:
+    cmd = [*argv_prefix, "rm", f"PAM Environments/{project_name}"]
+    result = subprocess.run(
+        cmd,
+        cwd=ROOT,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+        stdin=subprocess.DEVNULL,
+    )
+    if result.returncode == 0:
+        return
+    text = "\n".join(part for part in (result.stdout, result.stderr) if part).casefold()
+    if "not found" in text or "cannot be resolved" in text or "does not exist" in text:
+        log.info("project tree already absent: PAM Environments/%s", project_name)
+        return
+    log.warning(
+        "project tree cleanup failed rc=%s for PAM Environments/%s",
+        result.returncode,
+        project_name,
+    )
+
+
 def _mark(state: dict[str, Any], message: str) -> None:
     state.setdefault("passed", []).append(message)
 
@@ -358,7 +436,7 @@ def _print_post_mortem(state: dict[str, Any], exc: BaseException) -> None:
         "failed": str(exc),
     }
     admin_params = state.get("admin_params")
-    sf_uid = state.get("sf_uid")
+    sf_uid = state.get("managed_folder_uid") or state.get("sf_uid")
     if admin_params and sf_uid:
         payload["shared_folder_contents"] = _current_sf_contents(admin_params, sf_uid)
     print(json.dumps(payload, indent=2), file=sys.stderr)
@@ -413,13 +491,27 @@ def main(argv: list[str] | None = None) -> int:
             try:
                 removed = sandbox.teardown_records(
                     state["admin_params"],
-                    state["sf_uid"],
+                    state.get("managed_folder_uid") or state["sf_uid"],
                     manager=MANAGER_NAME,
                 )
                 if removed:
                     log.info("cleanup removed %d record(s): %s", len(removed), removed)
             except Exception as cleanup_exc:  # pragma: no cover - live-only path
                 print(f"cleanup failed: {cleanup_exc}", file=sys.stderr)
+            ident = state.get("ident")
+            if ident:
+                try:
+                    cleanup_env = dict(os.environ)
+                    cleanup_env["KEEPER_CONFIG"] = ident["commander_config_path"]
+                    cleanup_env["KEEPER_DECLARATIVE_FOLDER"] = state.get("sf_uid", "")
+                    cleanup_env["KEEPER_PASSWORD"] = ident["password"]
+                    _remove_project_tree(
+                        identity.sdktest_keeper_args(),
+                        env=cleanup_env,
+                        project_name=SMOKE_PROJECT_NAME,
+                    )
+                except Exception as cleanup_exc:  # pragma: no cover - live-only path
+                    print(f"project cleanup failed: {cleanup_exc}", file=sys.stderr)
 
 
 if __name__ == "__main__":
