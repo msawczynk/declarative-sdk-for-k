@@ -57,10 +57,15 @@ class CommanderCliProvider(Provider):
         folder_uid: str | None = None,
         config_file: str | None = None,
         manifest_source: dict[str, Any] | None = None,
+        keeper_password: str | None = None,
     ) -> None:
         self._bin = keeper_bin or os.environ.get("KEEPER_BIN", "keeper")
         self._folder_uid = folder_uid or os.environ.get("KEEPER_DECLARATIVE_FOLDER")
         self._config = config_file or os.environ.get("KEEPER_CONFIG")
+        # Commander's persistent-login still needs the master password on
+        # subprocess invocation to unlock the local key; honor --batch-mode by
+        # sourcing it from constructor or KEEPER_PASSWORD rather than prompting.
+        self._password = keeper_password or os.environ.get("KEEPER_PASSWORD")
         self._manifest_source = manifest_source or {}
 
         if not shutil.which(self._bin):
@@ -262,14 +267,22 @@ class CommanderCliProvider(Provider):
         )
 
     def _run_cmd(self, args: list[str]) -> str:
-        base = [self._bin]
+        # --batch-mode suppresses interactive prompts (password, 2FA,
+        # confirmations). stdin=DEVNULL is belt-and-braces — if Commander ever
+        # tries to read stdin despite --batch-mode we want EOF, not a hang.
+        base = [self._bin, "--batch-mode"]
         if self._config:
             base += ["--config", self._config]
+        env = os.environ.copy()
+        if self._password:
+            env["KEEPER_PASSWORD"] = self._password
         result = subprocess.run(
             base + args,
             check=False,
             capture_output=True,
             text=True,
+            stdin=subprocess.DEVNULL,
+            env=env,
         )
         if result.returncode != 0:
             raise CapabilityError(

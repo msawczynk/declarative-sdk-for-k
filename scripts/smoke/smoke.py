@@ -116,6 +116,10 @@ def run_smoke(
     env = dict(os.environ)
     env["KEEPER_CONFIG"] = ident["commander_config_path"]
     env["KEEPER_DECLARATIVE_FOLDER"] = sf_uid
+    # Commander's --batch-mode still requires the master password to unlock the
+    # local key on each subprocess invocation; KEEPER_PASSWORD short-circuits
+    # the prompt without hitting stdin.
+    env["KEEPER_PASSWORD"] = ident["password"]
     state["keeper_args"] = argv_prefix
 
     _sdk(["validate", str(manifest_path)], env=env)
@@ -129,7 +133,11 @@ def run_smoke(
     _sdk(["apply", "--auto-approve", str(manifest_path)], env=env)
     _mark(state, "apply OK")
 
-    prov = CommanderCliProvider(config_file=ident["commander_config_path"], folder_uid=sf_uid)
+    prov = CommanderCliProvider(
+        config_file=ident["commander_config_path"],
+        folder_uid=sf_uid,
+        keeper_password=ident["password"],
+    )
     live = prov.discover()
     owned = [
         record
