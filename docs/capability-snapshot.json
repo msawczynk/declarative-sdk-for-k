@@ -1,0 +1,609 @@
+{
+  "commander_branch": "pr1848-rebase",
+  "commander_sha": "231f557c",
+  "commands": [
+    {
+      "class": "PAMConnectionEditCommand",
+      "flags": [
+        {
+          "aliases": [
+            "-a"
+          ],
+          "dest": "admin",
+          "help": "The record path or UID of the PAM User record to configure the admin credential on the PAM Resource",
+          "name": "--admin-user",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-c"
+          ],
+          "dest": "config",
+          "help": "The PAM Configuration UID or path to use for connections. Use command `pam config list` to view available PAM Configurations.",
+          "name": "--configuration",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-cn"
+          ],
+          "dest": "connections",
+          "help": "Set connections permissions",
+          "name": "--connections",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-cop"
+          ],
+          "dest": "connections_override_port",
+          "help": "Port to use for connections. If not provided, the port from the record will be used.",
+          "name": "--connections-override-port",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-cr"
+          ],
+          "dest": "recording",
+          "help": "Set recording connections permissions for the resource",
+          "name": "--connections-recording",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-k"
+          ],
+          "dest": "key_events",
+          "help": "Toggle Key Events settings",
+          "name": "--key-events",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-lu"
+          ],
+          "dest": "launch_user",
+          "help": "The record path or UID of the PAM User record to configure as the launch credential on the PAM Resource",
+          "name": "--launch-user",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-p"
+          ],
+          "dest": "protocol",
+          "help": "Set connection protocol",
+          "name": "--protocol",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-s"
+          ],
+          "dest": "silent",
+          "help": "Silent mode - don't print PAM User, PAM Config etc.",
+          "name": "--silent",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "-tr"
+          ],
+          "dest": "typescriptrecording",
+          "help": "Set TypeScript recording permissions for the resource",
+          "name": "--typescript-recording",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "record",
+          "help": "The record UID or path of the PAM resource record with network information to use for connections",
+          "name": "<record>",
+          "required": true,
+          "type": "str"
+        }
+      ],
+      "group_command": "pam connection edit",
+      "module": "keepercommander.commands.tunnel_and_connections"
+    },
+    {
+      "class": "PAMProjectExtendCommand",
+      "flags": [
+        {
+          "aliases": [
+            "-c"
+          ],
+          "dest": "config",
+          "help": "PAM Configuration UID or Title",
+          "name": "--config",
+          "required": true,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-d"
+          ],
+          "dest": "dry_run",
+          "help": "Test import without modifying vault.",
+          "name": "--dry-run",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "-f"
+          ],
+          "dest": "file_name",
+          "help": "File to load import data from.",
+          "name": "--filename",
+          "required": true,
+          "type": "str"
+        }
+      ],
+      "group_command": "pam project extend",
+      "module": "keepercommander.commands.pam_import.extend"
+    },
+    {
+      "class": "PAMProjectImportCommand",
+      "flags": [
+        {
+          "aliases": [
+            "-d"
+          ],
+          "dest": "dry_run",
+          "help": "Test import without modifying vault.",
+          "name": "--dry-run",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "-f"
+          ],
+          "dest": "file_name",
+          "help": "File to load import data from.",
+          "name": "--filename",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-n"
+          ],
+          "dest": "project_name",
+          "help": "Project name.",
+          "name": "--name",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-o"
+          ],
+          "dest": "output",
+          "help": "Output format (token: one-time token, config: base64/json/k8s)",
+          "name": "--output",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-s"
+          ],
+          "dest": "sample_data",
+          "help": "Generate sample data.",
+          "name": "--sample-data",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "-t"
+          ],
+          "dest": "show_template",
+          "help": "Print JSON template required for manual import.",
+          "name": "--show-template",
+          "required": false,
+          "type": "flag"
+        }
+      ],
+      "group_command": "pam project import",
+      "module": "keepercommander.commands.pam_import.edit"
+    },
+    {
+      "class": "PAMRbiEditCommand",
+      "flags": [
+        {
+          "aliases": [
+            "-cpy"
+          ],
+          "dest": "allow_copy",
+          "help": "Allow copying to clipboard (on/off/default)",
+          "name": "--allow-copy",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-p"
+          ],
+          "dest": "allow_paste",
+          "help": "Allow pasting from clipboard (on/off/default)",
+          "name": "--allow-paste",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-nav"
+          ],
+          "dest": "allow_url_navigation",
+          "help": "Allow navigation via direct URL manipulation (on/off/default)",
+          "name": "--allow-url-navigation",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-aru"
+          ],
+          "dest": "allowed_resource_urls",
+          "help": "Allowed resource URL patterns (can specify multiple times)",
+          "name": "--allowed-resource-urls",
+          "required": false,
+          "type": "append[str]"
+        },
+        {
+          "aliases": [
+            "-au"
+          ],
+          "dest": "allowed_urls",
+          "help": "Allowed URL patterns (can specify multiple times)",
+          "name": "--allowed-urls",
+          "required": false,
+          "type": "append[str]"
+        },
+        {
+          "aliases": [
+            "-bd"
+          ],
+          "dest": "audio_bit_depth",
+          "help": "Audio bit depth (8 or 16)",
+          "name": "--audio-bit-depth",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "aliases": [
+            "-ac"
+          ],
+          "dest": "audio_channels",
+          "help": "Number of audio channels (e.g., 1 for mono, 2 for stereo)",
+          "name": "--audio-channels",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "aliases": [
+            "-sr"
+          ],
+          "dest": "audio_sample_rate",
+          "help": "Audio sample rate in Hz (e.g., 44100, 48000)",
+          "name": "--audio-sample-rate",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "aliases": [
+            "-a"
+          ],
+          "dest": "autofill",
+          "help": "The record UID or path of the RBI Autofill Credentials record.",
+          "name": "--autofill-credentials",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-at"
+          ],
+          "dest": "autofill_targets",
+          "help": "Autofill target selectors (can specify multiple times)",
+          "name": "--autofill-targets",
+          "required": false,
+          "type": "append[str]"
+        },
+        {
+          "aliases": [
+            "-c"
+          ],
+          "dest": "config",
+          "help": "The PAM Configuration UID or path to use for connections. Use command `pam config list` to view available PAM Configurations.",
+          "name": "--configuration",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-cr"
+          ],
+          "dest": "recording",
+          "help": "Set recording connections permissions for the resource",
+          "name": "--connections-recording",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-da"
+          ],
+          "dest": "disable_audio",
+          "help": "Disable audio for RBI sessions (on/off/default)",
+          "name": "--disable-audio",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-isc"
+          ],
+          "dest": "ignore_server_cert",
+          "help": "Ignore server certificate errors (on/off/default)",
+          "name": "--ignore-server-cert",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-k"
+          ],
+          "dest": "key_events",
+          "help": "Toggle Key Events settings",
+          "name": "--key-events",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-r"
+          ],
+          "dest": "record",
+          "help": "The record UID or path of the RBI record.",
+          "name": "--record",
+          "required": true,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-rbi"
+          ],
+          "dest": "rbi",
+          "help": "Set RBI permissions",
+          "name": "--remote-browser-isolation",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-s"
+          ],
+          "dest": "silent",
+          "help": "Silent mode - don't print PAM User, PAM Config etc.",
+          "name": "--silent",
+          "required": false,
+          "type": "flag"
+        }
+      ],
+      "group_command": "pam rbi edit",
+      "module": "keepercommander.commands.tunnel_and_connections"
+    }
+  ],
+  "enforcements": [
+    {
+      "category": "ACCOUNT_ENFORCEMENTS",
+      "id": 226,
+      "name": "ALLOW_CONFIGURE_ROTATION_SETTINGS",
+      "type": "BOOLEAN"
+    },
+    {
+      "category": "ACCOUNT_ENFORCEMENTS",
+      "id": 219,
+      "name": "ALLOW_PAM_DISCOVERY",
+      "type": "BOOLEAN"
+    },
+    {
+      "category": "ACCOUNT_ENFORCEMENTS",
+      "id": 225,
+      "name": "ALLOW_PAM_GATEWAY",
+      "type": "BOOLEAN"
+    },
+    {
+      "category": "ACCOUNT_ENFORCEMENTS",
+      "id": 218,
+      "name": "ALLOW_PAM_ROTATION",
+      "type": "BOOLEAN"
+    },
+    {
+      "category": "ACCOUNT_ENFORCEMENTS",
+      "id": 227,
+      "name": "ALLOW_ROTATE_CREDENTIALS",
+      "type": "BOOLEAN"
+    },
+    {
+      "category": "VAULT_FEATURES",
+      "id": 212,
+      "name": "ALLOW_SECRETS_MANAGER",
+      "type": "BOOLEAN"
+    }
+  ],
+  "generated_at": "2026-04-24T16:53:27+00:00",
+  "groups": [
+    {
+      "class": "PAMProjectCommand",
+      "group": "pam project",
+      "subcommands": [
+        {
+          "class": "PAMProjectExtendCommand",
+          "help": "Extend PAM Project by importing additional data",
+          "module": "keepercommander.commands.pam_import.extend",
+          "name": "extend"
+        },
+        {
+          "class": "PAMProjectImportCommand",
+          "help": "Import PAM Project",
+          "module": "keepercommander.commands.pam_import.edit",
+          "name": "import"
+        }
+      ]
+    },
+    {
+      "class": "PAMRbiCommand",
+      "group": "pam rbi",
+      "subcommands": [
+        {
+          "class": "PAMRbiEditCommand",
+          "help": "Edit Remote Browser Isolation settings",
+          "module": "keepercommander.commands.tunnel_and_connections",
+          "name": "edit"
+        }
+      ]
+    }
+  ],
+  "record_types": {
+    "login": {
+      "pam_settings": {
+        "connection": [],
+        "options": [],
+        "port_forward": []
+      },
+      "top_level_keys": [
+        "pam_data"
+      ]
+    },
+    "pamDatabase": {
+      "pam_settings": {
+        "connection": [],
+        "options": [],
+        "port_forward": []
+      },
+      "top_level_keys": [
+        "pam_data"
+      ]
+    },
+    "pamDirectory": {
+      "pam_settings": {
+        "connection": [],
+        "options": [],
+        "port_forward": []
+      },
+      "top_level_keys": [
+        "pam_data"
+      ]
+    },
+    "pamMachine": {
+      "pam_settings": {
+        "connection": [
+          "administrative_credentials",
+          "allow_supply_user",
+          "ca_certificate",
+          "client_certificate",
+          "client_key",
+          "color_scheme",
+          "command",
+          "container",
+          "destination_host",
+          "destination_port",
+          "disable_audio",
+          "disable_authentication",
+          "disable_copy",
+          "disable_dynamic_resizing",
+          "disable_paste",
+          "enable_full_window_drag",
+          "enable_wallpaper",
+          "font_size",
+          "ignore_server_cert",
+          "launch_credentials",
+          "load_balance_info",
+          "login_failure_regex",
+          "login_success_regex",
+          "namespace",
+          "password_regex",
+          "pod_name",
+          "port",
+          "preconnection_blob",
+          "preconnection_id",
+          "protocol",
+          "public_host_key",
+          "recording_include_keys",
+          "security",
+          "sftp",
+          "username_regex"
+        ],
+        "options": [
+          "ai_settings",
+          "ai_terminate_session_on_detection",
+          "ai_threat_detection",
+          "connections",
+          "graphical_session_recording",
+          "jit_settings",
+          "remote_browser_isolation",
+          "rotation",
+          "text_session_recording",
+          "tunneling"
+        ],
+        "port_forward": [
+          "port",
+          "reuse_port"
+        ]
+      },
+      "top_level_keys": [
+        "attachments",
+        "host",
+        "instance_id",
+        "instance_name",
+        "notes",
+        "operating_system",
+        "otp",
+        "pam_settings",
+        "port",
+        "provider_group",
+        "provider_region",
+        "scripts",
+        "ssl_verification",
+        "title",
+        "type"
+      ]
+    },
+    "pamRemoteBrowser": {
+      "pam_settings": {
+        "connection": [],
+        "options": [],
+        "port_forward": []
+      },
+      "top_level_keys": [
+        "pam_data"
+      ]
+    },
+    "pamUser": {
+      "pam_settings": {
+        "connection": [],
+        "options": [],
+        "port_forward": []
+      },
+      "top_level_keys": [
+        "pam_data"
+      ]
+    }
+  }
+}

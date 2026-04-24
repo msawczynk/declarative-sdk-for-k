@@ -7,6 +7,34 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- `scripts/sync_upstream.py` — extracts the Keeper Commander capability
+  surface (registered PAM group commands, argparse flags for
+  `pam project import` / `extend` / `pam rbi edit` /
+  `pam connection edit`, `ALLOW_PAM_*` enforcements, record-type field
+  sets from `pam_import/README.md`) into
+  `docs/CAPABILITY_MATRIX.md` + `docs/capability-snapshot.json`. Runs
+  in `--check` mode for CI drift detection.
+- `docs/CAPABILITY_MATRIX.md` + `docs/capability-snapshot.json` —
+  pinned upstream surface for Commander `231f557c`.
+- `.commander-pin` — single-line Commander SHA that CI clones and
+  diffs against (`drift-check` job in `.github/workflows/ci.yml`).
+- Schema hardening (`pam-environment.v1.schema.json`): typed fields
+  for RDP options (`security`, `disable_authentication`,
+  `load_balance_info`, `preconnection_id`, `preconnection_blob`,
+  `disable_audio`, `disable_dynamic_resizing`, `enable_full_window_drag`,
+  `enable_wallpaper`), audio (`audio_channels`, `audio_bps`,
+  `audio_sample_rate`), and `text_session_recording` on
+  `pam_remote_browser.options`. Non-breaking.
+- `docs/COMMANDER.md`: new "Automated capability mirror" section
+  linking to the pinned matrix and the DOR drift policy.
+
+### Changed
+- Sibling `keeper-pam-declarative` repo reframed as a capability
+  mirror (not a forward-looking Design of Record). Retired 10 design
+  docs, rewrote README + SCHEMA_CONTRACT + PLATFORM_REFERENCE, added
+  DRIFT_POLICY. The authoritative capability matrix now lives in this
+  repo under `docs/` and is auto-generated.
+
 - Initial public release scaffolding: `LICENSE` (MIT), `SECURITY.md`, `CHANGELOG.md`.
 - GitHub Actions CI: ruff + mypy + pytest on Python 3.11 / 3.12 / 3.13.
 - `AGENTS.md` — agent- and LLM-oriented operating manual (exit-code map,

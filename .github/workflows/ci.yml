@@ -57,10 +57,35 @@ jobs:
           # workflow (not in public CI).
           DSK_CI: "1"
 
+  drift-check:
+    name: drift-check (upstream capability mirror)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read Commander pin
+        id: pin
+        run: echo "sha=$(tr -d '[:space:]' < .commander-pin)" >> "$GITHUB_OUTPUT"
+      - name: Clone Commander at pinned SHA
+        uses: actions/checkout@v4
+        with:
+          repository: Keeper-Security/Commander
+          ref: ${{ steps.pin.outputs.sha }}
+          path: Commander
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Ensure generated matrix matches upstream
+        run: |
+          python scripts/sync_upstream.py --check --commander ./Commander
+        # Failure mode: either the pin moved and docs/CAPABILITY_MATRIX.md
+        # + docs/capability-snapshot.json need regenerating (run the script
+        # without --check locally and commit), or someone hand-edited one
+        # of those files (they're generated; don't).
+
   build:
     name: build (sdist + wheel)
     runs-on: ubuntu-latest
-    needs: [lint, typecheck, test]
+    needs: [lint, typecheck, test, drift-check]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

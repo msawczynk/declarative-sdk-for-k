@@ -305,7 +305,21 @@
         "recording_include_keys": { "type": "boolean" },
         "disable_copy": { "type": "boolean" },
         "disable_paste": { "type": "boolean" },
-        "sftp": { "$ref": "#/$defs/sftp_block" }
+        "sftp": { "$ref": "#/$defs/sftp_block" },
+
+        "security": { "type": "string", "enum": ["any", "rdp", "nla", "tls", "vmconnect"] },
+        "disable_authentication": { "type": "boolean" },
+        "load_balance_info": { "type": "string" },
+        "preconnection_id": { "type": "string" },
+        "preconnection_blob": { "type": "string" },
+        "disable_audio": { "type": "boolean" },
+        "disable_dynamic_resizing": { "type": "boolean" },
+        "enable_full_window_drag": { "type": "boolean" },
+        "enable_wallpaper": { "type": "boolean" },
+
+        "audio_channels": { "type": "integer", "minimum": 1, "maximum": 2 },
+        "audio_bps": { "type": "integer", "minimum": 8, "maximum": 32 },
+        "audio_sample_rate": { "type": "integer", "minimum": 8000, "maximum": 48000 }
       }
     },
     "pam_settings": {
@@ -480,12 +494,13 @@
               "additionalProperties": false,
               "properties": {
                 "remote_browser_isolation": { "$ref": "#/$defs/on_off" },
-                "graphical_session_recording": { "$ref": "#/$defs/on_off" }
+                "graphical_session_recording": { "$ref": "#/$defs/on_off" },
+                "text_session_recording": { "$ref": "#/$defs/on_off" }
               }
             },
             "connection": {
               "type": "object",
-              "additionalProperties": false,
+              "additionalProperties": true,
               "properties": {
                 "protocol": { "const": "http" },
                 "autofill_credentials_uid_ref": { "$ref": "#/$defs/uid_ref" },
@@ -496,7 +511,12 @@
                 "recording_include_keys": { "type": "boolean" },
                 "disable_copy": { "type": "boolean" },
                 "disable_paste": { "type": "boolean" },
-                "ignore_server_cert": { "type": "boolean" }
+                "ignore_server_cert": { "type": "boolean" },
+
+                "disable_audio": { "type": "boolean" },
+                "audio_channels": { "type": "integer", "minimum": 1, "maximum": 2 },
+                "audio_bps": { "type": "integer", "minimum": 8, "maximum": 32 },
+                "audio_sample_rate": { "type": "integer", "minimum": 8000, "maximum": 48000 }
               }
             }
           }
