@@ -573,9 +573,21 @@ def render_markdown(snapshot: dict[str, Any], warnings: Sequence[str]) -> str:
 
 
 def _snapshot_for_compare(snapshot: dict[str, Any]) -> dict[str, Any]:
-    """Strip volatile fields before a drift comparison."""
+    """Strip volatile fields before a drift comparison.
+
+    ``generated_at`` is always stripped (pure timestamp).
+    ``commander_branch`` is also stripped: in CI we clone Commander by
+    SHA (``actions/checkout@v4`` with ``ref: <sha>`` and
+    ``fetch-depth: 0``) and the resulting working tree has no local
+    ``refs/heads/*`` or ``refs/remotes/origin/*`` pointing at HEAD, so
+    ``git for-each-ref --points-at=HEAD`` falls through to ``detached``.
+    Locally a human-readable branch name (``release`` for the pinned
+    upstream) survives. The SHA is the real identity for drift
+    purposes — branch name is an environment artefact.
+    """
     stripped = dict(snapshot)
     stripped.pop("generated_at", None)
+    stripped.pop("commander_branch", None)
     return stripped
 
 
