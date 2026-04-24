@@ -32,7 +32,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from keeper_sdk.core.diff import ChangeKind
+from keeper_sdk.core.diff import _DIFF_IGNORED_FIELDS, ChangeKind
 from keeper_sdk.core.errors import CapabilityError, CollisionError, DeleteUnsupportedError
 from keeper_sdk.core.interfaces import ApplyOutcome, LiveRecord, Provider
 from keeper_sdk.core.metadata import (
@@ -163,6 +163,11 @@ class CommanderCliProvider(Provider):
                             "keeper_uid": live.keeper_uid,
                         }
                     )
+                    drift = _field_drift(change.after or {}, live.payload)
+                    if drift:
+                        outcome.details["field_drift"] = drift
+                    else:
+                        outcome.details["verified"] = True
 
         if deletes:
             raise DeleteUnsupportedError(
@@ -232,6 +237,42 @@ def _utc_now() -> str:
 
 def _has_existing(changes: list[Any]) -> bool:
     return any(c.kind is ChangeKind.UPDATE for c in changes)
+
+
+def _field_drift(expected: dict[str, Any], observed: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Return only fields whose expected/observed values differ."""
+    ignored = _DIFF_IGNORED_FIELDS | {
+        "keeper_uid",
+        "record_uid",
+        "record_title",
+        "custom_fields",
+        "custom",
+        "type",
+        "title",
+        "_legacy_type_fallback",
+        "_note",
+    }
+    drift: dict[str, dict[str, Any]] = {}
+    for key, expected_value in expected.items():
+        if key in ignored or expected_value is None:
+            continue
+        observed_value = observed.get(key)
+        if key == "port" and _port_value(expected_value) == _port_value(observed_value):
+            continue
+        if expected_value != observed_value:
+            drift[key] = {
+                "expected": expected_value,
+                "observed": observed_value,
+            }
+    return drift
+
+
+def _port_value(value: Any) -> Any:
+    if isinstance(value, str):
+        stripped = value.strip()
+        if stripped.isdigit():
+            return int(stripped)
+    return value
 
 
 def _records_from_export(data: Any) -> list[LiveRecord]:

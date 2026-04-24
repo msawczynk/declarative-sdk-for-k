@@ -187,6 +187,8 @@ def test_apply_writes_marker_after_create(monkeypatch: pytest.MonkeyPatch) -> No
     ]
     assert outcomes[0].details["marker_written"] is True
     assert outcomes[0].details["keeper_uid"] == "keeper-created-uid"
+    assert outcomes[0].details["verified"] is True
+    assert "field_drift" not in outcomes[0].details
     assert calls[-1][:4] == ["record-update", "--record", "keeper-created-uid", "-cf"]
     label, payload = calls[-1][4].split("=", 1)
     assert label == "keeper_declarative_manager"
@@ -278,3 +280,145 @@ def test_apply_skips_marker_when_record_not_discoverable(monkeypatch: pytest.Mon
     assert outcomes[0].details["marker_written"] is False
     assert outcomes[0].details["reason"] == "record not found after apply"
     assert all(call[0] != "record-update" for call in calls)
+
+
+def test_apply_verifies_fields_match(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper")
+    monkeypatch.setattr("keeper_sdk.providers.commander_cli._utc_now", lambda: "2026-04-24T12:34:56Z")
+
+    calls: list[list[str]] = []
+
+    def recorder(self: CommanderCliProvider, args: list[str]) -> str:
+        calls.append(args)
+        if args[:3] == ["pam", "project", "import"]:
+            return ""
+        if args[:3] == ["pam", "project", "export"]:
+            return json.dumps(
+                {
+                    "resources": [
+                        {
+                            "record_uid": "keeper-created-uid",
+                            "title": "db-prod",
+                            "type": "pamDatabase",
+                            "host": "db.example.com",
+                            "port": 5432,
+                        }
+                    ]
+                }
+            )
+        if args[:2] == ["record-update", "--record"]:
+            return ""
+        raise AssertionError(f"unexpected command: {args}")
+
+    monkeypatch.setattr(CommanderCliProvider, "_run_cmd", recorder)
+    provider = CommanderCliProvider(
+        folder_uid="folder-uid",
+        manifest_source={
+            "version": "1",
+            "name": "customer-prod",
+            "resources": [
+                {
+                    "uid_ref": "prod-db",
+                    "type": "pamDatabase",
+                    "title": "db-prod",
+                    "host": "db.example.com",
+                    "port": 5432,
+                }
+            ],
+        },
+    )
+    plan = Plan(
+        manifest_name="customer-prod",
+        changes=[
+            Change(
+                kind=ChangeKind.CREATE,
+                uid_ref="prod-db",
+                resource_type="pamDatabase",
+                title="db-prod",
+                after={"title": "db-prod", "host": "db.example.com", "port": "5432"},
+            )
+        ],
+        order=["prod-db"],
+    )
+
+    outcomes = provider.apply_plan(plan)
+
+    assert [call[:3] for call in calls] == [
+        ["pam", "project", "import"],
+        ["pam", "project", "export"],
+        ["record-update", "--record", "keeper-created-uid"],
+    ]
+    assert outcomes[0].details["marker_written"] is True
+    assert outcomes[0].details["verified"] is True
+    assert "field_drift" not in outcomes[0].details
+
+
+def test_apply_reports_field_drift(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper")
+    monkeypatch.setattr("keeper_sdk.providers.commander_cli._utc_now", lambda: "2026-04-24T12:34:56Z")
+
+    calls: list[list[str]] = []
+
+    def recorder(self: CommanderCliProvider, args: list[str]) -> str:
+        calls.append(args)
+        if args[:3] == ["pam", "project", "import"]:
+            return ""
+        if args[:3] == ["pam", "project", "export"]:
+            return json.dumps(
+                {
+                    "resources": [
+                        {
+                            "record_uid": "keeper-created-uid",
+                            "title": "db-prod",
+                            "type": "pamDatabase",
+                            "host": "db-observed.example.com",
+                            "port": 5432,
+                        }
+                    ]
+                }
+            )
+        if args[:2] == ["record-update", "--record"]:
+            return ""
+        raise AssertionError(f"unexpected command: {args}")
+
+    monkeypatch.setattr(CommanderCliProvider, "_run_cmd", recorder)
+    provider = CommanderCliProvider(
+        folder_uid="folder-uid",
+        manifest_source={
+            "version": "1",
+            "name": "customer-prod",
+            "resources": [
+                {
+                    "uid_ref": "prod-db",
+                    "type": "pamDatabase",
+                    "title": "db-prod",
+                    "host": "db.example.com",
+                    "port": 5432,
+                }
+            ],
+        },
+    )
+    plan = Plan(
+        manifest_name="customer-prod",
+        changes=[
+            Change(
+                kind=ChangeKind.CREATE,
+                uid_ref="prod-db",
+                resource_type="pamDatabase",
+                title="db-prod",
+                after={"title": "db-prod", "host": "db.example.com", "port": "5432"},
+            )
+        ],
+        order=["prod-db"],
+    )
+
+    outcomes = provider.apply_plan(plan)
+
+    assert outcomes[0].details["marker_written"] is True
+    assert "verified" not in outcomes[0].details
+    assert outcomes[0].details["field_drift"] == {
+        "host": {
+            "expected": "db.example.com",
+            "observed": "db-observed.example.com",
+        }
+    }
