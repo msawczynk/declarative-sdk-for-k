@@ -65,8 +65,16 @@ class CommanderCliProvider(Provider):
 
     def discover(self) -> list[LiveRecord]:
         if not self._folder_uid:
-            return []
+            raise CapabilityError(
+                reason=(
+                    "CommanderCliProvider requires folder_uid "
+                    "(or KEEPER_DECLARATIVE_FOLDER) to discover live state"
+                ),
+                next_action="set --folder-uid on the CLI or KEEPER_DECLARATIVE_FOLDER env var",
+            )
         payload = self._run_cmd(["pam", "project", "export", "--folder", self._folder_uid, "--format", "json"])
+        if not payload.strip():
+            raise CapabilityError(reason="keeper pam project export produced no output")
         try:
             data = json.loads(payload)
         except ValueError as exc:
@@ -162,17 +170,26 @@ def _has_existing(changes: list[Any]) -> bool:
 
 def _records_from_export(data: Any) -> list[LiveRecord]:
     records: list[LiveRecord] = []
-    if not isinstance(data, dict):
+    export = _unwrap_export_payload(data)
+    if not isinstance(export, dict):
         return records
     for collection_key in ("resources", "users", "pam_configurations", "gateways"):
-        for item in data.get(collection_key) or []:
+        for item in export.get(collection_key) or []:
             if not isinstance(item, dict):
                 continue
             keeper_uid = item.get("record_uid") or item.get("uid") or item.get("keeper_uid")
             if not keeper_uid:
                 continue
-            title = item.get("title") or item.get("name") or ""
-            resource_type = item.get("type") or _kind_from_collection(collection_key)
+            title = _title_from_item(item)
+            payload = {k: v for k, v in item.items() if k not in {"record_uid"}}
+            if title == "":
+                payload["_note"] = "empty title"
+            resource_type = item.get("type")
+            if not resource_type:
+                resource_type = _kind_from_collection(collection_key)
+                if not resource_type:
+                    continue
+                payload["_legacy_type_fallback"] = True
             marker_raw = _extract_marker_field(item)
             marker = decode_marker(marker_raw)
             records.append(
@@ -180,20 +197,42 @@ def _records_from_export(data: Any) -> list[LiveRecord]:
                     keeper_uid=keeper_uid,
                     title=title,
                     resource_type=resource_type,
-                    payload={k: v for k, v in item.items() if k not in {"record_uid"}},
+                    payload=payload,
                     marker=marker,
                 )
             )
     return records
 
 
-def _kind_from_collection(collection: str) -> str:
+def _unwrap_export_payload(data: Any) -> Any:
+    if isinstance(data, list):
+        for item in data:
+            unwrapped = _unwrap_export_payload(item)
+            if isinstance(unwrapped, dict):
+                return unwrapped
+        return None
+    if not isinstance(data, dict):
+        return None
+    project = data.get("project")
+    if isinstance(project, dict):
+        return project
+    return data
+
+
+def _title_from_item(item: dict[str, Any]) -> str:
+    for key in ("title", "record_title", "name"):
+        value = item.get(key)
+        if value is not None:
+            return value
+    return ""
+
+
+def _kind_from_collection(collection: str) -> str | None:
     return {
-        "resources": "pamResource",
         "users": "pamUser",
         "pam_configurations": "pam_configuration",
         "gateways": "gateway",
-    }.get(collection, collection)
+    }.get(collection)
 
 
 def _extract_marker_field(item: dict[str, Any]) -> str | None:
