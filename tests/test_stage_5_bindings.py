@@ -11,6 +11,7 @@ stage-5 exit code contract or remediation text should update both.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Any
 
@@ -228,6 +229,62 @@ def test_ksm_app_name_mismatch(monkeypatch: pytest.MonkeyPatch) -> None:
     assert any(
         "ksm_application_name='Expected App'" in issue and "Actual App" in issue for issue in issues
     )
+
+
+def test_ksm_app_name_uses_cached_app_list_and_surfaces_unverifiable_binding(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest = _Manifest(
+        gateways=[_Gateway(uid_ref="gw", name="GW", ksm_application_name="Expected App")],
+        pam_configurations=[],
+    )
+
+    provider = _provider_with_rows(
+        monkeypatch,
+        gateway_rows=[
+            {
+                "app_title": "",
+                "app_uid": "A1",
+                "gateway_name": "GW",
+                "gateway_uid": "G1",
+            }
+        ],
+        config_rows=[],
+    )
+    pass_calls: list[list[str]] = []
+
+    def _pass_run_cmd(args: list[str]) -> str:
+        pass_calls.append(args)
+        assert args == ["secrets-manager", "app", "list", "--format", "json"]
+        return json.dumps({"applications": [{"app_name": "Expected App", "app_uid": "A1"}]})
+
+    monkeypatch.setattr(provider, "_run_cmd", _pass_run_cmd)
+    assert provider.check_tenant_bindings(manifest) == []
+    assert provider.check_tenant_bindings(manifest) == []
+    assert pass_calls == [["secrets-manager", "app", "list", "--format", "json"]]
+
+    fail_provider = _provider_with_rows(
+        monkeypatch,
+        gateway_rows=[
+            {
+                "app_title": "",
+                "app_uid": "A1",
+                "gateway_name": "GW",
+                "gateway_uid": "G1",
+            }
+        ],
+        config_rows=[],
+    )
+
+    def _fail_run_cmd(args: list[str]) -> str:
+        assert args == ["secrets-manager", "app", "list", "--format", "json"]
+        return json.dumps({"applications": []})
+
+    monkeypatch.setattr(fail_provider, "_run_cmd", _fail_run_cmd)
+    issues = fail_provider.check_tenant_bindings(manifest)
+    assert len(issues) == 1
+    assert "could not be verified" in issues[0]
+    assert "next_action=confirm the gateway's bound KSM application in the Keeper UI" in issues[0]
 
 
 def test_multiple_issues_accumulate(monkeypatch: pytest.MonkeyPatch) -> None:

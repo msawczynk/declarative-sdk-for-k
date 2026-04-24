@@ -100,6 +100,7 @@ class CommanderCliProvider(Provider):
         # the lifetime of the provider.
         self._keeper_params: Any | None = None
         self._keeper_login_attempted = False
+        self._ksm_app_rows_cache: list[dict[str, str]] | None = None
 
         if not shutil.which(self._bin):
             raise CapabilityError(
@@ -173,7 +174,9 @@ class CommanderCliProvider(Provider):
         confirm a live PAM configuration with the same title resolves and
         carries a valid ``shared_folder_uid`` + ``gateway_uid`` pairing.
         When a ``gateway_uid_ref`` is declared on a PAM configuration, verify
-        the live config is actually paired with that gateway.
+        the live config is actually paired with that gateway. When a gateway
+        declares ``ksm_application_name``, verify the tenant's bound KSM app
+        matches it or report that the CLI output cannot prove the binding.
 
         Each returned string is a human-readable binding failure ready for
         ``click.echo(..., err=True)`` and maps 1:1 to a stage-5 violation
@@ -243,11 +246,18 @@ class CommanderCliProvider(Provider):
                 continue
             gateway_uid_by_ref[uid_ref] = row["gateway_uid"]
             declared_app = _get(gateway, "ksm_application_name")
-            if declared_app and row.get("app_title") and declared_app != row["app_title"]:
-                issues.append(
-                    f"gateway '{name}' declares ksm_application_name='{declared_app}' "
-                    f"but tenant has it bound to '{row['app_title']}'"
-                )
+            if declared_app:
+                actual_app, binding_issue = self._gateway_bound_app_name(row)
+                if actual_app and declared_app != actual_app:
+                    issues.append(
+                        f"gateway '{name}' declares ksm_application_name='{declared_app}' "
+                        f"but tenant has it bound to '{actual_app}'"
+                    )
+                elif binding_issue:
+                    issues.append(
+                        f"gateway '{name}' declares ksm_application_name='{declared_app}' "
+                        f"but the tenant binding could not be verified: {binding_issue}"
+                    )
 
         for config in pam_configs:
             title = _get(config, "title")
@@ -689,6 +699,80 @@ class CommanderCliProvider(Provider):
                 }
             )
         return rows
+
+    def _ksm_app_rows(self) -> list[dict[str, str]]:
+        """Return KSM application rows, caching the JSON payload per provider."""
+        if self._ksm_app_rows_cache is not None:
+            return self._ksm_app_rows_cache
+        raw = self._run_cmd(["secrets-manager", "app", "list", "--format", "json"])
+        data = _load_json(raw, command="secrets-manager app list --format json")
+        if isinstance(data, dict):
+            items = data.get("applications") or []
+        elif isinstance(data, list):
+            items = data
+        else:
+            items = []
+        rows: list[dict[str, str]] = []
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            rows.append(
+                {
+                    "app_title": str(
+                        item.get("app_name")
+                        or item.get("title")
+                        or item.get("name")
+                        or item.get("application_name")
+                        or ""
+                    ),
+                    "app_uid": str(
+                        item.get("app_uid") or item.get("uid") or item.get("application_uid") or ""
+                    ),
+                }
+            )
+        self._ksm_app_rows_cache = rows
+        return rows
+
+    def _gateway_bound_app_name(self, row: dict[str, str]) -> tuple[str | None, str | None]:
+        """Resolve the KSM app title for a gateway row, or explain why not."""
+        app_title = row.get("app_title") or ""
+        if app_title:
+            return app_title, None
+
+        app_uid = row.get("app_uid") or ""
+        next_action = (
+            "next_action=confirm the gateway's bound KSM application in the Keeper UI "
+            "(PAM Gateway details / Secrets Manager Applications) and update the manifest "
+            "or tenant to match"
+        )
+        if not app_uid:
+            return (
+                None,
+                "CLI output exposed neither a KSM app name nor a KSM app UID for this gateway; "
+                f"`secrets-manager app list --format json` is application-only and cannot link "
+                f"an unlabelled gateway to an app. {next_action}",
+            )
+
+        try:
+            app_rows = self._ksm_app_rows()
+        except (CapabilityError, OSError) as exc:
+            return (
+                None,
+                "CLI output exposed only KSM app UID "
+                f"'{app_uid}', and `secrets-manager app list --format json` could not be read: "
+                f"{exc}. {next_action}",
+            )
+
+        app_by_uid = {item["app_uid"]: item for item in app_rows if item.get("app_uid")}
+        resolved = app_by_uid.get(app_uid)
+        if resolved and resolved.get("app_title"):
+            return resolved["app_title"], None
+        return (
+            None,
+            "CLI output exposed only KSM app UID "
+            f"'{app_uid}', and `secrets-manager app list --format json` did not resolve it "
+            f"to a visible application name. {next_action}",
+        )
 
     def _pam_config_rows(self) -> list[dict[str, str]]:
         """Return PAM configuration rows using Commander's JSON output.

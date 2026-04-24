@@ -11,10 +11,14 @@ PRs that close them so the next agent can tell at a glance what's left.
       **shrink** — add `x-preview` on `rotation_settings`,
       `jit_settings`, `gateway.mode: create`, top-level `projects[]`.
       Validation rejects them unless `DSK_PREVIEW=1`.
-- [ ] Examples under `examples/` must run clean against
-      `--provider commander` with no preview flag.
-- [ ] `pam_configuration_uid_ref` linking implemented OR marked
-      preview with a stub.
+- [x] Examples under `examples/` now validate clean with no preview
+      flag and pass a `--provider mock` no-conflict `plan` check in CI;
+      Commander live-smoke covers the same resource shapes via
+      `scripts/smoke/scenarios.py`.
+- [x] `pam_configuration_uid_ref` linking implemented OR marked
+      preview with a stub. Current v1.0 contract: in-manifest linking
+      is GA; cross-manifest / live-tenant-config linking is deferred
+      and fails at stage 3 (`tests/test_uid_ref_gate.py::test_validate_rejects_cross_manifest_pam_configuration_uid_ref`).
 - [ ] Upstream DOR `keeper-pam-declarative/` updated to remove the
       mismatched schema surface.
 
@@ -34,10 +38,12 @@ PRs that close them so the next agent can tell at a glance what's left.
 - [x] MIT `LICENSE`, `CHANGELOG.md`, `SECURITY.md`.
 - [x] GitHub Actions: ruff + mypy + pytest 3.11/3.12/3.13.
 - [x] `pyproject.toml` pins `keepercommander>=17.2.13,<18`.
-- [ ] First green CI run on `main`.
-- [ ] PyPI publish workflow (`on: release: published`) gated by a
-      protected `pypi-publish` environment with an OIDC trusted
-      publisher — no API tokens in repo secrets.
+- [x] First green CI run on `main` (`fb6fb8b`).
+- [x] PyPI publish workflow (`on: release: published`) landed in
+      `.github/workflows/publish.yml`; maintainer still must complete
+      the protected `pypi-publish` environment + PyPI OIDC trusted
+      publisher setup before the first real release — no API tokens in
+      repo secrets.
 - [ ] Signed release tag `v1.0.0` with `gh release create`.
 
 ### 4. Login path usability
@@ -78,14 +84,25 @@ flow; each scenario only diverges at `resources[]` and the post-apply
 invariant verifier. See `scripts/smoke/scenarios.py` and
 `tests/test_smoke_scenarios.py`.
 
+## Recently closed (this session)
+
+- `fb6fb8b` — first green CI run on `main`; drift-check fix kept the
+  upstream mirror job green.
+- `a1f859e` — examples/live-shape coverage closed via the scenarios
+  registry for `pamDatabase`, `pamDirectory`, and `pamRemoteBrowser`.
+- `870bffe` — `validate --online` stage-5 tenant-binding checks shipped.
+- `581bddb` — CI drift-check job hardened with Commander deps and
+  detached-HEAD normalization.
+- `80614e5` — CI pinning hardened with full Commander SHA + `fetch-depth: 0`.
+
 ## Hardening (non-blocking but tracked)
 
 - [ ] Remove unused `DeleteUnsupportedError` OR wire it as a narrower
       exception than `CapabilityError`.
-- [ ] Read `gateway.ksm_application_name` in `reference_existing`
+- [x] Read `gateway.ksm_application_name` in `reference_existing`
       mode (currently parsed and dropped).
 - [ ] Snapshot tests for `RichRenderer` table layouts.
-- [ ] Expand `redact()` patterns (bearer tokens, JWTs, KSM URLs).
+- [x] Expand `redact()` patterns (bearer tokens, JWTs, KSM URLs).
 - [ ] `tests/test_perf.py` → add `resource.getrusage` memory
       assertions (currently prints only).
 - [ ] Map DOR `TEST_PLAN.md` scenarios to SDK tests (~6 still zero-cov:

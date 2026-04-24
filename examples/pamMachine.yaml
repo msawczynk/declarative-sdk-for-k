@@ -1,0 +1,60 @@
+version: "1"
+name: example-pam-machine
+
+# Minimal manifest demonstrating a single Linux pamMachine resource
+# bound to a referenced gateway + pam_configuration. No preview keys
+# (no rotation_settings, jit_settings, gateway.mode: create, top-level
+# projects[]) so this validates clean WITHOUT DSK_PREVIEW=1.
+#
+# Run:
+#   dsk validate examples/pamMachine.yaml
+#   dsk plan     examples/pamMachine.yaml --provider mock --json
+#
+# To exercise the same shape live against a real tenant, see
+# scripts/smoke/scenarios.py::pamMachine which is the parametrised
+# version of this example and is what live-smoke runs.
+
+shared_folders:
+  resources:
+    uid_ref: example-sf-resources
+    manage_users: true
+    manage_records: true
+    can_edit: true
+    can_share: true
+
+gateways:
+  - uid_ref: example-gw
+    name: "Example Gateway"
+    mode: reference_existing
+
+pam_configurations:
+  - uid_ref: example-cfg
+    environment: local
+    title: "Example Local PAM Configuration"
+    gateway_uid_ref: example-gw
+    options:
+      connections: "on"
+      rotation: "off"
+      tunneling: "on"
+    network_id: example-net
+    network_cidr: 10.16.9.0/28
+
+resources:
+  - uid_ref: example-host-1
+    type: pamMachine
+    title: "example-host-1"
+    pam_configuration_uid_ref: example-cfg
+    shared_folder: resources
+    host: 10.16.9.10
+    port: "22"
+    ssl_verification: true
+    operating_system: Linux
+    pam_settings:
+      options:
+        connections: "on"
+        tunneling: "on"
+      allow_supply_host: false
+      connection:
+        protocol: ssh
+        port: "22"
+        allow_supply_user: true

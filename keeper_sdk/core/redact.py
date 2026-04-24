@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 # Field substrings that must never be rendered.
@@ -18,6 +19,15 @@ _SECRET_TOKENS = (
 )
 
 REDACTED = "***redacted***"
+
+_STRING_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("bearer_token", re.compile(r"Bearer [A-Za-z0-9._\-]+")),
+    (
+        "jwt_token",
+        re.compile(r"eyJ[A-Za-z0-9_\-]+\.eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+"),
+    ),
+    ("ksm_one_time_token", re.compile(r"(US|EU|AU|JP|CA|GOV):[A-Za-z0-9_\-]{20,}")),
+)
 
 
 def _is_secret(key: str) -> bool:
@@ -36,4 +46,8 @@ def redact(value: Any) -> Any:
         return [redact(item) for item in value]
     if isinstance(value, tuple):
         return tuple(redact(item) for item in value)
+    if isinstance(value, str):
+        for _name, pattern in _STRING_PATTERNS:
+            value = pattern.sub(REDACTED, value)
+        return value
     return value

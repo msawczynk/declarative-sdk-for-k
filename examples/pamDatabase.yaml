@@ -1,0 +1,56 @@
+version: "1"
+name: example-pam-database
+
+# Minimal pamDatabase manifest (PostgreSQL). Same envelope as
+# pamMachine.yaml — gateway + pam_configuration + one resource. No
+# preview keys.
+#
+# Run:
+#   dsk validate examples/pamDatabase.yaml
+#   dsk plan     examples/pamDatabase.yaml --provider mock --json
+#
+# Live equivalent: scripts/smoke/scenarios.py::pamDatabase.
+
+shared_folders:
+  resources:
+    uid_ref: example-sf-resources
+    manage_users: true
+    manage_records: true
+    can_edit: true
+    can_share: true
+
+gateways:
+  - uid_ref: example-gw
+    name: "Example Gateway"
+    mode: reference_existing
+
+pam_configurations:
+  - uid_ref: example-cfg
+    environment: local
+    title: "Example Local PAM Configuration"
+    gateway_uid_ref: example-gw
+    options:
+      connections: "on"
+      tunneling: "on"
+    network_id: example-net
+    network_cidr: 10.16.9.0/28
+
+resources:
+  - uid_ref: example-db-1
+    type: pamDatabase
+    title: "example-db-1"
+    pam_configuration_uid_ref: example-cfg
+    shared_folder: resources
+    database_type: postgresql
+    database_id: example-db
+    host: 10.16.9.20
+    port: "5432"
+    use_ssl: true
+    pam_settings:
+      options:
+        connections: "on"
+        tunneling: "on"
+      connection:
+        protocol: postgresql
+        port: "5432"
+        default_database: example

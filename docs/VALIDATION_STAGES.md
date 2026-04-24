@@ -19,6 +19,14 @@ the specific failure class without parsing stderr.
 
 Success path (all stages pass) exits `0`.
 
+Stage 3 is also the current guard for `pam_configuration_uid_ref`
+scope. In-manifest linking is GA: every resource may point at a
+`pam_configuration.uid_ref` declared in the same manifest, and that
+continues to work. Cross-manifest / live-tenant-config linking is
+deferred to v1.1, so a resource whose `pam_configuration_uid_ref`
+targets a config that is not declared in the manifest currently fails
+as an unresolved reference and exits `3`.
+
 ## Exit code semantics
 
 - `0` (`EXIT_OK`) — validation passed all enabled stages.
@@ -102,7 +110,9 @@ Stage 4 is the gate: if enforcements block the session or the gateway
 doesn't exist, stage 5's detail-level binding checks can't run
 meaningfully. Stage 5 assumes the tenant is reachable and the gateway
 exists — it just verifies every declared binding inside that reachable
-surface lines up.
+surface lines up. If Commander CLI output cannot prove a gateway's
+`ksm_application_name` binding, stage 5 fails closed and points the
+operator at a manual Keeper UI check rather than silently passing.
 
 Both map to the same exit code (`5`) because both are "tenant side
 can't execute this manifest today." Operators get the specific cause

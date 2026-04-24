@@ -7,6 +7,10 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- `examples/`: minimal `pamMachine` / `pamDatabase` / `pamDirectory` /
+  `pamRemoteBrowser` manifests; CI validates + mock-plans every file.
+- `SCAFFOLD.md`: LLM-readable repo map + design-vs-shipped reconcile.
+- `ci(examples)`: new examples job + added to build needs.
 - `scripts/smoke/scenarios.py` — registered live-smoke matrix
   (`pamMachine`, `pamDatabase`, `pamDirectory`, `pamRemoteBrowser`).
   `smoke.py` now accepts `--scenario NAME`; the identity / sandbox /

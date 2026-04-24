@@ -1,0 +1,55 @@
+version: "1"
+name: example-pam-remote-browser
+
+# Minimal pamRemoteBrowser (RBI) manifest. Exercises the
+# pam_settings.connection / options sub-schemas. No preview keys.
+#
+# Run:
+#   dsk validate examples/pamRemoteBrowser.yaml
+#   dsk plan     examples/pamRemoteBrowser.yaml --provider mock --json
+#
+# Live equivalent: scripts/smoke/scenarios.py::pamRemoteBrowser.
+
+shared_folders:
+  resources:
+    uid_ref: example-sf-resources
+    manage_users: true
+    manage_records: true
+    can_edit: true
+    can_share: true
+
+gateways:
+  - uid_ref: example-gw
+    name: "Example Gateway"
+    mode: reference_existing
+
+pam_configurations:
+  - uid_ref: example-cfg
+    environment: local
+    title: "Example Local PAM Configuration"
+    gateway_uid_ref: example-gw
+    options:
+      connections: "on"
+      tunneling: "on"
+      remote_browser_isolation: "on"
+      graphical_session_recording: "on"
+    network_id: example-net
+    network_cidr: 10.16.9.0/28
+
+resources:
+  - uid_ref: example-rbi-1
+    type: pamRemoteBrowser
+    title: "example-rbi-1"
+    pam_configuration_uid_ref: example-cfg
+    shared_folder: resources
+    url: "https://example.invalid/login"
+    pam_settings:
+      options:
+        remote_browser_isolation: "on"
+        graphical_session_recording: "on"
+      connection:
+        protocol: http
+        allow_url_manipulation: false
+        disable_copy: true
+        disable_paste: true
+        ignore_server_cert: false

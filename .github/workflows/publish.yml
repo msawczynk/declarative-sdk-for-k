@@ -1,0 +1,40 @@
+# Requires one-time PyPI trusted publisher setup before first release:
+# project `declarative-sdk-for-k`, owner `msawczynk`, workflow `publish.yml`,
+# environment `pypi-publish`.
+# Docs: https://docs.pypi.org/trusted-publishers/
+name: Publish
+
+on:
+  release:
+    types: [published]
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi-publish
+      url: https://pypi.org/p/declarative-sdk-for-k
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build backend
+        run: pip install build
+
+      - name: Build distributions
+        run: python -m build
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
