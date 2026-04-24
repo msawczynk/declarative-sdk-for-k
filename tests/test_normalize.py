@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from keeper_sdk.core import dump_manifest, load_manifest, to_pam_import_json
+from keeper_sdk.core import load_manifest, to_pam_import_json
 from keeper_sdk.core.normalize import canonicalize
 
 
@@ -46,4 +46,5 @@ def test_to_pam_import_preserves_top_metadata(minimal_manifest_path: Path) -> No
     doc = manifest.model_dump(mode="python", exclude_none=True)
     converted = to_pam_import_json(doc)
     assert converted["version"] == "1"
-    assert converted["name"] == manifest.name
+    assert converted["project"] == manifest.name
+    assert "name" not in converted

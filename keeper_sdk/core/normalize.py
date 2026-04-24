@@ -137,7 +137,7 @@ def to_pam_import_json(manifest: dict[str, Any]) -> dict[str, Any]:
     canonical = canonicalize(manifest)
     lookup = _build_lookup(canonical)
 
-    out: dict[str, Any] = {"version": canonical.get("version"), "name": canonical.get("name")}
+    out: dict[str, Any] = {"version": canonical.get("version"), "project": canonical.get("name")}
     for key in (
         "projects",
         "shared_folders",
@@ -164,7 +164,7 @@ def from_pam_import_json(document: dict[str, Any], *, name: str | None = None) -
     doc = canonicalize(document)
     out: dict[str, Any] = {
         "version": doc.get("version", "1"),
-        "name": name or doc.get("name") or "exported",
+        "name": name or doc.get("project") or doc.get("name") or "exported",
     }
 
     used: set[str] = set()

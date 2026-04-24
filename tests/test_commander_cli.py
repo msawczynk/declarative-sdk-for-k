@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 
 import pytest
 
@@ -306,7 +307,7 @@ def test_apply_writes_marker_after_create(monkeypatch: pytest.MonkeyPatch) -> No
     outcomes = provider.apply_plan(plan)
 
     assert calls[:6] == [
-        ["pam", "project", "import", "--file", calls[0][4]],
+        ["pam", "project", "import", "--file", calls[0][4], "--name", "customer-prod"],
         ["ls", "--format", "json", "PAM Environments"],
         ["ls", "--format", "json", "pam-env-root"],
         ["ls", "--format", "json", "project-folder"],
@@ -460,7 +461,7 @@ def test_apply_verifies_fields_match(monkeypatch: pytest.MonkeyPatch) -> None:
     outcomes = provider.apply_plan(plan)
 
     assert calls[:6] == [
-        ["pam", "project", "import", "--file", calls[0][4]],
+        ["pam", "project", "import", "--file", calls[0][4], "--name", "customer-prod"],
         ["ls", "--format", "json", "PAM Environments"],
         ["ls", "--format", "json", "pam-env-root"],
         ["ls", "--format", "json", "project-folder"],
@@ -664,3 +665,24 @@ def test_apply_delete_without_keeper_uid_is_skipped(monkeypatch: pytest.MonkeyPa
     assert outcomes[0].keeper_uid == ""
     assert outcomes[0].details["skipped"] is True
     assert outcomes[0].details["reason"] == "no keeper_uid on delete change"
+
+
+def test_run_cmd_raises_on_rc0_pam_import_silent_fail(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper")
+
+    def fake_run(*args, **kwargs):
+        return subprocess.CompletedProcess(
+            args=args[0],
+            returncode=0,
+            stdout="",
+            stderr='Project name is required - JSON property: "project": "Project 1"',
+        )
+
+    monkeypatch.setattr("keeper_sdk.providers.commander_cli.subprocess.run", fake_run)
+    provider = CommanderCliProvider(folder_uid="folder-uid")
+
+    with pytest.raises(CapabilityError) as exc_info:
+        provider._run_cmd(["pam", "project", "import", "--file", "/tmp/manifest.json"])
+
+    assert "silent-fail" in exc_info.value.reason
+    assert "Project name is required" in exc_info.value.reason

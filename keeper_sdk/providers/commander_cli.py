@@ -45,6 +45,19 @@ from keeper_sdk.core.normalize import to_pam_import_json
 from keeper_sdk.core.planner import Plan
 
 _DELETE_UNSUPPORTED_ERROR = DeleteUnsupportedError
+_SILENT_FAIL_COMMANDS = {
+    ("pam", "project", "import"),
+    ("pam", "project", "extend"),
+    ("ls",),
+    ("get",),
+    ("record-update",),
+    ("rm",),
+}
+_SILENT_FAIL_MARKERS = (
+    "Project name is required",
+    "No such folder or record",
+    "cannot be resolved",
+)
 
 
 class CommanderCliProvider(Provider):
@@ -121,8 +134,15 @@ class CommanderCliProvider(Provider):
                 json.dump(payload, handle, indent=2)
                 temp_path = Path(handle.name)
             try:
-                cmd = ["pam", "project", "extend" if _has_existing(creates_updates) else "import",
-                       "--file", str(temp_path)]
+                cmd = [
+                    "pam",
+                    "project",
+                    "extend" if _has_existing(creates_updates) else "import",
+                    "--file",
+                    str(temp_path),
+                    "--name",
+                    plan.manifest_name,
+                ]
                 if dry_run:
                     cmd.append("--dry-run")
                 self._run_cmd(cmd)
@@ -332,7 +352,23 @@ class CommanderCliProvider(Provider):
                 context={"stdout": result.stdout[-400:], "stderr": result.stderr[-400:]},
                 next_action="inspect the Commander output above and retry",
             )
+        stderr = (result.stderr or "").strip()
+        if self._is_silent_failure(args, stdout=result.stdout, stderr=stderr):
+            stderr_head = stderr[:200]
+            raise CapabilityError(
+                reason=f"keeper {' '.join(args)} silent-fail: {stderr_head}",
+                context={"stdout": result.stdout[-400:], "stderr": result.stderr[-400:]},
+                next_action="inspect the Commander output above and retry",
+            )
         return result.stdout
+
+    @staticmethod
+    def _is_silent_failure(args: list[str], *, stdout: str, stderr: str) -> bool:
+        if stdout.strip() or not stderr:
+            return False
+        if not any(args[: len(prefix)] == list(prefix) for prefix in _SILENT_FAIL_COMMANDS):
+            return False
+        return any(marker in stderr for marker in _SILENT_FAIL_MARKERS)
 
 
 def _utc_now() -> str:
