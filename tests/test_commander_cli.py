@@ -761,21 +761,36 @@ def test_apply_reference_existing_splits_to_extend(monkeypatch: pytest.MonkeyPat
             return ""
         if args[:4] == ["secrets-manager", "share", "add", "--app"]:
             return ""
-        if args == ["pam", "gateway", "list"]:
-            return "\n".join(
-                [
-                    "KSM Application Name (UID)  Gateway Name  Gateway UID  Status  Gateway Version",
-                    "--------------------------  ------------  -----------  ------  ---------------",
-                    "Lab GW Application (app-uid)  Lab GW Rocky  gw-uid  ONLINE  1.7.6",
-                ]
+        if args == ["pam", "gateway", "list", "--format", "json"]:
+            return json.dumps(
+                {
+                    "gateways": [
+                        {
+                            "ksm_app_name": "Lab GW Application",
+                            "ksm_app_uid": "app-uid",
+                            "ksm_app_accessible": True,
+                            "gateway_name": "Lab GW Rocky",
+                            "gateway_uid": "gw-uid",
+                            "status": "ONLINE",
+                            "gateway_version": "1.7.6",
+                        }
+                    ]
+                }
             )
-        if args == ["pam", "config", "list"]:
-            return "\n".join(
-                [
-                    "UID  Config Name  Config Type  Shared Folder  Gateway UID  Resource Record UIDs",
-                    "---  -----------  -----------  -------------  -----------  --------------------",
-                    "cfg-uid  LW Gateway Configuration  pamNetworkConfiguration  Lab GW Folder - Resources (folder-uid)  gw-uid  none",
-                ]
+        if args == ["pam", "config", "list", "--format", "json"]:
+            return json.dumps(
+                {
+                    "configurations": [
+                        {
+                            "uid": "cfg-uid",
+                            "config_name": "LW Gateway Configuration",
+                            "config_type": "pamNetworkConfiguration",
+                            "shared_folder": {"name": "Lab GW Folder - Resources", "uid": "folder-uid"},
+                            "gateway_uid": "gw-uid",
+                            "resource_record_uids": [],
+                        }
+                    ]
+                }
             )
         if args[:4] == ["pam", "project", "extend", "--config"]:
             payload = json.loads(Path(args[6]).read_text(encoding="utf-8"))

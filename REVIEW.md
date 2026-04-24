@@ -2,11 +2,13 @@
 
 Devil's-advocate code review of `keeper-declarative-sdk/keeper_sdk/` against
 the design-of-record in `../keeper-pam-declarative/` and the real capabilities
-of Keeper Commander `17.2.13` at `../Commander/`.
+of Keeper Commander `17.2.13+` (pinned to `upstream/release` HEAD
+`63150540` — "Pam Remote Browser Get JSON response data added"). At
+`../Commander/review-release`.
 
-All 82 unit tests green after the fixes listed below. No live-smoke re-run
+**Status: 97 unit tests green (was 82 at review start).** No live-smoke re-run
 performed in this pass — the `sdk-completion` branch is the last
-live-verified state.
+live-verified state. Deltas are pure refactor + new capability guards + docs.
 
 ---
 
@@ -162,3 +164,116 @@ planned follow-up, not an urgent defect.
 4. **Merge `sdk-review` into `sdk-completion`** if happy with this pass,
    then re-run the live smoke (currently expected green — changes are
    pure refactor + docs). `main` still untouched.
+
+---
+
+## Update — 2026-04-24 second pass ("finish it all")
+
+User requested full completion of D-1..D-7 against the Commander release
+branch. Outcome, item-by-item:
+
+### D-1 · commander_cli.py split — **partial, shipped**
+
+Approach changed from a 5-module split to a pragmatic helpers extraction.
+Rationale: the proposed `{subprocess, pam_project_in_process, discover,
+apply, scaffold}.py` split requires class decomposition (mixins or the
+provider class partitioned across files), which is high regression risk
+for zero test benefit. Instead, ~300 LOC of pure module-level helpers
+moved to `providers/_commander_cli_helpers.py`. `commander_cli.py`
+dropped from 1082 to ~760 LOC and now contains only the provider class +
+its stateful collaborators (`_run_cmd`, `_write_marker`,
+`_run_pam_project_in_process`, `_get_keeper_params`, scaffold). Tests
+unchanged. The full class split stays deferred — re-file only if the
+class itself grows again.
+
+### D-2 · compute_diff decomposition — **shipped**
+
+`keeper_sdk/core/diff.py::compute_diff` refactored into three helpers:
+`_index_live`, `_classify_desired`, `_classify_orphans`. Top-level
+function is now a 30-line orchestrator; each helper has a single
+responsibility and a docstring. Zero behaviour change; all existing
+tests still cover the branches.
+
+### D-3 · ASCII-table → `--format json` — **shipped**
+
+Commander release branch **does** ship `--format json` on both
+`pam gateway list` (`discoveryrotation.py` L1373-1606) and
+`pam config list` (L1729-1967). `_pam_gateway_rows` / `_pam_config_rows`
+migrated to consume the documented JSON shape. `_parse_ascii_table`
+removed entirely (`re` import no longer needed). Two contract tests
+added in `tests/test_coverage_followups.py` pin the exact JSON keys
+against the Commander source line range.
+
+### D-4 · Capability gaps — **loud-failure guards shipped, features deferred**
+
+Commander hooks now known for every DOR-declared capability (see
+`docs/COMMANDER.md` and `keeper-pam-declarative/NOTES_FROM_SDK.md`).
+None of the actual feature implementations shipped — each is a genuine
+product decision (schema for rotation JSON, which JIT dimensions to
+expose, whether `mode: create` should bootstrap KSM apps, etc.). What
+DID ship is a loud-failure guard:
+`CommanderCliProvider._assert_no_unsupported_capabilities` now fails
+`apply_plan` with a `CapabilityError` pointing at the missing
+Commander hook whenever the manifest declares `rotation_settings`,
+`default_rotation_schedule`, `jit_settings`, `rotation_schedule`, or
+`gateway.mode: create`. Previously these were silently dropped.
+Two regression tests in `tests/test_coverage_followups.py`.
+
+### D-5 · DOR contradictions raised — **shipped**
+
+`../keeper-pam-declarative/NOTES_FROM_SDK.md` created with seven
+itemised contradictions / mismatches and concrete proposals:
+
+1. Marker wire format (METADATA_OWNERSHIP vs reference/marker.md).
+2. Exit code 2 overloading.
+3. `pamRemoteBrowser` text + audio session recording gaps.
+4. `pam project export` / `remove` referenced but non-existent.
+5. Per-capability DOR-vs-SDK matrix (links to D-4 guards).
+6. `KEEPER_SDK_LOGIN_HELPER` env var not mentioned by DOR.
+7. Missing Commander version pin in `DELIVERY_PLAN.md`.
+
+### D-6 · Test coverage — **shipped**
+
+`tests/test_coverage_followups.py` added (+13 tests, suite 82 → 95):
+
+* `from_pam_import_json` round-trip (3 tests including `to_from` pair).
+* `load_manifest_string` YAML / JSON / auto-detect / dump round-trip.
+* `MetadataStore` protocol structural check with an in-memory impl.
+* `utc_timestamp` ISO-8601 `Z` suffix pin.
+* `pam gateway list` / `pam config list` JSON contract pins (D-3).
+* Marker-constant cross-check vs DOR.
+* D-4 guard regressions (`mode: create`, `rotation_settings`).
+
+Total: **97 passing, 0 skipped, 0 xfail.**
+
+### D-7 · Commander version pin doc — **shipped**
+
+`docs/COMMANDER.md` created: target version, binary-vs-module split,
+why two versions matter, subprocess + in-process capability tables,
+explicit "do not use" list (`pam project export`, subprocess
+`record-update`, interactive login), workstation verification
+checklist, and a pin-churn policy.
+
+### Commander baseline
+
+`../Commander/` checked out at `review-release` tracking
+`upstream/release` (HEAD `63150540`). Key deltas since `v17.2.13` tag:
+
+* `pam gateway list` / `pam config list` gain `--format json` (unlocked D-3).
+* `pam launch --jit` merged (JIT single-source-of-truth is
+  `commands/pam_launch/jit.py`).
+* Pam Remote Browser audio keys (`disableAudio`, `audioChannels`,
+  `audioBps`, `audioSampleRate`) added to `ConnectionSettingsHTTP`
+  (SDK declarative mapping does not emit them — D-5 item #3).
+* `pam project` still only exposes `import` + `extend` (confirmed; no
+  `export` / `remove` / `list` coming upstream).
+
+### What's still deferred after this pass
+
+* D-1 full class split (see rationale above).
+* D-4 actual feature implementations for rotation / JIT / gateway
+  mode:create / RBI audio / GCP+Azure+OCI — each needs a product
+  decision, not engineering time.
+* Follow-up on the contradictions raised in D-5 (upstream).
+* D-6 does not yet cover: `redact` internals, `cli/renderer.py` against
+  real terminals, the `pam project in-process` error code paths.

@@ -29,7 +29,6 @@ import io
 import json
 import logging
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -37,18 +36,38 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from keeper_sdk.core.diff import _DIFF_IGNORED_FIELDS, ChangeKind
+from keeper_sdk.core.diff import ChangeKind
 from keeper_sdk.core.errors import CapabilityError, CollisionError
 from keeper_sdk.core.interfaces import ApplyOutcome, LiveRecord, Provider
 from keeper_sdk.core.metadata import (
     MARKER_FIELD_LABEL,
-    decode_marker,
     encode_marker,
     serialize_marker,
     utc_timestamp,
 )
 from keeper_sdk.core.normalize import to_pam_import_json
 from keeper_sdk.core.planner import Plan
+from keeper_sdk.providers._commander_cli_helpers import (
+    _FIELD_LABEL_ALIASES,
+    _canonical_payload_from_field,
+    _entry_uid_by_name,
+    _extract_marker_field,
+    _field_drift,
+    _has_existing,
+    _host_payload,
+    _kind_from_collection,
+    _load_json,
+    _pam_configuration_uid_ref,
+    _parse_pam_project_args,
+    _payload_for_extend,
+    _payload_from_get,
+    _port_value,
+    _record_from_get,
+    _resource_type_from_get,
+    _title_from_item,
+    _type_from_listing_details,
+    _uses_reference_existing,
+)
 
 _SILENT_FAIL_COMMANDS = {
     ("pam", "project", "import"),
@@ -140,6 +159,13 @@ class CommanderCliProvider(Provider):
         return records
 
     def apply_plan(self, plan: Plan, *, dry_run: bool = False) -> list[ApplyOutcome]:
+        # Guard against manifests that declare capabilities the provider
+        # doesn't implement yet. Without this guard the provider would
+        # silently pass through to `pam project import`, which quietly
+        # ignores the unknown keys — operators would think it worked.
+        # See REVIEW.md D-4 for the full list + Commander hook points.
+        _assert_no_unsupported_capabilities(self._manifest_source)
+
         outcomes: list[ApplyOutcome] = []
         creates_updates = [c for c in plan.ordered() if c.kind in (ChangeKind.CREATE, ChangeKind.UPDATE)]
         deletes = plan.deletes
@@ -500,34 +526,61 @@ class CommanderCliProvider(Provider):
         }
 
     def _pam_gateway_rows(self) -> list[dict[str, str]]:
-        table = self._run_cmd(["pam", "gateway", "list"])
+        """Return gateway rows using Commander's JSON output.
+
+        Commander release `17.2.13+` exposes ``pam gateway list --format json``
+        (``keepercommander/commands/discoveryrotation.py`` L1373-1606). The
+        response is ``{"gateways": [{gateway_name, gateway_uid, ksm_app_name,
+        ksm_app_uid, ksm_app_accessible, status, gateway_version, ...}, ...]}``.
+        Empty enterprises return ``{"gateways": [], "message": ...}``.
+        """
+        raw = self._run_cmd(["pam", "gateway", "list", "--format", "json"])
+        data = _load_json(raw, command="pam gateway list --format json")
+        if isinstance(data, dict):
+            items = data.get("gateways") or []
+        else:
+            items = []
         rows: list[dict[str, str]] = []
-        for row in _parse_ascii_table(table):
-            app_cell = row.get("KSM Application Name (UID)", "")
-            match = re.match(r"^(?P<title>.+) \((?P<uid>[^()]+)\)$", app_cell)
+        for item in items:
+            if not isinstance(item, dict):
+                continue
             rows.append(
                 {
-                    "app_title": match.group("title") if match else app_cell,
-                    "app_uid": match.group("uid") if match else "",
-                    "gateway_name": row.get("Gateway Name", ""),
-                    "gateway_uid": row.get("Gateway UID", ""),
+                    "app_title": str(item.get("ksm_app_name") or ""),
+                    "app_uid": str(item.get("ksm_app_uid") or ""),
+                    "gateway_name": str(item.get("gateway_name") or ""),
+                    "gateway_uid": str(item.get("gateway_uid") or ""),
                 }
             )
         return rows
 
     def _pam_config_rows(self) -> list[dict[str, str]]:
-        table = self._run_cmd(["pam", "config", "list"])
+        """Return PAM configuration rows using Commander's JSON output.
+
+        Commander release `17.2.13+` exposes ``pam config list --format json``
+        (``keepercommander/commands/discoveryrotation.py`` L1729-1967).
+        Response: ``{"configurations": [{uid, config_name, config_type,
+        shared_folder: {name, uid}, gateway_uid, resource_record_uids,
+        ...}, ...]}``.
+        """
+        raw = self._run_cmd(["pam", "config", "list", "--format", "json"])
+        data = _load_json(raw, command="pam config list --format json")
+        if isinstance(data, dict):
+            items = data.get("configurations") or []
+        else:
+            items = []
         rows: list[dict[str, str]] = []
-        for row in _parse_ascii_table(table):
-            shared_folder = row.get("Shared Folder", "")
-            match = re.match(r"^(?P<title>.+) \((?P<uid>[^()]+)\)$", shared_folder)
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            sf = item.get("shared_folder") or {}
             rows.append(
                 {
-                    "config_uid": row.get("UID", ""),
-                    "config_name": row.get("Config Name", ""),
-                    "gateway_uid": row.get("Gateway UID", ""),
-                    "shared_folder_title": match.group("title") if match else shared_folder,
-                    "shared_folder_uid": match.group("uid") if match else "",
+                    "config_uid": str(item.get("uid") or ""),
+                    "config_name": str(item.get("config_name") or ""),
+                    "gateway_uid": str(item.get("gateway_uid") or ""),
+                    "shared_folder_title": str(sf.get("name") or "") if isinstance(sf, dict) else "",
+                    "shared_folder_uid": str(sf.get("uid") or "") if isinstance(sf, dict) else "",
                 }
             )
         return rows
@@ -756,319 +809,59 @@ class CommanderCliProvider(Provider):
         return params
 
 
-def _parse_pam_project_args(tail: list[str]) -> dict[str, Any]:
-    """Lightweight parser for the argv tail after 'pam project <import|extend>'.
+_UNSUPPORTED_CAPABILITY_HINTS: tuple[tuple[str, str, str], ...] = (
+    # (dotted manifest path fragment, human name, Commander hook the SDK
+    # should eventually drive to fulfil this capability)
+    ("rotation_settings", "resources[].rotation_settings", "pam rotation edit --schedulejson / --schedulecron"),
+    ("default_rotation_schedule", "pam_configurations[].default_rotation_schedule", "pam rotation edit --schedule-config"),
+    ("jit_settings", "jit_settings (per-resource or per-config)", "pam_launch/jit.py + DAG jit_settings writer"),
+    ("rotation_schedule", "rotation_schedule (embedded)", "pam rotation edit --schedulecron"),
+)
 
-    Recognises: --name/-n, --file/--filename/-f, --config/-c, --dry-run/-d.
-    Long forms accept both `--flag value` and `--flag=value`.
+
+def _assert_no_unsupported_capabilities(manifest: dict[str, Any]) -> None:
+    """Refuse to apply a manifest that declares an unimplemented capability.
+
+    The SDK's JSON Schema accepts a wider surface than the Commander
+    provider currently drives (see REVIEW.md D-4). Letting apply proceed
+    silently would write a subset of the declared state, which the
+    operator would not notice until a follow-up plan showed persistent
+    drift. Failing loud is cheaper.
+
+    We also check gateway ``mode: create`` because the provider only
+    implements ``mode: reference_existing`` today.
     """
-    parsed: dict[str, Any] = {"dry_run": False}
-    i = 0
-    while i < len(tail):
-        token = tail[i]
-        if token in ("--dry-run", "-d"):
-            parsed["dry_run"] = True
-            i += 1
-            continue
-        if "=" in token:
-            key, _, value = token.partition("=")
-        else:
-            key = token
-            value = tail[i + 1] if i + 1 < len(tail) else ""
-            i += 1
-        i += 1
-        if key in ("--name", "-n"):
-            parsed["name"] = value
-        elif key in ("--file", "--filename", "-f"):
-            parsed["file"] = value
-        elif key in ("--config", "-c"):
-            parsed["config"] = value
-    return parsed
+    hits: list[str] = []
 
-
-def _has_existing(changes: list[Any]) -> bool:
-    return any(c.kind is ChangeKind.UPDATE for c in changes)
-
-
-def _uses_reference_existing(manifest: dict[str, Any]) -> bool:
     gateways = manifest.get("gateways")
-    if not isinstance(gateways, list):
-        return False
-    return any(isinstance(gateway, dict) and gateway.get("mode") == "reference_existing" for gateway in gateways)
+    if isinstance(gateways, list):
+        for gateway in gateways:
+            if isinstance(gateway, dict) and gateway.get("mode") == "create":
+                hits.append(
+                    f"gateway '{gateway.get('uid_ref') or gateway.get('name')}': "
+                    "mode: create is not implemented (use Commander `pam gateway new "
+                    "--application <ksm_app> --config-init json` and switch to "
+                    "mode: reference_existing)"
+                )
 
+    serialized = json.dumps(manifest, default=str)
+    for needle, human, hook in _UNSUPPORTED_CAPABILITY_HINTS:
+        if needle in serialized:
+            hits.append(f"{human} is not implemented (Commander hook: `{hook}`)")
 
-def _pam_configuration_uid_ref(manifest: dict[str, Any]) -> str | None:
-    configs = manifest.get("pam_configurations")
-    if not isinstance(configs, list) or not configs:
-        return None
-    first = configs[0]
-    if not isinstance(first, dict):
-        return None
-    uid_ref = first.get("uid_ref")
-    return str(uid_ref) if isinstance(uid_ref, str) and uid_ref.strip() else None
-
-
-def _payload_for_extend(
-    payload: dict[str, Any],
-    *,
-    resources_folder_name: str,
-    users_folder_name: str,
-) -> dict[str, Any]:
-    extend_payload = {"pam_data": json.loads(json.dumps(payload.get("pam_data") or {}))}
-    pam_data = extend_payload["pam_data"]
-
-    for resource in pam_data.get("resources") or []:
-        if not isinstance(resource, dict):
-            continue
-        resource["folder_path"] = resources_folder_name
-        for user in resource.get("users") or []:
-            if isinstance(user, dict):
-                user["folder_path"] = users_folder_name
-
-    for user in pam_data.get("users") or []:
-        if isinstance(user, dict):
-            user["folder_path"] = users_folder_name
-    return extend_payload
-
-
-def _field_drift(expected: dict[str, Any], observed: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    """Return only fields whose expected/observed values differ."""
-    ignored = _DIFF_IGNORED_FIELDS | {
-        "keeper_uid",
-        "record_uid",
-        "record_title",
-        "custom_fields",
-        "custom",
-        "type",
-        "title",
-        "_legacy_type_fallback",
-        "_note",
-        # Manifest-only keys that never round-trip through Commander as record
-        # fields — they're SDK-layer placement / linkage metadata, not vault
-        # field data. Comparing them post-apply always shows drift.
-        "pam_configuration",
-        "pam_configuration_uid_ref",
-        "shared_folder",
-        "users",
-        "gateway",
-        "gateway_uid_ref",
-    }
-    drift: dict[str, dict[str, Any]] = {}
-    for key, expected_value in expected.items():
-        if key in ignored or expected_value is None:
-            continue
-        observed_value = observed.get(key)
-        if key == "port" and _port_value(expected_value) == _port_value(observed_value):
-            continue
-        if expected_value != observed_value:
-            drift[key] = {
-                "expected": expected_value,
-                "observed": observed_value,
-            }
-    return drift
-
-
-def _port_value(value: Any) -> Any:
-    if isinstance(value, str):
-        stripped = value.strip()
-        if stripped.isdigit():
-            return int(stripped)
-    return value
-
-
-def _load_json(payload: str, *, command: str) -> Any:
-    # Commander 17.x emits an empty string when listing an empty folder;
-    # treat that as an empty list so discover() on a fresh sandbox works.
-    if not payload or not payload.strip():
-        return []
-    try:
-        return json.loads(payload)
-    except ValueError as exc:
+    if hits:
         raise CapabilityError(
-            reason=f"Commander returned non-JSON from `{command}`",
-            next_action="upgrade Commander to a version that supports --format json",
-        ) from exc
-
-
-def _entry_uid_by_name(entries: Any, name: str) -> str | None:
-    if not isinstance(entries, list):
-        raise CapabilityError(
-            reason="Commander returned non-array JSON while resolving folder entries",
-            next_action="upgrade Commander to a version that supports --format json",
+            reason=(
+                "manifest declares capabilities the CommanderCliProvider does not "
+                "implement yet: " + "; ".join(hits)
+            ),
+            next_action=(
+                "remove the declarations, or drive the Commander hook manually "
+                "before re-running apply. See REVIEW.md D-4 for per-capability "
+                "status and keeper-pam-declarative/NOTES_FROM_SDK.md for the "
+                "upstream reconciliation."
+            ),
         )
-    for entry in entries:
-        if not isinstance(entry, dict):
-            continue
-        if entry.get("name") == name or entry.get("title") == name:
-            uid = entry.get("uid") or entry.get("folder_uid") or entry.get("shared_folder_uid")
-            if uid:
-                return str(uid)
-    return None
-
-
-def _parse_ascii_table(payload: str) -> list[dict[str, str]]:
-    lines = [line.rstrip() for line in payload.splitlines() if line.strip()]
-    if len(lines) < 3:
-        return []
-    header = re.split(r"\s{2,}", lines[0].strip())
-    rows: list[dict[str, str]] = []
-    for line in lines[2:]:
-        if set(line.strip()) == {"-"}:
-            continue
-        cells = re.split(r"\s{2,}", line.strip(), maxsplit=max(len(header) - 1, 0))
-        if len(cells) > len(header):
-            continue
-        if len(cells) < len(header):
-            cells.extend([""] * (len(header) - len(cells)))
-        rows.append(dict(zip(header, cells, strict=False)))
-    return rows
-
-
-def _record_from_get(item: dict[str, Any], *, listing_entry: dict[str, Any]) -> LiveRecord | None:
-    keeper_uid = item.get("record_uid") or item.get("uid") or item.get("keeper_uid") or listing_entry.get("uid")
-    if not keeper_uid:
-        return None
-
-    title = _title_from_item(item)
-    payload = _payload_from_get(item)
-    if title == "":
-        payload["_note"] = "empty title"
-
-    resource_type, legacy_type_fallback = _resource_type_from_get(item, listing_entry=listing_entry)
-    if not resource_type:
-        return None
-    if legacy_type_fallback:
-        payload["_legacy_type_fallback"] = True
-
-    marker_raw = _extract_marker_field(item)
-    marker = decode_marker(marker_raw)
-    return LiveRecord(
-        keeper_uid=keeper_uid,
-        title=title,
-        resource_type=resource_type,
-        folder_uid=listing_entry.get("folder_uid"),
-        payload=payload,
-        marker=marker,
-    )
-
-
-def _payload_from_get(item: dict[str, Any]) -> dict[str, Any]:
-    payload = {k: v for k, v in item.items() if k not in {"record_uid"}}
-    for field in item.get("fields") or []:
-        if not isinstance(field, dict):
-            continue
-        payload.update(_canonical_payload_from_field(field))
-    for field in item.get("custom") or []:
-        if not isinstance(field, dict):
-            continue
-        payload.update(_canonical_payload_from_field(field))
-    return payload
-
-
-_FIELD_LABEL_ALIASES = {
-    "operatingSystem": "operating_system",
-    "sslVerification": "ssl_verification",
-    "instanceId": "instance_id",
-    "instanceName": "instance_name",
-    "providerGroup": "provider_group",
-    "providerRegion": "provider_region",
-}
-
-
-def _canonical_payload_from_field(field: dict[str, Any]) -> dict[str, Any]:
-    field_type = field.get("type")
-    values = field.get("value")
-    if not field_type or not isinstance(values, list):
-        return {}
-    # pamMachine stores host+port under a single `pamHostname`/`host` field.
-    if field_type in {"host", "pamHostname"}:
-        return _host_payload(values)
-    label = field.get("label") or ""
-    if not values:
-        return {}
-    value = values[0] if len(values) == 1 else values
-    # Prefer the field's label when it maps to a canonical manifest key;
-    # otherwise fall back to the raw Commander type (covers simple 1:1
-    # typed fields like login/password).
-    key = _FIELD_LABEL_ALIASES.get(label) or label or field_type
-    if isinstance(value, (str, int, float, bool)):
-        return {key: value}
-    return {}
-
-
-def _host_payload(values: list[Any]) -> dict[str, Any]:
-    if len(values) != 1 or not isinstance(values[0], dict):
-        return {}
-    value = values[0]
-    payload: dict[str, Any] = {}
-    if value.get("hostName") is not None:
-        payload["host"] = value["hostName"]
-    if value.get("port") is not None:
-        payload["port"] = value["port"]
-    return payload
-
-
-def _resource_type_from_get(item: dict[str, Any], *, listing_entry: dict[str, Any]) -> tuple[str | None, bool]:
-    resource_type = item.get("type")
-    if resource_type:
-        return resource_type, False
-    resource_type = _type_from_listing_details(listing_entry.get("details"))
-    if resource_type:
-        return resource_type, False
-    resource_type = _kind_from_collection(item.get("collection", ""))
-    if resource_type:
-        item.setdefault("type", resource_type)
-        return resource_type, True
-    return None, False
-
-
-def _type_from_listing_details(details: Any) -> str | None:
-    if not isinstance(details, str):
-        return None
-    prefix = "Type:"
-    if not details.startswith(prefix):
-        return None
-    tail = details[len(prefix):].strip()
-    if not tail:
-        return None
-    return tail.split(",", 1)[0].strip() or None
-
-
-def _title_from_item(item: dict[str, Any]) -> str:
-    for key in ("title", "record_title", "name"):
-        value = item.get(key)
-        if value is not None:
-            return value
-    return ""
-
-
-def _kind_from_collection(collection: str) -> str | None:
-    return {
-        "users": "pamUser",
-        "pam_configurations": "pam_configuration",
-        "gateways": "gateway",
-    }.get(collection)
-
-
-def _extract_marker_field(item: dict[str, Any]) -> str | None:
-    # Commander exports may expose custom fields under a few shapes.
-    for key in ("custom_fields", "custom"):
-        block = item.get(key)
-        if isinstance(block, dict) and MARKER_FIELD_LABEL in block:
-            value = block[MARKER_FIELD_LABEL]
-            if isinstance(value, list):
-                return value[0] if value else None
-            return value
-        if isinstance(block, list):
-            for entry in block:
-                if not isinstance(entry, dict):
-                    continue
-                if entry.get("label") == MARKER_FIELD_LABEL or entry.get("name") == MARKER_FIELD_LABEL:
-                    value = entry.get("value")
-                    if isinstance(value, list):
-                        return value[0] if value else None
-                    return value
-    return None
 
 
 __all__ = ["CommanderCliProvider"]

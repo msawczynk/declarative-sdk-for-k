@@ -105,19 +105,58 @@ def compute_diff(
     allow_delete: bool = False,
     adopt: bool = False,
 ) -> list[Change]:
-    """Classify desired vs observed.
+    """Classify desired (manifest) vs observed (live) state.
 
     Matching rules:
-      1. Prefer LiveRecord.marker.uid_ref == desired.uid_ref when present.
-      2. Otherwise match by (resource_type, title).
-      3. Live records with a marker whose ``manager != keeper-pam-declarative`` are
-         flagged as CONFLICT and never altered.
+      1. Prefer ``LiveRecord.marker.uid_ref == desired.uid_ref`` when present.
+      2. Otherwise match by ``(resource_type, title)``.
+      3. Records marked by a *different* manager are flagged as CONFLICT
+         and never touched — the SDK owns only what it wrote.
+
+    The function is deliberately a thin orchestrator: the three hard
+    sub-problems (duplicate detection, desired-vs-live matching, orphan
+    classification) live in private helpers so each can be read + tested
+    in isolation.
     """
     manifest_name = manifest_name or manifest.name
-    changes: list[Change] = []
-
     _raise_live_record_collisions(live_records)
 
+    by_uid_ref, by_title = _index_live(live_records)
+
+    changes: list[Change] = []
+    matched: set[str] = set()
+
+    for uid_ref, resource_type, title, payload in _desired_objects(manifest):
+        live = by_uid_ref.get(uid_ref) or by_title.get((resource_type, title))
+        change = _classify_desired(
+            uid_ref=uid_ref,
+            resource_type=resource_type,
+            title=title,
+            payload=payload,
+            live=live,
+            by_title=by_title,
+            adopt=adopt,
+        )
+        changes.append(change)
+        if change.kind in (ChangeKind.UPDATE, ChangeKind.NOOP) and live is not None:
+            matched.add(live.keeper_uid)
+
+    changes.extend(
+        _classify_orphans(
+            live_records,
+            matched=matched,
+            manifest_name=manifest_name,
+            allow_delete=allow_delete,
+        )
+    )
+
+    return changes
+
+
+def _index_live(
+    live_records: list[LiveRecord],
+) -> tuple[dict[str, LiveRecord], dict[tuple[str, str], LiveRecord]]:
+    """Return two lookup dicts over live records: by marker uid_ref, by (type, title)."""
     by_uid_ref: dict[str, LiveRecord] = {}
     by_title: dict[tuple[str, str], LiveRecord] = {}
     for live in live_records:
@@ -125,112 +164,122 @@ def compute_diff(
         if marker_uid_ref:
             by_uid_ref[marker_uid_ref] = live
         by_title[(live.resource_type, live.title)] = live
+    return by_uid_ref, by_title
 
-    matched: set[str] = set()  # keeper_uid
-    desired = _desired_objects(manifest)
 
-    for uid_ref, resource_type, title, payload in desired:
-        live = by_uid_ref.get(uid_ref) or by_title.get((resource_type, title))
-        if live is None:
-            changes.append(
-                Change(
-                    kind=ChangeKind.CREATE,
-                    uid_ref=uid_ref or None,
-                    resource_type=resource_type,
-                    title=title,
-                    after=payload,
-                )
-            )
-            continue
+def _classify_desired(
+    *,
+    uid_ref: str,
+    resource_type: str,
+    title: str,
+    payload: dict[str, Any],
+    live: LiveRecord | None,
+    by_title: dict[tuple[str, str], LiveRecord],
+    adopt: bool,
+) -> Change:
+    """Classify ONE desired resource against its best live match.
 
-        marker = live.marker or {}
-        manager = marker.get("manager")
-        if marker and manager and manager != MANAGER_NAME:
-            changes.append(
-                Change(
-                    kind=ChangeKind.CONFLICT,
-                    uid_ref=uid_ref or None,
-                    resource_type=resource_type,
-                    title=title,
-                    keeper_uid=live.keeper_uid,
-                    reason=f"record managed by '{manager}', refusing to touch",
-                )
-            )
-            continue
-        if marker and marker.get("version") not in (None, MARKER_VERSION):
-            raise OwnershipError(
-                reason=f"marker version {marker.get('version')} not supported by core v{MARKER_VERSION}",
-                uid_ref=uid_ref,
+    Branches in order:
+      * no live match → CREATE
+      * foreign marker → CONFLICT (never adopt)
+      * unsupported marker version → raise OwnershipError
+      * unmanaged title collision → CONFLICT (or UPDATE with adoption
+        reason when ``adopt`` is set)
+      * field drift → UPDATE; otherwise NOOP
+    """
+    if live is None:
+        return Change(
+            kind=ChangeKind.CREATE,
+            uid_ref=uid_ref or None,
+            resource_type=resource_type,
+            title=title,
+            after=payload,
+        )
+
+    marker = live.marker or {}
+    manager = marker.get("manager")
+    if marker and manager and manager != MANAGER_NAME:
+        return Change(
+            kind=ChangeKind.CONFLICT,
+            uid_ref=uid_ref or None,
+            resource_type=resource_type,
+            title=title,
+            keeper_uid=live.keeper_uid,
+            reason=f"record managed by '{manager}', refusing to touch",
+        )
+    if marker and marker.get("version") not in (None, MARKER_VERSION):
+        raise OwnershipError(
+            reason=f"marker version {marker.get('version')} not supported by core v{MARKER_VERSION}",
+            uid_ref=uid_ref,
+            resource_type=resource_type,
+            live_identifier=live.keeper_uid,
+            next_action="upgrade the declarative core or rewrite the marker",
+        )
+    if not marker and by_title.get((resource_type, title)) is live:
+        if not adopt:
+            return Change(
+                kind=ChangeKind.CONFLICT,
+                uid_ref=uid_ref or None,
                 resource_type=resource_type,
-                live_identifier=live.keeper_uid,
-                next_action="upgrade the declarative core or rewrite the marker",
+                title=title,
+                keeper_uid=live.keeper_uid,
+                reason="unmanaged record with matching title; pass --adopt or use an import workflow to claim it",
             )
-        if not marker and by_title.get((resource_type, title)) is live:
-            if not adopt:
-                changes.append(
-                    Change(
-                        kind=ChangeKind.CONFLICT,
-                        uid_ref=uid_ref or None,
-                        resource_type=resource_type,
-                        title=title,
-                        keeper_uid=live.keeper_uid,
-                        reason="unmanaged record with matching title; pass --adopt or use an import workflow to claim it",
-                    )
-                )
-                continue
-            # record exists with the right title but no marker — manifest
-            # has not yet adopted it. Offer adoption via update.
-            changes.append(
-                Change(
-                    kind=ChangeKind.UPDATE,
-                    uid_ref=uid_ref or None,
-                    resource_type=resource_type,
-                    title=title,
-                    keeper_uid=live.keeper_uid,
-                    before=live.payload,
-                    after=payload,
-                    reason="adoption: write ownership marker",
-                )
-            )
-            matched.add(live.keeper_uid)
+        return Change(
+            kind=ChangeKind.UPDATE,
+            uid_ref=uid_ref or None,
+            resource_type=resource_type,
+            title=title,
+            keeper_uid=live.keeper_uid,
+            before=live.payload,
+            after=payload,
+            reason="adoption: write ownership marker",
+        )
+
+    diff_fields = _field_diff(live.payload, payload)
+    if not diff_fields:
+        return Change(
+            kind=ChangeKind.NOOP,
+            uid_ref=uid_ref or None,
+            resource_type=resource_type,
+            title=title,
+            keeper_uid=live.keeper_uid,
+        )
+    return Change(
+        kind=ChangeKind.UPDATE,
+        uid_ref=uid_ref or None,
+        resource_type=resource_type,
+        title=title,
+        keeper_uid=live.keeper_uid,
+        before={k: live.payload.get(k) for k in diff_fields},
+        after={k: payload.get(k) for k in diff_fields},
+    )
+
+
+def _classify_orphans(
+    live_records: list[LiveRecord],
+    *,
+    matched: set[str],
+    manifest_name: str,
+    allow_delete: bool,
+) -> list[Change]:
+    """Emit DELETE / CONFLICT rows for records that went unmatched.
+
+    Only this-manifest-managed records are considered. Foreign-managed
+    and unmanaged records silently fall through — the SDK refuses to
+    remove anything it did not create.
+    """
+    out: list[Change] = []
+    for live in live_records:
+        if live.keeper_uid in matched:
             continue
-
-        diff_fields = _field_diff(live.payload, payload)
-        if not diff_fields:
-            changes.append(
-                Change(
-                    kind=ChangeKind.NOOP,
-                    uid_ref=uid_ref or None,
-                    resource_type=resource_type,
-                    title=title,
-                    keeper_uid=live.keeper_uid,
-                )
-            )
-        else:
-            changes.append(
-                Change(
-                    kind=ChangeKind.UPDATE,
-                    uid_ref=uid_ref or None,
-                    resource_type=resource_type,
-                    title=title,
-                    keeper_uid=live.keeper_uid,
-                    before={k: live.payload.get(k) for k in diff_fields},
-                    after={k: payload.get(k) for k in diff_fields},
-                )
-            )
-        matched.add(live.keeper_uid)
-
-    # deletion candidates: live records owned by this manifest with no desired match
-    if allow_delete:
-        for live in live_records:
-            if live.keeper_uid in matched:
-                continue
-            marker = live.marker or {}
-            if marker.get("manager") != MANAGER_NAME:
-                continue
-            if marker.get("manifest") and manifest_name and marker.get("manifest") != manifest_name:
-                continue
-            changes.append(
+        marker = live.marker or {}
+        if marker.get("manager") != MANAGER_NAME:
+            continue
+        if marker.get("manifest") and manifest_name and marker.get("manifest") != manifest_name:
+            continue
+        if allow_delete:
+            out.append(
                 Change(
                     kind=ChangeKind.DELETE,
                     uid_ref=marker.get("uid_ref"),
@@ -240,24 +289,18 @@ def compute_diff(
                     before=live.payload,
                 )
             )
-    else:
-        for live in live_records:
-            if live.keeper_uid in matched:
-                continue
-            marker = live.marker or {}
-            if marker.get("manager") == MANAGER_NAME and marker.get("manifest") == manifest_name:
-                changes.append(
-                    Change(
-                        kind=ChangeKind.CONFLICT,
-                        uid_ref=marker.get("uid_ref"),
-                        resource_type=live.resource_type,
-                        title=live.title,
-                        keeper_uid=live.keeper_uid,
-                        reason="managed record missing from manifest; pass --allow-delete to remove",
-                    )
+        else:
+            out.append(
+                Change(
+                    kind=ChangeKind.CONFLICT,
+                    uid_ref=marker.get("uid_ref"),
+                    resource_type=live.resource_type,
+                    title=live.title,
+                    keeper_uid=live.keeper_uid,
+                    reason="managed record missing from manifest; pass --allow-delete to remove",
                 )
-
-    return changes
+            )
+    return out
 
 
 def _raise_live_record_collisions(live_records: list[LiveRecord]) -> None:

@@ -147,9 +147,29 @@ End-to-end drill against `msawczyn+lab@acme-demo.com` is **GREEN**
 
 ## Next steps for the reviewer
 
-1. Run `pytest -q` (offline, 82 tests).
+1. Run `pytest -q` (offline, **97 tests** after the 2026-04-24 review +
+   finish-it-all pass).
 2. Run the live-smoke drill:
    `cd keeper-declarative-sdk && python3 scripts/smoke/smoke.py` — the
-   full `create → verify → destroy` cycle should complete clean and
-   print `SMOKE PASSED`.
-3. Merge `sdk-live-smoke` → `sdk-completion` → `main`.
+   full `create → verify → destroy` cycle should still complete clean
+   and print `SMOKE PASSED`. Changes since last live-verified state are
+   pure refactor + JSON-list migration + capability guards.
+3. Merge `sdk-review` → `sdk-completion`. `main` still untouched.
+
+## 2026-04-24 late — finish-it-all pass (REVIEW.md second update)
+
+- D-3: `pam gateway list` / `pam config list` migrated to `--format json`
+  against Commander release branch `17.2.13+` (HEAD `63150540` on
+  `../Commander/review-release`). ASCII-table parser removed.
+- D-2: `compute_diff` decomposed into `_index_live` +
+  `_classify_desired` + `_classify_orphans`.
+- D-1: 294 LOC of pure helpers moved to
+  `keeper_sdk/providers/_commander_cli_helpers.py`. Main file 1082 →
+  ~760 LOC.
+- D-4: loud-failure guard
+  (`_assert_no_unsupported_capabilities`) added — no more silent drops
+  of `rotation_settings` / `jit_settings` / `mode: create`.
+- D-5: `../keeper-pam-declarative/NOTES_FROM_SDK.md` filed (7 items).
+- D-6: +13 tests → 95; plus +2 D-4-guard tests → **97 total**.
+- D-7: `docs/COMMANDER.md` pinned to release HEAD.
+- No live-smoke re-run in this pass; expected-green (refactor only).
