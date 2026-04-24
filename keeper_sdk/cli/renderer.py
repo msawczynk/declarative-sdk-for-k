@@ -23,6 +23,14 @@ _STYLES = {
 
 
 class RichRenderer:
+    """Terminal-focused implementation of the :class:`Renderer` protocol.
+
+    All three methods return the rendered table as a plain string (no
+    ANSI escapes) so the caller can ``print`` them, capture them for
+    tests, or pipe them through other tools. Colour/style information is
+    re-applied by Rich when the caller prints to a real TTY.
+    """
+
     def render_plan(self, plan: Plan) -> str:
         console = _console()
         table = Table(title=f"Plan: {plan.manifest_name}")

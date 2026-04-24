@@ -13,6 +13,23 @@ from keeper_sdk.core.models import Manifest
 
 
 class ChangeKind(str, Enum):
+    """Classification of a single planned change.
+
+    * ``CREATE`` — manifest describes a resource that does not exist in
+      the vault yet.
+    * ``UPDATE`` — manifest and vault both carry the resource but their
+      fields drift. Only raised when drift is detected on declarative
+      (manifest-owned) fields — SDK-internal placement metadata is
+      ignored via :data:`_DIFF_IGNORED_FIELDS`.
+    * ``DELETE`` — vault carries a record with an ownership marker whose
+      ``uid_ref`` is absent from the manifest. Requires
+      ``allow_delete=True`` on ``compute_diff``.
+    * ``NOOP`` — manifest and vault agree; no action required.
+    * ``CONFLICT`` — a situation the planner cannot resolve automatically
+      (name collision, ambiguous marker, incompatible type). Operator
+      must resolve before re-running.
+    """
+
     CREATE = "create"
     UPDATE = "update"
     DELETE = "delete"
@@ -22,6 +39,22 @@ class ChangeKind(str, Enum):
 
 @dataclass
 class Change:
+    """One row of a :class:`Plan`.
+
+    Attributes:
+        kind: Classification — see :class:`ChangeKind`.
+        uid_ref: Manifest handle. ``None`` only for deletes on records
+            that never had a declarative owner (should be rare).
+        resource_type: Declarative type (``pamMachine``, ``gateway``, …).
+        title: Human-facing identifier used by renderers and by
+            Commander ``pam project import`` to match records.
+        keeper_uid: Vault UID of the matched live record; ``None`` on
+            pure creates.
+        before / after: Normalised field dicts for diff rendering.
+        reason: Optional human-readable explanation (used for NOOP /
+            CONFLICT rows).
+    """
+
     kind: ChangeKind
     uid_ref: str | None
     resource_type: str

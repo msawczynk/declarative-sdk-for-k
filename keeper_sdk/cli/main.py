@@ -49,6 +49,11 @@ from keeper_sdk.providers import CommanderCliProvider, MockProvider
 
 EXIT_OK = 0
 EXIT_GENERIC = 1
+# Exit code 2 is intentionally overloaded per DOR (DELIVERY_PLAN.md + ARCHITECTURE.md):
+#   - `plan` / `diff`: 2 = "changes present" (actionable, not a failure)
+#   - `validate`: 2 = "schema invalid" (failure)
+# Operators distinguish via the subcommand. Do NOT split these into
+# different numbers without a spec update — CI pipelines depend on 2.
 EXIT_CHANGES = 2
 EXIT_SCHEMA = 2
 EXIT_REF = 3

@@ -288,7 +288,7 @@ def test_resolve_project_resources_folder_walks_pam_environments(monkeypatch: py
 
 def test_apply_writes_marker_after_create(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper")
-    monkeypatch.setattr("keeper_sdk.providers.commander_cli._utc_now", lambda: "2026-04-24T12:34:56Z")
+    monkeypatch.setattr("keeper_sdk.providers.commander_cli.utc_timestamp", lambda: "2026-04-24T12:34:56Z")
 
     calls: list[list[str]] = []
     monkeypatch.setattr(
@@ -436,7 +436,7 @@ def test_apply_skips_marker_when_record_not_discoverable(monkeypatch: pytest.Mon
 
 def test_apply_verifies_fields_match(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper")
-    monkeypatch.setattr("keeper_sdk.providers.commander_cli._utc_now", lambda: "2026-04-24T12:34:56Z")
+    monkeypatch.setattr("keeper_sdk.providers.commander_cli.utc_timestamp", lambda: "2026-04-24T12:34:56Z")
 
     calls: list[list[str]] = []
     monkeypatch.setattr(
@@ -504,7 +504,7 @@ def test_apply_verifies_fields_match(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_apply_reports_field_drift(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper")
-    monkeypatch.setattr("keeper_sdk.providers.commander_cli._utc_now", lambda: "2026-04-24T12:34:56Z")
+    monkeypatch.setattr("keeper_sdk.providers.commander_cli.utc_timestamp", lambda: "2026-04-24T12:34:56Z")
 
     calls: list[list[str]] = []
     monkeypatch.setattr(
@@ -569,7 +569,7 @@ def test_apply_reports_field_drift(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_apply_deletes_managed_record(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper")
-    monkeypatch.setattr("keeper_sdk.providers.commander_cli._utc_now", lambda: "2026-04-24T12:34:56Z")
+    monkeypatch.setattr("keeper_sdk.providers.commander_cli.utc_timestamp", lambda: "2026-04-24T12:34:56Z")
 
     calls: list[list[str]] = []
     monkeypatch.setattr(
@@ -728,7 +728,7 @@ def test_run_cmd_wraps_in_process_pam_import_exception(monkeypatch: pytest.Monke
 
 def test_apply_reference_existing_splits_to_extend(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper")
-    monkeypatch.setattr("keeper_sdk.providers.commander_cli._utc_now", lambda: "2026-04-24T12:34:56Z")
+    monkeypatch.setattr("keeper_sdk.providers.commander_cli.utc_timestamp", lambda: "2026-04-24T12:34:56Z")
 
     calls: list[list[str]] = []
 

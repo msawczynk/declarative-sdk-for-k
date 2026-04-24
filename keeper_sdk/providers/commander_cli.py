@@ -24,7 +24,6 @@ The provider:
 from __future__ import annotations
 
 import contextlib
-import datetime as dt
 import importlib.util
 import io
 import json
@@ -39,18 +38,18 @@ from pathlib import Path
 from typing import Any
 
 from keeper_sdk.core.diff import _DIFF_IGNORED_FIELDS, ChangeKind
-from keeper_sdk.core.errors import CapabilityError, CollisionError, DeleteUnsupportedError
+from keeper_sdk.core.errors import CapabilityError, CollisionError
 from keeper_sdk.core.interfaces import ApplyOutcome, LiveRecord, Provider
 from keeper_sdk.core.metadata import (
     MARKER_FIELD_LABEL,
     decode_marker,
     encode_marker,
     serialize_marker,
+    utc_timestamp,
 )
 from keeper_sdk.core.normalize import to_pam_import_json
 from keeper_sdk.core.planner import Plan
 
-_DELETE_UNSUPPORTED_ERROR = DeleteUnsupportedError
 _SILENT_FAIL_COMMANDS = {
     ("pam", "project", "import"),
     ("pam", "project", "extend"),
@@ -214,8 +213,12 @@ class CommanderCliProvider(Provider):
                 for live in live_records:
                     live_by_key.setdefault((live.resource_type, live.title), []).append(live)
 
-                now = _utc_now()
-                for change, outcome in zip(creates_updates, outcomes, strict=False):
+                now = utc_timestamp()
+                # outcomes is built by iterating creates_updates in the same
+                # order above, so lengths must match — strict=True turns any
+                # future drift into a loud failure rather than a silent
+                # mis-association of markers to changes.
+                for change, outcome in zip(creates_updates, outcomes, strict=True):
                     if synthetic_config and change.resource_type == "pam_configuration":
                         outcome.details.update(
                             {
@@ -719,22 +722,23 @@ class CommanderCliProvider(Provider):
             )
         self._keeper_login_attempted = True
 
+        # Require an explicit helper path. The helper must expose
+        # ``load_keeper_creds()`` and ``keeper_login(email, password, totp)``
+        # — see ``keeper-vault-rbi-pam-testenv/scripts/deploy_watcher.py`` in
+        # the acme lab for the canonical implementation. A prior version of
+        # this code fell back to a workstation-local path; that is unsafe as
+        # library behaviour.
         helper_path = os.environ.get("KEEPER_SDK_LOGIN_HELPER")
-        if helper_path and Path(helper_path).is_file():
-            candidate = Path(helper_path)
-        else:
-            candidate = (
-                Path.home()
-                / "Downloads"
-                / "Cursor tests"
-                / "keeper-vault-rbi-pam-testenv"
-                / "scripts"
-                / "deploy_watcher.py"
+        if not helper_path:
+            raise CapabilityError(
+                reason="in-process Commander login requires KEEPER_SDK_LOGIN_HELPER to point at a Python helper exposing load_keeper_creds() + keeper_login()",
+                next_action="export KEEPER_SDK_LOGIN_HELPER=/abs/path/to/deploy_watcher.py (or equivalent) and retry",
             )
+        candidate = Path(helper_path)
         if not candidate.is_file():
             raise CapabilityError(
-                reason=f"in-process Commander login requires deploy_watcher.py; not found at {candidate}",
-                next_action="set KEEPER_SDK_LOGIN_HELPER to the absolute path of deploy_watcher.py",
+                reason=f"KEEPER_SDK_LOGIN_HELPER points at a non-existent file: {candidate}",
+                next_action="correct the path or remove the env var",
             )
         try:
             spec = importlib.util.spec_from_file_location("_sdk_deploy_watcher", candidate)
@@ -780,10 +784,6 @@ def _parse_pam_project_args(tail: list[str]) -> dict[str, Any]:
         elif key in ("--config", "-c"):
             parsed["config"] = value
     return parsed
-
-
-def _utc_now() -> str:
-    return dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _has_existing(changes: list[Any]) -> bool:

@@ -39,7 +39,7 @@ def load_manifest_string(raw: str, *, suffix: str = ".yaml", validate: bool = Tr
         validate_manifest(document)
     try:
         return Manifest.model_validate(document)
-    except Exception as exc:  # pragma: no cover - defensive; schema already covers
+    except (ValueError, TypeError) as exc:  # pydantic ValidationError subclasses ValueError
         raise SchemaError(
             reason=f"typed validation failed: {exc}",
             next_action="fix the reported fields",

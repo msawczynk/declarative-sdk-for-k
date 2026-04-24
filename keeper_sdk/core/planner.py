@@ -14,6 +14,21 @@ from keeper_sdk.core.diff import Change, ChangeKind
 
 @dataclass
 class Plan:
+    """Deterministic, ordered set of changes for a single manifest.
+
+    A Plan is built from the output of :func:`compute_diff` (unordered
+    changes) plus :func:`execution_order` (topological uid_ref order).
+    It is the unit of work the CLI and Provider hand to each other:
+
+    * :meth:`ordered` returns creates/updates in dependency order,
+      followed by deletes in reverse dependency order.
+    * :meth:`is_clean` is the "no actionable changes" predicate used to
+      drive the ``plan`` / ``diff`` exit code (2 when non-clean).
+    * The ``creates`` / ``updates`` / ``deletes`` / ``conflicts`` /
+      ``noops`` properties expose per-kind slices without mutating the
+      underlying list.
+    """
+
     manifest_name: str
     changes: list[Change] = field(default_factory=list)
     order: list[str] = field(default_factory=list)
@@ -65,4 +80,11 @@ def build_plan(
     changes: list[Change],
     order: list[str],
 ) -> Plan:
+    """Construct a Plan, defensively copying its inputs.
+
+    The copies keep the Plan independent of any mutation the caller
+    applies to ``changes`` / ``order`` afterwards — important because
+    downstream code (renderers, providers) inspects the Plan across
+    multiple call sites.
+    """
     return Plan(manifest_name=manifest_name, changes=list(changes), order=list(order))

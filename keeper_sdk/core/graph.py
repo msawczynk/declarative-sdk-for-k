@@ -116,9 +116,6 @@ def build_graph(manifest: Manifest) -> nx.DiGraph:
         owner = resource.get("uid_ref")
         for user in resource.get("users") or []:
             user_ref = user.get("uid_ref") or owner
-            if user_ref and user_ref in owners:
-                # resource depends on nested users to the extent it binds credentials
-                pass
             for target in _iter_refs(user):
                 if target not in owners:
                     raise RefError(

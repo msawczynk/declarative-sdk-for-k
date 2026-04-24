@@ -34,9 +34,24 @@ class LiveRecord:
 
 @dataclass(frozen=True)
 class ApplyOutcome:
+    """Result of applying a single planned change.
+
+    Attributes:
+        uid_ref: Manifest handle for the resource. Empty string if the
+            change had no uid_ref (e.g. a synthetic conflict outcome).
+        keeper_uid: Vault UID of the record after the action completed.
+            Empty string for dry-run or failed creates.
+        action: One of ``create``, ``update``, ``delete``, ``noop``,
+            ``conflict``. Matches :class:`ChangeKind` values.
+        details: Free-form provider-specific metadata. Well-known keys
+            include ``dry_run`` (bool), ``marker_written`` (bool),
+            ``verified`` (bool), ``field_drift`` (dict), ``reason`` (str),
+            ``reused_existing`` (bool), ``removed`` (bool).
+    """
+
     uid_ref: str
     keeper_uid: str
-    action: str  # create | update | delete | noop
+    action: str
     details: dict[str, Any] = field(default_factory=dict)
 
 

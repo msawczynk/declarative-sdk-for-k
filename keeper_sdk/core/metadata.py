@@ -72,8 +72,20 @@ def decode_marker(raw: str | None) -> dict[str, Any] | None:
     return data
 
 
-def _utc_now() -> str:
+def utc_timestamp() -> str:
+    """Return the current UTC time as an ISO-8601 ``Z``-suffixed string.
+
+    The format matches what :func:`encode_marker` writes into
+    ``first_applied_at`` / ``last_applied_at``; exposed as a public
+    helper so providers can stamp ``last_applied_at`` without
+    round-tripping through :func:`encode_marker` just for the
+    timestamp.
+    """
     return _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+# Backwards-compatible alias; internal-only, will be removed in a future release.
+_utc_now = utc_timestamp
 
 
 __all__ = [
@@ -83,4 +95,5 @@ __all__ = [
     "decode_marker",
     "encode_marker",
     "serialize_marker",
+    "utc_timestamp",
 ]

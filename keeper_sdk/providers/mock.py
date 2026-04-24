@@ -16,6 +16,7 @@ from keeper_sdk.core.metadata import (
     MARKER_FIELD_LABEL,
     encode_marker,
     serialize_marker,
+    utc_timestamp,
 )
 from keeper_sdk.core.planner import Plan
 
@@ -89,14 +90,7 @@ class MockProvider(Provider):
                     **marker,
                     "manifest": manifest_name,
                     "resource_type": change.resource_type,
-                    "last_applied_at": encode_marker(
-                        uid_ref=marker["uid_ref"],
-                        manifest=manifest_name,
-                        resource_type=change.resource_type,
-                        parent_uid_ref=marker.get("parent_uid_ref"),
-                        first_applied_at=marker.get("first_applied_at"),
-                        applied_by=marker.get("applied_by", "commander/unknown"),
-                    )["last_applied_at"],
+                    "last_applied_at": utc_timestamp(),
                 }
                 existing_cf = new_payload.get("custom_fields") or {}
                 existing_cf[MARKER_FIELD_LABEL] = serialize_marker(marker)

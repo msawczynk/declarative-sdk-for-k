@@ -134,6 +134,11 @@ def run_smoke(
     # local key on each subprocess invocation; KEEPER_PASSWORD short-circuits
     # the prompt without hitting stdin.
     env["KEEPER_PASSWORD"] = admin_password
+    # The SDK routes pam project import/extend + marker writes through the
+    # in-process Commander API; point it at the lab's deploy_watcher.py so
+    # _get_keeper_params() can bootstrap a KeeperParams session.
+    env["KEEPER_SDK_LOGIN_HELPER"] = str(identity.LAB_ROOT / "scripts" / "deploy_watcher.py")
+    os.environ["KEEPER_SDK_LOGIN_HELPER"] = env["KEEPER_SDK_LOGIN_HELPER"]
     state["keeper_args"] = argv_prefix
     state["admin_config_path"] = admin_config_path
     _remove_project_tree(argv_prefix, env=env, project_name=SMOKE_PROJECT_NAME)
