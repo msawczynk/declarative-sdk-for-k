@@ -83,6 +83,8 @@ def compute_diff(
     manifest_name = manifest_name or manifest.name
     changes: list[Change] = []
 
+    _raise_live_record_collisions(live_records)
+
     by_uid_ref: dict[str, LiveRecord] = {}
     by_title: dict[tuple[str, str], LiveRecord] = {}
     for live in live_records:
@@ -223,6 +225,41 @@ def compute_diff(
                 )
 
     return changes
+
+
+def _raise_live_record_collisions(live_records: list[LiveRecord]) -> None:
+    """Reject ambiguous live-record matches before diffing desired state."""
+    marker_matches: dict[str, list[LiveRecord]] = {}
+    title_matches: dict[tuple[str, str], list[LiveRecord]] = {}
+
+    for live in live_records:
+        marker_uid_ref = (live.marker or {}).get("uid_ref") if live.marker else None
+        if marker_uid_ref:
+            marker_matches.setdefault(marker_uid_ref, []).append(live)
+        title_matches.setdefault((live.resource_type, live.title), []).append(live)
+
+    for uid_ref, matches in marker_matches.items():
+        if len(matches) < 2:
+            continue
+        raise CollisionError(
+            reason=f"live tenant has {len(matches)} records claiming uid_ref='{uid_ref}'",
+            uid_ref=uid_ref,
+            next_action="reconcile the duplicate ownership markers manually before re-running apply",
+            context={"live_identifiers": [live.keeper_uid for live in matches]},
+        )
+
+    for (resource_type, title), matches in title_matches.items():
+        if len(matches) < 2:
+            continue
+        if any((live.marker or {}).get("uid_ref") for live in matches):
+            continue
+        raise CollisionError(
+            reason=f"live tenant has {len(matches)} {resource_type} records titled '{title}' with no ownership markers",
+            uid_ref=None,
+            resource_type=resource_type,
+            next_action="rename duplicates or add ownership markers so matching is unambiguous",
+            context={"live_identifiers": [live.keeper_uid for live in matches]},
+        )
 
 
 _DIFF_IGNORED_FIELDS = frozenset({
