@@ -73,7 +73,9 @@ def main(ctx: click.Context, provider: str, folder_uid: str | None) -> None:
 @main.command()
 @click.argument("manifest_path", type=click.Path(exists=True, path_type=Path))
 @click.option("--emit-canonical", is_flag=True, help="Print the canonicalised document")
-def validate(manifest_path: Path, emit_canonical: bool) -> None:
+@click.option("--online", is_flag=True, help="Run tenant-connectivity checks (stage 4-5)")
+@click.pass_context
+def validate(ctx: click.Context, manifest_path: Path, emit_canonical: bool, online: bool) -> None:
     """Validate the manifest against the v1 schema."""
     try:
         manifest = load_manifest(manifest_path)
@@ -97,7 +99,49 @@ def validate(manifest_path: Path, emit_canonical: bool) -> None:
         click.echo(f"reference error: {exc}", err=True)
         sys.exit(EXIT_REF)
 
-    click.echo(f"ok: {manifest.name} ({len(manifest.iter_uid_refs())} uid_refs)")
+    online_suffix = ""
+    if online:
+        provider = _make_provider(ctx, manifest_path, manifest=manifest)
+        try:
+            live = provider.discover()
+        except CapabilityError as exc:
+            click.echo(f"discovery failed: {exc}", err=True)
+            sys.exit(EXIT_CAPABILITY)
+
+        live_gateway_names = {
+            record.title for record in live if record.resource_type == "gateway"
+        }
+        stage4_failed = False
+        for gateway in manifest.gateways:
+            if gateway.mode != "reference_existing":
+                continue
+            if gateway.name in live_gateway_names:
+                continue
+            click.echo(f"stage 4: gateway '{gateway.name}' not found in tenant", err=True)
+            stage4_failed = True
+
+        try:
+            changes = compute_diff(manifest, live, adopt=False)
+        except OwnershipError as exc:
+            click.echo(f"ownership error: {exc}", err=True)
+            sys.exit(EXIT_CAPABILITY)
+
+        create_count = sum(1 for change in changes if change.kind.value == "create")
+        update_count = sum(1 for change in changes if change.kind.value == "update")
+        delete_count = sum(1 for change in changes if change.kind.value == "delete")
+        conflict_count = sum(1 for change in changes if change.kind.value == "conflict")
+        click.echo(
+            "stage 5: "
+            f"{create_count} create, "
+            f"{update_count} update, "
+            f"{delete_count} delete-candidates, "
+            f"{conflict_count} conflicts"
+        )
+        online_suffix = f"; online: {len(live)} live records"
+        if stage4_failed:
+            sys.exit(EXIT_CAPABILITY)
+
+    click.echo(f"ok: {manifest.name} ({len(manifest.iter_uid_refs())} uid_refs){online_suffix}")
     if emit_canonical:
         click.echo(dump_manifest(manifest, fmt="yaml"))
 

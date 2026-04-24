@@ -48,6 +48,52 @@ def test_validate_rejects_capability(invalid_manifest) -> None:
     assert result.exit_code == EXIT_CAPABILITY
 
 
+def test_validate_online_passes_with_mock_provider(
+    minimal_manifest_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest = load_manifest(minimal_manifest_path)
+    provider = MockProvider(manifest.name)
+    provider.seed(
+        [
+            LiveRecord(
+                keeper_uid="LIVE_GW_UID",
+                title="Acme Lab Gateway",
+                resource_type="gateway",
+                payload={"name": "Acme Lab Gateway"},
+                marker=None,
+            )
+        ]
+    )
+
+    monkeypatch.setattr(cli_main_module, "MockProvider", lambda manifest_name: provider)
+
+    result = _run(["validate", str(minimal_manifest_path), "--online"])
+    assert result.exit_code == 0, result.output
+    assert "online:" in result.output
+
+
+def test_validate_online_warns_on_missing_gateway(
+    minimal_manifest_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest = load_manifest(minimal_manifest_path)
+    provider = MockProvider(manifest.name)
+
+    monkeypatch.setattr(cli_main_module, "MockProvider", lambda manifest_name: provider)
+
+    result = _run(["validate", str(minimal_manifest_path), "--online"])
+    assert result.exit_code == EXIT_CAPABILITY, result.output
+    assert "stage 4" in result.output
+
+
+def test_validate_without_online_unchanged(minimal_manifest_path: Path) -> None:
+    result = _run(["validate", str(minimal_manifest_path)])
+    assert result.exit_code == 0, result.output
+    assert "online" not in result.output
+    assert "stage" not in result.output
+
+
 @pytest.mark.parametrize(
     ("scenario", "expected_exit"),
     [
