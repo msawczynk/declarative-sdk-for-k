@@ -25,6 +25,7 @@ from pathlib import Path
 
 import click
 
+from keeper_sdk.cli.renderer import RichRenderer
 from keeper_sdk.core import (
     CapabilityError,
     DeleteUnsupportedError,
@@ -37,15 +38,12 @@ from keeper_sdk.core import (
     compute_diff,
     dump_manifest,
     execution_order,
+    from_pam_import_json,
     load_manifest,
     redact,
-    to_pam_import_json,
-    from_pam_import_json,
 )
-from keeper_sdk.core.diff import ChangeKind
 from keeper_sdk.core.planner import Plan
 from keeper_sdk.providers import CommanderCliProvider, MockProvider
-from keeper_sdk.cli.renderer import RichRenderer
 
 EXIT_OK = 0
 EXIT_GENERIC = 1

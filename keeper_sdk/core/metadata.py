@@ -3,13 +3,15 @@
 Canonical payload matches METADATA_OWNERSHIP.md:
 
     {
+      "manager": "keeper-pam-declarative",
       "version": "1",
-      "manager": "keeper_declarative",
       "uid_ref": "pc.domain-local-admin",
-      "manifest_name": "acme-prod",
-      "created_at": "2025-11-20T18:22:10Z",
-      "updated_at": "2025-11-20T18:22:10Z",
-      "extra": { ... }
+      "manifest": "acme-prod",
+      "resource_type": "pamUser",
+      "parent_uid_ref": null,
+      "first_applied_at": "2026-04-15T18:22:11Z",
+      "last_applied_at": "2026-04-16T02:05:44Z",
+      "applied_by": "commander/unknown"
     }
 
 Stored as a JSON string in a custom record field labelled
@@ -22,7 +24,7 @@ import datetime as _dt
 import json
 from typing import Any
 
-MANAGER_NAME = "keeper_declarative"
+MANAGER_NAME = "keeper-pam-declarative"
 MARKER_VERSION = "1"
 MARKER_FIELD_LABEL = "keeper_declarative_manager"
 
@@ -30,20 +32,25 @@ MARKER_FIELD_LABEL = "keeper_declarative_manager"
 def encode_marker(
     *,
     uid_ref: str,
-    manifest_name: str,
-    created_at: str | None = None,
-    updated_at: str | None = None,
-    extra: dict[str, Any] | None = None,
+    manifest: str,
+    resource_type: str,
+    parent_uid_ref: str | None = None,
+    first_applied_at: str | None = None,
+    last_applied_at: str | None = None,
+    applied_by: str = "commander/unknown",
 ) -> dict[str, Any]:
     now = _utc_now()
+    first_seen = first_applied_at or now
     return {
-        "version": MARKER_VERSION,
         "manager": MANAGER_NAME,
+        "version": MARKER_VERSION,
         "uid_ref": uid_ref,
-        "manifest_name": manifest_name,
-        "created_at": created_at or now,
-        "updated_at": updated_at or now,
-        **({"extra": extra} if extra else {}),
+        "manifest": manifest,
+        "resource_type": resource_type,
+        "parent_uid_ref": parent_uid_ref,
+        "first_applied_at": first_seen,
+        "last_applied_at": last_applied_at or first_seen,
+        "applied_by": applied_by,
     }
 
 

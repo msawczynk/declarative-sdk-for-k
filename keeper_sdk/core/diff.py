@@ -76,7 +76,7 @@ def compute_diff(
     Matching rules:
       1. Prefer LiveRecord.marker.uid_ref == desired.uid_ref when present.
       2. Otherwise match by (resource_type, title).
-      3. Live records with a marker whose ``manager != keeper_declarative`` are
+      3. Live records with a marker whose ``manager != keeper-pam-declarative`` are
          flagged as CONFLICT and never altered.
     """
     manifest_name = manifest_name or manifest.name
@@ -180,7 +180,7 @@ def compute_diff(
             marker = live.marker or {}
             if marker.get("manager") != MANAGER_NAME:
                 continue
-            if marker.get("manifest_name") and manifest_name and marker.get("manifest_name") != manifest_name:
+            if marker.get("manifest") and manifest_name and marker.get("manifest") != manifest_name:
                 continue
             changes.append(
                 Change(
@@ -197,7 +197,7 @@ def compute_diff(
             if live.keeper_uid in matched:
                 continue
             marker = live.marker or {}
-            if marker.get("manager") == MANAGER_NAME and marker.get("manifest_name") == manifest_name:
+            if marker.get("manager") == MANAGER_NAME and marker.get("manifest") == manifest_name:
                 changes.append(
                     Change(
                         kind=ChangeKind.CONFLICT,

@@ -14,7 +14,6 @@ from keeper_sdk.core.diff import ChangeKind
 from keeper_sdk.core.interfaces import ApplyOutcome, LiveRecord, Provider
 from keeper_sdk.core.metadata import (
     MARKER_FIELD_LABEL,
-    decode_marker,
     encode_marker,
     serialize_marker,
 )
@@ -43,7 +42,8 @@ class MockProvider(Provider):
                 keeper_uid = _stable_uid(f"{manifest_name}:{change.uid_ref or change.title}")
                 marker = encode_marker(
                     uid_ref=change.uid_ref or change.title,
-                    manifest_name=manifest_name,
+                    manifest=manifest_name,
+                    resource_type=change.resource_type,
                 )
                 payload = dict(change.after)
                 custom_fields = payload.get("custom_fields") or {}
@@ -82,11 +82,22 @@ class MockProvider(Provider):
                 new_payload = {**existing.payload, **change.after}
                 marker = existing.marker or encode_marker(
                     uid_ref=change.uid_ref or change.title,
-                    manifest_name=manifest_name,
+                    manifest=manifest_name,
+                    resource_type=change.resource_type,
                 )
-                marker = {**marker, "updated_at": encode_marker(
-                    uid_ref=marker["uid_ref"], manifest_name=marker["manifest_name"],
-                )["updated_at"]}
+                marker = {
+                    **marker,
+                    "manifest": manifest_name,
+                    "resource_type": change.resource_type,
+                    "last_applied_at": encode_marker(
+                        uid_ref=marker["uid_ref"],
+                        manifest=manifest_name,
+                        resource_type=change.resource_type,
+                        parent_uid_ref=marker.get("parent_uid_ref"),
+                        first_applied_at=marker.get("first_applied_at"),
+                        applied_by=marker.get("applied_by", "commander/unknown"),
+                    )["last_applied_at"],
+                }
                 existing_cf = new_payload.get("custom_fields") or {}
                 existing_cf[MARKER_FIELD_LABEL] = serialize_marker(marker)
                 new_payload["custom_fields"] = existing_cf
@@ -160,7 +171,8 @@ class MockProvider(Provider):
         if marker_uid_ref:
             marker = encode_marker(
                 uid_ref=marker_uid_ref,
-                manifest_name=manifest_name or self._manifest_name or "unknown",
+                manifest=manifest_name or self._manifest_name or "unknown",
+                resource_type=resource_type,
             )
             custom_fields = payload.get("custom_fields") or {}
             custom_fields[MARKER_FIELD_LABEL] = serialize_marker(marker)

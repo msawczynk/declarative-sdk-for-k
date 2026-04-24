@@ -32,7 +32,11 @@ def test_diff_noop_when_marker_matches(minimal_manifest_path: Path) -> None:
             title="lab-linux-1",
             resource_type="pamMachine",
             payload=payload,
-            marker=encode_marker(uid_ref="acme-lab-linux1", manifest_name=manifest.name),
+            marker=encode_marker(
+                uid_ref="acme-lab-linux1",
+                manifest=manifest.name,
+                resource_type="pamMachine",
+            ),
         )
     ]
     changes = compute_diff(manifest, live_records=live)
@@ -84,7 +88,11 @@ def test_diff_delete_when_allowed(minimal_manifest_path: Path) -> None:
         keeper_uid="ORPHAN",
         title="old-host",
         resource_type="pamMachine",
-        marker=encode_marker(uid_ref="acme-lab-old", manifest_name=manifest.name),
+        marker=encode_marker(
+            uid_ref="acme-lab-old",
+            manifest=manifest.name,
+            resource_type="pamMachine",
+        ),
         payload={"title": "old-host"},
     )
     changes = compute_diff(manifest, live_records=[orphan], allow_delete=True)
@@ -98,7 +106,11 @@ def test_diff_no_delete_without_flag(minimal_manifest_path: Path) -> None:
         keeper_uid="ORPHAN",
         title="old-host",
         resource_type="pamMachine",
-        marker=encode_marker(uid_ref="acme-lab-old", manifest_name=manifest.name),
+        marker=encode_marker(
+            uid_ref="acme-lab-old",
+            manifest=manifest.name,
+            resource_type="pamMachine",
+        ),
         payload={"title": "old-host"},
     )
     changes = compute_diff(manifest, live_records=[orphan], allow_delete=False)

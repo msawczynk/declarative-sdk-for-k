@@ -12,17 +12,19 @@ from keeper_sdk.core.metadata import (
 
 
 def test_encode_contains_required_fields() -> None:
-    marker = encode_marker(uid_ref="x", manifest_name="env")
+    marker = encode_marker(uid_ref="x", manifest="env", resource_type="pamMachine")
     assert marker["manager"] == MANAGER_NAME
     assert marker["version"] == MARKER_VERSION
     assert marker["uid_ref"] == "x"
-    assert marker["manifest_name"] == "env"
-    assert "created_at" in marker
-    assert "updated_at" in marker
+    assert marker["manifest"] == "env"
+    assert marker["resource_type"] == "pamMachine"
+    assert marker["parent_uid_ref"] is None
+    assert marker["first_applied_at"] == marker["last_applied_at"]
+    assert marker["applied_by"] == "commander/unknown"
 
 
 def test_roundtrip() -> None:
-    original = encode_marker(uid_ref="x", manifest_name="env")
+    original = encode_marker(uid_ref="x", manifest="env", resource_type="pamMachine")
     raw = serialize_marker(original)
     decoded = decode_marker(raw)
     assert decoded == original
