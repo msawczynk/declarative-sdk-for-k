@@ -42,14 +42,16 @@ keeper-sdk export path/to/pam-project-export.json --output env.yaml
 ## Status (sdk-completion branch, as of 2026-04-24)
 
 Core + mock: complete.
-Commander CLI provider: partial — discover, apply (import/extend), and
-capability checks are wired; delete support and per-record metadata
-writeback are on the sdk-completion roadmap (Phase C: W13–W18).
+Commander CLI provider: discover, plan, apply (create / update / delete
+via `keeper rm`, gated behind `--allow-delete`), ownership-marker
+read/write, and a provider-level capability check are all wired. Rotation
+/ JIT / gateway `mode: create` remain deferred (see REVIEW.md D-4) and
+surface as plan-time CONFLICTs rather than silent drops.
 
-Use `--provider commander` (with `KEEPER_DECLARATIVE_FOLDER` set) to delegate
-to the installed `keeper` CLI via subprocess. Deletion via the Commander
-provider is intentionally unsupported for v1; operators must remove records
-manually or stay on the mock/core path.
+Use `--provider commander` (with `KEEPER_DECLARATIVE_FOLDER` set) to
+delegate to the installed `keeper` CLI via subprocess. Deletion is
+scoped to records that carry the SDK's ownership marker and still
+requires `--allow-delete` on `plan` / `apply`.
 
 ## Exit codes
 

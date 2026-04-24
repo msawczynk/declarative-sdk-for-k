@@ -70,6 +70,22 @@ class Provider(Protocol):
         """Execute a plan. Must respect ``dry_run`` and fail fast on errors."""
         ...
 
+    def unsupported_capabilities(self, manifest: Any) -> list[str]:  # noqa: ARG002
+        """Return human-readable reasons the manifest exceeds this provider.
+
+        Called by the CLI at plan/apply time BEFORE ``apply_plan``. Each
+        returned string becomes a ``ChangeKind.CONFLICT`` row in the plan,
+        guaranteeing ``plan`` / ``apply --dry-run`` / ``apply`` surface the
+        same capability failures — no more green-plan + red-apply.
+
+        Default for providers that implement everything the schema accepts:
+        return ``[]``. See :class:`MockProvider` for the trivial case and
+        :meth:`CommanderCliProvider.unsupported_capabilities` for the
+        Commander-release-17.2.13 list (rotation, JIT, gateway mode:create,
+        …).
+        """
+        ...
+
 
 class MetadataStore(Protocol):
     """Reads/writes declarative-ownership metadata on live records."""

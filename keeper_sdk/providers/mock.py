@@ -34,6 +34,16 @@ class MockProvider(Provider):
     def discover(self) -> list[LiveRecord]:
         return list(self._records.values())
 
+    def unsupported_capabilities(self, manifest: object = None) -> list[str]:  # noqa: ARG002
+        """Mock fiat: every schema-valid manifest is supported.
+
+        The in-memory provider doesn't actually drive rotation/JIT/etc, it
+        just stores payloads — so from the operator's perspective there's
+        nothing the mock refuses that the schema allows. Real providers
+        override this (see :class:`CommanderCliProvider`).
+        """
+        return []
+
     def apply_plan(self, plan: Plan, *, dry_run: bool = False) -> list[ApplyOutcome]:
         outcomes: list[ApplyOutcome] = []
         manifest_name = plan.manifest_name

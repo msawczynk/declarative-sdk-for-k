@@ -115,6 +115,12 @@ def validate(ctx: click.Context, manifest_path: Path, emit_canonical: bool, onli
             click.echo(f"discovery failed: {exc}", err=True)
             sys.exit(EXIT_CAPABILITY)
 
+        gaps = getattr(provider, "unsupported_capabilities", lambda _m: [])(manifest)
+        if gaps:
+            click.echo("capability gaps (will appear as plan conflicts):", err=True)
+            for reason in gaps:
+                click.echo(f"  - {reason}", err=True)
+
         live_gateway_names = {
             record.title for record in live if record.resource_type == "gateway"
         }
@@ -224,7 +230,7 @@ def import_(
 
     Shows the adoption plan first, then writes markers only after confirmation.
     """
-    manifest, order, live = _load_plan_context(ctx, manifest_path)
+    manifest, order, live, _provider = _load_plan_context(ctx, manifest_path)
     try:
         changes = compute_diff(manifest, live, adopt=True)
     except OwnershipError as exc:
@@ -324,12 +330,36 @@ def apply(
 # shared helpers
 
 def _build_plan(ctx: click.Context, manifest_path: Path, *, allow_delete: bool) -> Plan:
-    manifest, order, live = _load_plan_context(ctx, manifest_path)
+    manifest, order, live, provider = _load_plan_context(ctx, manifest_path)
     try:
         changes = compute_diff(manifest, live, allow_delete=allow_delete)
     except OwnershipError as exc:
         click.echo(f"ownership error: {exc}", err=True)
         sys.exit(EXIT_CAPABILITY)
+
+    # Surface provider capability gaps as CONFLICT rows so plan / dry-run /
+    # apply are behaviourally identical (DELIVERY_PLAN.md: "plan == apply
+    # --dry-run"). Without this, CommanderCliProvider.apply_plan would only
+    # raise at real-apply time — operators would see green plans. See
+    # REVIEW.md "Update — second pass / C3".
+    try:
+        capability_gaps = provider.unsupported_capabilities(manifest)
+    except AttributeError:
+        # Older third-party providers may not implement the hook; treat
+        # as "no gaps" rather than breaking their integration.
+        capability_gaps = []
+    for reason in capability_gaps:
+        from keeper_sdk.core.diff import Change, ChangeKind
+        changes.insert(
+            0,
+            Change(
+                kind=ChangeKind.CONFLICT,
+                uid_ref=None,
+                resource_type="capability",
+                title="unsupported-by-provider",
+                reason=reason,
+            ),
+        )
 
     return build_plan(manifest.name, changes, order)
 
@@ -361,7 +391,7 @@ def _load_plan_context(ctx: click.Context, manifest_path: Path):
         click.echo(f"discovery failed: {exc}", err=True)
         sys.exit(EXIT_CAPABILITY)
 
-    return manifest, order, live
+    return manifest, order, live, provider
 
 
 def _make_provider(ctx: click.Context, manifest_path: Path, *, manifest=None):

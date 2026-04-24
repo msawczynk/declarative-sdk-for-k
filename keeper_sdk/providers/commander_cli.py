@@ -158,13 +158,35 @@ class CommanderCliProvider(Provider):
             records.append(config_record)
         return records
 
+    def unsupported_capabilities(self, manifest: Any = None) -> list[str]:
+        """Enumerate manifest-declared capabilities this provider cannot drive.
+
+        Called by the CLI at plan / dry-run / apply time. Each item becomes a
+        CONFLICT row in the plan so ``plan == apply --dry-run == apply``
+        (DELIVERY_PLAN.md L94). Previously this ran only inside ``apply_plan``
+        as a late-apply guard, producing green plans followed by red applies
+        for the same input — see REVIEW.md "Update — second pass / D-4".
+
+        ``manifest`` argument is accepted for protocol parity; the provider
+        introspects its own ``self._manifest_source`` in practice.
+        """
+        source = manifest if manifest is not None else self._manifest_source
+        return _detect_unsupported_capabilities(source)
+
     def apply_plan(self, plan: Plan, *, dry_run: bool = False) -> list[ApplyOutcome]:
-        # Guard against manifests that declare capabilities the provider
-        # doesn't implement yet. Without this guard the provider would
-        # silently pass through to `pam project import`, which quietly
-        # ignores the unknown keys — operators would think it worked.
-        # See REVIEW.md D-4 for the full list + Commander hook points.
-        _assert_no_unsupported_capabilities(self._manifest_source)
+        # Last-line defence — CLI should have surfaced these as conflicts
+        # already (see unsupported_capabilities above). If an SDK caller
+        # bypasses the CLI and hands us a plan directly, we still refuse.
+        hits = _detect_unsupported_capabilities(self._manifest_source)
+        if hits:
+            raise CapabilityError(
+                reason="manifest declares capabilities the CommanderCliProvider does not implement yet: "
+                + "; ".join(hits),
+                next_action=(
+                    "remove the declarations, or drive the Commander hook manually before "
+                    "re-running apply. See REVIEW.md D-4."
+                ),
+            )
 
         outcomes: list[ApplyOutcome] = []
         creates_updates = [c for c in plan.ordered() if c.kind in (ChangeKind.CREATE, ChangeKind.UPDATE)]
@@ -819,21 +841,27 @@ _UNSUPPORTED_CAPABILITY_HINTS: tuple[tuple[str, str, str], ...] = (
 )
 
 
-def _assert_no_unsupported_capabilities(manifest: dict[str, Any]) -> None:
-    """Refuse to apply a manifest that declares an unimplemented capability.
+def _detect_unsupported_capabilities(manifest: Any) -> list[str]:
+    """Return human-readable reasons the manifest exceeds this provider.
 
-    The SDK's JSON Schema accepts a wider surface than the Commander
-    provider currently drives (see REVIEW.md D-4). Letting apply proceed
-    silently would write a subset of the declared state, which the
-    operator would not notice until a follow-up plan showed persistent
-    drift. Failing loud is cheaper.
-
-    We also check gateway ``mode: create`` because the provider only
-    implements ``mode: reference_existing`` today.
+    Pure detector — does not raise. Returns a list of strings suitable for
+    CONFLICT rows in a plan or for a late-apply CapabilityError. Handles
+    both ``dict`` manifests (the provider's normalised form) and Pydantic
+    ``Manifest`` instances (what the CLI has on hand before building a
+    plan); callers pass whichever is convenient.
     """
+    if manifest is None:
+        return []
+    if hasattr(manifest, "model_dump"):
+        source = manifest.model_dump(mode="python", exclude_none=True)
+    elif isinstance(manifest, dict):
+        source = manifest
+    else:
+        return []
+
     hits: list[str] = []
 
-    gateways = manifest.get("gateways")
+    gateways = source.get("gateways")
     if isinstance(gateways, list):
         for gateway in gateways:
             if isinstance(gateway, dict) and gateway.get("mode") == "create":
@@ -844,24 +872,12 @@ def _assert_no_unsupported_capabilities(manifest: dict[str, Any]) -> None:
                     "mode: reference_existing)"
                 )
 
-    serialized = json.dumps(manifest, default=str)
+    serialized = json.dumps(source, default=str)
     for needle, human, hook in _UNSUPPORTED_CAPABILITY_HINTS:
         if needle in serialized:
             hits.append(f"{human} is not implemented (Commander hook: `{hook}`)")
 
-    if hits:
-        raise CapabilityError(
-            reason=(
-                "manifest declares capabilities the CommanderCliProvider does not "
-                "implement yet: " + "; ".join(hits)
-            ),
-            next_action=(
-                "remove the declarations, or drive the Commander hook manually "
-                "before re-running apply. See REVIEW.md D-4 for per-capability "
-                "status and keeper-pam-declarative/NOTES_FROM_SDK.md for the "
-                "upstream reconciliation."
-            ),
-        )
+    return hits
 
 
 __all__ = ["CommanderCliProvider"]
