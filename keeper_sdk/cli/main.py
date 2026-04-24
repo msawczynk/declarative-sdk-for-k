@@ -153,8 +153,19 @@ def validate(ctx: click.Context, manifest_path: Path, emit_canonical: bool, onli
             f"{delete_count} delete-candidates, "
             f"{conflict_count} conflicts"
         )
+
+        binding_issues: list[str] = getattr(provider, "check_tenant_bindings", lambda _m: [])(
+            manifest
+        )
+        stage5_failed = False
+        if binding_issues:
+            stage5_failed = True
+            click.echo("stage 5: tenant binding failures:", err=True)
+            for issue in binding_issues:
+                click.echo(f"  - {issue}", err=True)
+
         online_suffix = f"; online: {len(live)} live records"
-        if stage4_failed:
+        if stage4_failed or stage5_failed:
             sys.exit(EXIT_CAPABILITY)
 
     click.echo(f"ok: {manifest.name} ({len(manifest.iter_uid_refs())} uid_refs){online_suffix}")

@@ -86,6 +86,24 @@ class Provider(Protocol):
         """
         ...
 
+    def check_tenant_bindings(self, manifest: Any) -> list[str]:  # noqa: ARG002
+        """Return human-readable reasons the manifest can't bind to this tenant.
+
+        Called by the CLI's ``validate --online`` at stage 5, AFTER
+        ``discover()`` but before the diff summary. Each returned string is a
+        hard binding failure — a gateway the manifest expects that doesn't
+        exist on the tenant, a ``pam_configuration`` whose title doesn't
+        resolve, a shared folder that was promised but isn't reachable by
+        the active session, a KSM-app-to-shared-folder binding that's missing.
+
+        Stage-4 checks (enforcements / discover access) are still handled
+        inline in ``validate``; stage-5 is exclusively ``check_tenant_bindings``.
+
+        Default for providers with no tenant-side bindings worth checking
+        (mock, offline, service-layer-without-live-session): return ``[]``.
+        """
+        ...
+
 
 class MetadataStore(Protocol):
     """Reads/writes declarative-ownership metadata on live records."""

@@ -70,9 +70,13 @@ Every mutating command honours `--auto-approve` (skip prompts) and
 | 4    | plan has conflicts                  | `plan --json` → iterate `changes[*].reason`    |
 | 5    | provider / capability error         | `stderr` carries `next_action`; apply it       |
 
-Exit 2 is overloaded intentionally — see `DELIVERY_PLAN.md` upstream.
+Exit 2 is overloaded intentionally — see `docs/VALIDATION_STAGES.md`.
 Disambiguate via the subcommand you invoked. CI pipelines depend on
 this. Do not propose changes to the numbering without a spec update.
+
+For the per-stage breakdown of what `validate` checks and which exit
+code fires for which failure (schema vs reference vs capability vs
+binding), read [`docs/VALIDATION_STAGES.md`](./docs/VALIDATION_STAGES.md).
 
 ## Agent playbook
 

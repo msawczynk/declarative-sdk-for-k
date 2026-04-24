@@ -165,6 +165,124 @@ class CommanderCliProvider(Provider):
         source = manifest if manifest is not None else self._manifest_source
         return _detect_unsupported_capabilities(source)
 
+    def check_tenant_bindings(self, manifest: Any = None) -> list[str]:
+        """Stage-5 online checks: verify every declared binding resolves.
+
+        For each ``reference_existing`` gateway, confirm a live gateway with
+        that name exists. For each PAM configuration declared in the manifest,
+        confirm a live PAM configuration with the same title resolves and
+        carries a valid ``shared_folder_uid`` + ``gateway_uid`` pairing.
+        When a ``gateway_uid_ref`` is declared on a PAM configuration, verify
+        the live config is actually paired with that gateway.
+
+        Each returned string is a human-readable binding failure ready for
+        ``click.echo(..., err=True)`` and maps 1:1 to a stage-5 violation
+        documented in ``docs/VALIDATION_STAGES.md``. Returning ``[]`` means
+        stage-5 passed.
+
+        Accepts either the typed :class:`Manifest` (preferred; used by the
+        CLI) or the raw manifest dict (for SDK callers bypassing typed
+        loading). One round-trip to ``pam gateway list`` + ``pam config list``
+        per call; no caching — validate is short-lived.
+        """
+
+        def _as_list(value: Any, attr: str) -> list[Any]:
+            if value is None:
+                return []
+            if hasattr(value, attr):
+                return list(getattr(value, attr))
+            if isinstance(value, dict):
+                return list(value.get(attr) or [])
+            return []
+
+        source: Any = manifest if manifest is not None else self._manifest_source
+        gateways = _as_list(source, "gateways")
+        pam_configs = _as_list(source, "pam_configurations")
+
+        def _get(item: Any, key: str) -> Any:
+            if hasattr(item, key):
+                return getattr(item, key)
+            if isinstance(item, dict):
+                return item.get(key)
+            return None
+
+        if not gateways and not pam_configs:
+            return []
+
+        try:
+            gateway_rows = self._pam_gateway_rows()
+        except (CapabilityError, OSError) as exc:
+            return [f"could not list tenant gateways: {exc}"]
+        try:
+            config_rows = self._pam_config_rows()
+        except (CapabilityError, OSError) as exc:
+            return [f"could not list tenant PAM configurations: {exc}"]
+
+        live_gateways_by_name: dict[str, dict[str, str]] = {
+            row["gateway_name"]: row for row in gateway_rows if row.get("gateway_name")
+        }
+        live_configs_by_title: dict[str, dict[str, str]] = {
+            row["config_name"]: row for row in config_rows if row.get("config_name")
+        }
+
+        gateway_uid_by_ref: dict[str, str] = {}
+        issues: list[str] = []
+
+        for gateway in gateways:
+            mode = _get(gateway, "mode") or "reference_existing"
+            name = _get(gateway, "name") or ""
+            uid_ref = _get(gateway, "uid_ref") or ""
+            if mode != "reference_existing":
+                continue
+            row = live_gateways_by_name.get(name)
+            if row is None:
+                issues.append(
+                    f"gateway '{name}' (uid_ref={uid_ref}) not found on tenant; "
+                    "check the enterprise's `pam gateway list --format json` output"
+                )
+                continue
+            gateway_uid_by_ref[uid_ref] = row["gateway_uid"]
+            declared_app = _get(gateway, "ksm_application_name")
+            if declared_app and row.get("app_title") and declared_app != row["app_title"]:
+                issues.append(
+                    f"gateway '{name}' declares ksm_application_name='{declared_app}' "
+                    f"but tenant has it bound to '{row['app_title']}'"
+                )
+
+        for config in pam_configs:
+            title = _get(config, "title")
+            uid_ref = _get(config, "uid_ref") or ""
+            if not title:
+                continue
+            row = live_configs_by_title.get(title)
+            if row is None:
+                issues.append(
+                    f"pam_configuration '{title}' (uid_ref={uid_ref}) not found on tenant; "
+                    "declare a matching title or create the configuration in Keeper first"
+                )
+                continue
+            if not row.get("shared_folder_uid"):
+                issues.append(
+                    f"pam_configuration '{title}' has no shared_folder on tenant — "
+                    "apply cannot write resources without a bound shared folder"
+                )
+            gateway_ref = _get(config, "gateway_uid_ref")
+            if gateway_ref:
+                expected_gateway_uid = gateway_uid_by_ref.get(gateway_ref)
+                actual_gateway_uid = row.get("gateway_uid") or ""
+                if (
+                    expected_gateway_uid
+                    and actual_gateway_uid
+                    and expected_gateway_uid != actual_gateway_uid
+                ):
+                    issues.append(
+                        f"pam_configuration '{title}' declares gateway_uid_ref='{gateway_ref}' "
+                        f"(uid={expected_gateway_uid}) but tenant pairs it with gateway uid "
+                        f"'{actual_gateway_uid}'"
+                    )
+
+        return issues
+
     def apply_plan(self, plan: Plan, *, dry_run: bool = False) -> list[ApplyOutcome]:
         # Last-line defence — CLI should have surfaced these as conflicts
         # already (see unsupported_capabilities above). If an SDK caller

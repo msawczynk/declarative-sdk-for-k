@@ -44,6 +44,15 @@ class MockProvider(Provider):
         """
         return []
 
+    def check_tenant_bindings(self, manifest: object = None) -> list[str]:  # noqa: ARG002
+        """In-memory provider has no tenant to bind against — always [].
+
+        Real providers override this with gateway / pam_configuration /
+        shared-folder existence checks; see
+        :meth:`CommanderCliProvider.check_tenant_bindings`.
+        """
+        return []
+
     def apply_plan(self, plan: Plan, *, dry_run: bool = False) -> list[ApplyOutcome]:
         outcomes: list[ApplyOutcome] = []
         manifest_name = plan.manifest_name

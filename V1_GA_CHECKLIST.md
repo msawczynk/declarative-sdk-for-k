@@ -48,10 +48,15 @@ PRs that close them so the next agent can tell at a glance what's left.
       workstation-local `deploy_watcher.py`).
 
 ### 5. `validate --online` completeness
-- [ ] Stage 5 actually verifies pam_configuration presence,
-      shared-folder reachability, KSM app binding. Today it only
-      prints a plan summary.
-- [ ] Documented exit codes for each stage failure.
+- [x] Stage 5 actually verifies pam_configuration presence,
+      shared-folder reachability, KSM app binding — implemented as
+      `Provider.check_tenant_bindings()` (commander: resolves
+      pam_configuration titles against `pam config list --format
+      json`, asserts `shared_folder_uid` present on each config,
+      cross-checks declared `gateway_uid_ref` against the tenant's
+      pairing, and flags `ksm_application_name` mismatches).
+- [x] Documented exit codes for each stage failure — see
+      [`docs/VALIDATION_STAGES.md`](./docs/VALIDATION_STAGES.md).
 
 ### 6. Live-smoke coverage
 - [x] `pamMachine` create → verify → delete cycle.

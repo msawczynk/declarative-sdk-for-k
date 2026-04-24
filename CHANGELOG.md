@@ -7,6 +7,17 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- `Provider.check_tenant_bindings(manifest) -> list[str]` protocol
+  method. `validate --online` stage 5 now calls it and exits
+  `EXIT_CAPABILITY` (`5`) on any returned issue. Commander
+  implementation verifies pam_configuration titles resolve, each
+  config has a `shared_folder_uid`, `gateway_uid_ref` pairings match
+  the tenant, and declared `ksm_application_name` matches what the
+  tenant actually bound. MockProvider returns `[]`. See
+  `docs/VALIDATION_STAGES.md` for the per-stage exit-code contract.
+- `docs/VALIDATION_STAGES.md` — complete stage-by-stage exit code
+  contract, remediation pointers, passing / failing examples.
+  Linked from `AGENTS.md`.
 - `scripts/sync_upstream.py` — extracts the Keeper Commander capability
   surface (registered PAM group commands, argparse flags for
   `pam project import` / `extend` / `pam rbi edit` /
