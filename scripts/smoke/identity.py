@@ -187,6 +187,49 @@ def _login_user(
     return params
 
 
+def _wait_for_next_totp_window(*, log_label: str = "next TOTP window") -> None:
+    """Sleep until the start of the next 30-second TOTP window plus 2s safety."""
+    remaining = 30 - int(time.time()) % 30
+    nap = remaining + 2
+    log.info("waiting %ds for %s", nap, log_label)
+    time.sleep(nap)
+
+
+def _retry_totp_login(
+    email: str,
+    password: str,
+    *,
+    config_path: Path,
+    totp_secret: str,
+    attempts: int = 3,
+):
+    """Wrap _login_user with retries on KeeperApiError 'two_factor_code_invalid'.
+
+    Keeper invalidates a consumed TOTP code for the remainder of its window.
+    The safest recovery is to wait for the next window and try again.
+    """
+    try:
+        from keepercommander.error import KeeperApiError
+    except ImportError as exc:
+        raise _dependency_error(exc)
+
+    last_exc: Exception | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            return _login_user(
+                email, password, config_path=config_path, totp_secret=totp_secret,
+            )
+        except KeeperApiError as exc:
+            last_exc = exc
+            if "two_factor_code_invalid" not in str(exc).lower():
+                raise
+            log.warning("TOTP rejected on attempt %d/%d; waiting for next window", attempt, attempts)
+            _wait_for_next_totp_window(log_label=f"retry {attempt + 1}")
+    raise RuntimeError(
+        f"TOTP login for {email} failed after {attempts} attempts"
+    ) from last_exc
+
+
 def _enroll_totp(params) -> tuple[str, str, str]:
     try:
         from keepercommander import api, utils
@@ -431,11 +474,16 @@ def ensure_sdktest_identity(*, force_reenroll: bool = False) -> dict[str, Any]:
     )
 
     log.info("=== target relogin (verify stored creds) ===")
-    verified_params = _login_user(
+    # After /2fa_add_validate Keeper marks the consumed TOTP code as used; the
+    # next window must be clean before /2fa_validate will accept a fresh code.
+    # Sleep to the start of the next 30-second window + 2s safety.
+    _wait_for_next_totp_window(log_label="post-enrollment settle")
+    verified_params = _retry_totp_login(
         TARGET_EMAIL,
         DEFAULT_PASSWORD,
         config_path=SDKTEST_COMMANDER_CONFIG,
         totp_secret=totp_secret,
+        attempts=3,
     )
     _write_commander_config(verified_params, SDKTEST_COMMANDER_CONFIG)
 

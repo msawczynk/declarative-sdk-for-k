@@ -1,0 +1,418 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import json
+import logging
+import os
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+ROOT = Path(__file__).resolve().parents[2]
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+# ruff: noqa: E402 - sys.path bootstrap above must precede these imports
+import identity
+import sandbox
+
+from keeper_sdk.core.diff import compute_diff
+from keeper_sdk.core.graph import build_graph, execution_order
+from keeper_sdk.core.manifest import load_manifest
+from keeper_sdk.core.metadata import MANAGER_NAME, MARKER_FIELD_LABEL
+from keeper_sdk.core.planner import build_plan
+from keeper_sdk.core.schema import validate_manifest
+from keeper_sdk.providers.commander_cli import CommanderCliProvider
+
+log = logging.getLogger("sdk_smoke.smoke")
+
+RESOURCE_TITLES = ("sdk-smoke-host-1", "sdk-smoke-host-2")
+GATEWAY_UID_REF = "lab-gw"
+GATEWAY_NAME = "Lab GW Rocky"
+PAM_CONFIG_UID_REF = "lab-cfg"
+PAM_CONFIG_TITLE = "Lab Rocky PAM Configuration"
+
+
+class SmokeError(Exception):
+    pass
+
+
+class PreflightError(Exception):
+    pass
+
+
+class TenantConstraintError(Exception):
+    pass
+
+
+class SdkCommandError(Exception):
+    def __init__(self, *, args: list[str], returncode: int) -> None:
+        self.args_list = list(args)
+        self.returncode = returncode
+        super().__init__(f"sdk command failed rc={returncode}: {' '.join(args)}")
+
+
+def run_smoke(
+    *,
+    keep_sf: bool = True,
+    teardown_only: bool = False,
+    keep_records: bool = False,
+    state: dict[str, Any] | None = None,
+) -> int:
+    del keep_sf  # Shared-folder removal is intentionally not part of this runner.
+    state = state if state is not None else {}
+
+    try:
+        admin_params = identity.admin_login()
+        _mark(state, "admin auth OK")
+        ident = identity.ensure_sdktest_identity()
+        _mark(state, f"test identity OK ({ident['email']})")
+    except Exception as exc:  # pragma: no cover - live-only path
+        raise PreflightError(f"auth bootstrap failed: {exc}") from exc
+
+    state["admin_params"] = admin_params
+    state["ident"] = ident
+
+    try:
+        sb = sandbox.ensure_sandbox(admin_params, testuser_email=ident["email"])
+        sf_uid = sb["sf_uid"]
+        state["sf_uid"] = sf_uid
+        _mark(state, f"sandbox ready ({sf_uid})")
+    except Exception as exc:  # pragma: no cover - live-only path
+        if _looks_like_tenant_constraint(exc):
+            raise TenantConstraintError(str(exc)) from exc
+        raise PreflightError(f"sandbox provisioning failed: {exc}") from exc
+
+    try:
+        removed = sandbox.teardown_records(admin_params, sf_uid, manager=MANAGER_NAME)
+        if removed:
+            log.info("pre-clean removed %d orphan records: %s", len(removed), removed)
+        _mark(state, f"pre-clean complete ({len(removed)} removed)")
+    except Exception as exc:  # pragma: no cover - live-only path
+        raise PreflightError(f"pre-clean failed: {exc}") from exc
+
+    if teardown_only:
+        log.info("teardown-only mode - done")
+        return 0
+
+    try:
+        manifest_path = _write_manifest(sf_uid)
+        empty_manifest_path = _write_empty_manifest(sf_uid)
+        state["manifest_path"] = str(manifest_path)
+        state["empty_manifest_path"] = str(empty_manifest_path)
+        _mark(state, "temp manifests written")
+    except Exception as exc:
+        raise PreflightError(f"manifest generation failed: {exc}") from exc
+
+    argv_prefix = identity.sdktest_keeper_args()
+    env = dict(os.environ)
+    env["KEEPER_CONFIG"] = ident["commander_config_path"]
+    env["KEEPER_DECLARATIVE_FOLDER"] = sf_uid
+    state["keeper_args"] = argv_prefix
+
+    _sdk(["validate", str(manifest_path)], env=env)
+    _mark(state, "sdk validate OK")
+
+    rc_plan = _sdk_allow([2], ["plan", str(manifest_path)], env=env)
+    if rc_plan != 2:
+        raise SmokeError(f"expected plan exit 2 (changes present), got {rc_plan}")
+    _mark(state, "initial plan shows creates")
+
+    _sdk(["apply", "--auto-approve", str(manifest_path)], env=env)
+    _mark(state, "apply OK")
+
+    prov = CommanderCliProvider(config_file=ident["commander_config_path"], folder_uid=sf_uid)
+    live = prov.discover()
+    owned = [
+        record
+        for record in live
+        if record.resource_type == "pamMachine"
+        and record.title in RESOURCE_TITLES
+        and record.marker
+        and record.marker.get("manager") == MANAGER_NAME
+    ]
+    expected_count = 2
+    if len(owned) != expected_count:
+        raise SmokeError(
+            f"expected {expected_count} SDK-managed pamMachine records, found {len(owned)}; "
+            f"live={_live_summary(live)}"
+        )
+    _mark(state, "marker verification OK")
+
+    rc_plan2 = _sdk_allow([0], ["plan", str(manifest_path)], env=env)
+    if rc_plan2 != 0:
+        raise SmokeError(f"re-plan expected 0 (noop), got {rc_plan2}; drift present")
+    _mark(state, "re-plan clean")
+
+    if keep_records:
+        log.info("keep-records mode - skipping destroy phase")
+        return 0
+
+    rc_destroy_plan = _sdk_allow([2], ["plan", "--allow-delete", str(empty_manifest_path)], env=env)
+    if rc_destroy_plan != 2:
+        raise SmokeError(f"destroy plan expected 2 (deletes present), got {rc_destroy_plan}")
+    _mark(state, "destroy plan shows deletes")
+
+    _sdk(["apply", "--allow-delete", "--auto-approve", str(empty_manifest_path)], env=env)
+    _mark(state, "destroy apply OK")
+
+    live_after = prov.discover()
+    still_ours = [
+        record
+        for record in live_after
+        if record.marker and record.marker.get("manager") == MANAGER_NAME
+    ]
+    if still_ours:
+        raise SmokeError(
+            f"destroy failed - {len(still_ours)} records still marked SDK-owned: {_live_summary(still_ours)}"
+        )
+
+    log.info("SMOKE PASSED: create->verify->destroy cycle clean")
+    return 0
+
+
+def _write_manifest(sf_uid: str) -> Path:
+    document = _base_manifest(sf_uid)
+    document["resources"] = [
+        {
+            "uid_ref": "sdk-smoke-host-1",
+            "type": "pamMachine",
+            "title": "sdk-smoke-host-1",
+            "pam_configuration_uid_ref": PAM_CONFIG_UID_REF,
+            "shared_folder": "resources",
+            "host": "10.0.0.201",
+            "port": "22",
+            "ssl_verification": True,
+            "operating_system": "Linux",
+        },
+        {
+            "uid_ref": "sdk-smoke-host-2",
+            "type": "pamMachine",
+            "title": "sdk-smoke-host-2",
+            "pam_configuration_uid_ref": PAM_CONFIG_UID_REF,
+            "shared_folder": "resources",
+            "host": "10.0.0.202",
+            "port": "22",
+            "ssl_verification": True,
+            "operating_system": "Linux",
+        },
+    ]
+    _preflight_manifest(document)
+    return _write_temp_manifest(document, suffix=".smoke.yaml")
+
+
+def _write_empty_manifest(sf_uid: str) -> Path:
+    document = _base_manifest(sf_uid)
+    document["resources"] = []
+    _preflight_manifest(document)
+    return _write_temp_manifest(document, suffix=".smoke-empty.yaml")
+
+
+def _base_manifest(sf_uid: str) -> dict[str, Any]:
+    return {
+        "version": "1",
+        "name": "sdk-smoke-testuser2",
+        "shared_folders": {
+            "resources": {
+                "uid_ref": "smoke-sf-resources",
+                "manage_users": True,
+                "manage_records": True,
+                "can_edit": True,
+                "can_share": True,
+            }
+        },
+        "gateways": [
+            {
+                "uid_ref": GATEWAY_UID_REF,
+                "name": GATEWAY_NAME,
+                "mode": "reference_existing",
+            }
+        ],
+        "pam_configurations": [
+            {
+                "uid_ref": PAM_CONFIG_UID_REF,
+                "environment": "local",
+                "title": PAM_CONFIG_TITLE,
+                "gateway_uid_ref": GATEWAY_UID_REF,
+            }
+        ],
+    }
+
+
+def _preflight_manifest(document: dict[str, Any]) -> None:
+    validate_manifest(document)
+    path = _write_temp_manifest(document, suffix=".preflight.yaml")
+    try:
+        manifest = load_manifest(path)
+        order = execution_order(build_graph(manifest))
+        changes = compute_diff(manifest, [], allow_delete=True)
+        plan = build_plan(manifest.name, changes, order)
+        if document.get("resources") and len(plan.creates) < 2:
+            raise PreflightError("generated manifest did not produce the expected create plan")
+    finally:
+        path.unlink(missing_ok=True)
+
+
+def _write_temp_manifest(document: dict[str, Any], *, suffix: str) -> Path:
+    fd, raw_path = tempfile.mkstemp(prefix="keeper-sdk-", suffix=suffix)
+    path = Path(raw_path)
+    os.close(fd)
+    path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
+    return path
+
+
+def _sdk(args: list[str], *, env: dict[str, str]) -> None:
+    rc = _sdk_allow([0], args, env=env)
+    if rc != 0:
+        raise SdkCommandError(args=args, returncode=rc)
+
+
+def _sdk_allow(ok_codes: list[int], args: list[str], *, env: dict[str, str]) -> int:
+    cmd = [sys.executable, "-m", "keeper_sdk.cli", "--provider", "commander", *args]
+    log.info("SDK: %s", " ".join(cmd))
+    result = subprocess.run(cmd, cwd=ROOT, env=env, check=False)
+    if result.returncode not in ok_codes:
+        if result.returncode == 5:
+            raise TenantConstraintError(f"sdk command reported tenant/provider constraint: {' '.join(args)}")
+        raise SdkCommandError(args=args, returncode=result.returncode)
+    return result.returncode
+
+
+def _mark(state: dict[str, Any], message: str) -> None:
+    state.setdefault("passed", []).append(message)
+
+
+def _live_summary(records: list[Any]) -> list[dict[str, Any]]:
+    summary: list[dict[str, Any]] = []
+    for record in records:
+        marker = record.marker or {}
+        summary.append(
+            {
+                "uid": record.keeper_uid,
+                "title": record.title,
+                "type": record.resource_type,
+                "manager": marker.get("manager"),
+                "marker_field": MARKER_FIELD_LABEL if marker else None,
+            }
+        )
+    return summary
+
+
+def _current_sf_contents(admin_params: Any, sf_uid: str) -> list[dict[str, Any]]:
+    try:
+        entries = sandbox._list_folder_entries(admin_params, sf_uid)  # type: ignore[attr-defined]
+    except Exception as exc:  # pragma: no cover - live-only path
+        return [{"error": str(exc)}]
+
+    out: list[dict[str, Any]] = []
+    for entry in entries:
+        item = {
+            "uid": sandbox._entry_uid(entry),  # type: ignore[attr-defined]
+            "name": sandbox._entry_name(entry),  # type: ignore[attr-defined]
+            "type": sandbox._entry_type(entry),  # type: ignore[attr-defined]
+        }
+        record_uid = item["uid"]
+        if item["type"] == "record" and record_uid:
+            try:
+                marker = sandbox._record_marker(admin_params, record_uid)  # type: ignore[attr-defined]
+            except Exception as exc:  # pragma: no cover - live-only path
+                marker = {"error": str(exc)}
+            item["marker"] = marker
+        out.append(item)
+    return out
+
+
+def _looks_like_tenant_constraint(exc: BaseException) -> bool:
+    text = str(exc).casefold()
+    hints = (
+        "gateway",
+        "not visible",
+        "not found",
+        "shared to that admin session",
+        "permission",
+        "capability",
+        "provider",
+    )
+    return any(hint in text for hint in hints)
+
+
+def _print_post_mortem(state: dict[str, Any], exc: BaseException) -> None:
+    payload = {
+        "passed": state.get("passed", []),
+        "failed": str(exc),
+    }
+    admin_params = state.get("admin_params")
+    sf_uid = state.get("sf_uid")
+    if admin_params and sf_uid:
+        payload["shared_folder_contents"] = _current_sf_contents(admin_params, sf_uid)
+    print(json.dumps(payload, indent=2), file=sys.stderr)
+
+
+def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Live Keeper SDK smoke runner")
+    parser.add_argument("--teardown", action="store_true", help="only remove SDK-managed records")
+    parser.add_argument("--keep-records", action="store_true", help="skip destroy phase for debugging")
+    parser.add_argument(
+        "--log-level",
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        help="logger level for sdk_smoke.smoke",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = _parse_args(argv)
+    logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
+    log.setLevel(getattr(logging, args.log_level))
+    state: dict[str, Any] = {"passed": []}
+    exit_code = 0
+    needs_cleanup = False
+
+    try:
+        exit_code = run_smoke(
+            keep_sf=True,
+            teardown_only=args.teardown,
+            keep_records=args.keep_records,
+            state=state,
+        )
+        return exit_code
+    except KeyboardInterrupt as exc:  # pragma: no cover - live-only path
+        needs_cleanup = True
+        _print_post_mortem(state, exc)
+        return 2
+    except TenantConstraintError as exc:
+        needs_cleanup = True
+        _print_post_mortem(state, exc)
+        return 4
+    except PreflightError as exc:
+        _print_post_mortem(state, exc)
+        return 3
+    except (SmokeError, SdkCommandError) as exc:
+        needs_cleanup = True
+        _print_post_mortem(state, exc)
+        return 2
+    finally:
+        if needs_cleanup and state.get("admin_params") and state.get("sf_uid"):
+            try:
+                removed = sandbox.teardown_records(
+                    state["admin_params"],
+                    state["sf_uid"],
+                    manager=MANAGER_NAME,
+                )
+                if removed:
+                    log.info("cleanup removed %d record(s): %s", len(removed), removed)
+            except Exception as cleanup_exc:  # pragma: no cover - live-only path
+                print(f"cleanup failed: {cleanup_exc}", file=sys.stderr)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
