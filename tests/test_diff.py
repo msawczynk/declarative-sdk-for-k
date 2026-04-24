@@ -7,7 +7,7 @@ from pathlib import Path
 from keeper_sdk.core import compute_diff, load_manifest
 from keeper_sdk.core.diff import ChangeKind
 from keeper_sdk.core.interfaces import LiveRecord
-from keeper_sdk.core.metadata import MANAGER_NAME, encode_marker
+from keeper_sdk.core.metadata import encode_marker
 
 
 def test_diff_all_create(minimal_manifest_path: Path) -> None:
@@ -64,7 +64,7 @@ def test_diff_conflict_on_foreign_manager(minimal_manifest_path: Path) -> None:
     assert conflicts[0].title == "lab-linux-1"
 
 
-def test_diff_adoption_when_marker_missing(minimal_manifest_path: Path) -> None:
+def test_diff_conflict_when_unmanaged_title_matches_by_default(minimal_manifest_path: Path) -> None:
     manifest = load_manifest(minimal_manifest_path)
     live = [
         LiveRecord(
@@ -76,10 +76,29 @@ def test_diff_adoption_when_marker_missing(minimal_manifest_path: Path) -> None:
         )
     ]
     changes = compute_diff(manifest, live_records=live)
+    conflicts = [c for c in changes if c.uid_ref == "acme-lab-linux1"]
+    assert conflicts
+    assert conflicts[0].kind is ChangeKind.CONFLICT
+    assert conflicts[0].reason
+    assert any(term in conflicts[0].reason for term in ("unmanaged", "claim", "import"))
+
+
+def test_diff_adoption_when_unmanaged_title_matches_with_adopt_flag(minimal_manifest_path: Path) -> None:
+    manifest = load_manifest(minimal_manifest_path)
+    live = [
+        LiveRecord(
+            keeper_uid="LIVE_UID",
+            title="lab-linux-1",
+            resource_type="pamMachine",
+            marker=None,
+            payload={"title": "lab-linux-1", "host": "10.16.9.10"},
+        )
+    ]
+    changes = compute_diff(manifest, live_records=live, adopt=True)
     adopt = [c for c in changes if c.uid_ref == "acme-lab-linux1"]
     assert adopt
     assert adopt[0].kind is ChangeKind.UPDATE
-    assert adopt[0].reason and "adoption" in adopt[0].reason
+    assert adopt[0].reason == "adoption: write ownership marker"
 
 
 def test_diff_delete_when_allowed(minimal_manifest_path: Path) -> None:

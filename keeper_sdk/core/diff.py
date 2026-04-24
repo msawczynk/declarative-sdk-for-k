@@ -70,6 +70,7 @@ def compute_diff(
     *,
     manifest_name: str | None = None,
     allow_delete: bool = False,
+    adopt: bool = False,
 ) -> list[Change]:
     """Classify desired vs observed.
 
@@ -130,6 +131,18 @@ def compute_diff(
                 next_action="upgrade the declarative core or rewrite the marker",
             )
         if not marker and by_title.get((resource_type, title)) is live:
+            if not adopt:
+                changes.append(
+                    Change(
+                        kind=ChangeKind.CONFLICT,
+                        uid_ref=uid_ref or None,
+                        resource_type=resource_type,
+                        title=title,
+                        keeper_uid=live.keeper_uid,
+                        reason="unmanaged record with matching title; pass --adopt or use an import workflow to claim it",
+                    )
+                )
+                continue
             # record exists with the right title but no marker — manifest
             # has not yet adopted it. Offer adoption via update.
             changes.append(
