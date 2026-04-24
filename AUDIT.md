@@ -92,16 +92,64 @@ Deliberately deferred (captured in JOURNAL.md for follow-up):
 ## Numbers
 
 - 20 planned tasks; 19 implemented (W10 absorbed into W3).
-- 42 → 76 tests (+34 net).
+- 42 → 82 tests (+40 net — 6 added on `sdk-live-smoke` for in-process
+  Commander routing).
 - 0 new runtime dependencies.
-- 19 commits on `sdk-completion`, one per task.
-- Every commit: pytest green, ruff clean on touched files, file whitelist
-  honoured.
+- 19 commits on `sdk-completion` + 11 on `sdk-live-smoke`, each one a
+  single-task unit.
+- Every commit: pytest green, ruff clean on touched files, file
+  whitelist honoured.
+
+## Live smoke (2026-04-24, `sdk-live-smoke`)
+
+End-to-end drill against `msawczyn+lab@acme-demo.com` is **GREEN**
+(`create → verify → destroy` cycle clean). Fixes landed on the branch:
+
+- **`pam project import` + `pam project extend` routed through the
+  in-process Commander Python API.** Subprocess invocation cannot resume
+  a persistent-login session for these two subcommands — Commander
+  always re-prompts `User(Email):` regardless of `--batch-mode`,
+  `KEEPER_PASSWORD`, `--user/--password` flags, or stdin piping. The
+  provider obtains an authenticated `KeeperParams` via
+  `deploy_watcher.keeper_login()` and calls `PAMProjectImportCommand` /
+  `PAMProjectExtendCommand` directly; stdout/stderr are captured with
+  `contextlib.redirect_stdout` so callers that grep the output (e.g.
+  for `access_token=`) keep working.
+- **`_write_marker` migrated to the in-process Commander vault API.**
+  The macOS `keeper` 17.1.14 binary has no `record-update` subcommand;
+  Commander 17.2.13's `-cf custom.label=value` syntax is fragile across
+  versions. Markers now go through `api.sync_down` →
+  `vault.KeeperRecord.load` → `record_management.update_record` against
+  the same `KeeperParams` the PAM-project path uses.
+- **Commander `get --format json` field-shape fixes.** `pamMachine`
+  records store `host`+`port` under a single `pamHostname` field type
+  (not `host`); `_canonical_payload_from_field` now handles both. Labels
+  like `operatingSystem` / `sslVerification` / `instanceId` /
+  `instanceName` / `providerGroup` / `providerRegion` map to canonical
+  manifest keys via `_FIELD_LABEL_ALIASES`. `sslVerification` lives in
+  `item["custom"]`, not `item["fields"]`; `_payload_from_get` walks both
+  arrays.
+- **Planner + provider drift ignore SDK-only placement metadata.**
+  `pam_configuration`, `pam_configuration_uid_ref`, `shared_folder`,
+  `users`, `gateway`, `gateway_uid_ref` never round-trip through
+  Commander as record fields and were producing false-positive drift on
+  re-plan. Added to `keeper_sdk/core/diff.py::_DIFF_IGNORED_FIELDS` and
+  `commander_cli.py::_field_drift`.
+- **Reference-existing synthetic LiveRecord reflects manifest fields.**
+  Previously carried only `{"title": ...}`, causing `environment` /
+  other declared keys to show as drift. Now mirrors the manifest entry
+  so re-plan is noop when nothing actually drifted.
+- **`keeper rm` gets `--force`.** Commander prompts
+  `Do you want to proceed with deletion? [y/n]` even in batch mode
+  without the `-f` switch; destructive subprocess calls now pass it.
+- **`SMOKE_NO_CLEANUP=1`** preserves tenant state on smoke.py failure
+  paths so the next run can inspect the live tree.
 
 ## Next steps for the reviewer
 
-1. Run `pytest -q` (offline).
-2. Run the live-smoke drill described in "Out of scope" against the
-   acme lab. Abort criterion: if `keeper pam project export` returns
-   `Gateway offline` on an unrelated record, stop and escalate.
-3. Merge `sdk-completion` → `main` after live-smoke passes.
+1. Run `pytest -q` (offline, 82 tests).
+2. Run the live-smoke drill:
+   `cd keeper-declarative-sdk && python3 scripts/smoke/smoke.py` — the
+   full `create → verify → destroy` cycle should complete clean and
+   print `SMOKE PASSED`.
+3. Merge `sdk-live-smoke` → `sdk-completion` → `main`.
