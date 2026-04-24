@@ -31,7 +31,7 @@ def ensure_sandbox(admin_params, *, testuser_email: str) -> dict:
     sf_uid = _find_shared_folder_uid(admin_params, SANDBOX_SF_TITLE)
     if not sf_uid:
         log.info("Creating shared folder %s", SANDBOX_SF_TITLE)
-        _do(admin_params, f'mkdir -s "{SANDBOX_SF_TITLE}"')
+        _do(admin_params, f'mkdir -sf --manage-users --manage-records --can-edit --can-share "{SANDBOX_SF_TITLE}"')
         sf_uid = _find_shared_folder_uid(admin_params, SANDBOX_SF_TITLE)
         if not sf_uid:
             raise RuntimeError(
@@ -42,17 +42,15 @@ def ensure_sandbox(admin_params, *, testuser_email: str) -> dict:
     shared_to_testuser = _ensure_shared_to_user(admin_params, testuser_email=testuser_email)
 
     existing_app = _find_ksm_app(admin_params, SANDBOX_KSM_APP_NAME)
-    created_app_uid: str | None = None
     if existing_app is None:
         log.info("Creating KSM application %s", SANDBOX_KSM_APP_NAME)
         _do(admin_params, f'secrets-manager app create "{SANDBOX_KSM_APP_NAME}"')
-        created = _find_ksm_app(admin_params, SANDBOX_KSM_APP_NAME)
-        if created is None:
+        existing_app = _find_ksm_app(admin_params, SANDBOX_KSM_APP_NAME)
+        if existing_app is None:
             raise RuntimeError(
                 f"Created KSM application {SANDBOX_KSM_APP_NAME!r} but could not resolve its UID. "
                 "Re-run `keeper secrets-manager app list --format json` and confirm Commander supports JSON output."
             )
-        created_app_uid = created["uid"]
     else:
         log.info("KSM application %s already exists (%s)", SANDBOX_KSM_APP_NAME, existing_app["uid"])
 
@@ -60,7 +58,7 @@ def ensure_sandbox(admin_params, *, testuser_email: str) -> dict:
 
     return {
         "sf_uid": sf_uid,
-        "ksm_app_uid": created_app_uid,
+        "ksm_app_uid": existing_app["uid"],
         "gateway_name": GATEWAY_NAME,
         "shared_to_testuser": shared_to_testuser,
     }
@@ -121,11 +119,25 @@ def _sync_down(admin_params) -> None:
 
 
 def _do(admin_params, command: str) -> str:
+    """Run a keeper CLI command via cli.do_command, capturing stdout.
+
+    Commander CLI subcommands print results directly to stdout (tabulate /
+    json.dump) and usually return None. We redirect stdout into a buffer so the
+    caller sees the actual payload and the terminal stays clean.
+    """
+    import contextlib
+    import io
+
     from keepercommander import cli
 
     log.info("CLI: %s", command)
-    result = cli.do_command(admin_params, command)
-    return result if isinstance(result, str) else ""
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        result = cli.do_command(admin_params, command)
+    captured = buf.getvalue()
+    if isinstance(result, str) and result:
+        return result
+    return captured
 
 
 def _ensure_gateway_visible(admin_params) -> None:
@@ -168,9 +180,12 @@ def _ensure_shared_to_user(admin_params, *, testuser_email: str) -> bool:
         log.info("Shared folder already granted to %s", testuser_email)
         return True
 
+    # Commander 17.x share-folder flags: -e EMAIL, -p on|off (manage-records),
+    # -o on|off (manage-users), -d on|off (can-edit), -s on|off (can-share),
+    # -f to ignore default folder permissions on the initial sharing action.
     command = (
-        f'share-folder "{SANDBOX_SF_TITLE}" -a grant -u {testuser_email} '
-        "--manage-records --manage-users --can-edit"
+        f'share-folder "{SANDBOX_SF_TITLE}" -a grant -e {testuser_email} '
+        "-p on -o on -d on -s on -f"
     )
     try:
         output = _do(admin_params, command)
@@ -187,7 +202,12 @@ def _ensure_shared_to_user(admin_params, *, testuser_email: str) -> bool:
 
 
 def _share_folder_info(admin_params) -> str:
-    return _do(admin_params, f'share-folder "{SANDBOX_SF_TITLE}" --info')
+    # Commander 17.x has no `share-folder --info`; use `get <sf_uid>` which
+    # includes the user_permissions and shared_folder_permissions blocks.
+    sf_uid = _find_shared_folder_uid(admin_params, SANDBOX_SF_TITLE)
+    if not sf_uid:
+        return ""
+    return _do(admin_params, f"get {sf_uid}")
 
 
 def _share_info_mentions_user(info: str, email: str) -> bool:
