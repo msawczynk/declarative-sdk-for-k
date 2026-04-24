@@ -86,9 +86,33 @@ def extract_commander_pin(commander_path: Path) -> dict[str, str]:
             LOG.warning("git %s failed in %s: %s", " ".join(args), commander_path, exc)
             return "unknown"
 
+    branch = _run(["rev-parse", "--abbrev-ref", "HEAD"])
+    if branch == "HEAD":
+        # Detached-HEAD (CI clones by SHA). Pick the first branch or
+        # remote ref that points at this commit so the snapshot stays
+        # stable across local vs CI runs. Fall back to ``detached``.
+        pointed_at = _run(
+            [
+                "for-each-ref",
+                "--points-at=HEAD",
+                "--format=%(refname:short)",
+                "refs/heads/",
+                "refs/remotes/",
+            ]
+        )
+        for candidate in pointed_at.splitlines():
+            candidate = candidate.strip()
+            if not candidate or candidate == "unknown":
+                continue
+            if candidate.startswith("origin/"):
+                candidate = candidate[len("origin/") :]
+            branch = candidate
+            break
+        else:
+            branch = "detached"
     return {
         "sha": _run(["rev-parse", "--short", "HEAD"]),
-        "branch": _run(["rev-parse", "--abbrev-ref", "HEAD"]),
+        "branch": branch,
     }
 
 
