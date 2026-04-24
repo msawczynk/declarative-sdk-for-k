@@ -176,6 +176,10 @@ def apply(
 ) -> None:
     """Apply a manifest via the selected provider."""
     plan_obj = _build_plan(ctx, manifest_path, allow_delete=allow_delete)
+    if dry_run:
+        click.echo(ctx.obj["renderer"].render_plan(plan_obj))
+        sys.exit(_exit_from_plan(plan_obj))
+
     click.echo(ctx.obj["renderer"].render_plan(plan_obj))
     if plan_obj.is_clean:
         click.echo("nothing to do.")

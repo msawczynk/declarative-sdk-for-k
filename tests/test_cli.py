@@ -108,3 +108,34 @@ def test_apply_auto_approve(minimal_manifest_path: Path) -> None:
     result = _run(["apply", str(minimal_manifest_path), "--auto-approve"])
     assert result.exit_code == 0, result.output
     assert "create" in result.output.lower()
+
+
+@pytest.mark.parametrize(
+    ("seed_clean", "expected_exit"),
+    [
+        (False, EXIT_CHANGES),
+        (True, 0),
+    ],
+)
+def test_apply_dry_run_equivalent_to_plan(
+    minimal_manifest_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    seed_clean: bool,
+    expected_exit: int,
+) -> None:
+    manifest = load_manifest(minimal_manifest_path)
+    provider = MockProvider(manifest.name)
+
+    if seed_clean:
+        graph = build_graph(manifest)
+        order = execution_order(graph)
+        provider.apply_plan(build_plan(manifest.name, compute_diff(manifest, provider.discover()), order))
+
+    monkeypatch.setattr(cli_main_module, "MockProvider", lambda manifest_name: provider)
+
+    result_plan = _run(["plan", str(minimal_manifest_path)])
+    assert result_plan.exit_code == expected_exit, result_plan.output
+
+    result_apply = _run(["apply", str(minimal_manifest_path), "--dry-run"])
+    assert result_apply.exit_code == expected_exit, result_apply.output
+    assert result_plan.output == result_apply.output
