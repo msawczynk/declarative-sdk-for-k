@@ -42,3 +42,41 @@ def apply_semantic_rules(document: dict[str, Any]) -> None:
                     resource_type="pamRemoteBrowser",
                     next_action="remove rotation from pam_settings.options",
                 )
+
+    if document.get("pam_configurations"):
+        for resource in document.get("resources") or []:
+            if not resource.get("pam_configuration_uid_ref"):
+                raise SchemaError(
+                    reason=(
+                        f"resource '{resource.get('uid_ref')}' must set "
+                        "pam_configuration_uid_ref because pam_configurations "
+                        "are declared"
+                    ),
+                    uid_ref=resource.get("uid_ref"),
+                    resource_type=resource.get("type"),
+                    next_action=(
+                        "set pam_configuration_uid_ref on the resource or remove "
+                        "all pam_configurations"
+                    ),
+                )
+
+    rotatable_resource_types = {"pamMachine", "pamDatabase", "pamDirectory"}
+    for resource in document.get("resources") or []:
+        resource_type = resource.get("type")
+        options = ((resource.get("pam_settings") or {}).get("options")) or {}
+
+        if resource_type == "pamRemoteBrowser" and options.get("jit_settings"):
+            raise SchemaError(
+                reason="pamRemoteBrowser does not support jit_settings",
+                uid_ref=resource.get("uid_ref"),
+                resource_type="pamRemoteBrowser",
+                next_action="remove jit_settings from pam_settings.options",
+            )
+
+        if resource_type not in rotatable_resource_types and "rotation" in options:
+            raise SchemaError(
+                reason=f"rotation is not supported for {resource_type}",
+                uid_ref=resource.get("uid_ref"),
+                resource_type=resource_type,
+                next_action="remove rotation from pam_settings.options",
+            )
