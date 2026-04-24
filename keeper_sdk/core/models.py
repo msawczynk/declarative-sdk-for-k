@@ -7,7 +7,7 @@ model is a superset-compatible wrapper that round-trips without renames.
 
 from __future__ import annotations
 
-from typing import Annotated, Any, Literal, Union
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -38,7 +38,7 @@ class RotationScheduleCron(_Model):
     cron: str
 
 
-RotationSchedule = Union[RotationScheduleOnDemand, RotationScheduleCron]
+RotationSchedule = RotationScheduleOnDemand | RotationScheduleCron
 
 
 class RotationSettings(_Model):
@@ -261,14 +261,12 @@ class PamConfigurationOci(_PamConfigBase):
 
 
 PamConfiguration = Annotated[
-    Union[
-        PamConfigurationLocal,
-        PamConfigurationAws,
-        PamConfigurationAzure,
-        PamConfigurationDomain,
-        PamConfigurationGcp,
-        PamConfigurationOci,
-    ],
+    PamConfigurationLocal
+    | PamConfigurationAws
+    | PamConfigurationAzure
+    | PamConfigurationDomain
+    | PamConfigurationGcp
+    | PamConfigurationOci,
     Field(discriminator="environment"),
 ]
 
@@ -304,7 +302,7 @@ class LoginRecord(_Model):
     otp: str | None = None
 
 
-User = Annotated[Union[PamUser, LoginRecord], Field(discriminator="type")]
+User = Annotated[PamUser | LoginRecord, Field(discriminator="type")]
 
 
 # ----------------------------------------------------------------------------
@@ -339,10 +337,15 @@ class PamMachine(_ResourceBase):
 class PamDatabase(_ResourceBase):
     type: Literal["pamDatabase"]
     database_type: Literal[
-        "postgresql", "postgresql-flexible",
-        "mysql", "mysql-flexible",
-        "mariadb", "mariadb-flexible",
-        "mssql", "oracle", "mongodb",
+        "postgresql",
+        "postgresql-flexible",
+        "mysql",
+        "mysql-flexible",
+        "mariadb",
+        "mariadb-flexible",
+        "mssql",
+        "oracle",
+        "mongodb",
     ]
     host: str | None = None
     port: str | int | None = None
@@ -379,8 +382,8 @@ class PamRemoteBrowser(_Model):
     pam_settings: RbiPamSettings | None = None
 
     @model_validator(mode="after")
-    def _no_rotation(self) -> "PamRemoteBrowser":
-        opts = (self.pam_settings.options if self.pam_settings else None)
+    def _no_rotation(self) -> PamRemoteBrowser:
+        opts = self.pam_settings.options if self.pam_settings else None
         if opts is not None:
             extras = getattr(opts, "__pydantic_extra__", {}) or {}
             if "rotation" in extras:
@@ -389,7 +392,7 @@ class PamRemoteBrowser(_Model):
 
 
 Resource = Annotated[
-    Union[PamMachine, PamDatabase, PamDirectory, PamRemoteBrowser],
+    PamMachine | PamDatabase | PamDirectory | PamRemoteBrowser,
     Field(discriminator="type"),
 ]
 

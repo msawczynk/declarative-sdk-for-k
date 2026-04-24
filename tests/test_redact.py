@@ -11,7 +11,10 @@ def test_redact_nested() -> None:
     out = redact(
         {
             "resources": [
-                {"title": "r", "pam_settings": {"connection": {"administrative_credentials_uid_ref": "x"}}},
+                {
+                    "title": "r",
+                    "pam_settings": {"connection": {"administrative_credentials_uid_ref": "x"}},
+                },
             ],
             "aws_secret_access_key": "SUPER",
             "notes": "",

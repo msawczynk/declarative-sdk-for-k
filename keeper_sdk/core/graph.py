@@ -29,9 +29,7 @@ _SCALAR_REF_FIELDS = (
 )
 
 # fields whose value is a list of uid_refs
-_LIST_REF_FIELDS = (
-    "additional_credentials_uid_refs",
-)
+_LIST_REF_FIELDS = ("additional_credentials_uid_refs",)
 
 
 def _iter_refs(node: Any) -> Iterable[str]:
@@ -74,7 +72,9 @@ def build_graph(manifest: Manifest) -> nx.DiGraph:
     def _owner_ref(container: dict[str, Any]) -> str | None:
         return container.get("uid_ref") if isinstance(container, dict) else None
 
-    def _walk_collection(collection: list[dict[str, Any]], default_owner: str | None = None) -> None:
+    def _walk_collection(
+        collection: list[dict[str, Any]], default_owner: str | None = None
+    ) -> None:
         for item in collection or []:
             owner = _owner_ref(item) or default_owner
             if owner is None:

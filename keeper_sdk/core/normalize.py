@@ -43,6 +43,7 @@ _FIELD_ALIASES: dict[str, str] = {
     "dom_administrative_credentials_uid_ref": "dom_administrative_credential_uid_ref",
 }
 
+
 def _rename(mapping: dict[str, Any]) -> dict[str, Any]:
     renamed: dict[str, Any] = {}
     for key, value in mapping.items():
@@ -167,6 +168,7 @@ def to_pam_import_json(manifest: dict[str, Any]) -> dict[str, Any]:
 # ----------------------------------------------------------------------------
 # pam_import JSON -> manifest
 
+
 def from_pam_import_json(document: dict[str, Any], *, name: str | None = None) -> dict[str, Any]:
     """Lift a Commander export into a declarative manifest.
 
@@ -244,7 +246,8 @@ def from_pam_import_json(document: dict[str, Any], *, name: str | None = None) -
             item["gateway_uid_ref"] = out["gateways"][0]["uid_ref"]
         out["pam_configurations"] = [item]
 
-    pam_data = doc.get("pam_data") if isinstance(doc.get("pam_data"), dict) else {}
+    raw_pam = doc.get("pam_data")
+    pam_data: dict[str, Any] = raw_pam if isinstance(raw_pam, dict) else {}
 
     if "resources" in doc:
         out["resources"] = []

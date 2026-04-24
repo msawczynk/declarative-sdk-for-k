@@ -36,9 +36,7 @@ class LoginHelper(Protocol):
         """
         ...
 
-    def keeper_login(
-        self, email: str, password: str, totp_secret: str, **kwargs: Any
-    ) -> Any:
+    def keeper_login(self, email: str, password: str, totp_secret: str, **kwargs: Any) -> Any:
         """Return a logged-in ``keepercommander.params.KeeperParams`` instance.
 
         Raise ``CapabilityError`` with a clear ``next_action`` if any
@@ -101,9 +99,7 @@ class EnvLoginHelper:
             "config_path": os.environ.get("KEEPER_CONFIG", ""),
         }
 
-    def keeper_login(
-        self, email: str, password: str, totp_secret: str, **kwargs: Any
-    ) -> Any:
+    def keeper_login(self, email: str, password: str, totp_secret: str, **kwargs: Any) -> Any:
         """Perform a Commander login. Imports ``keepercommander`` lazily
         so the SDK can be imported and used against ``MockProvider``
         without Commander installed."""
@@ -204,8 +200,7 @@ def load_helper_from_path(path: str | Path) -> LoginHelper:
     if not (hasattr(helper, "load_keeper_creds") and hasattr(helper, "keeper_login")):
         raise CapabilityError(
             reason=(
-                f"login helper at {candidate} does not expose "
-                "load_keeper_creds + keeper_login"
+                f"login helper at {candidate} does not expose load_keeper_creds + keeper_login"
             ),
             next_action="see docs/LOGIN.md for the minimal contract (~30 lines)",
         )

@@ -63,8 +63,12 @@ EXIT_CAPABILITY = 5
 
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
 @click.version_option()
-@click.option("--provider", type=click.Choice(["mock", "commander"]), default="mock", show_default=True)
-@click.option("--folder-uid", default=None, help="Keeper shared-folder UID scope (for commander provider)")
+@click.option(
+    "--provider", type=click.Choice(["mock", "commander"]), default="mock", show_default=True
+)
+@click.option(
+    "--folder-uid", default=None, help="Keeper shared-folder UID scope (for commander provider)"
+)
 @click.pass_context
 def main(ctx: click.Context, provider: str, folder_uid: str | None) -> None:
     """Keeper PAM Declarative SDK."""
@@ -76,6 +80,7 @@ def main(ctx: click.Context, provider: str, folder_uid: str | None) -> None:
 
 # ---------------------------------------------------------------------------
 # validate
+
 
 @main.command()
 @click.argument("manifest_path", type=click.Path(exists=True, path_type=Path))
@@ -115,15 +120,13 @@ def validate(ctx: click.Context, manifest_path: Path, emit_canonical: bool, onli
             click.echo(f"discovery failed: {exc}", err=True)
             sys.exit(EXIT_CAPABILITY)
 
-        gaps = getattr(provider, "unsupported_capabilities", lambda _m: [])(manifest)
+        gaps: list[str] = getattr(provider, "unsupported_capabilities", lambda _m: [])(manifest)
         if gaps:
             click.echo("capability gaps (will appear as plan conflicts):", err=True)
             for reason in gaps:
                 click.echo(f"  - {reason}", err=True)
 
-        live_gateway_names = {
-            record.title for record in live if record.resource_type == "gateway"
-        }
+        live_gateway_names = {record.title for record in live if record.resource_type == "gateway"}
         stage4_failed = False
         for gateway in manifest.gateways:
             if gateway.mode != "reference_existing":
@@ -162,11 +165,17 @@ def validate(ctx: click.Context, manifest_path: Path, emit_canonical: bool, onli
 # ---------------------------------------------------------------------------
 # export
 
+
 @main.command(name="export")
 @click.argument("commander_json", type=click.Path(exists=True, path_type=Path))
 @click.option("--name", default=None, help="Manifest name (defaults to file stem)")
-@click.option("--output", "-o", type=click.Path(path_type=Path), default=None,
-              help="Write YAML to file (else stdout)")
+@click.option(
+    "--output",
+    "-o",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="Write YAML to file (else stdout)",
+)
 def export_cmd(commander_json: Path, name: str | None, output: Path | None) -> None:
     """Lift a ``keeper pam project export`` JSON document into a manifest."""
     data = json.loads(commander_json.read_text(encoding="utf-8"))
@@ -185,6 +194,7 @@ def export_cmd(commander_json: Path, name: str | None, output: Path | None) -> N
 
 # ---------------------------------------------------------------------------
 # plan / diff
+
 
 @main.command()
 @click.argument("manifest_path", type=click.Path(exists=True, path_type=Path))
@@ -270,6 +280,7 @@ def import_(
 # ---------------------------------------------------------------------------
 # apply
 
+
 @main.command()
 @click.argument("manifest_path", type=click.Path(exists=True, path_type=Path))
 @click.option("--allow-delete", is_flag=True)
@@ -329,6 +340,7 @@ def apply(
 # ---------------------------------------------------------------------------
 # shared helpers
 
+
 def _build_plan(ctx: click.Context, manifest_path: Path, *, allow_delete: bool) -> Plan:
     manifest, order, live, provider = _load_plan_context(ctx, manifest_path)
     try:
@@ -350,6 +362,7 @@ def _build_plan(ctx: click.Context, manifest_path: Path, *, allow_delete: bool) 
         capability_gaps = []
     for reason in capability_gaps:
         from keeper_sdk.core.diff import Change, ChangeKind
+
         changes.insert(
             0,
             Change(
@@ -398,7 +411,9 @@ def _make_provider(ctx: click.Context, manifest_path: Path, *, manifest=None):
     provider_name = ctx.obj.get("provider", "mock")
     folder_uid = ctx.obj.get("folder_uid")
     if provider_name == "mock":
-        return ctx.obj.setdefault("_provider_instance", MockProvider(manifest.name if manifest else None))
+        return ctx.obj.setdefault(
+            "_provider_instance", MockProvider(manifest.name if manifest else None)
+        )
     if provider_name == "commander":
         manifest_source = {}
         if manifest is not None:

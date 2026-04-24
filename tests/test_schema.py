@@ -14,10 +14,7 @@ from keeper_sdk.core import (
 )
 
 _INVALID_DIR = (
-    Path(__file__).resolve().parents[1].parent
-    / "keeper-pam-declarative"
-    / "examples"
-    / "invalid"
+    Path(__file__).resolve().parents[1].parent / "keeper-pam-declarative" / "examples" / "invalid"
 )
 _INVALID_FILES = sorted(p.name for p in _INVALID_DIR.glob("*.yaml"))
 

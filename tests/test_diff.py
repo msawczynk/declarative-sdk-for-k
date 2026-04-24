@@ -86,7 +86,9 @@ def test_diff_conflict_when_unmanaged_title_matches_by_default(minimal_manifest_
     assert any(term in conflicts[0].reason for term in ("unmanaged", "claim", "import"))
 
 
-def test_diff_adoption_when_unmanaged_title_matches_with_adopt_flag(minimal_manifest_path: Path) -> None:
+def test_diff_adoption_when_unmanaged_title_matches_with_adopt_flag(
+    minimal_manifest_path: Path,
+) -> None:
     manifest = load_manifest(minimal_manifest_path)
     live = [
         LiveRecord(

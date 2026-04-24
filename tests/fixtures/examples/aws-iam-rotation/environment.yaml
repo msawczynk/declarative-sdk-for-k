@@ -1,0 +1,56 @@
+version: "1"
+name: acme-cloud-aws
+
+projects:
+  - uid_ref: acme-cloud
+    project: "Acme Cloud"
+
+shared_folders:
+  users:
+    uid_ref: acme-cloud-sf-users
+    manage_users: true
+    manage_records: true
+    can_edit: true
+    can_share: true
+  resources:
+    uid_ref: acme-cloud-sf-resources
+    manage_users: true
+    manage_records: true
+    can_edit: true
+    can_share: true
+
+gateways:
+  - uid_ref: acme-cloud-gw
+    name: "Acme Cloud Gateway"
+    mode: reference_existing
+
+pam_configurations:
+  - uid_ref: acme-aws-cfg
+    environment: aws
+    title: "Acme AWS PAM Configuration"
+    gateway_uid_ref: acme-cloud-gw
+    options:
+      connections: "off"
+      rotation: "on"
+      tunneling: "off"
+      remote_browser_isolation: "off"
+    aws_id: "123456789012"
+    aws_access_key_id: "REPLACE_ME_AKIA..."
+    aws_secret_access_key: "REPLACE_ME"
+    aws_region_names:
+      - us-east-1
+      - us-west-2
+
+users:
+  - uid_ref: acme-aws-svc-deploy
+    type: pamUser
+    title: "acme-aws-svc-deploy"
+    login: svc-deploy
+    password: "REPLACE_ME"
+    rotation_settings:
+      rotation: iam_user
+      enabled: "on"
+      schedule:
+        type: CRON
+        cron: "0 5 1 * *"
+      password_complexity: "40,10,10,10,5"

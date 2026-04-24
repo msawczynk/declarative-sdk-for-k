@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from keeper_sdk.core.errors import CollisionError, OwnershipError
@@ -12,7 +12,7 @@ from keeper_sdk.core.metadata import MANAGER_NAME, MARKER_VERSION
 from keeper_sdk.core.models import Manifest
 
 
-class ChangeKind(str, Enum):
+class ChangeKind(StrEnum):
     """Classification of a single planned change.
 
     * ``CREATE`` — manifest describes a resource that does not exist in
@@ -338,22 +338,24 @@ def _raise_live_record_collisions(live_records: list[LiveRecord]) -> None:
         )
 
 
-_DIFF_IGNORED_FIELDS = frozenset({
-    "uid_ref",
-    "attachments",
-    "scripts",
-    "custom_fields",
-    "record_uid",
-    # SDK-only placement/linkage metadata — not record fields and never
-    # observable from Commander `get`. Keep them out of the planner diff so
-    # re-plans are clean when fields match.
-    "pam_configuration",
-    "pam_configuration_uid_ref",
-    "shared_folder",
-    "users",
-    "gateway",
-    "gateway_uid_ref",
-})
+_DIFF_IGNORED_FIELDS = frozenset(
+    {
+        "uid_ref",
+        "attachments",
+        "scripts",
+        "custom_fields",
+        "record_uid",
+        # SDK-only placement/linkage metadata — not record fields and never
+        # observable from Commander `get`. Keep them out of the planner diff so
+        # re-plans are clean when fields match.
+        "pam_configuration",
+        "pam_configuration_uid_ref",
+        "shared_folder",
+        "users",
+        "gateway",
+        "gateway_uid_ref",
+    }
+)
 
 
 def _field_diff(before: dict[str, Any], after: dict[str, Any]) -> list[str]:

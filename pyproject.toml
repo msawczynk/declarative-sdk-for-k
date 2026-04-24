@@ -55,6 +55,8 @@ dev = [
     "pytest-cov",
     "mypy",
     "ruff",
+    "types-PyYAML",
+    "types-jsonschema",
 ]
 
 [project.scripts]
@@ -78,6 +80,12 @@ exclude = ["tests*"]
 [tool.mypy]
 python_version = "3.11"
 ignore_missing_imports = true
+# yaml stubs live in types-PyYAML (dev dep); silence on systems where
+# someone runs mypy without installing the dev extra.
+[[tool.mypy.overrides]]
+module = ["yaml", "yaml.*"]
+ignore_missing_imports = true
+follow_imports = "skip"
 
 [tool.ruff]
 target-version = "py311"

@@ -329,7 +329,9 @@ def _sdk_allow(ok_codes: list[int], args: list[str], *, env: dict[str, str]) -> 
     result = subprocess.run(cmd, cwd=ROOT, env=env, check=False)
     if result.returncode not in ok_codes:
         if result.returncode == 5:
-            raise TenantConstraintError(f"sdk command reported tenant/provider constraint: {' '.join(args)}")
+            raise TenantConstraintError(
+                f"sdk command reported tenant/provider constraint: {' '.join(args)}"
+            )
         raise SdkCommandError(args=args, returncode=result.returncode)
     return result.returncode
 
@@ -348,7 +350,9 @@ def _load_admin_password() -> str:
 
 
 def _share_ksm_app_folder(admin_params: Any, *, app_uid: str, folder_uid: str) -> None:
-    config_path = getattr(admin_params, "config_filename", None) or str(identity.ADMIN_COMMANDER_CONFIG)
+    config_path = getattr(admin_params, "config_filename", None) or str(
+        identity.ADMIN_COMMANDER_CONFIG
+    )
     env = dict(os.environ)
     password = getattr(admin_params, "password", None) or _load_admin_password()
     env["KEEPER_PASSWORD"] = password
@@ -381,7 +385,9 @@ def _share_ksm_app_folder(admin_params: Any, *, app_uid: str, folder_uid: str) -
     if "already" in text:
         log.info("KSM app %s already bound to folder %s", app_uid, folder_uid)
         return
-    raise SmokeError(f"share-add failed for app {app_uid} -> folder {folder_uid} (rc={result.returncode})")
+    raise SmokeError(
+        f"share-add failed for app {app_uid} -> folder {folder_uid} (rc={result.returncode})"
+    )
 
 
 def _remove_project_tree(argv_prefix: list[str], *, env: dict[str, str], project_name: str) -> None:
@@ -481,7 +487,9 @@ def _print_post_mortem(state: dict[str, Any], exc: BaseException) -> None:
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Live Keeper SDK smoke runner")
     parser.add_argument("--teardown", action="store_true", help="only remove SDK-managed records")
-    parser.add_argument("--keep-records", action="store_true", help="skip destroy phase for debugging")
+    parser.add_argument(
+        "--keep-records", action="store_true", help="skip destroy phase for debugging"
+    )
     parser.add_argument(
         "--log-level",
         default="INFO",
@@ -558,7 +566,10 @@ def main(argv: list[str] | None = None) -> int:
                 except Exception as cleanup_exc:  # pragma: no cover - live-only path
                     print(f"project cleanup failed: {cleanup_exc}", file=sys.stderr)
             elif os.environ.get("SMOKE_NO_CLEANUP"):
-                print("SMOKE_NO_CLEANUP=1 → skipping project tree cleanup for debugging", file=sys.stderr)
+                print(
+                    "SMOKE_NO_CLEANUP=1 → skipping project tree cleanup for debugging",
+                    file=sys.stderr,
+                )
 
 
 if __name__ == "__main__":

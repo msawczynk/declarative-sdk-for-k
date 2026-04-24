@@ -35,7 +35,6 @@ from keeper_sdk.core.normalize import (
 )
 from keeper_sdk.providers.commander_cli import CommanderCliProvider
 
-
 # ---------------------------------------------------------------------------
 # from_pam_import_json round-trip
 
@@ -135,9 +134,7 @@ def test_load_manifest_string_accepts_json() -> None:
         {
             "version": "1",
             "name": "json-manifest",
-            "gateways": [
-                {"uid_ref": "gw.lab", "name": "Lab", "mode": "reference_existing"}
-            ],
+            "gateways": [{"uid_ref": "gw.lab", "name": "Lab", "mode": "reference_existing"}],
         }
     )
     manifest = load_manifest_string(raw, suffix=".json")
@@ -221,7 +218,9 @@ def test_pam_gateway_rows_parses_release_json_shape(monkeypatch: pytest.MonkeyPa
     monkeypatch.setattr(
         CommanderCliProvider,
         "_run_cmd",
-        lambda self, args: payload if args == ["pam", "gateway", "list", "--format", "json"] else "",
+        lambda self, args: (
+            payload if args == ["pam", "gateway", "list", "--format", "json"] else ""
+        ),
     )
     rows = provider._pam_gateway_rows()
     assert rows == [
@@ -276,12 +275,16 @@ def test_pam_config_rows_parses_release_json_shape(monkeypatch: pytest.MonkeyPat
     ]
 
 
-def test_apply_plan_refuses_unimplemented_gateway_mode_create(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_apply_plan_refuses_unimplemented_gateway_mode_create(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """D-4 guard: gateway mode:create must fail loud, not silently drop."""
     from keeper_sdk.core.errors import CapabilityError
     from keeper_sdk.core.planner import Plan
 
-    monkeypatch.setattr("keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper")
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
     provider = CommanderCliProvider(
         manifest_source={
             "version": "1",
@@ -299,7 +302,9 @@ def test_apply_plan_refuses_rotation_settings(monkeypatch: pytest.MonkeyPatch) -
     from keeper_sdk.core.errors import CapabilityError
     from keeper_sdk.core.planner import Plan
 
-    monkeypatch.setattr("keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper")
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
     provider = CommanderCliProvider(
         manifest_source={
             "version": "1",

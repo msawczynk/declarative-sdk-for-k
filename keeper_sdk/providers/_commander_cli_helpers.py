@@ -313,7 +313,10 @@ def _extract_marker_field(item: dict[str, Any]) -> str | None:
             for entry in block:
                 if not isinstance(entry, dict):
                     continue
-                if entry.get("label") == MARKER_FIELD_LABEL or entry.get("name") == MARKER_FIELD_LABEL:
+                if (
+                    entry.get("label") == MARKER_FIELD_LABEL
+                    or entry.get("name") == MARKER_FIELD_LABEL
+                ):
                     value = entry.get("value")
                     if isinstance(value, list):
                         return value[0] if value else None

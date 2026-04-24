@@ -1,0 +1,27 @@
+# Fails: administrative_credentials string "ghost-admin" does not resolve to any pamUser.
+version: "1"
+name: invalid-admin-cred
+
+gateways:
+  - uid_ref: gw
+    name: "Some Gateway"
+    mode: reference_existing
+
+pam_configurations:
+  - uid_ref: cfg
+    environment: local
+    title: "cfg"
+    gateway_uid_ref: gw
+
+resources:
+  - uid_ref: needs-admin
+    type: pamMachine
+    title: "needs-admin"
+    pam_configuration_uid_ref: cfg
+    shared_folder: resources
+    host: 10.0.0.1
+    operating_system: Linux
+    pam_settings:
+      connection:
+        protocol: ssh
+        administrative_credentials: "ghost-admin"   # string-by-title; no such user defined anywhere

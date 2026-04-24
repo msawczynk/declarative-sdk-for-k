@@ -31,7 +31,10 @@ def ensure_sandbox(admin_params, *, testuser_email: str) -> dict:
     sf_uid = _find_shared_folder_uid(admin_params, SANDBOX_SF_TITLE)
     if not sf_uid:
         log.info("Creating shared folder %s", SANDBOX_SF_TITLE)
-        _do(admin_params, f'mkdir -sf --manage-users --manage-records --can-edit --can-share "{SANDBOX_SF_TITLE}"')
+        _do(
+            admin_params,
+            f'mkdir -sf --manage-users --manage-records --can-edit --can-share "{SANDBOX_SF_TITLE}"',
+        )
         sf_uid = _find_shared_folder_uid(admin_params, SANDBOX_SF_TITLE)
         if not sf_uid:
             raise RuntimeError(
@@ -52,7 +55,9 @@ def ensure_sandbox(admin_params, *, testuser_email: str) -> dict:
                 "Re-run `keeper secrets-manager app list --format json` and confirm Commander supports JSON output."
             )
     else:
-        log.info("KSM application %s already exists (%s)", SANDBOX_KSM_APP_NAME, existing_app["uid"])
+        log.info(
+            "KSM application %s already exists (%s)", SANDBOX_KSM_APP_NAME, existing_app["uid"]
+        )
 
     return {
         "sf_uid": sf_uid,
@@ -182,8 +187,7 @@ def _ensure_shared_to_user(admin_params, *, testuser_email: str) -> bool:
     # -o on|off (manage-users), -d on|off (can-edit), -s on|off (can-share),
     # -f to ignore default folder permissions on the initial sharing action.
     command = (
-        f'share-folder "{SANDBOX_SF_TITLE}" -a grant -e {testuser_email} '
-        "-p on -o on -d on -s on -f"
+        f'share-folder "{SANDBOX_SF_TITLE}" -a grant -e {testuser_email} -p on -o on -d on -s on -f'
     )
     try:
         output = _do(admin_params, command)
@@ -227,8 +231,7 @@ def _find_ksm_app(admin_params, name: str) -> dict[str, str] | None:
 
 def _ensure_app_share(admin_params, *, sf_uid: str) -> None:
     command = (
-        f'secrets-manager share add --app "{SANDBOX_KSM_APP_NAME}" '
-        f"--secret {sf_uid} --editable"
+        f'secrets-manager share add --app "{SANDBOX_KSM_APP_NAME}" --secret {sf_uid} --editable'
     )
     try:
         output = _do(admin_params, command)
@@ -267,7 +270,10 @@ def _extract_marker_field(item: dict[str, Any]) -> str | None:
             for entry in block:
                 if not isinstance(entry, dict):
                     continue
-                if entry.get("label") == MARKER_FIELD_LABEL or entry.get("name") == MARKER_FIELD_LABEL:
+                if (
+                    entry.get("label") == MARKER_FIELD_LABEL
+                    or entry.get("name") == MARKER_FIELD_LABEL
+                ):
                     value = entry.get("value")
                     if isinstance(value, list):
                         return value[0] if value else None
@@ -330,7 +336,9 @@ def _looks_like_missing_share(message: str) -> bool:
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Ensure the SDK smoke sandbox exists")
-    parser.add_argument("--testuser", required=True, help="User email to share the sandbox shared folder with")
+    parser.add_argument(
+        "--testuser", required=True, help="User email to share the sandbox shared folder with"
+    )
     parser.add_argument(
         "--log-level",
         default="INFO",

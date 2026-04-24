@@ -28,8 +28,10 @@ def _is_secret(key: str) -> bool:
 def redact(value: Any) -> Any:
     """Deep-copy with any secret-flavored field replaced by the sentinel."""
     if isinstance(value, dict):
-        return {k: (REDACTED if _is_secret(k) and v not in (None, "") else redact(v))
-                for k, v in value.items()}
+        return {
+            k: (REDACTED if _is_secret(k) and v not in (None, "") else redact(v))
+            for k, v in value.items()
+        }
     if isinstance(value, list):
         return [redact(item) for item in value]
     if isinstance(value, tuple):

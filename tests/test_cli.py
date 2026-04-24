@@ -114,7 +114,9 @@ def test_plan_emits_json_exit_codes(
     if scenario == "clean":
         graph = build_graph(manifest)
         order = execution_order(graph)
-        provider.apply_plan(build_plan(manifest.name, compute_diff(manifest, provider.discover()), order))
+        provider.apply_plan(
+            build_plan(manifest.name, compute_diff(manifest, provider.discover()), order)
+        )
     elif scenario == "conflict":
         provider.seed(
             [
@@ -175,7 +177,9 @@ def test_apply_dry_run_equivalent_to_plan(
     if seed_clean:
         graph = build_graph(manifest)
         order = execution_order(graph)
-        provider.apply_plan(build_plan(manifest.name, compute_diff(manifest, provider.discover()), order))
+        provider.apply_plan(
+            build_plan(manifest.name, compute_diff(manifest, provider.discover()), order)
+        )
 
     monkeypatch.setattr(cli_main_module, "MockProvider", lambda manifest_name: provider)
 
@@ -224,7 +228,9 @@ def test_import_noop_when_nothing_to_adopt(
     provider = MockProvider(manifest.name)
     graph = build_graph(manifest)
     order = execution_order(graph)
-    provider.apply_plan(build_plan(manifest.name, compute_diff(manifest, provider.discover()), order))
+    provider.apply_plan(
+        build_plan(manifest.name, compute_diff(manifest, provider.discover()), order)
+    )
 
     monkeypatch.setattr(cli_main_module, "MockProvider", lambda manifest_name: provider)
 

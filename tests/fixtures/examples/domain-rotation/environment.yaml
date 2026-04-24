@@ -1,0 +1,55 @@
+version: "1"
+name: acme-domain
+
+projects:
+  - uid_ref: acme-domain
+    project: "Acme Domain"
+
+shared_folders:
+  users:
+    uid_ref: acme-domain-sf-users
+    manage_users: true
+    manage_records: true
+    can_edit: true
+    can_share: true
+  resources:
+    uid_ref: acme-domain-sf-resources
+    manage_users: true
+    manage_records: true
+    can_edit: true
+    can_share: true
+
+gateways:
+  - uid_ref: acme-domain-gw
+    name: "Acme Domain Gateway"
+    mode: reference_existing
+
+pam_configurations:
+  - uid_ref: acme-domain-cfg
+    environment: domain
+    title: "Acme Domain PAM Configuration"
+    gateway_uid_ref: acme-domain-gw
+    options:
+      connections: "on"
+      rotation: "on"
+      tunneling: "on"
+    dom_domain_id: "acme.local"
+    dom_hostname: "dc1.acme.local"
+    dom_port: "636"
+    dom_use_ssl: true
+    dom_scan_dc_cidr: true
+    dom_network_cidr: "10.16.9.0/24"
+    dom_administrative_credential_uid_ref: acme-domain-admin
+
+users:
+  - uid_ref: acme-domain-admin
+    type: pamUser
+    title: "acme-domain-admin"
+    login: admin@acme.local
+    password: "REPLACE_ME"
+    distinguished_name: "CN=acme-domain-admin,CN=Users,DC=acme,DC=local"
+    rotation_settings:
+      rotation: general
+      enabled: "on"
+      schedule: { type: CRON, cron: "0 3 * * 0" }
+      password_complexity: "32,5,5,5,5"

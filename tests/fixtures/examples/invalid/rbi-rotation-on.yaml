@@ -1,0 +1,28 @@
+# Fails: pamRemoteBrowser cannot set rotation; its options subset excludes rotation.
+version: "1"
+name: invalid-rbi-rotation
+
+gateways:
+  - uid_ref: gw
+    name: "Some Gateway"
+    mode: reference_existing
+
+pam_configurations:
+  - uid_ref: cfg
+    environment: local
+    title: "cfg"
+    gateway_uid_ref: gw
+
+resources:
+  - uid_ref: rbi-bad
+    type: pamRemoteBrowser
+    title: "bad rbi"
+    url: "https://example.com"
+    pam_configuration_uid_ref: cfg
+    shared_folder: resources
+    pam_settings:
+      options:
+        rotation: "on"   # not a valid option for pamRemoteBrowser
+        remote_browser_isolation: "on"
+      connection:
+        protocol: http

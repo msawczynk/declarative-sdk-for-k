@@ -20,7 +20,6 @@ H6  C3 contract: provider.unsupported_capabilities() results appear as
 
 from __future__ import annotations
 
-import os
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -39,9 +38,9 @@ from keeper_sdk.core.interfaces import LiveRecord
 from keeper_sdk.core.manifest import load_manifest_string
 from keeper_sdk.providers.commander_cli import CommanderCliProvider
 
-
 # ---------------------------------------------------------------------------
 # H1: _run_cmd error paths
+
 
 def _make_provider(monkeypatch: pytest.MonkeyPatch, **extra: Any) -> CommanderCliProvider:
     monkeypatch.setattr(
@@ -96,6 +95,7 @@ def test_run_cmd_silent_failure_detector(monkeypatch: pytest.MonkeyPatch) -> Non
 # ---------------------------------------------------------------------------
 # H2: post-apply collision
 
+
 def test_apply_plan_post_apply_collision_detected(monkeypatch: pytest.MonkeyPatch) -> None:
     """keeper_sdk/providers/commander_cli.py L281-289 — after a successful
     pam project import, discover() returns two records with the same
@@ -120,17 +120,26 @@ def test_apply_plan_post_apply_collision_detected(monkeypatch: pytest.MonkeyPatc
 
     dup_live = [
         LiveRecord(
-            keeper_uid="uid-a", title="machine-1", resource_type="pamMachine",
-            folder_uid="folder-xyz", payload={}, marker=None,
+            keeper_uid="uid-a",
+            title="machine-1",
+            resource_type="pamMachine",
+            folder_uid="folder-xyz",
+            payload={},
+            marker=None,
         ),
         LiveRecord(
-            keeper_uid="uid-b", title="machine-1", resource_type="pamMachine",
-            folder_uid="folder-xyz", payload={}, marker=None,
+            keeper_uid="uid-b",
+            title="machine-1",
+            resource_type="pamMachine",
+            folder_uid="folder-xyz",
+            payload={},
+            marker=None,
         ),
     ]
     monkeypatch.setattr(provider, "discover", lambda: dup_live)
     monkeypatch.setattr(
-        provider, "_run_cmd",
+        provider,
+        "_run_cmd",
         lambda _argv: "Access token: 00000000-0000-0000-0000-000000000000\n",
     )
     monkeypatch.setattr(provider, "_resolve_project_resources_folder", lambda _n: None)
@@ -157,8 +166,10 @@ def test_apply_plan_post_apply_collision_detected(monkeypatch: pytest.MonkeyPatc
 # ---------------------------------------------------------------------------
 # H3: CLI apply exits 4 when conflicts exist and --allow-delete not passed
 
+
 def test_cli_apply_exits_conflict_when_conflicts_and_no_allow_delete(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """keeper_sdk/cli/main.py L302-304 — ``apply`` refuses to proceed
     past a conflict-bearing plan without ``--allow-delete``, and exits
@@ -194,7 +205,9 @@ resources:
 
     runner = CliRunner()
     result = runner.invoke(
-        cli_main, ["apply", str(manifest_path), "--auto-approve"], catch_exceptions=False,
+        cli_main,
+        ["apply", str(manifest_path), "--auto-approve"],
+        catch_exceptions=False,
     )
     assert result.exit_code == 4, result.output
     assert "conflict" in result.output.lower()
@@ -202,6 +215,7 @@ resources:
 
 # ---------------------------------------------------------------------------
 # H4: OwnershipError on unsupported marker version
+
 
 def test_compute_diff_unsupported_marker_version_raises(tmp_path: Path) -> None:
     """keeper_sdk/core/diff.py L210-216 — marker with a version string
@@ -236,6 +250,7 @@ resources:
 # ---------------------------------------------------------------------------
 # H5: _get_keeper_params failure branches
 
+
 def test_get_keeper_params_no_helper_falls_back_to_env_helper(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -256,7 +271,8 @@ def test_get_keeper_params_no_helper_falls_back_to_env_helper(
 
 
 def test_get_keeper_params_helper_path_missing(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     """An explicit but missing helper path is loud: we do NOT fall back
     to ``EnvLoginHelper`` in that case — the operator clearly intended
@@ -284,8 +300,10 @@ def test_get_keeper_params_after_prior_failure_refuses_retry(
 # ---------------------------------------------------------------------------
 # H6: C3 contract — provider capability gaps appear in the plan
 
+
 def test_cli_plan_surfaces_provider_capability_gaps_as_conflicts(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """C3 contract test: when a provider declares capability gaps (e.g.
     rotation_settings on Commander), ``plan`` / ``apply --dry-run`` /
@@ -309,18 +327,24 @@ resources:
     from keeper_sdk.providers.mock import MockProvider
 
     monkeypatch.setattr(
-        MockProvider, "unsupported_capabilities",
-        lambda self, _m=None: ["rotation_settings is not implemented (Commander hook: `keeper pam rotation set`)"],
+        MockProvider,
+        "unsupported_capabilities",
+        lambda self, _m=None: [
+            "rotation_settings is not implemented (Commander hook: `keeper pam rotation set`)"
+        ],
     )
 
     import json as _json
 
     runner = CliRunner()
     plan_result = runner.invoke(
-        cli_main, ["plan", str(manifest_path), "--json"], catch_exceptions=False,
+        cli_main,
+        ["plan", str(manifest_path), "--json"],
+        catch_exceptions=False,
     )
     dry_result = runner.invoke(
-        cli_main, ["apply", str(manifest_path), "--dry-run", "--auto-approve"],
+        cli_main,
+        ["apply", str(manifest_path), "--dry-run", "--auto-approve"],
         catch_exceptions=False,
     )
     # Both paths must report exit 4 (EXIT_CONFLICT).
@@ -330,8 +354,7 @@ resources:
     # --json mode exposes the full reason without table truncation.
     doc = _json.loads(plan_result.output)
     capability_conflicts = [
-        c for c in doc["changes"]
-        if c["kind"] == "conflict" and c["resource_type"] == "capability"
+        c for c in doc["changes"] if c["kind"] == "conflict" and c["resource_type"] == "capability"
     ]
     assert len(capability_conflicts) == 1
     assert "rotation_settings" in capability_conflicts[0]["reason"]

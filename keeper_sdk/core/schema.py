@@ -13,7 +13,6 @@ from typing import Any
 
 from keeper_sdk.core.errors import SchemaError
 
-
 SCHEMA_ID = "pam-environment.v1.schema.json"
 
 

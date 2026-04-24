@@ -81,7 +81,7 @@ def utc_timestamp() -> str:
     round-tripping through :func:`encode_marker` just for the
     timestamp.
     """
-    return _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return _dt.datetime.now(_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 # Backwards-compatible alias; internal-only, will be removed in a future release.

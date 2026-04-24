@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import subprocess
 import sys
 import types
 from pathlib import Path
@@ -18,7 +17,9 @@ from keeper_sdk.providers.commander_cli import CommanderCliProvider
 
 
 def _provider(monkeypatch: pytest.MonkeyPatch, stdout: str = "") -> CommanderCliProvider:
-    monkeypatch.setattr("keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper")
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
     monkeypatch.setattr(CommanderCliProvider, "_run_cmd", lambda self, args: stdout)
     return CommanderCliProvider(folder_uid="folder-uid")
 
@@ -29,7 +30,9 @@ def _discover_provider(
     ls_payload: object,
     get_payloads: dict[str, object] | None = None,
 ) -> CommanderCliProvider:
-    monkeypatch.setattr("keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper")
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
 
     def fake_run(self: CommanderCliProvider, args: list[str]) -> str:
         if args[:1] == ["ls"]:
@@ -126,14 +129,19 @@ def _apply_recorder(
 
 
 def test_discover_requires_folder_uid(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper")
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
     provider = CommanderCliProvider(folder_uid=None)
 
     with pytest.raises(CapabilityError) as exc_info:
         provider.discover()
 
     assert "run apply_plan() first" in exc_info.value.reason
-    assert exc_info.value.next_action == "pass --folder-uid (or KEEPER_DECLARATIVE_FOLDER), or call apply_plan() first"
+    assert (
+        exc_info.value.next_action
+        == "pass --folder-uid (or KEEPER_DECLARATIVE_FOLDER), or call apply_plan() first"
+    )
 
 
 def test_discover_empty_folder_returns_empty_list(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -201,7 +209,9 @@ def test_discover_decodes_marker_from_custom_field(monkeypatch: pytest.MonkeyPat
                 "title": "host1",
                 "type": "pamMachine",
                 "fields": [],
-                "custom": [{"type": "text", "label": "keeper_declarative_manager", "value": [marker]}],
+                "custom": [
+                    {"type": "text", "label": "keeper_declarative_manager", "value": [marker]}
+                ],
             }
         },
     )
@@ -217,7 +227,12 @@ def test_discover_ignores_folder_entries(monkeypatch: pytest.MonkeyPatch) -> Non
         monkeypatch,
         ls_payload=[
             {"type": "folder", "uid": "F1", "name": "nested", "details": "Folder"},
-            {"type": "record", "uid": "R1", "name": "host1", "details": "Type: pamMachine, Description: ..."},
+            {
+                "type": "record",
+                "uid": "R1",
+                "name": "host1",
+                "details": "Type: pamMachine, Description: ...",
+            },
         ],
         get_payloads={
             "R1": {
@@ -239,7 +254,12 @@ def test_discover_uses_ls_details_when_get_type_missing(monkeypatch: pytest.Monk
     provider = _discover_provider(
         monkeypatch,
         ls_payload=[
-            {"type": "record", "uid": "R1", "name": "svc-admin", "details": "Type: pamUser, Description: ..."}
+            {
+                "type": "record",
+                "uid": "R1",
+                "name": "svc-admin",
+                "details": "Type: pamUser, Description: ...",
+            }
         ],
         get_payloads={
             "R1": {
@@ -265,14 +285,20 @@ def test_discover_raises_on_non_json_ls(monkeypatch: pytest.MonkeyPatch) -> None
     assert exc_info.value.reason == "Commander returned non-JSON from `ls --format json`"
 
 
-def test_resolve_project_resources_folder_walks_pam_environments(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper")
+def test_resolve_project_resources_folder_walks_pam_environments(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
 
     calls: list[list[str]] = []
     monkeypatch.setattr(
         CommanderCliProvider,
         "_run_cmd",
-        _apply_recorder(calls, project_name="customer-prod", discovered_entries=[], monkeypatch=monkeypatch),
+        _apply_recorder(
+            calls, project_name="customer-prod", discovered_entries=[], monkeypatch=monkeypatch
+        ),
     )
     provider = CommanderCliProvider(folder_uid=None)
 
@@ -287,8 +313,12 @@ def test_resolve_project_resources_folder_walks_pam_environments(monkeypatch: py
 
 
 def test_apply_writes_marker_after_create(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper")
-    monkeypatch.setattr("keeper_sdk.providers.commander_cli.utc_timestamp", lambda: "2026-04-24T12:34:56Z")
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.utc_timestamp", lambda: "2026-04-24T12:34:56Z"
+    )
 
     calls: list[list[str]] = []
     monkeypatch.setattr(
@@ -304,7 +334,7 @@ def test_apply_writes_marker_after_create(monkeypatch: pytest.MonkeyPatch) -> No
                 "fields": [],
                 "custom": [],
             },
-            monkeypatch=monkeypatch
+            monkeypatch=monkeypatch,
         ),
     )
     provider = CommanderCliProvider(
@@ -358,7 +388,9 @@ def test_apply_writes_marker_after_create(monkeypatch: pytest.MonkeyPatch) -> No
 
 
 def test_apply_dry_run_skips_marker_writeback(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper")
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
 
     calls: list[list[str]] = []
 
@@ -397,13 +429,17 @@ def test_apply_dry_run_skips_marker_writeback(monkeypatch: pytest.MonkeyPatch) -
 
 
 def test_apply_skips_marker_when_record_not_discoverable(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper")
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
 
     calls: list[list[str]] = []
     monkeypatch.setattr(
         CommanderCliProvider,
         "_run_cmd",
-        _apply_recorder(calls, project_name="customer-prod", discovered_entries=[], monkeypatch=monkeypatch),
+        _apply_recorder(
+            calls, project_name="customer-prod", discovered_entries=[], monkeypatch=monkeypatch
+        ),
     )
     provider = CommanderCliProvider(
         folder_uid="folder-uid",
@@ -435,8 +471,12 @@ def test_apply_skips_marker_when_record_not_discoverable(monkeypatch: pytest.Mon
 
 
 def test_apply_verifies_fields_match(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper")
-    monkeypatch.setattr("keeper_sdk.providers.commander_cli.utc_timestamp", lambda: "2026-04-24T12:34:56Z")
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.utc_timestamp", lambda: "2026-04-24T12:34:56Z"
+    )
 
     calls: list[list[str]] = []
     monkeypatch.setattr(
@@ -449,10 +489,12 @@ def test_apply_verifies_fields_match(monkeypatch: pytest.MonkeyPatch) -> None:
                 "record_uid": "keeper-created-uid",
                 "title": "db-prod",
                 "type": "pamDatabase",
-                "fields": [{"type": "host", "value": [{"hostName": "db.example.com", "port": 5432}]}],
+                "fields": [
+                    {"type": "host", "value": [{"hostName": "db.example.com", "port": 5432}]}
+                ],
                 "custom": [],
             },
-            monkeypatch=monkeypatch
+            monkeypatch=monkeypatch,
         ),
     )
     provider = CommanderCliProvider(
@@ -503,8 +545,12 @@ def test_apply_verifies_fields_match(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_apply_reports_field_drift(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper")
-    monkeypatch.setattr("keeper_sdk.providers.commander_cli.utc_timestamp", lambda: "2026-04-24T12:34:56Z")
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.utc_timestamp", lambda: "2026-04-24T12:34:56Z"
+    )
 
     calls: list[list[str]] = []
     monkeypatch.setattr(
@@ -518,11 +564,14 @@ def test_apply_reports_field_drift(monkeypatch: pytest.MonkeyPatch) -> None:
                 "title": "db-prod",
                 "type": "pamDatabase",
                 "fields": [
-                    {"type": "host", "value": [{"hostName": "db-observed.example.com", "port": 5432}]}
+                    {
+                        "type": "host",
+                        "value": [{"hostName": "db-observed.example.com", "port": 5432}],
+                    }
                 ],
                 "custom": [],
             },
-            monkeypatch=monkeypatch
+            monkeypatch=monkeypatch,
         ),
     )
     provider = CommanderCliProvider(
@@ -568,8 +617,12 @@ def test_apply_reports_field_drift(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_apply_deletes_managed_record(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper")
-    monkeypatch.setattr("keeper_sdk.providers.commander_cli.utc_timestamp", lambda: "2026-04-24T12:34:56Z")
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.utc_timestamp", lambda: "2026-04-24T12:34:56Z"
+    )
 
     calls: list[list[str]] = []
     monkeypatch.setattr(
@@ -585,7 +638,7 @@ def test_apply_deletes_managed_record(monkeypatch: pytest.MonkeyPatch) -> None:
                 "fields": [],
                 "custom": [],
             },
-            monkeypatch=monkeypatch
+            monkeypatch=monkeypatch,
         ),
     )
     provider = CommanderCliProvider(
@@ -620,7 +673,9 @@ def test_apply_deletes_managed_record(monkeypatch: pytest.MonkeyPatch) -> None:
     outcomes = provider.apply_plan(plan)
 
     rm_index = calls.index(["rm", "--force", "DEL_UID"])
-    import_index = next(idx for idx, call in enumerate(calls) if call[:3] == ["pam", "project", "import"])
+    import_index = next(
+        idx for idx, call in enumerate(calls) if call[:3] == ["pam", "project", "import"]
+    )
     assert rm_index > import_index
     assert calls[-1] == ["rm", "--force", "DEL_UID"]
     delete_outcome = next(outcome for outcome in outcomes if outcome.action == "delete")
@@ -630,7 +685,9 @@ def test_apply_deletes_managed_record(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_apply_dry_run_delete_does_not_shell(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper")
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
 
     calls: list[list[str]] = []
 
@@ -664,7 +721,9 @@ def test_apply_dry_run_delete_does_not_shell(monkeypatch: pytest.MonkeyPatch) ->
 
 
 def test_apply_delete_without_keeper_uid_is_skipped(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper")
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
 
     calls: list[list[str]] = []
 
@@ -701,7 +760,9 @@ def test_run_cmd_wraps_in_process_pam_import_exception(monkeypatch: pytest.Monke
     """`pam project import` now runs in-process — a CommandError raised by
     Commander (e.g. missing --name) must surface as a CapabilityError with
     stdout/stderr context preserved so the CLI can display it."""
-    monkeypatch.setattr("keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper")
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
 
     class _FakeCmd:
         def execute(self, params, **kwargs):
@@ -727,8 +788,12 @@ def test_run_cmd_wraps_in_process_pam_import_exception(monkeypatch: pytest.Monke
 
 
 def test_apply_reference_existing_splits_to_extend(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper")
-    monkeypatch.setattr("keeper_sdk.providers.commander_cli.utc_timestamp", lambda: "2026-04-24T12:34:56Z")
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.utc_timestamp", lambda: "2026-04-24T12:34:56Z"
+    )
 
     calls: list[list[str]] = []
 
@@ -743,21 +808,66 @@ def test_apply_reference_existing_splits_to_extend(monkeypatch: pytest.MonkeyPat
                 raise CapabilityError(reason="missing")
             return json.dumps(
                 [
-                    {"type": "folder", "uid": "resources-folder", "name": "customer-prod - Resources"},
+                    {
+                        "type": "folder",
+                        "uid": "resources-folder",
+                        "name": "customer-prod - Resources",
+                    },
                     {"type": "folder", "uid": "users-folder", "name": "customer-prod - Users"},
                 ]
             )
         if args == ["mkdir", "-uf", "PAM Environments/customer-prod"]:
             return ""
-        if args == ["ls", "--format", "json", "PAM Environments/customer-prod/customer-prod - Resources"]:
-            if not any(call[:6] == ["mkdir", "-sf", "--manage-users", "--manage-records", "--can-edit", "--can-share"] and call[-1] == "PAM Environments/customer-prod/customer-prod - Resources" for call in calls):
+        if args == [
+            "ls",
+            "--format",
+            "json",
+            "PAM Environments/customer-prod/customer-prod - Resources",
+        ]:
+            if not any(
+                call[:6]
+                == [
+                    "mkdir",
+                    "-sf",
+                    "--manage-users",
+                    "--manage-records",
+                    "--can-edit",
+                    "--can-share",
+                ]
+                and call[-1] == "PAM Environments/customer-prod/customer-prod - Resources"
+                for call in calls
+            ):
                 raise CapabilityError(reason="missing")
             return json.dumps([])
-        if args == ["ls", "--format", "json", "PAM Environments/customer-prod/customer-prod - Users"]:
-            if not any(call[:6] == ["mkdir", "-sf", "--manage-users", "--manage-records", "--can-edit", "--can-share"] and call[-1] == "PAM Environments/customer-prod/customer-prod - Users" for call in calls):
+        if args == [
+            "ls",
+            "--format",
+            "json",
+            "PAM Environments/customer-prod/customer-prod - Users",
+        ]:
+            if not any(
+                call[:6]
+                == [
+                    "mkdir",
+                    "-sf",
+                    "--manage-users",
+                    "--manage-records",
+                    "--can-edit",
+                    "--can-share",
+                ]
+                and call[-1] == "PAM Environments/customer-prod/customer-prod - Users"
+                for call in calls
+            ):
                 raise CapabilityError(reason="missing")
             return json.dumps([])
-        if args[:6] == ["mkdir", "-sf", "--manage-users", "--manage-records", "--can-edit", "--can-share"]:
+        if args[:6] == [
+            "mkdir",
+            "-sf",
+            "--manage-users",
+            "--manage-records",
+            "--can-edit",
+            "--can-share",
+        ]:
             return ""
         if args[:4] == ["secrets-manager", "share", "add", "--app"]:
             return ""
@@ -785,7 +895,10 @@ def test_apply_reference_existing_splits_to_extend(monkeypatch: pytest.MonkeyPat
                             "uid": "cfg-uid",
                             "config_name": "LW Gateway Configuration",
                             "config_type": "pamNetworkConfiguration",
-                            "shared_folder": {"name": "Lab GW Folder - Resources", "uid": "folder-uid"},
+                            "shared_folder": {
+                                "name": "Lab GW Folder - Resources",
+                                "uid": "folder-uid",
+                            },
                             "gateway_uid": "gw-uid",
                             "resource_record_uids": [],
                         }

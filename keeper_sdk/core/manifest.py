@@ -14,6 +14,7 @@ from typing import Any
 from keeper_sdk.core.errors import ManifestError, SchemaError
 from keeper_sdk.core.models import Manifest
 from keeper_sdk.core.normalize import canonicalize
+from keeper_sdk.core.preview import assert_preview_keys_allowed
 from keeper_sdk.core.schema import validate_manifest
 
 
@@ -37,6 +38,11 @@ def load_manifest_string(raw: str, *, suffix: str = ".yaml", validate: bool = Tr
     document = canonicalize(data)
     if validate:
         validate_manifest(document)
+        # Schema accepts more than the SDK implements; the preview gate
+        # closes that gap at load time with a one-line remediation
+        # (DSK_PREVIEW=1) instead of forcing operators to read plan
+        # output to find out their manifest is half-declarative.
+        assert_preview_keys_allowed(document)
     try:
         return Manifest.model_validate(document)
     except (ValueError, TypeError) as exc:  # pydantic ValidationError subclasses ValueError

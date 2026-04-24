@@ -1,0 +1,241 @@
+version: "1"
+name: acme-prod-full-local
+
+projects:
+  - uid_ref: acme-prod
+    project: "Acme Production"
+
+shared_folders:
+  users:
+    uid_ref: acme-prod-sf-users
+    manage_users: true
+    manage_records: true
+    can_edit: true
+    can_share: true
+    permissions:
+      - name: "PAM Admins"
+        manage_users: true
+        manage_records: true
+      - name: "noc@acme.example"
+        manage_users: false
+        manage_records: false
+  resources:
+    uid_ref: acme-prod-sf-resources
+    manage_users: true
+    manage_records: true
+    can_edit: true
+    can_share: true
+    permissions:
+      - name: "PAM Admins"
+        manage_users: true
+        manage_records: true
+
+gateways:
+  - uid_ref: acme-prod-gw-01
+    name: "Acme Prod Gateway 01"
+    mode: reference_existing
+
+pam_configurations:
+  - uid_ref: acme-prod-cfg
+    environment: local
+    title: "Acme Prod Local PAM Configuration"
+    gateway_uid_ref: acme-prod-gw-01
+    options:
+      connections: "on"
+      rotation: "on"
+      tunneling: "on"
+      remote_browser_isolation: "on"
+      graphical_session_recording: "on"
+      text_session_recording: "on"
+      ai_threat_detection: "on"
+      ai_terminate_session_on_detection: "on"
+    port_mapping:
+      - "2222=ssh"
+      - "33306=mysql"
+    default_rotation_schedule:
+      type: CRON
+      cron: "30 18 * * *"
+    scripts: []
+    attachments: []
+    network_id: acme-prod-net
+    network_cidr: 10.16.9.0/24
+
+users:
+  - uid_ref: acme-rbi-login
+    type: login
+    title: "RBI Admin Portal Login"
+    login: admin@acme.example
+    password: "REPLACE_ME"
+    otp: "otpauth://totp/Acme:admin@acme.example?secret=JBSWY3DPEHPK3PXP&issuer=Acme"
+
+resources:
+  - uid_ref: acme-ad
+    type: pamDirectory
+    title: "Acme AD"
+    notes: "Primary domain controller cluster"
+    pam_configuration_uid_ref: acme-prod-cfg
+    shared_folder: resources
+    directory_type: active_directory
+    host: dc1.acme.local
+    port: "636"
+    use_ssl: true
+    domain_name: acme.local
+    alternative_ips: ["10.16.9.11", "10.16.9.12"]
+    pam_settings:
+      options:
+        rotation: "on"
+        connections: "on"
+        tunneling: "on"
+        graphical_session_recording: "on"
+        text_session_recording: "on"
+      allow_supply_host: false
+      connection:
+        protocol: ssh
+        port: "22"
+        allow_supply_user: true
+        administrative_credentials_uid_ref: acme-ad-admin
+    users:
+      - uid_ref: acme-ad-admin
+        type: pamUser
+        title: "DomainAdmin"
+        login: admin@acme.local
+        password: "REPLACE_ME"
+        rotation_settings:
+          rotation: general
+          enabled: "on"
+          schedule: { type: on-demand }
+          password_complexity: "32,5,5,5,5"
+
+  - uid_ref: acme-ssh-1
+    type: pamMachine
+    title: "acme-ssh-1"
+    pam_configuration_uid_ref: acme-prod-cfg
+    shared_folder: resources
+    host: 10.16.9.21
+    port: "22"
+    ssl_verification: true
+    operating_system: Linux
+    pam_settings:
+      options:
+        rotation: "on"
+        connections: "on"
+        tunneling: "on"
+        graphical_session_recording: "on"
+        text_session_recording: "on"
+        jit_settings:
+          create_ephemeral: true
+          elevate: true
+          elevation_method: group
+          elevation_string: "wheel"
+          ephemeral_account_type: linux
+      allow_supply_host: false
+      port_forward:
+        port: "2222"
+        reuse_port: true
+      connection:
+        protocol: ssh
+        port: "22"
+        allow_supply_user: true
+        administrative_credentials_uid_ref: acme-ssh-1-root
+        launch_credentials_uid_ref: acme-ssh-1-devops
+        sftp:
+          enable_sftp: true
+          sftp_root_directory: "/opt/sftp"
+    users:
+      - uid_ref: acme-ssh-1-root
+        type: pamUser
+        title: "acme-ssh-1-root"
+        login: root
+        password: "REPLACE_ME"
+        rotation_settings:
+          rotation: general
+          enabled: "on"
+          schedule: { type: CRON, cron: "0 4 * * 0" }
+          password_complexity: "32,5,5,5,5"
+      - uid_ref: acme-ssh-1-devops
+        type: pamUser
+        title: "acme-ssh-1-devops"
+        login: devops
+        password: "REPLACE_ME"
+        rotation_settings:
+          rotation: scripts_only
+          enabled: "on"
+          schedule: { type: on-demand }
+
+  - uid_ref: acme-rdp-1
+    type: pamMachine
+    title: "acme-rdp-1"
+    pam_configuration_uid_ref: acme-prod-cfg
+    shared_folder: resources
+    host: 10.16.9.22
+    port: "3389"
+    ssl_verification: true
+    operating_system: Windows
+    pam_settings:
+      options:
+        rotation: "on"
+        connections: "on"
+        tunneling: "on"
+        graphical_session_recording: "on"
+      connection:
+        protocol: rdp
+        port: "3389"
+        administrative_credentials_uid_ref: acme-ad-admin
+        security: any
+        ignore_server_cert: true
+        disable_copy: true
+        disable_paste: true
+    users: []
+
+  - uid_ref: acme-mysql-1
+    type: pamDatabase
+    title: "acme-mysql-1"
+    pam_configuration_uid_ref: acme-prod-cfg
+    shared_folder: resources
+    database_type: mysql
+    host: 10.16.9.23
+    port: "3306"
+    use_ssl: true
+    pam_settings:
+      options:
+        rotation: "on"
+        connections: "on"
+        tunneling: "on"
+      port_forward:
+        port: "33306"
+        reuse_port: true
+      connection:
+        protocol: mysql
+        port: "3306"
+        administrative_credentials_uid_ref: acme-mysql-admin
+        default_database: acme
+        disable_copy: true
+        disable_paste: true
+    users:
+      - uid_ref: acme-mysql-admin
+        type: pamUser
+        title: "acme-mysql-admin"
+        login: dbadmin
+        password: "REPLACE_ME"
+        rotation_settings:
+          rotation: general
+          enabled: "on"
+          schedule: { type: CRON, cron: "0 3 * * 0" }
+
+  - uid_ref: acme-rbi-admin-portal
+    type: pamRemoteBrowser
+    title: "Acme Admin Portal (RBI)"
+    url: "https://admin.acme.example/login"
+    pam_configuration_uid_ref: acme-prod-cfg
+    shared_folder: resources
+    pam_settings:
+      options:
+        remote_browser_isolation: "on"
+        graphical_session_recording: "on"
+      connection:
+        protocol: http
+        autofill_credentials_uid_ref: acme-rbi-login
+        autofill_targets: "input[name='email']\ninput[name='password']"
+        allow_url_manipulation: false
+        allowed_url_patterns: "*.acme.example"
+        allowed_resource_url_patterns: "*.acme.example"

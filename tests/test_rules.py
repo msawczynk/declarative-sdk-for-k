@@ -21,8 +21,7 @@ def test_rule_resource_requires_pam_configuration_uid_ref_when_configs_exist() -
 
     exc = exc_info.value
     assert (
-        exc.reason
-        == "resource 'res1' must set pam_configuration_uid_ref because "
+        exc.reason == "resource 'res1' must set pam_configuration_uid_ref because "
         "pam_configurations are declared"
     )
     assert exc.uid_ref == "res1"

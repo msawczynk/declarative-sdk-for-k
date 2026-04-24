@@ -9,7 +9,7 @@ import logging
 import os
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
@@ -217,17 +217,20 @@ def _retry_totp_login(
     for attempt in range(1, attempts + 1):
         try:
             return _login_user(
-                email, password, config_path=config_path, totp_secret=totp_secret,
+                email,
+                password,
+                config_path=config_path,
+                totp_secret=totp_secret,
             )
         except KeeperApiError as exc:
             last_exc = exc
             if "two_factor_code_invalid" not in str(exc).lower():
                 raise
-            log.warning("TOTP rejected on attempt %d/%d; waiting for next window", attempt, attempts)
+            log.warning(
+                "TOTP rejected on attempt %d/%d; waiting for next window", attempt, attempts
+            )
             _wait_for_next_totp_window(log_label=f"retry {attempt + 1}")
-    raise RuntimeError(
-        f"TOTP login for {email} failed after {attempts} attempts"
-    ) from last_exc
+    raise RuntimeError(f"TOTP login for {email} failed after {attempts} attempts") from last_exc
 
 
 def _enroll_totp(params) -> tuple[str, str, str]:
@@ -300,7 +303,7 @@ def _upsert_admin_record(
 
     note = (
         "Autoprovisioned by keeper-declarative-sdk/scripts/smoke/identity.py at "
-        f"{datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}"
+        f"{datetime.now(UTC).strftime('%Y-%m-%dT%H:%M:%SZ')}"
     )
     data = {
         "title": SDK_TEST_LOGIN_RECORD_TITLE,

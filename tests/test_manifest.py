@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from keeper_sdk.core import dump_manifest, load_manifest
 
 

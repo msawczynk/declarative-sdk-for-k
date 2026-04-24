@@ -1,0 +1,52 @@
+# Fails: user-a names user-b as its administrative cred and vice versa.
+# Normally admin creds are attached to a resource, not a user, but a misuse
+# still triggers cycle detection if both reference each other via launch_credentials.
+version: "1"
+name: invalid-cyclic-refs
+
+gateways:
+  - uid_ref: gw
+    name: "Some Gateway"
+    mode: reference_existing
+
+pam_configurations:
+  - uid_ref: cfg
+    environment: local
+    title: "cfg"
+    gateway_uid_ref: gw
+
+resources:
+  - uid_ref: host-a
+    type: pamMachine
+    title: "host-a"
+    pam_configuration_uid_ref: cfg
+    shared_folder: resources
+    host: 10.0.0.1
+    operating_system: Linux
+    pam_settings:
+      connection:
+        protocol: ssh
+        administrative_credentials_uid_ref: host-b-admin
+  - uid_ref: host-b
+    type: pamMachine
+    title: "host-b"
+    pam_configuration_uid_ref: cfg
+    shared_folder: resources
+    host: 10.0.0.2
+    operating_system: Linux
+    pam_settings:
+      connection:
+        protocol: ssh
+        administrative_credentials_uid_ref: host-a-admin
+    users:
+      - uid_ref: host-b-admin
+        type: pamUser
+        title: "host-b-admin"
+        login: root
+        rotation_settings:
+          rotation: general
+          enabled: "on"
+          schedule: { type: on-demand }
+# host-a-admin is intentionally also placed only under host-a below,
+# and host-a references host-b-admin while host-b references host-a-admin → cycle at plan time.
+# The graph validator should reject this.

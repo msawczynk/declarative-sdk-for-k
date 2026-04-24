@@ -24,14 +24,12 @@ The provider:
 from __future__ import annotations
 
 import contextlib
-import importlib.util
 import io
 import json
 import logging
 import os
 import shutil
 import subprocess
-import sys
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -48,24 +46,14 @@ from keeper_sdk.core.metadata import (
 from keeper_sdk.core.normalize import to_pam_import_json
 from keeper_sdk.core.planner import Plan
 from keeper_sdk.providers._commander_cli_helpers import (
-    _FIELD_LABEL_ALIASES,
-    _canonical_payload_from_field,
     _entry_uid_by_name,
-    _extract_marker_field,
     _field_drift,
     _has_existing,
-    _host_payload,
-    _kind_from_collection,
     _load_json,
     _pam_configuration_uid_ref,
     _parse_pam_project_args,
     _payload_for_extend,
-    _payload_from_get,
-    _port_value,
     _record_from_get,
-    _resource_type_from_get,
-    _title_from_item,
-    _type_from_listing_details,
     _uses_reference_existing,
 )
 
@@ -137,7 +125,9 @@ class CommanderCliProvider(Provider):
         payload = self._run_cmd(["ls", self._folder_uid, "--format", "json"])
         entries = _load_json(payload, command="ls --format json")
         if not isinstance(entries, list):
-            raise CapabilityError(reason="Commander returned non-array JSON from `ls --format json`")
+            raise CapabilityError(
+                reason="Commander returned non-array JSON from `ls --format json`"
+            )
 
         records: list[LiveRecord] = []
         for entry in entries:
@@ -149,7 +139,9 @@ class CommanderCliProvider(Provider):
             item_payload = self._run_cmd(["get", keeper_uid, "--format", "json"])
             item = _load_json(item_payload, command="get --format json")
             if not isinstance(item, dict):
-                raise CapabilityError(reason="Commander returned non-object JSON from `get --format json`")
+                raise CapabilityError(
+                    reason="Commander returned non-object JSON from `get --format json`"
+                )
             record = _record_from_get(item, listing_entry=entry)
             if record is not None:
                 records.append(record)
@@ -189,14 +181,14 @@ class CommanderCliProvider(Provider):
             )
 
         outcomes: list[ApplyOutcome] = []
-        creates_updates = [c for c in plan.ordered() if c.kind in (ChangeKind.CREATE, ChangeKind.UPDATE)]
+        creates_updates = [
+            c for c in plan.ordered() if c.kind in (ChangeKind.CREATE, ChangeKind.UPDATE)
+        ]
         deletes = plan.deletes
 
         if creates_updates:
             payload = to_pam_import_json(self._manifest_source)
-            with tempfile.NamedTemporaryFile(
-                mode="w", suffix=".json", delete=False
-            ) as handle:
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as handle:
                 cmd = ["pam", "project", "extend" if _has_existing(creates_updates) else "import"]
                 synthetic_config = None
                 if _uses_reference_existing(self._manifest_source):
@@ -433,7 +425,9 @@ class CommanderCliProvider(Provider):
             marker=marker,
         )
 
-    def _ensure_reference_project_scaffold(self, *, project_name: str, gateway_app_uid: str) -> dict[str, str]:
+    def _ensure_reference_project_scaffold(
+        self, *, project_name: str, gateway_app_uid: str
+    ) -> dict[str, str]:
         root_name = "PAM Environments"
         project_path = f"{root_name}/{project_name}"
         resources_name = f"{project_name} - Resources"
@@ -455,7 +449,7 @@ class CommanderCliProvider(Provider):
         if not resources_uid or not users_uid:
             raise CapabilityError(
                 reason=f"Commander did not return the shared folders for {project_path}",
-                next_action=f"inspect `keeper ls --format json \"{project_path}\"` and confirm scaffold creation succeeded",
+                next_action=f'inspect `keeper ls --format json "{project_path}"` and confirm scaffold creation succeeded',
             )
 
         self._share_folder_to_ksm_app(folder_uid=resources_uid, app_uid=gateway_app_uid)
@@ -505,9 +499,7 @@ class CommanderCliProvider(Provider):
             )
         except CapabilityError as exc:
             text = "\n".join(
-                str(value)
-                for value in (exc.context or {}).values()
-                if isinstance(value, str)
+                str(value) for value in (exc.context or {}).values() if isinstance(value, str)
             ).casefold()
             if "already" not in text:
                 raise
@@ -519,10 +511,14 @@ class CommanderCliProvider(Provider):
         gateway_rows = self._pam_gateway_rows()
         config_rows = self._pam_config_rows()
 
-        gateway_row = next((row for row in gateway_rows if row["gateway_name"] == gateway_name), None)
+        gateway_row = next(
+            (row for row in gateway_rows if row["gateway_name"] == gateway_name), None
+        )
         config_row = next((row for row in config_rows if row["config_name"] == config_name), None)
         if config_row is None and gateway_row is not None:
-            matches = [row for row in config_rows if row["gateway_uid"] == gateway_row["gateway_uid"]]
+            matches = [
+                row for row in config_rows if row["gateway_uid"] == gateway_row["gateway_uid"]
+            ]
             if len(matches) == 1:
                 config_row = matches[0]
 
@@ -601,7 +597,9 @@ class CommanderCliProvider(Provider):
                     "config_uid": str(item.get("uid") or ""),
                     "config_name": str(item.get("config_name") or ""),
                     "gateway_uid": str(item.get("gateway_uid") or ""),
-                    "shared_folder_title": str(sf.get("name") or "") if isinstance(sf, dict) else "",
+                    "shared_folder_title": str(sf.get("name") or "")
+                    if isinstance(sf, dict)
+                    else "",
                     "shared_folder_uid": str(sf.get("uid") or "") if isinstance(sf, dict) else "",
                 }
             )
@@ -661,7 +659,7 @@ class CommanderCliProvider(Provider):
         if not project_uid:
             raise CapabilityError(
                 reason=f"Commander did not return project folder '{project_name}' under PAM Environments",
-                next_action="inspect `keeper ls --format json \"PAM Environments\"` and confirm import created the project folder",
+                next_action='inspect `keeper ls --format json "PAM Environments"` and confirm import created the project folder',
             )
 
         resources_entries = _load_json(
@@ -690,7 +688,12 @@ class CommanderCliProvider(Provider):
         # subprocess can't resume the session for this specific subcommand.
         # In-process invocation via the Commander Python API works cleanly
         # once we've done one api.login() with full TOTP, so we delegate.
-        if len(args) >= 3 and args[0] == "pam" and args[1] == "project" and args[2] in {"import", "extend"}:
+        if (
+            len(args) >= 3
+            and args[0] == "pam"
+            and args[1] == "project"
+            and args[2] in {"import", "extend"}
+        ):
             return self._run_pam_project_in_process(args)
 
         # --batch-mode suppresses interactive prompts (password, 2FA,
@@ -758,6 +761,7 @@ class CommanderCliProvider(Provider):
             with contextlib.redirect_stdout(buf_out), contextlib.redirect_stderr(buf_err):
                 if subcmd == "import":
                     from keepercommander.commands.pam_import.edit import PAMProjectImportCommand
+
                     cmd = PAMProjectImportCommand()
                     cmd.execute(
                         params,
@@ -767,6 +771,7 @@ class CommanderCliProvider(Provider):
                     )
                 else:
                     from keepercommander.commands.pam_import.extend import PAMProjectExtendCommand
+
                     cmd = PAMProjectExtendCommand()
                     cmd.execute(
                         params,
@@ -810,17 +815,11 @@ class CommanderCliProvider(Provider):
 
         helper_path = os.environ.get("KEEPER_SDK_LOGIN_HELPER")
         try:
-            helper = (
-                load_helper_from_path(helper_path)
-                if helper_path
-                else EnvLoginHelper()
-            )
+            helper = load_helper_from_path(helper_path) if helper_path else EnvLoginHelper()
             creds = helper.load_keeper_creds()
             email = creds["email"] if isinstance(creds, dict) else creds[0]
             password = creds["password"] if isinstance(creds, dict) else creds[1]
-            totp_secret = (
-                creds["totp_secret"] if isinstance(creds, dict) else creds[2]
-            )
+            totp_secret = creds["totp_secret"] if isinstance(creds, dict) else creds[2]
             extra = {
                 k: v
                 for k, v in (creds.items() if isinstance(creds, dict) else [])
@@ -844,9 +843,21 @@ class CommanderCliProvider(Provider):
 _UNSUPPORTED_CAPABILITY_HINTS: tuple[tuple[str, str, str], ...] = (
     # (dotted manifest path fragment, human name, Commander hook the SDK
     # should eventually drive to fulfil this capability)
-    ("rotation_settings", "resources[].rotation_settings", "pam rotation edit --schedulejson / --schedulecron"),
-    ("default_rotation_schedule", "pam_configurations[].default_rotation_schedule", "pam rotation edit --schedule-config"),
-    ("jit_settings", "jit_settings (per-resource or per-config)", "pam_launch/jit.py + DAG jit_settings writer"),
+    (
+        "rotation_settings",
+        "resources[].rotation_settings",
+        "pam rotation edit --schedulejson / --schedulecron",
+    ),
+    (
+        "default_rotation_schedule",
+        "pam_configurations[].default_rotation_schedule",
+        "pam rotation edit --schedule-config",
+    ),
+    (
+        "jit_settings",
+        "jit_settings (per-resource or per-config)",
+        "pam_launch/jit.py + DAG jit_settings writer",
+    ),
     ("rotation_schedule", "rotation_schedule (embedded)", "pam rotation edit --schedulecron"),
 )
 
