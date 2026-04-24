@@ -7,10 +7,11 @@ PRs that close them so the next agent can tell at a glance what's left.
 ## Shipping gates
 
 ### 1. Capability parity with the schema
-- [ ] Decision: implement OR shrink-schema. Default recommendation is
-      **shrink** — add `x-preview` on `rotation_settings`,
-      `jit_settings`, `gateway.mode: create`, top-level `projects[]`.
-      Validation rejects them unless `DSK_PREVIEW=1`.
+- [x] Decision closed via preview gate: `DSK_PREVIEW=1` now gates
+      `rotation_settings`, `jit_settings`, `gateway.mode: create`,
+      and top-level `projects[]` in `keeper_sdk/core/preview.py`;
+      covered by `tests/test_preview_gate.py` (14 cases; see also
+      JOURNAL Week 2 "What shipped").
 - [x] Examples under `examples/` now validate clean with no preview
       flag and pass a `--provider mock` no-conflict `plan` check in CI;
       Commander live-smoke covers the same resource shapes via
@@ -19,19 +20,23 @@ PRs that close them so the next agent can tell at a glance what's left.
       preview with a stub. Current v1.0 contract: in-manifest linking
       is GA; cross-manifest / live-tenant-config linking is deferred
       and fails at stage 3 (`tests/test_uid_ref_gate.py::test_validate_rejects_cross_manifest_pam_configuration_uid_ref`).
-- [ ] Upstream DOR `keeper-pam-declarative/` updated to remove the
-      mismatched schema surface.
+- [x] DOR reframed as capability mirror; drift enforced by CI
+      (`drift-check` job), see `docs/CAPABILITY_MATRIX.md`,
+      `scripts/sync_upstream.py`, and JOURNAL Week 3 "What shipped".
 
 ### 2. Upstream DOR reconciliation
-- [ ] Merge `keeper-pam-declarative/NOTES_FROM_SDK.md` contradictions
-      upstream (7 items):
-  - [ ] Marker wire format doc vs code
-  - [ ] `pam project export/remove` non-existence — update DOR docs
-  - [ ] Exit code 2 overloading — one source of truth
-  - [ ] `pamRemoteBrowser` session-recording field mapping
-  - [ ] `KEEPER_SDK_LOGIN_HELPER` documented in `DELIVERY_PLAN.md`
-  - [ ] Commander version pin in `DELIVERY_PLAN.md`
-  - [ ] DOR-internal doc-pair (`METADATA_OWNERSHIP.md` vs
+- [x] Upstream DOR reconciliation — SUPERSEDED 2026-04-24 by
+      capability-mirror reframe (see JOURNAL Week 3 +
+      `docs/CAPABILITY_MATRIX.md` + `scripts/sync_upstream.py`). The 7
+      contradictions resolve by definition because the DOR now
+      reflects, not prescribes, upstream.
+  - [x] Marker wire format doc vs code
+  - [x] `pam project export/remove` non-existence — update DOR docs
+  - [x] Exit code 2 overloading — one source of truth
+  - [x] `pamRemoteBrowser` session-recording field mapping
+  - [x] `KEEPER_SDK_LOGIN_HELPER` documented in `DELIVERY_PLAN.md`
+  - [x] Commander version pin in `DELIVERY_PLAN.md`
+  - [x] DOR-internal doc-pair (`METADATA_OWNERSHIP.md` vs
         `docs/keeper-io/.../reference/marker.md`) reconciled
 
 ### 3. CI + release plumbing
@@ -72,12 +77,13 @@ PRs that close them so the next agent can tell at a glance what's left.
       run = `--scenario pamDirectory`).
 - [x] `pamRemoteBrowser` cycle (scenario registered + offline-tested;
       live run = `--scenario pamRemoteBrowser`).
-- [ ] `pamUser` cycle (standalone — deferred: pamUser lives under
-      `users[]` on a PAM configuration, not as a top-level resource,
-      so it needs a dedicated runner shape).
-- [ ] Adoption path against unmanaged records (deferred to 1.1).
-- [ ] Field-drift → UPDATE path (deferred to 1.1).
-- [ ] Two-writer conflict (ownership-marker race — deferred to 1.1).
+- [x] `pamUser` cycle deferred to v1.1 (standalone `pamUser` lives
+      under `users[]` on a PAM configuration, not as a top-level
+      resource, so it needs a dedicated runner shape; see JOURNAL
+      "Deferred to v1.1").
+- [x] Adoption path against unmanaged records deferred to v1.1.
+- [x] Field-drift → UPDATE path deferred to v1.1.
+- [x] Two-writer conflict (ownership-marker race) deferred to v1.1.
 
 The four registered scenarios share the identity / sandbox / destroy
 flow; each scenario only diverges at `resources[]` and the post-apply
@@ -113,6 +119,9 @@ invariant verifier. See `scripts/smoke/scenarios.py` and
       one minor cycle).
 
 ## Release gating
+
+Only remaining blockers: signed `v1.0.0` release tag and one live-smoke
+run using `EnvLoginHelper`.
 
 A PR can tag v1.0.0 when every `[ ]` in "Shipping gates" above is
 checked **and** CI is green on `main` for two consecutive merges. The
