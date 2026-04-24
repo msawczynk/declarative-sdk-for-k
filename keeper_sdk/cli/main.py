@@ -47,6 +47,7 @@ from keeper_sdk.providers import CommanderCliProvider, MockProvider
 
 EXIT_OK = 0
 EXIT_GENERIC = 1
+EXIT_CHANGES = 2
 EXIT_SCHEMA = 2
 EXIT_REF = 3
 EXIT_CONFLICT = 4
@@ -134,7 +135,10 @@ def export_cmd(commander_json: Path, name: str | None, output: Path | None) -> N
 @click.option("--json", "as_json", is_flag=True, help="Emit plan as JSON")
 @click.pass_context
 def plan(ctx: click.Context, manifest_path: Path, allow_delete: bool, as_json: bool) -> None:
-    """Compute an execution plan against the configured provider."""
+    """Compute an execution plan against the configured provider.
+
+    Exits 0 when the plan is clean, 2 when changes are present, 4 when conflicts exist.
+    """
     plan_obj = _build_plan(ctx, manifest_path, allow_delete=allow_delete)
     if as_json:
         click.echo(json.dumps(_plan_to_dict(plan_obj), indent=2))
@@ -252,7 +256,9 @@ def _make_provider(ctx: click.Context, manifest_path: Path, *, manifest=None):
 def _exit_from_plan(plan_obj: Plan) -> int:
     if plan_obj.conflicts:
         return EXIT_CONFLICT
-    return EXIT_OK
+    if plan_obj.is_clean:
+        return EXIT_OK
+    return EXIT_CHANGES
 
 
 def _plan_to_dict(plan_obj: Plan) -> dict:
