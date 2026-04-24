@@ -7,9 +7,11 @@ with shell-runnable commands, exit codes as integers, JSON examples.
 
 ## What this is
 
-`pamform` turns a YAML / JSON manifest describing PAM resources
-(gateways, `pam_configuration`s, machines, databases, directories,
-users) into a declarative lifecycle:
+`dsk` (declarative-sdk-for-k) turns a YAML / JSON manifest describing
+K-tenant state — PAM resources today (gateways, `pam_configuration`s,
+machines, databases, directories, users, remote-browsers), expanding to
+vault records, shared folders, teams, roles, enterprise config, KSM
+apps, compliance, and rotation — into a declarative lifecycle:
 
 ```text
 validate -> plan -> apply
@@ -31,8 +33,8 @@ Everything is deterministic, dry-runnable, and speaks exit codes.
 ## Install
 
 ```bash
-pip install -e ".[dev]"   # contributor install (this repo)
-pip install pamform       # (once published to PyPI — future release)
+pip install -e ".[dev]"              # contributor install (this repo)
+pip install declarative-sdk-for-k    # (once published to PyPI — future release)
 ```
 
 Python 3.11+. Requires `keepercommander>=17.2.13,<18` installed and a
@@ -42,14 +44,17 @@ agents.
 
 ## Command table (all machine-readable)
 
-| Command                 | Input                | Output                 | Machine flag          |
-|-------------------------|----------------------|------------------------|-----------------------|
-| `pamform validate PATH` | manifest YAML/JSON   | `ok: <name> (<n>refs)` | `--emit-canonical`    |
-| `pamform plan PATH`     | manifest             | plan summary + table   | `--json`              |
-| `pamform diff PATH`     | manifest             | field-level diff       | —                     |
-| `pamform apply PATH`    | manifest             | outcomes table         | `--dry-run`           |
-| `pamform import PATH`   | manifest             | adoption plan          | `--dry-run`           |
-| `pamform export JSON`   | `pam project export` | manifest YAML          | `-o FILE`             |
+| Command             | Input                | Output                 | Machine flag          |
+|---------------------|----------------------|------------------------|-----------------------|
+| `dsk validate PATH` | manifest YAML/JSON   | `ok: <name> (<n>refs)` | `--emit-canonical`    |
+| `dsk plan PATH`     | manifest             | plan summary + table   | `--json`              |
+| `dsk diff PATH`     | manifest             | field-level diff       | —                     |
+| `dsk apply PATH`    | manifest             | outcomes table         | `--dry-run`           |
+| `dsk import PATH`   | manifest             | adoption plan          | `--dry-run`           |
+| `dsk export JSON`   | `pam project export` | manifest YAML          | `-o FILE`             |
+
+Aliases `pamform` and `keeper-sdk` resolve to the same entrypoint for
+backward compatibility with pre-1.0 callers; they will be removed in 2.0.
 
 Every mutating command honours `--auto-approve` (skip prompts) and
 `--allow-delete` (permit delete rows in the plan).
@@ -74,10 +79,10 @@ this. Do not propose changes to the numbering without a spec update.
 ### A. "Apply this manifest"
 
 ```bash
-pamform validate env.yaml                        # gate 1: schema
-pamform plan env.yaml --json > /tmp/plan.json    # gate 2: inspect machine-readable
+dsk validate env.yaml                        # gate 1: schema
+dsk plan env.yaml --json > /tmp/plan.json    # gate 2: inspect machine-readable
 # Parse /tmp/plan.json; if summary.conflict > 0 -> abort with the reasons
-pamform apply env.yaml --auto-approve            # gate 3: execute
+dsk apply env.yaml --auto-approve            # gate 3: execute
 ```
 
 Abort conditions for the agent:
@@ -94,8 +99,8 @@ Abort conditions for the agent:
 ### B. "Adopt what already exists"
 
 ```bash
-pamform import env.yaml --dry-run                # see what would be claimed
-pamform import env.yaml --auto-approve           # write ownership markers
+dsk import env.yaml --dry-run                # see what would be claimed
+dsk import env.yaml --auto-approve           # write ownership markers
 ```
 
 Adoption only matches records with **no** existing marker. If a record
@@ -106,21 +111,21 @@ already belongs to another `manager` string, it shows as CONFLICT and
 
 ```bash
 keeper pam project export --output project.json  # upstream Commander
-pamform export project.json -o env.yaml          # lift to a manifest
-pamform validate env.yaml
-pamform apply env.yaml                           # on the new tenant
+dsk export project.json -o env.yaml          # lift to a manifest
+dsk validate env.yaml
+dsk apply env.yaml                           # on the new tenant
 ```
 
 ### D. "Debug a drift"
 
 ```bash
-pamform diff env.yaml > diff.txt                 # human-readable
-pamform plan env.yaml --json | jq '.changes[] | select(.kind=="update")'
+dsk diff env.yaml > diff.txt                 # human-readable
+dsk plan env.yaml --json | jq '.changes[] | select(.kind=="update")'
 ```
 
 ## JSON contracts agents can parse
 
-### `pamform plan --json` → shape
+### `dsk plan --json` → shape
 
 ```json
 {

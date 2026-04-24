@@ -105,7 +105,7 @@ class EnvLoginHelper:
         self, email: str, password: str, totp_secret: str, **kwargs: Any
     ) -> Any:
         """Perform a Commander login. Imports ``keepercommander`` lazily
-        so ``pamform`` can be imported and used against ``MockProvider``
+        so the SDK can be imported and used against ``MockProvider``
         without Commander installed."""
         try:
             import pyotp  # type: ignore[import-not-found]
@@ -114,7 +114,7 @@ class EnvLoginHelper:
         except ImportError as exc:
             raise CapabilityError(
                 reason=f"EnvLoginHelper requires keepercommander + pyotp: {exc}",
-                next_action="pip install 'pamform[commander]' or pip install keepercommander pyotp",
+                next_action="pip install 'declarative-sdk-for-k[commander]' or pip install keepercommander pyotp",
             ) from exc
 
         self._sleep_past_totp_edge(totp_secret, pyotp)
@@ -191,7 +191,7 @@ def load_helper_from_path(path: str | Path) -> LoginHelper:
             reason=f"login helper path not found: {candidate}",
             next_action="correct KEEPER_SDK_LOGIN_HELPER or drop it to use EnvLoginHelper",
         )
-    spec = importlib.util.spec_from_file_location("_pamform_user_helper", candidate)
+    spec = importlib.util.spec_from_file_location("_dsk_user_helper", candidate)
     if spec is None or spec.loader is None:
         raise CapabilityError(
             reason=f"cannot load login helper from {candidate}",

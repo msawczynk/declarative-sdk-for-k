@@ -55,7 +55,7 @@ jobs:
           # Offline-only; live-smoke against a real tenant runs via
           # scripts/smoke/smoke.py in a separate, credential-bearing
           # workflow (not in public CI).
-          PAMFORM_CI: "1"
+          DSK_CI: "1"
 
   build:
     name: build (sdist + wheel)

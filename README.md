@@ -1,20 +1,48 @@
-# pamform
+# declarative-sdk-for-k
 
-Declarative lifecycle (validate / export / plan / diff / apply) for PAM
-resources — agent- and LLM-friendly by design. Pure Python core, no
-network I/O until you reach a provider.
+> `dsk` — a declarative, agent-first SDK covering the full K surface:
+> vault records, shared folders, teams, roles, enterprise config, KSM
+> apps, PAM (machines / databases / directories / users / remote
+> browsers), compliance, rotation, migration.
+
+Pure-Python core, no network I/O until you reach a provider. Machine-
+readable everywhere (`--json`, typed exit codes, `next_action` on
+every error). Designed so an LLM agent can plan, apply, and recover
+from failure without a human in the loop.
 
 **If you are an agent or LLM**: start at [`AGENTS.md`](AGENTS.md) for
 the command table, exit-code contract, and JSON shapes. This README is
 optimised for humans.
 
+## Capability scope
+
+| Area                 | v1.0 coverage                        | Roadmap                      |
+|----------------------|--------------------------------------|------------------------------|
+| PAM resources        | machines, databases, directories, users, remote-browsers (full declarative lifecycle) | rotation settings, JIT, gateway `mode: create` (behind `DSK_PREVIEW=1`) |
+| Gateways             | `reference_existing` mode            | `create` mode                |
+| Shared folders       | scope + membership refs              | permissions matrix           |
+| KSM applications     | reference_existing + share-bindings  | app create + client rotation |
+| Ownership markers    | read + write + adopt                 | multi-manager arbitration    |
+| Vault records (non-PAM) | typed-model read/write via `login` resource | generic records, file records |
+| Teams / roles        | discover surface only                | full declarative lifecycle   |
+| Enterprise config    | not yet                              | SSO, SCIM, node tree         |
+| Compliance / audit   | not yet                              | reports-as-manifest          |
+
+The schema stays stable across capability additions — new top-level
+blocks join `pam-environment.v1` rather than bumping the version. See
+[`V1_GA_CHECKLIST.md`](V1_GA_CHECKLIST.md) for the commitment list
+gating the `1.0.0` tag.
+
+## Layout
+
 ```
-keeper_sdk/                          # import path stays stable in 1.x
+keeper_sdk/                          # import path stable through 1.x
+                                     # (renamed to declarative_sdk_k in 2.0 with a shim)
   core/                              # pure models, schema, graph, diff, planner, metadata, redact
     schemas/                         # packaged pam-environment.v1.schema.json
   providers/                         # MockProvider, CommanderCliProvider
   auth/                              # LoginHelper protocol + EnvLoginHelper reference impl
-  cli/                               # `pamform` (validate / export / plan / diff / apply / import)
+  cli/                               # `dsk` (validate / export / plan / diff / apply / import)
 tests/                               # 106 tests; reuses examples/ fixtures
 docs/
   AGENTS.md                          # agent-first operating manual
@@ -26,18 +54,20 @@ docs/
 
 ```bash
 pip install -e '.[dev]'
+# once published to PyPI:
+pip install declarative-sdk-for-k
 ```
 
-Requires Python 3.11+. `jsonschema` ships pinned. `keepercommander`
-17.2.13+ is pulled in automatically — only used when you hit the
-`commander` provider; mock provider works standalone.
+Requires Python 3.11+. `keepercommander>=17.2.13,<18` is pulled in
+automatically — only exercised when you hit the `commander` provider;
+the mock provider works standalone.
 
 ## Quick start (offline, mock provider)
 
 ```bash
-pamform validate examples/minimal/environment.yaml
-pamform plan examples/minimal/environment.yaml
-pamform apply examples/minimal/environment.yaml --auto-approve
+dsk validate examples/minimal/environment.yaml
+dsk plan examples/minimal/environment.yaml
+dsk apply examples/minimal/environment.yaml --auto-approve
 ```
 
 ## Quick start (live tenant)
@@ -48,27 +78,27 @@ export KEEPER_PASSWORD='...'
 export KEEPER_TOTP_SECRET='JBSWY3DPEHPK3PXP'      # base32 secret, NOT a 6-digit code
 export KEEPER_DECLARATIVE_FOLDER='<shared-folder-uid>'
 
-pamform --provider commander validate examples/minimal/environment.yaml --online
-pamform --provider commander plan     examples/minimal/environment.yaml
-pamform --provider commander apply    examples/minimal/environment.yaml --auto-approve
+dsk --provider commander validate examples/minimal/environment.yaml --online
+dsk --provider commander plan     examples/minimal/environment.yaml
+dsk --provider commander apply    examples/minimal/environment.yaml --auto-approve
 ```
 
-See `docs/LOGIN.md` for custom login flows (KSM pull, HSM-backed TOTP,
-device-approval queues, …).
+See [`docs/LOGIN.md`](docs/LOGIN.md) for custom login flows (KSM pull,
+HSM-backed TOTP, device-approval queues, …).
 
-## Status (sdk-completion branch, as of 2026-04-24)
+The legacy `pamform` and `keeper-sdk` CLI names remain installed as
+aliases for one major version so existing pipelines do not break.
 
-Core + mock: complete.
-Commander CLI provider: discover, plan, apply (create / update / delete
-via `keeper rm`, gated behind `--allow-delete`), ownership-marker
-read/write, and a provider-level capability check are all wired. Rotation
-/ JIT / gateway `mode: create` remain deferred (see REVIEW.md D-4) and
-surface as plan-time CONFLICTs rather than silent drops.
+## Status (main, 2026-04-24)
 
-Use `--provider commander` (with `KEEPER_DECLARATIVE_FOLDER` set) to
-delegate to the installed `keeper` CLI via subprocess. Deletion is
-scoped to records that carry the SDK's ownership marker and still
-requires `--allow-delete` on `plan` / `apply`.
+Core + mock: complete. Commander provider: discover, plan, apply
+(create / update / delete via `keeper rm`, gated behind
+`--allow-delete`), ownership-marker read/write, provider-level
+capability check. Capability gaps (rotation, JIT, gateway `mode: create`)
+surface as plan-time CONFLICT rows rather than silent drops, so
+`plan == apply --dry-run == apply` for every manifest + provider pair.
+106/106 tests green. Live-smoke GREEN end-to-end against a real
+tenant (create → verify → destroy).
 
 ## Exit codes
 

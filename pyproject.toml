@@ -3,14 +3,25 @@ requires = ["setuptools>=68.0", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "pamform"
+name = "declarative-sdk-for-k"
 version = "1.0.0"
-description = "Declarative lifecycle (validate / export / plan / diff / apply) for PAM resources, agent- and LLM-friendly by design."
+description = "Declarative lifecycle (validate / export / plan / diff / apply) across the full K surface — vault records, shared folders, teams, roles, enterprise config, KSM, PAM, compliance, rotation — agent- and LLM-friendly by design."
 requires-python = ">=3.11"
 readme = "README.md"
 license = { text = "MIT" }
-authors = [{ name = "pamform contributors" }]
-keywords = ["pam", "declarative", "iac", "agents", "llm", "terraform-like"]
+authors = [{ name = "declarative-sdk-for-k contributors" }]
+keywords = [
+    "keeper",
+    "vault",
+    "pam",
+    "ksm",
+    "enterprise",
+    "declarative",
+    "iac",
+    "agents",
+    "llm",
+    "terraform-like",
+]
 classifiers = [
     "Development Status :: 4 - Beta",
     "License :: OSI Approved :: MIT License",
@@ -34,9 +45,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/OWNER/pamform"
-Issues = "https://github.com/OWNER/pamform/issues"
-Documentation = "https://github.com/OWNER/pamform#readme"
+Homepage = "https://github.com/msawczynk/declarative-sdk-for-k"
+Issues = "https://github.com/msawczynk/declarative-sdk-for-k/issues"
+Documentation = "https://github.com/msawczynk/declarative-sdk-for-k#readme"
 
 [project.optional-dependencies]
 dev = [
@@ -47,8 +58,11 @@ dev = [
 ]
 
 [project.scripts]
+# Short, tab-completable, agent-friendly. Primary CLI name.
+dsk = "keeper_sdk.cli:main"
+# Backwards-compat aliases for pre-1.0 callers + CI scripts. Will be
+# removed in v2.0.0 when the package is also renamed to `declarative_sdk_k`.
 pamform = "keeper_sdk.cli:main"
-# Backwards-compat alias (pre-v1 callers / CI scripts); will be removed in v2.
 keeper-sdk = "keeper_sdk.cli:main"
 
 [tool.setuptools]

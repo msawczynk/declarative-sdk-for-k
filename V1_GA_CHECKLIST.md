@@ -10,7 +10,7 @@ PRs that close them so the next agent can tell at a glance what's left.
 - [ ] Decision: implement OR shrink-schema. Default recommendation is
       **shrink** — add `x-preview` on `rotation_settings`,
       `jit_settings`, `gateway.mode: create`, top-level `projects[]`.
-      Validation rejects them unless `PAMFORM_PREVIEW=1`.
+      Validation rejects them unless `DSK_PREVIEW=1`.
 - [ ] Examples under `examples/` must run clean against
       `--provider commander` with no preview flag.
 - [ ] `pam_configuration_uid_ref` linking implemented OR marked
@@ -76,7 +76,9 @@ PRs that close them so the next agent can tell at a glance what's left.
 - [ ] Map DOR `TEST_PLAN.md` scenarios to SDK tests (~6 still zero-cov:
       adoption race, partial-apply rollback, KSM rotation mid-apply,
       Commander version mismatch, stale marker cleanup, two-writer).
-- [ ] Module rename from `keeper_sdk` → `pamform` (breaking, v2.0.0).
+- [ ] Module rename from `keeper_sdk` → `declarative_sdk_k` (breaking, v2.0.0;
+      will ship a shim module so `import keeper_sdk` keeps working for
+      one minor cycle).
 
 ## Release gating
 

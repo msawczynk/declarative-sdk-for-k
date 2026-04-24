@@ -27,7 +27,7 @@ or mitigation within 30 days for high-severity issues.
 
 ## Scope reminders
 
-`pamform` shells out to the installed `keeper` CLI (or its in-process
+`dsk` (declarative-sdk-for-k) shells out to the installed `keeper` CLI (or its in-process
 Python equivalent) via subprocess. The SDK itself never stores
 credentials at rest, but any agent running it has the full blast radius
 of whatever Keeper session it inherits. Protect the login helper

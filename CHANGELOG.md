@@ -1,6 +1,7 @@
 # Changelog
 
-All notable changes to `pamform` land here. Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+All notable changes to `declarative-sdk-for-k` (`dsk`) land here.
+Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
@@ -13,14 +14,24 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 - `keeper_sdk.auth` reference login helper (`EnvLoginHelper`) so
   `KEEPER_SDK_LOGIN_HELPER` is now optional for the common case.
 - `docs/LOGIN.md` — helper contract + 30-line skeleton for custom flows.
-- `V1_GA_CHECKLIST.md` — roadmap toward v1.0.0 (from the 2026-04-24 audit).
+- `V1_GA_CHECKLIST.md` — roadmap toward v1.0.0; now tracks full-K
+  scope (vault records, shared folders, teams, roles, enterprise
+  config, KSM apps, PAM, compliance, rotation, migration) rather
+  than PAM-only.
 
 ### Changed
-- Repository + PyPI name: `keeper-declarative-sdk` → `pamform`. Import
-  path stays `keeper_sdk` in 1.x to keep 106 existing tests green; a
-  module rename will land in `2.0.0` with a shim.
-- `pyproject.toml`: pin `keepercommander>=17.2.13,<18`; require Python
-  `>=3.11`; add classifiers + keywords + `project.urls`.
+- **Project renamed** across two hops:
+  - `keeper-declarative-sdk` → `pamform` (PAM-scoped rebrand).
+  - `pamform` → `declarative-sdk-for-k` (scope broadened to the
+    full K surface; primary CLI is now `dsk`). `pamform` and
+    `keeper-sdk` remain as CLI aliases through 1.x.
+- Import path stays `keeper_sdk` in 1.x (keeps the 106-test suite
+  green). Will rename to `declarative_sdk_k` in 2.0 with a shim.
+- `pyproject.toml`: pin `keepercommander>=17.2.13,<18`; require
+  Python `>=3.11`; expanded `keywords` + `classifiers`; homepage
+  points at `msawczynk/declarative-sdk-for-k`.
+- Env-var convention rename: `PAMFORM_CI` → `DSK_CI`,
+  `PAMFORM_PREVIEW` → `DSK_PREVIEW`.
 
 ## [0.y.z] — pre-release history
 
