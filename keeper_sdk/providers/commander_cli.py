@@ -23,6 +23,7 @@ operator can act explicitly.
 
 from __future__ import annotations
 
+import datetime as dt
 import json
 import os
 import shutil
@@ -32,9 +33,14 @@ from pathlib import Path
 from typing import Any
 
 from keeper_sdk.core.diff import ChangeKind
-from keeper_sdk.core.errors import CapabilityError, DeleteUnsupportedError
+from keeper_sdk.core.errors import CapabilityError, CollisionError, DeleteUnsupportedError
 from keeper_sdk.core.interfaces import ApplyOutcome, LiveRecord, Provider
-from keeper_sdk.core.metadata import MARKER_FIELD_LABEL, decode_marker
+from keeper_sdk.core.metadata import (
+    MARKER_FIELD_LABEL,
+    decode_marker,
+    encode_marker,
+    serialize_marker,
+)
 from keeper_sdk.core.normalize import to_pam_import_json
 from keeper_sdk.core.planner import Plan
 
@@ -114,6 +120,50 @@ class CommanderCliProvider(Provider):
             finally:
                 temp_path.unlink(missing_ok=True)
 
+            if not dry_run:
+                live_records = self.discover()
+                live_by_key: dict[tuple[str, str], list[LiveRecord]] = {}
+                for live in live_records:
+                    live_by_key.setdefault((live.resource_type, live.title), []).append(live)
+
+                now = _utc_now()
+                for change, outcome in zip(creates_updates, outcomes, strict=False):
+                    matches = live_by_key.get((change.resource_type, change.title), [])
+                    if len(matches) > 1:
+                        raise CollisionError(
+                            reason=(
+                                f"live tenant has {len(matches)} {change.resource_type} records titled "
+                                f"'{change.title}' after apply"
+                            ),
+                            uid_ref=change.uid_ref,
+                            resource_type=change.resource_type,
+                            next_action="rename duplicates or add ownership markers so matching is unambiguous",
+                            context={"live_identifiers": [live.keeper_uid for live in matches]},
+                        )
+                    if not matches:
+                        outcome.details.update(
+                            {
+                                "marker_written": False,
+                                "reason": "record not found after apply",
+                            }
+                        )
+                        continue
+
+                    live = matches[0]
+                    marker = encode_marker(
+                        uid_ref=change.uid_ref or change.title,
+                        manifest=plan.manifest_name,
+                        resource_type=change.resource_type,
+                        last_applied_at=now,
+                    )
+                    self._write_marker(live.keeper_uid, marker)
+                    outcome.details.update(
+                        {
+                            "marker_written": True,
+                            "keeper_uid": live.keeper_uid,
+                        }
+                    )
+
         if deletes:
             raise DeleteUnsupportedError(
                 reason="Commander declarative apply does not support deletion yet",
@@ -145,6 +195,18 @@ class CommanderCliProvider(Provider):
 
     # ------------------------------------------------------------------
 
+    def _write_marker(self, keeper_uid: str, marker: dict[str, Any]) -> None:
+        payload = serialize_marker(marker)
+        self._run_cmd(
+            [
+                "record-update",
+                "--record",
+                keeper_uid,
+                "-cf",
+                f"{MARKER_FIELD_LABEL}={payload}",
+            ]
+        )
+
     def _run_cmd(self, args: list[str]) -> str:
         base = [self._bin]
         if self._config:
@@ -162,6 +224,10 @@ class CommanderCliProvider(Provider):
                 next_action="inspect the Commander output above and retry",
             )
         return result.stdout
+
+
+def _utc_now() -> str:
+    return dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _has_existing(changes: list[Any]) -> bool:
