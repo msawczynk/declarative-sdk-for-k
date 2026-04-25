@@ -52,7 +52,13 @@ daybook continuity is private/global sync, not a repo-local doc.
       assets to the GitHub Release via `gh release upload`. **No PyPI**
       distribution for this repository (install from git or release wheels;
       see `docs/RELEASING.md`).
-- [ ] Signed release tag `v1.0.0` with `gh release create`.
+- [x] Annotated `v1.0.0` release tag via `gh release create` (no GPG/SSH
+      signature required). Rationale: distribution is GitHub-only, install path
+      is `pip install git+...@<tag-or-sha>` over TLS — no PyPI publish, no
+      Linux-distro packaging, no documented `git verify-tag` consumer flow.
+      Tag-signing policy revisited if/when supply-chain requirements change
+      (sigstore/cosign of `dist/*` in `publish.yml` is the cheap upgrade path —
+      OIDC, no maintainer key — see `docs/RELEASING.md`).
 
 ### 4. Login path usability
 - [x] Ship `EnvLoginHelper` as in-tree reference.
@@ -131,11 +137,16 @@ and `tests/test_smoke_scenarios.py`.
 
 ## Release gating
 
-Only remaining blocker: signed `v1.0.0` release tag. `EnvLoginHelper`
-live smoke proved the login contract on 2026-04-25; the remaining
-apply-path `session_token_expired` issue is a separate deferred
-Commander-CLI session-refresh gap.
+**Zero remaining v1.0.0 GA blockers.** `EnvLoginHelper` live smoke proved the
+login contract on 2026-04-25; the remaining apply-path `session_token_expired`
+issue is a separate deferred Commander-CLI session-refresh gap (does not gate
+GA — preview-gated rotation only).
 
 A PR can tag v1.0.0 when every `[ ]` in "Shipping gates" above is
 checked **and** CI is green on `main` for two consecutive merges. The
 "Hardening" section does not gate the tag; track via GitHub Issues.
+
+Tag policy: **annotated only** (no GPG/SSH signature). GitHub-only repo, no
+PyPI, no downstream `git verify-tag` consumer. Upgrade path if requirements
+change → sigstore/cosign of `dist/*` in `.github/workflows/publish.yml`
+(OIDC, no local key).

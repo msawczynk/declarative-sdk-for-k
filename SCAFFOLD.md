@@ -3,6 +3,26 @@
 ## Purpose (1 line)
 Agent-first Python SDK + CLI (`dsk`) for deterministic `validate -> plan -> apply` of Keeper tenant state, with mock-first tests and Commander-backed live coverage.
 
+## Per-folder scaffolds (agents: start here when you land in a folder)
+
+| Folder | Scaffold | Purpose |
+|---|---|---|
+| `keeper_sdk/` | [`keeper_sdk/SCAFFOLD.md`](./keeper_sdk/SCAFFOLD.md) | Package overview + sub-package map + invariants |
+| `keeper_sdk/core/` | [`keeper_sdk/core/SCAFFOLD.md`](./keeper_sdk/core/SCAFFOLD.md) | Pure logic — manifest/schema/graph/diff/planner/redact/preview |
+| `keeper_sdk/cli/` | [`keeper_sdk/cli/SCAFFOLD.md`](./keeper_sdk/cli/SCAFFOLD.md) | `dsk` Click entrypoint + Rich renderer + exit codes |
+| `keeper_sdk/providers/` | [`keeper_sdk/providers/SCAFFOLD.md`](./keeper_sdk/providers/SCAFFOLD.md) | Mock + Commander provider; capability gates |
+| `keeper_sdk/auth/` | [`keeper_sdk/auth/SCAFFOLD.md`](./keeper_sdk/auth/SCAFFOLD.md) | `EnvLoginHelper` + helper-protocol contract |
+| `tests/` | [`tests/SCAFFOLD.md`](./tests/SCAFFOLD.md) | Per-test-file inventory + where to land new tests |
+| `docs/` | [`docs/SCAFFOLD.md`](./docs/SCAFFOLD.md) | Doc inventory + audience + ownership |
+| `scripts/` | [`scripts/SCAFFOLD.md`](./scripts/SCAFFOLD.md) | Orchestration + smoke top-level map |
+| `scripts/agent/` | [`scripts/agent/SCAFFOLD.md`](./scripts/agent/SCAFFOLD.md) | Codex CLI wrappers + Phase-0 gates + parallel runner |
+| `scripts/smoke/` | [`scripts/smoke/SCAFFOLD.md`](./scripts/smoke/SCAFFOLD.md) | Live-smoke harness + scenario registry |
+| `examples/` | [`examples/SCAFFOLD.md`](./examples/SCAFFOLD.md) | Canonical minimal manifests + CI contract |
+| `.github/` | [`.github/SCAFFOLD.md`](./.github/SCAFFOLD.md) | Workflows + Codex Action + issue templates |
+
+Reconciliation against `V1_GA_CHECKLIST.md` + `docs/SDK_DA_COMPLETION_PLAN.md` +
+`AUDIT.md` + `REVIEW.md` lives in [`RECONCILIATION.md`](./RECONCILIATION.md).
+
 ## Tree
 
 `tree` absent locally; annotated from `find . -maxdepth 3` using the same ignore set.
@@ -84,10 +104,18 @@ Agent-first Python SDK + CLI (`dsk`) for deterministic `validate -> plan -> appl
 ├── scripts/                                # Maintenance and live-smoke tooling.
 │   ├── agent/                              # Codex CLI orchestration wrappers; see docs/CODEX_CLI.md.
 │   │   ├── README.md                       # When to use offline vs live-smoke scripts.
+│   │   ├── _codex_resolve.sh               # Resolve Codex path (CODEX_BIN → PATH → Cursor extension bundle).
 │   │   ├── phase0_gates.sh                 # Scripted quick/full merge gates (pytest, ruff, mypy, build).
 │   │   ├── run_smoke_matrix.sh             # Optional: all live smoke scenarios; logs `.smoke-runs/`.
+│   │   ├── run_parallel_codex.sh           # Run prompts/*.prompt.md via codex_offline_slice.sh in parallel; logs `.codex-runs/`.
 │   │   ├── codex_offline_slice.sh          # Default offline `codex exec` (no network, workspace-write).
-│   │   └── codex_live_smoke.sh             # Whitelisted Codex live-smoke runner with network/redaction rules.
+│   │   ├── codex_live_smoke.sh             # Whitelisted Codex live-smoke runner with network/redaction rules.
+│   │   └── prompts/                        # Disjoint slice prompts for parallel Codex runs.
+│   │       ├── README.md                   # How to add a slice prompt; DONE-block contract.
+│   │       ├── 00-ping.prompt.md           # No-edit connectivity check (skipped unless INCLUDE_PING=1).
+│   │       ├── 01-github-doc.prompt.md     # GitHub-doc slice prompt.
+│   │       ├── 02-smoke-docs.prompt.md     # Smoke-docs slice prompt.
+│   │       └── 03-root-docs.prompt.md      # Root-docs slice prompt.
 │   ├── smoke/                              # Live-smoke harness and scenario registry.
 │   │   ├── .commander-config-testuser2.json# Local smoke helper config fixture.
 │   │   ├── .gitignore                      # Keeps local smoke secrets/config out of git.
@@ -110,6 +138,7 @@ Agent-first Python SDK + CLI (`dsk`) for deterministic `validate -> plan -> appl
     ├── test_coverage_followups.py          # Regression coverage for prior review gaps.
     ├── test_diff.py                        # Diff taxonomy tests.
     ├── test_dor_scenarios.py               # Offline DOR TEST_PLAN scenario mapping.
+    ├── test_errors.py                       # `DeleteUnsupportedError` compat shim still subclass of `CapabilityError`.
     ├── test_graph.py                       # Graph/order/cycle tests.
     ├── test_h_series_gaps.py               # H-series audit gap regressions.
     ├── test_interfaces.py                  # Protocol/interface conformance tests.
@@ -120,6 +149,7 @@ Agent-first Python SDK + CLI (`dsk`) for deterministic `validate -> plan -> appl
     ├── test_planner.py                     # Plan construction/summary tests.
     ├── test_preview_gate.py                # Preview-key guard tests.
     ├── test_providers.py                   # Provider protocol/common-provider tests.
+    ├── test_rbi_readback.py                 # `pamRemoteBrowser` discover + `_merge_rbi_dag_options_into_pam_settings` unit tests (P3).
     ├── test_redact.py                      # Redaction contract tests.
     ├── test_renderer_snapshots.py          # RichRenderer snapshot tests.
     ├── test_rules.py                       # Semantic rule tests.
@@ -158,7 +188,7 @@ Agent-first Python SDK + CLI (`dsk`) for deterministic `validate -> plan -> appl
 | 3. CI + release | CI matrix, examples job, drift-check, build wiring are live | SHIPPED | `.github/workflows/ci.yml`, `pyproject.toml` |
 | 3. CI + release | First green `main` CI run recorded | SHIPPED | `V1_GA_CHECKLIST.md`, `CHANGELOG.md`, commit `fb6fb8b` in `git log` |
 | 3. CI + release | GitHub Release asset workflow (`publish.yml`); no PyPI | SHIPPED | `.github/workflows/publish.yml`, `docs/RELEASING.md` |
-| 3. CI + release | `v1.0.0` GitHub release exists; tag is annotated but not signed | EXTERNAL-GAP | GitHub release `v1.0.0`; no local signing key/config was available |
+| 3. CI + release | `v1.0.0` GitHub release exists; annotated tag only, no GPG/SSH signature | SHIPPED-by-policy | GitHub-only repo, no PyPI / no downstream `git verify-tag` flow; tag-signing not required (decision recorded 2026-04-26 in `V1_GA_CHECKLIST.md` + `RECONCILIATION.md`) |
 | 4. Login | Built-in env helper + helper contract docs shipped | SHIPPED | `keeper_sdk/auth/helper.py`, `docs/LOGIN.md`, `README.md` |
 | 4. Login | Live-smoke explicitly using `EnvLoginHelper` proved full apply session refresh path for `pamMachine` | SHIPPED | `scripts/smoke/smoke.py --login-helper env --scenario pamMachine`, `scripts/smoke/README.md`, `docs/LOGIN.md` |
 | 5. Validate stages | Stage-5 tenant-binding checks implemented + documented | SHIPPED | `keeper_sdk/core/interfaces.py`, `keeper_sdk/providers/commander_cli.py`, `tests/test_stage_5_bindings.py`, `docs/VALIDATION_STAGES.md` |
