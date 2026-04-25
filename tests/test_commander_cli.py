@@ -12,8 +12,9 @@ import pytest
 from keeper_sdk.core.diff import Change, ChangeKind
 from keeper_sdk.core.errors import CapabilityError
 from keeper_sdk.core.metadata import encode_marker, serialize_marker
+from keeper_sdk.core.models import RotationScheduleOnDemand, RotationSettings
 from keeper_sdk.core.planner import Plan
-from keeper_sdk.providers.commander_cli import CommanderCliProvider
+from keeper_sdk.providers.commander_cli import CommanderCliProvider, _build_pam_rotation_edit_args
 
 
 def _provider(monkeypatch: pytest.MonkeyPatch, stdout: str = "") -> CommanderCliProvider:
@@ -80,6 +81,98 @@ def _install_fake_write_marker(monkeypatch: pytest.MonkeyPatch, calls: list[list
         )
 
     monkeypatch.setattr(CommanderCliProvider, "_write_marker", fake_write_marker)
+
+
+def test_build_pam_rotation_edit_args_for_cron_settings() -> None:
+    args = _build_pam_rotation_edit_args(
+        record_uid="user-uid",
+        settings={
+            "rotation": "general",
+            "enabled": "on",
+            "schedule": {"type": "CRON", "cron": "30 18 * * *"},
+            "password_complexity": "32,5,5,5,5",
+        },
+        resource_uid="resource-uid",
+        config_uid="config-uid",
+        admin_uid="admin-uid",
+    )
+
+    assert args == [
+        "pam",
+        "rotation",
+        "edit",
+        "--record",
+        "user-uid",
+        "--config",
+        "config-uid",
+        "--resource",
+        "resource-uid",
+        "--admin-user",
+        "admin-uid",
+        "--rotation-profile",
+        "general",
+        "--schedulecron",
+        "30 18 * * *",
+        "--complexity",
+        "32,5,5,5,5",
+        "--enable",
+        "--force",
+    ]
+
+
+def test_build_pam_rotation_edit_args_for_typed_on_demand_schedule() -> None:
+    settings = RotationSettings(
+        rotation="scripts_only",
+        enabled="off",
+        schedule=RotationScheduleOnDemand(type="on-demand"),
+    )
+
+    args = _build_pam_rotation_edit_args(
+        record_uid="user-uid",
+        settings=settings,
+        config_uid="config-uid",
+        schedule_only=True,
+    )
+
+    assert args == [
+        "pam",
+        "rotation",
+        "edit",
+        "--record",
+        "user-uid",
+        "--config",
+        "config-uid",
+        "--rotation-profile",
+        "scripts_only",
+        "--on-demand",
+        "--disable",
+        "--schedule-only",
+        "--force",
+    ]
+
+
+def test_unsupported_default_rotation_schedule_has_precise_hook(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = _provider(monkeypatch)
+    reasons = provider.unsupported_capabilities(
+        {
+            "version": "1",
+            "name": "proj",
+            "pam_configurations": [
+                {
+                    "uid_ref": "cfg",
+                    "environment": "local",
+                    "default_rotation_schedule": {"type": "CRON", "cron": "30 18 * * *"},
+                }
+            ],
+        }
+    )
+
+    assert len(reasons) == 1
+    assert "default_rotation_schedule" in reasons[0]
+    assert "no confirmed Commander CLI setter" in reasons[0]
+    assert "--schedule-config only reads config default" in reasons[0]
 
 
 def _apply_recorder(

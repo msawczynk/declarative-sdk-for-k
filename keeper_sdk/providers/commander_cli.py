@@ -1047,13 +1047,13 @@ _UNSUPPORTED_CAPABILITY_HINTS: tuple[tuple[str, str, str], ...] = (
     # should eventually drive to fulfil this capability)
     (
         "rotation_settings",
-        "resources[].rotation_settings",
-        "pam rotation edit --schedulejson / --schedulecron",
+        "users[].rotation_settings / resources[].users[].rotation_settings",
+        "pam rotation edit --record / --resource / --schedulecron / --on-demand",
     ),
     (
         "default_rotation_schedule",
         "pam_configurations[].default_rotation_schedule",
-        "pam rotation edit --schedule-config",
+        "no confirmed Commander CLI setter; pam rotation edit --schedule-config only reads config default",
     ),
     (
         "jit_settings",
@@ -1062,6 +1062,71 @@ _UNSUPPORTED_CAPABILITY_HINTS: tuple[tuple[str, str, str], ...] = (
     ),
     ("rotation_schedule", "rotation_schedule (embedded)", "pam rotation edit --schedulecron"),
 )
+
+
+def _model_dump_dict(value: Any) -> dict[str, Any]:
+    if hasattr(value, "model_dump"):
+        dumped = value.model_dump(mode="python", exclude_none=True)
+        return dumped if isinstance(dumped, dict) else {}
+    return value if isinstance(value, dict) else {}
+
+
+def _contains_key(node: Any, key: str) -> bool:
+    if isinstance(node, dict):
+        return key in node or any(_contains_key(value, key) for value in node.values())
+    if isinstance(node, list):
+        return any(_contains_key(item, key) for item in node)
+    return False
+
+
+def _rotation_schedule_args(schedule: Any) -> list[str]:
+    data = _model_dump_dict(schedule)
+    schedule_type = str(data.get("type") or "").strip().lower()
+    if schedule_type == "on-demand":
+        return ["--on-demand"]
+    if schedule_type == "cron" and data.get("cron"):
+        return ["--schedulecron", str(data["cron"])]
+    return []
+
+
+def _build_pam_rotation_edit_args(
+    *,
+    record_uid: str,
+    settings: Any,
+    resource_uid: str | None = None,
+    config_uid: str | None = None,
+    admin_uid: str | None = None,
+    schedule_only: bool = False,
+    force: bool = True,
+) -> list[str]:
+    """Map declarative rotation settings to Commander's `pam rotation edit` argv.
+
+    Pure helper only. `apply_plan` still blocks rotation until the full
+    discovery/apply/outcome contract is proven offline and live.
+    """
+    data = _model_dump_dict(settings)
+    args = ["pam", "rotation", "edit", "--record", record_uid]
+    if config_uid:
+        args += ["--config", config_uid]
+    if resource_uid:
+        args += ["--resource", resource_uid]
+    if admin_uid:
+        args += ["--admin-user", admin_uid]
+    if data.get("rotation"):
+        args += ["--rotation-profile", str(data["rotation"])]
+    args += _rotation_schedule_args(data.get("schedule"))
+    if data.get("password_complexity"):
+        args += ["--complexity", str(data["password_complexity"])]
+    enabled = str(data.get("enabled") or "").strip().lower()
+    if enabled == "on":
+        args.append("--enable")
+    elif enabled == "off":
+        args.append("--disable")
+    if schedule_only:
+        args.append("--schedule-only")
+    if force:
+        args.append("--force")
+    return args
 
 
 def _detect_unsupported_capabilities(manifest: Any) -> list[str]:
@@ -1095,9 +1160,8 @@ def _detect_unsupported_capabilities(manifest: Any) -> list[str]:
                     "mode: reference_existing)"
                 )
 
-    serialized = json.dumps(source, default=str)
     for needle, human, hook in _UNSUPPORTED_CAPABILITY_HINTS:
-        if needle in serialized:
+        if _contains_key(source, needle):
             hits.append(f"{human} is not implemented (Commander hook: `{hook}`)")
 
     return hits

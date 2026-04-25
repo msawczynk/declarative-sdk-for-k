@@ -108,12 +108,29 @@ def test_detector_is_pure_and_ignores_env(preview_enabled: None) -> None:
     hits = detect_preview_keys(
         {
             "gateways": [{"uid_ref": "gw.new", "mode": "create"}],
-            "resources": [{"rotation_settings": {}}],
+            "resources": [{"users": [{"rotation_settings": {}}]}],
         }
     )
     joined = " ".join(hits)
     assert "mode: create" in joined
     assert "rotation_settings" in joined
+
+
+def test_detector_uses_exact_keys_for_default_rotation(preview_enabled: None) -> None:
+    hits = detect_preview_keys(
+        {
+            "pam_configurations": [
+                {
+                    "default_rotation_schedule": {
+                        "type": "CRON",
+                        "cron": "30 18 * * *",
+                    }
+                }
+            ]
+        }
+    )
+
+    assert hits == ["pam_configurations[].default_rotation_schedule (planned for 1.1)"]
 
 
 @pytest.mark.parametrize(
@@ -138,6 +155,6 @@ def test_env_var_truthiness(monkeypatch: pytest.MonkeyPatch, value: str, expecte
 def test_assert_helper_matches_gate(preview_disabled: None) -> None:
     # Direct call raises for preview-containing docs, no-ops for clean ones
     with pytest.raises(SchemaError):
-        assert_preview_keys_allowed({"resources": [{"rotation_settings": {}}]})
+        assert_preview_keys_allowed({"users": [{"rotation_settings": {}}]})
     assert_preview_keys_allowed({"resources": [{"type": "pamMachine"}]})
     assert os.environ.get(PREVIEW_ENV_VAR) is None
