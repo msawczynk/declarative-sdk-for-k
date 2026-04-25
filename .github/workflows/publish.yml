@@ -1,40 +1,41 @@
-# Requires one-time PyPI trusted publisher setup before first release:
-# project `declarative-sdk-for-k`, owner `msawczynk`, workflow `publish.yml`,
-# environment `pypi-publish`.
-# Docs: https://docs.pypi.org/trusted-publishers/
-name: Publish
+# GitHub-only distribution: attach sdist + wheels to the GitHub Release.
+# This project is not published to PyPI; consumers install from git or from
+# release assets. See docs/RELEASING.md.
+name: Release assets
 
 on:
   release:
     types: [published]
 
 concurrency:
-  group: publish-${{ github.ref }}
+  group: release-assets-${{ github.ref }}
   cancel-in-progress: false
 
-jobs:
-  publish:
-    runs-on: ubuntu-latest
-    environment:
-      name: pypi-publish
-      url: https://pypi.org/p/declarative-sdk-for-k
-    permissions:
-      id-token: write
-      contents: read
-    steps:
-      - name: Check out
-        uses: actions/checkout@v4
+permissions:
+  contents: write
 
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+jobs:
+  attach-dist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Install build backend
-        run: pip install build
+      - name: Install build tools
+        run: pip install build twine
 
       - name: Build distributions
         run: python -m build
 
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+      - name: Twine check
+        run: twine check dist/*
+
+      - name: Upload dist to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eux
+          gh release upload "${{ github.ref_name }}" dist/* --clobber

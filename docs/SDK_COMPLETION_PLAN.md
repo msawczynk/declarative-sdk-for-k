@@ -2,9 +2,13 @@
 
 Goal: make `declarative-sdk-for-k` feature-complete against current Keeper functionality while keeping the SDK safe, deterministic, and agent-friendly.
 
+Devil's-advocate execution gate: use
+[`docs/SDK_DA_COMPLETION_PLAN.md`](./SDK_DA_COMPLETION_PLAN.md) as the
+current completion contract when this roadmap conflicts with live evidence.
+
 This plan is written for a parent orchestrator plus cheap Codex workers:
 
-- Parent owns live-test design, credential boundaries, GitHub release/publish, roadmap decisions, merge safety, and final review.
+- Parent owns live-test design, credential boundaries, GitHub release assets, roadmap decisions, merge safety, and final review.
 - Codex owns scoped implementation slices and can run live smoke only when explicitly delegated through a whitelisted harness command.
 - Every Codex task returns a branch/patch, test output, caveats, and next steps. Parent verifies before merge.
 
@@ -13,23 +17,35 @@ This plan is written for a parent orchestrator plus cheap Codex workers:
 Main branch as of 2026-04-25:
 
 - `v1.0.0` GitHub release exists.
-- PyPI publish workflow exists but is blocked by PyPI trusted-publisher config.
-- Local/core checks: `216 passed / 2 xfailed`, ruff, format, mypy, build/twine clean.
+- **Distribution is GitHub only** (no PyPI): `publish.yml` attaches `dist/*` to
+  each GitHub Release; install via git URL or downloaded wheel per `docs/RELEASING.md`.
+- Local/core checks: **231 passed / 2 xfailed** (re-verify on current `main`),
+  ruff, format, mypy, build/twine clean. CI is green across lint, mypy,
+  py3.11/3.12/3.13 tests, examples, drift-check, and build.
 - Commander provider supports current GA PAM lifecycle for manifests without preview keys.
-- `EnvLoginHelper` supports Commander's step-based `LoginUi`, loads `KEEPER_CONFIG`, and retries in-process `session_token_expired` once.
+- `EnvLoginHelper` supports Commander's step-based `LoginUi`, loads `KEEPER_CONFIG`, retries in-process `session_token_expired` once, and is live-proven for a full `pamMachine` create -> verify -> clean re-plan -> destroy cycle.
 - First v1.1 slices landed:
   - `pamUserNested` offline smoke path.
-  - `pam rotation edit` argv helper, still gated.
-  - `pam connection edit` / `pam rbi edit` argv helper, not wired into live apply.
+  - `pam rotation edit` argv helper plus experimental apply wiring, still preview/experimental gated pending live proof.
+  - `pam connection edit` / `pam rbi edit` apply wiring, still preview-gated pending live proof.
+  - JIT and gateway-create / `projects[]` decisions captured as boundary/design docs; no gate removed.
 
 Open GitHub issues:
 
-- #1 Configure PyPI trusted publisher.
-- #3 Prove Commander apply session refresh path.
 - #4 Wire rotation settings after live proof.
 - #5 Integrate post-import connection/RBI tuning.
-- #6 Investigate JIT support boundary.
-- #7 Gateway create and `projects[]` design.
+
+Closed / classified:
+
+- #3 Commander apply session refresh path: `supported` by PR #9 live smoke.
+- #6 JIT support boundary: `upstream-gap`.
+- #7 Gateway create and `projects[]`: design-only / `preview-gated`.
+
+Latest #5 live proof:
+
+- `python3 scripts/smoke/smoke.py --login-helper env --scenario pamRemoteBrowser` created records and teardown-only cleanup passed, but verify failed before re-plan: discovered `pamRemoteBrowser` payload did not expose `remote_browser_isolation=on`.
+- Pinned Commander evidence: `pam rbi edit --remote-browser-isolation` writes DAG `allowedSettings.connections`, not a manifest-shaped field returned by current `discover()`.
+- Classification remains `preview-gated` until readback/re-plan semantics are designed and proven.
 
 ## Definition Of Complete
 
@@ -52,7 +68,8 @@ Hard objections:
 3. **Direct DAG writes are a trap.** They can make tests pass while bypassing Commander invariants. Treat direct DAG writes as forbidden unless a later design explicitly approves them.
 4. **"Full Keeper surface" can explode scope.** PAM completion ships first; broader vault/team/enterprise surfaces need capability mirror evidence and separate release phases.
 5. **Codex can overfit fixtures.** Parent must review for silent drops, fake support, broad retries, and tests that assert implementation details instead of behavior.
-6. **Release/publish is a dependency, not paperwork.** PyPI trusted publisher must be fixed early so downstream install smoke catches packaging regressions.
+6. **Release packaging is a dependency, not paperwork.** GitHub Release assets
+   plus `twine check` in CI catch broken wheels before consumers pin a bad tag.
 7. **Preview gates are product honesty.** Removing them is a user-facing support promise. Gate removal requires docs, tests, live proof, and clean re-plan.
 
 Refined execution rule:
@@ -74,6 +91,13 @@ Risk gates before merge:
 | New secret/output path | redaction test |
 
 ## Operating Model
+
+### Daybook and dedicated memory repo
+
+Orchestration memory is **not** only in this repo: read
+[`docs/DAYBOOK.md`](./DAYBOOK.md) for the GitHub daybook (`msawczynk/cursor-daybook`),
+`sync_daybook.sh`, and the split between **main agent** (read/write/sync) and
+**workers/subagents** (`AGENT_PREAMBLE.md`, silent read, lesson candidates).
 
 ### Cost-Optimized Orchestration And Checks
 
@@ -136,38 +160,29 @@ Codex must not:
 - Change release tags.
 - Push to `main`.
 - Modify GitHub repo settings.
-- Create PyPI releases.
+- Publish to PyPI (distribution is GitHub-only).
 - Touch customer/lab private data unless parent supplies a sanitized fixture.
 - Print env vars, credential JSON, TOTP seeds, passwords, KSM config contents, or raw secret-bearing logs.
 - Convert plan-only helpers into live apply without explicit acceptance tests.
 
 ## Phase 0: Release / Publish Hygiene
 
-### P0.1 PyPI Trusted Publisher
+### P0.1 GitHub Release assets (no PyPI)
 
 Owner: parent.
 
-Issue: #1.
-
 Steps:
 
-1. In PyPI project `declarative-sdk-for-k`, add trusted publisher:
-   - owner/repo: `msawczynk/declarative-sdk-for-k`
-   - workflow: `.github/workflows/publish.yml`
-   - environment: `pypi-publish`
-2. Ensure GitHub environment `pypi-publish` exists and intended protection is configured.
-3. Rerun failed publish workflow `24928045389`.
-4. Verify package install from PyPI in clean venv:
-   - `python3 -m venv /tmp/dsk-pypi-smoke`
-   - install package
-   - `dsk --help`
-   - `dsk validate examples/pamMachine.yaml`
+1. Confirm `.github/workflows/publish.yml` runs on `release: published`, runs
+   `python -m build` + `twine check`, and uploads `dist/*` to the GitHub Release.
+2. After the next tag, verify wheels/sdist appear on the release page.
+3. Smoke install from git or wheel in a clean venv (`dsk --help`, `dsk validate
+   examples/pamMachine.yaml`).
 
 Acceptance:
 
-- PyPI project has `1.0.0`.
-- Install + CLI smoke pass.
-- #1 closed with workflow URL.
+- `docs/RELEASING.md` matches workflow behavior.
+- Close or ignore historical **#1** (PyPI) as **out of scope** / cancelled.
 
 Codex: no.
 
@@ -203,7 +218,7 @@ Parent live commands:
 python3 scripts/smoke/smoke.py --login-helper env --scenario pamMachine
 python3 scripts/smoke/smoke.py --login-helper env --scenario pamDatabase
 python3 scripts/smoke/smoke.py --login-helper env --scenario pamDirectory
-python3 scripts/smoke/smoke.py --login-helper env --scenario pamRemoteBrowser
+python3 scripts/smoke/smoke.py --login-helper env --scenario pamRemoteBrowser # #5 proof harness; latest live run exposes RBI readback gap
 ```
 
 Codex task: add stronger smoke diagnostics.
@@ -332,14 +347,14 @@ Owner: Codex offline, parent live.
 Implementation:
 
 1. In `apply_plan`, after import/extend + discover + marker write, run rotation argv pass.
-2. Skip in dry-run.
+2. In dry-run, expose would-run rotation argv on the nested `pamUser` outcome without discover/execute.
 3. Add outcome details for executed rotation commands.
 4. Keep preview/provider gate until parent live proof passes.
 
 Acceptance:
 
 - `_run_cmd` receives `pam rotation edit ...` after record creation.
-- Dry-run does not run it.
+- Dry-run exposes deterministic argv and does not run it or discover live records.
 - Non-zero Commander error becomes `CapabilityError` with next action.
 
 Parent live proof:
@@ -348,6 +363,16 @@ Parent live proof:
 - Apply rotation cron/on-demand.
 - Verify in tenant/Commander that rotation config changed.
 - Only then remove gate for supported slice.
+
+Latest live evidence:
+
+- Experimental `pamUserNestedRotation` now reaches `pam rotation edit` with
+  real record/config/resource UIDs after Users-folder discover and unique-title
+  matching fixes.
+- After routing rotation edit through the in-process Commander session, apply
+  and marker verification pass. End-to-end support is still not proven because
+  the post-apply re-plan reports updates for the nested `pamUser` and parent
+  `pamMachine`; readback/drift semantics need to be designed before gate lift.
 
 ### P2.3 Rotation Gate Lift
 
@@ -369,7 +394,10 @@ Acceptance:
 
 Issue: #5.
 
-Current state: pure argv helper exists, not applied.
+Current state: field map and offline-tested apply wiring exist, but support
+remains preview-gated. Live `pamRemoteBrowser` proof showed Commander writes
+RBI state into DAG `allowedSettings.connections`, which current `discover()`
+does not read back as manifest-shaped drift state.
 
 ### P3.1 Tuning Field Map Audit
 
@@ -797,7 +825,7 @@ Merge order:
 
 Release cadence:
 
-- `1.0.1`: publish/config/docs fix only if PyPI/tag/doc cleanup needed.
+- `1.0.1`: publish/config/docs fix only if GitHub release/tag/doc cleanup needed.
 - `1.1.0`: live-proven rotation/tuning/session-refresh + smoke coverage.
 - `1.2.0`: gateway/create/projects/import-adopt improvements.
 - `1.3.0+`: broader Keeper surfaces beyond PAM.
@@ -822,5 +850,5 @@ Stop and return to parent when:
 - Full local checks green.
 - Main CI green.
 - Live smoke matrix green for all supported mutating surfaces.
-- PyPI publish green.
+- GitHub Release asset workflow green on the latest tag.
 - `README.md`, `SCAFFOLD.md`, `CHANGELOG.md`, `docs/CAPABILITY_MATRIX.md`, and daybook match reality.

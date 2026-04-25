@@ -10,15 +10,15 @@ readable everywhere (`--json`, typed exit codes, `next_action` on
 every error). Designed so an LLM agent can plan, apply, and recover
 from failure without a human in the loop.
 
-**If you are an agent or LLM**: start at [`AGENTS.md`](AGENTS.md) for
-the command table, exit-code contract, and JSON shapes. This README is
-optimised for humans.
+**If you are an agent or LLM**: start at [`AGENTS.md`](AGENTS.md) and
+[`docs/DAYBOOK.md`](docs/DAYBOOK.md) for the command table, exit-code contract,
+JSON shapes, and daybook discipline. This README is optimised for humans.
 
 ## Capability scope
 
 | Area                 | v1.0 coverage                        | Roadmap                      |
 |----------------------|--------------------------------------|------------------------------|
-| PAM resources        | machines, databases, directories, users, remote-browsers (full declarative lifecycle) | rotation settings, JIT, gateway `mode: create` (behind `DSK_PREVIEW=1`) |
+| PAM resources        | machines, databases, directories, nested users, remote-browsers (GA lifecycle; preview-gated tuning gaps called out below) | rotation settings, standalone users, JIT, gateway `mode: create` (behind `DSK_PREVIEW=1`) |
 | Gateways             | `reference_existing` mode            | `create` mode                |
 | Shared folders       | scope + membership refs              | permissions matrix           |
 | KSM applications     | reference_existing + share-bindings  | app create + client rotation |
@@ -43,9 +43,10 @@ keeper_sdk/                          # import path stable through 1.x
   providers/                         # MockProvider, CommanderCliProvider
   auth/                              # LoginHelper protocol + EnvLoginHelper reference impl
   cli/                               # `dsk` (validate / export / plan / diff / apply / import)
-tests/                               # 216 passing tests + 2 expected v1.1 deferrals
+tests/                               # ~231 passing tests + 2 expected v1.1 deferrals (run pytest)
 docs/
   COMMANDER.md                       # pinned Commander version + capability matrix
+  DAYBOOK.md                         # canonical daybook repo + sync + main vs worker rules
   LOGIN.md                           # login helper contract + 30-line skeleton
   VALIDATION_STAGES.md               # validate/plan/apply exit-code contract
 AGENTS.md                            # agent-first operating manual
@@ -55,8 +56,8 @@ AGENTS.md                            # agent-first operating manual
 
 ```bash
 pip install -e '.[dev]'
-# once published to PyPI:
-pip install declarative-sdk-for-k
+# pinned version from GitHub (no PyPI package for this repo):
+pip install git+https://github.com/msawczynk/declarative-sdk-for-k.git@v1.0.0
 ```
 
 Requires Python 3.11+. `keepercommander>=17.2.13,<18` is pulled in
@@ -85,10 +86,10 @@ dsk --provider commander plan     examples/pamMachine.yaml
 
 See [`docs/LOGIN.md`](docs/LOGIN.md) for custom login flows (KSM pull,
 HSM-backed TOTP, device-approval queues, …).
-The built-in `EnvLoginHelper` live proof currently covers validate, plan,
-and sandbox provisioning; full live apply has a deferred Commander
-session-refresh gap tracked for v1.1. Use a custom helper for apply only
-after validating that refresh path in your tenant.
+The built-in `EnvLoginHelper` is live-proven for a full `pamMachine`
+validate -> plan -> apply -> verify -> destroy cycle. Preview-gated
+surfaces such as RBI tuning and nested `pamUser` rotation still need their
+own live proof before they become support claims.
 
 The legacy `pamform` and `keeper-sdk` CLI names remain installed as
 aliases for one major version so existing pipelines do not break.
@@ -99,12 +100,12 @@ Core + mock: complete. Commander provider: discover, plan, apply
 (create / update / delete via `keeper rm`, gated behind
 `--allow-delete`), ownership-marker read/write, provider-level
 capability check. Capability gaps (rotation, JIT, gateway `mode: create`)
-surface as plan-time CONFLICT rows rather than silent drops, so
-`plan == apply --dry-run == apply` for every manifest + provider pair.
+surface as plan-time CONFLICT rows rather than silent drops, so the CLI's
+`plan` and `apply --dry-run` agree before any mutation runs.
 Current local suite: 216 passing tests + 2 expected v1.1 deferrals.
-Live `EnvLoginHelper` smoke proved the login contract (validate, plan,
-and sandbox provisioning); full apply is deferred behind a Commander
-session-refresh gap tracked for v1.1.
+Live `EnvLoginHelper` smoke proved full apply for `pamMachine`; Issue #5
+RBI readback and Issue #4 nested-user rotation remain preview-gated until
+their live create -> verify -> clean re-plan -> destroy loops pass.
 
 ## Exit codes
 

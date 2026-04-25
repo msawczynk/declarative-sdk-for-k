@@ -34,7 +34,8 @@ Everything is deterministic, dry-runnable, and speaks exit codes.
 
 ```bash
 pip install -e ".[dev]"              # contributor install (this repo)
-pip install declarative-sdk-for-k    # (once published to PyPI — future release)
+pip install git+https://github.com/msawczynk/declarative-sdk-for-k.git@main
+# or a release tag / wheel from GitHub Releases — see docs/RELEASING.md
 ```
 
 Python 3.11+. Requires `keepercommander>=17.2.13,<18` installed and a
@@ -210,11 +211,23 @@ See `docs/LOGIN.md` for the 30-line helper skeleton.
 
 ## Where to read next
 
+- **[`docs/DAYBOOK.md`](./docs/DAYBOOK.md)** — **read first** for daybook rules:
+  canonical repo [msawczynk/cursor-daybook](https://github.com/msawczynk/cursor-daybook),
+  `sync_daybook.sh` after edits, **main agent** vs **worker/subagent** duties.
+- **Canonical entrypoints (orchestrator machine):**
+  `/Users/martin/Downloads/JOURNAL.md` · `/Users/martin/Downloads/LESSONS.md`
+  (usually symlinks into `~/.cursor-daybook-sync`). **Main agent:** read at
+  session start, update on phase boundaries, **sync after changing** either
+  file. **Subagents / Codex / Task workers:** boot from
+  `/Users/martin/Downloads/.cursor/skills/AGENT_PREAMBLE.md` — read daybook
+  **silently**, stay in scope, return `LESSON CANDIDATE:` / `JOURNAL CANDIDATE:`
+  unless daybook edits are whitelisted; parent runs `sync_daybook.sh`.
 - `README.md` — human-oriented overview.
 - `docs/COMMANDER.md` — pinned Commander version + capability matrix.
+- `docs/SDK_DA_COMPLETION_PLAN.md` — current devil's-advocate completion
+  gates, phases, and stop conditions.
+- `docs/SDK_COMPLETION_PLAN.md` — parent/Codex orchestration roadmap.
 - `docs/LOGIN.md` — custom-helper contract.
 - `V1_GA_CHECKLIST.md` — roadmap toward v1.0.0 GA.
 - `AUDIT.md` — milestone history + reconciliation with the upstream DOR.
 - `REVIEW.md` — devil's-advocate review notes (what was deferred, why).
-- `LESSONS.md` (not in this repo — in the parent workspace's daybook) —
-  cross-session lessons for orchestrator-class models.

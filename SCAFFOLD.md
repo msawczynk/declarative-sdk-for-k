@@ -12,9 +12,14 @@ Agent-first Python SDK + CLI (`dsk`) for deterministic `validate -> plan -> appl
 ├── .commander-pin                          # Pinned Commander SHA for drift-check CI + docs sync.
 ├── .cursorrules                            # Local editor/agent rule entrypoint.
 ├── .github/                                # GitHub automation root.
+│   ├── codex/                              # Codex GitHub prompt templates.
+│   │   └── prompts/scoped-task.md          # Reusable scoped-task DONE contract.
+│   ├── ISSUE_TEMPLATE/                     # GitHub issue forms.
+│   │   └── codex_task.yml                  # Task/scope/success packet for Codex workers.
 │   └── workflows/
+│       ├── codex-task.yml                  # Manual Codex Action task runner; uploads output + patch artifacts.
 │       ├── ci.yml                          # CI: lint, mypy, pytest, examples, drift-check, build.
-│       └── publish.yml                     # PyPI trusted-publisher workflow, release-triggered.
+│       └── publish.yml                     # GitHub Release: build dist/* + upload assets (no PyPI).
 ├── .gitignore                              # Git ignore rules.
 ├── AGENTS.md                               # Machine-readable operating manual for agents.
 ├── AUDIT.md                                # Milestone/audit history and design reconciliation log.
@@ -26,11 +31,14 @@ Agent-first Python SDK + CLI (`dsk`) for deterministic `validate -> plan -> appl
 ├── V1_GA_CHECKLIST.md                      # Blocking v1.0.0 checklist and hardening backlog.
 ├── docs/                                   # Focused docs for operator and agent workflows.
 │   ├── CAPABILITY_MATRIX.md                # Generated Commander capability mirror.
+│   ├── CODEX_GITHUB.md                     # GitHub issue/comment/action pattern for scoped Codex tasks.
 │   ├── COMMANDER.md                        # Version pin, CLI/API usage, drift policy, post-import tuning field map.
+│   ├── DAYBOOK.md                          # Canonical daybook repo, sync, main agent vs worker/subagent contract.
 │   ├── ISSUE_6_JIT_SUPPORT_BOUNDARY.md     # JIT apply boundary decision against pinned Commander.
 │   ├── ISSUE_7_GATEWAY_CREATE_PROJECTS_DESIGN.md # Gateway create / projects[] design boundary.
 │   ├── LOGIN.md                            # `EnvLoginHelper` + custom login-helper contract.
-│   ├── RELEASING.md                        # Maintainer release ritual + PyPI OIDC setup.
+│   ├── RELEASING.md                        # Maintainer release ritual (GitHub-only; no PyPI).
+│   ├── SDK_DA_COMPLETION_PLAN.md           # Devil's-advocate completion gates, phases, and stop conditions.
 │   ├── SDK_COMPLETION_PLAN.md              # Parent/Codex orchestration plan for completing SDK support.
 │   ├── VALIDATION_STAGES.md                # Stage-by-stage `validate --online` contract.
 │   └── capability-snapshot.json            # Machine-readable mirror consumed by drift-check CI.
@@ -72,6 +80,8 @@ Agent-first Python SDK + CLI (`dsk`) for deterministic `validate -> plan -> appl
 │       └── mock.py                         # Offline mock provider used by tests/examples CI.
 ├── pyproject.toml                          # Packaging, deps, scripts, lint/type/test config.
 ├── scripts/                                # Maintenance and live-smoke tooling.
+│   ├── agent/                              # Agent orchestration wrappers.
+│   │   └── codex_live_smoke.sh             # Whitelisted Codex live-smoke runner with network/redaction rules.
 │   ├── smoke/                              # Live-smoke harness and scenario registry.
 │   │   ├── .commander-config-testuser2.json# Local smoke helper config fixture.
 │   │   ├── .gitignore                      # Keeps local smoke secrets/config out of git.
@@ -141,16 +151,17 @@ Agent-first Python SDK + CLI (`dsk`) for deterministic `validate -> plan -> appl
 | 2. DOR reconciliation | Old “merge NOTES_FROM_SDK upstream” checklist is superseded by shipped mirror/drift model | SHIPPED | `AUDIT.md`, `REVIEW.md`, `docs/COMMANDER.md`, `docs/CAPABILITY_MATRIX.md` |
 | 3. CI + release | CI matrix, examples job, drift-check, build wiring are live | SHIPPED | `.github/workflows/ci.yml`, `pyproject.toml` |
 | 3. CI + release | First green `main` CI run recorded | SHIPPED | `V1_GA_CHECKLIST.md`, `CHANGELOG.md`, commit `fb6fb8b` in `git log` |
-| 3. CI + release | PyPI publish workflow exists; maintainer-side trusted-publisher + protected env setup remains external | SHIPPED | `.github/workflows/publish.yml`, `docs/RELEASING.md` |
-| 3. CI + release | Signed `v1.0.0` release tag absent | GAP | `git tag -l v1.0.0` returns empty; `docs/RELEASING.md` documents the release command |
+| 3. CI + release | GitHub Release asset workflow (`publish.yml`); no PyPI | SHIPPED | `.github/workflows/publish.yml`, `docs/RELEASING.md` |
+| 3. CI + release | `v1.0.0` GitHub release exists; tag is annotated but not signed | EXTERNAL-GAP | GitHub release `v1.0.0`; no local signing key/config was available |
 | 4. Login | Built-in env helper + helper contract docs shipped | SHIPPED | `keeper_sdk/auth/helper.py`, `docs/LOGIN.md`, `README.md` |
-| 4. Login | Live-smoke explicitly using `EnvLoginHelper` proved validate + plan + sandbox provisioning; apply-path session refresh deferred | SHIPPED | `scripts/smoke/smoke.py --login-helper env`, `scripts/smoke/README.md`, `V1_GA_CHECKLIST.md` |
+| 4. Login | Live-smoke explicitly using `EnvLoginHelper` proved full apply session refresh path for `pamMachine` | SHIPPED | `scripts/smoke/smoke.py --login-helper env --scenario pamMachine`, `scripts/smoke/README.md`, `docs/LOGIN.md` |
 | 5. Validate stages | Stage-5 tenant-binding checks implemented + documented | SHIPPED | `keeper_sdk/core/interfaces.py`, `keeper_sdk/providers/commander_cli.py`, `tests/test_stage_5_bindings.py`, `docs/VALIDATION_STAGES.md` |
-| 5. Post-import tuning | Connection/RBI manifest fields audited against Commander import vs `pam connection edit` / `pam rbi edit` hooks | DOCS-ONLY | `docs/COMMANDER.md` |
+| 5. Post-import tuning | Connection/RBI manifest fields audited and offline apply-wired; live RBI proof exposed readback gap, so support remains preview-gated | PREVIEW-GATED | `docs/COMMANDER.md`, `docs/SDK_COMPLETION_PLAN.md`, `keeper_sdk/providers/commander_cli.py`, `tests/test_commander_cli.py` |
 | 6. Live-smoke coverage | `pamMachine` / `pamDatabase` / `pamDirectory` / `pamRemoteBrowser` scenario registry shipped | SHIPPED | `scripts/smoke/scenarios.py`, `scripts/smoke/smoke.py`, `tests/test_smoke_scenarios.py` |
-| 6. Live-smoke coverage | `pamUser` standalone runner not shipped yet | DEFERRED-1.1 | `V1_GA_CHECKLIST.md`, `scripts/smoke/scenarios.py` |
+| 6. Live-smoke coverage | Nested `pamUser` smoke shape shipped; standalone top-level `pamUser` remains unsupported | PREVIEW-GATED | `scripts/smoke/scenarios.py`, `tests/test_smoke_scenarios.py`, `docs/SDK_COMPLETION_PLAN.md` |
+| 6. Live-smoke coverage | Nested `pamUser` rotation smoke is experimental; latest live run applied and verified markers, but post-apply re-plan still reports update drift | PREVIEW-GATED | `scripts/smoke/scenarios.py`, `keeper_sdk/providers/commander_cli.py`, `tests/test_commander_cli.py` |
 | 6. Live-smoke coverage | Adoption / field-drift / two-writer smokes not shipped yet | DEFERRED-1.1 | `V1_GA_CHECKLIST.md`, `scripts/smoke/scenarios.py` |
-| Hardening | `DeleteUnsupportedError` retained as a public compat shim; provider failures use `CapabilityError` | SHIPPED | `V1_GA_CHECKLIST.md`, `keeper_sdk/cli/main.py`, `keeper_sdk/core/errors.py` |
+| Hardening | Dead `DeleteUnsupportedError` export/catches removed; provider failures use `CapabilityError` | SHIPPED | `keeper_sdk/cli/main.py`, `keeper_sdk/core/errors.py`, `tests/` |
 | Hardening | `gateway.ksm_application_name` in `reference_existing` enforced in tenant validation | SHIPPED | `V1_GA_CHECKLIST.md`, `keeper_sdk/providers/commander_cli.py`, `tests/test_stage_5_bindings.py` |
 | Hardening | Renderer snapshots, redact expansion, perf memory assertions shipped | SHIPPED | `tests/test_renderer_snapshots.py`, `tests/test_redact.py`, `tests/test_perf.py` |
 | Hardening | DOR `TEST_PLAN` scenario mapping shipped with two expected v1.1 deferrals; `keeper_sdk` rename remains v2 | MIXED | `tests/test_dor_scenarios.py`, `V1_GA_CHECKLIST.md`, `pyproject.toml`, `keeper_sdk/__init__.py` |
@@ -161,4 +172,5 @@ Agent-first Python SDK + CLI (`dsk`) for deterministic `validate -> plan -> appl
 - `sdk-live-smoke` branch still carries old `pamform`-era history — rename / delete / leave as snapshot?
 - `DSK_PREVIEW=1` discoverability — is a one-line check-list in the `validate` error enough, or does it deserve a dedicated doc page?
 - Gateway `mode: create` and `projects[]` — design exists; implementation still needs Commander source audit, provider conflict hardening for `projects[]`, and live proof before any gate lift.
-- Post-import connection/RBI tuning — wire helper argv into `apply`, add offline assertions, then run a live smoke before upgrading the docs-only audit to shipped support.
+- Post-import connection/RBI tuning — live `pamRemoteBrowser` smoke created records but failed verifier because RBI DAG state is not read back through `discover()`; design readback/re-plan semantics before upgrading preview-gated support.
+- Nested `pamUser` rotation — live smoke now gets through `pam rotation edit` and marker verification; keep gates until post-apply readback produces a clean re-plan and destroy cleanup passes.

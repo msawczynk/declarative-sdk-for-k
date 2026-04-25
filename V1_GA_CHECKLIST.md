@@ -44,11 +44,11 @@ PRs that close them so the next agent can tell at a glance what's left.
 - [x] GitHub Actions: ruff + mypy + pytest 3.11/3.12/3.13.
 - [x] `pyproject.toml` pins `keepercommander>=17.2.13,<18`.
 - [x] First green CI run on `main` (`fb6fb8b`).
-- [x] PyPI publish workflow (`on: release: published`) landed in
-      `.github/workflows/publish.yml`; maintainer still must complete
-      the protected `pypi-publish` environment + PyPI OIDC trusted
-      publisher setup before the first real release — no API tokens in
-      repo secrets.
+- [x] GitHub Release asset workflow (`on: release: published`) in
+      `.github/workflows/publish.yml`: builds `dist/*`, `twine check`, uploads
+      assets to the GitHub Release via `gh release upload`. **No PyPI**
+      distribution for this repository (install from git or release wheels;
+      see `docs/RELEASING.md`).
 - [ ] Signed release tag `v1.0.0` with `gh release create`.
 
 ### 4. Login path usability

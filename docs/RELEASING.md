@@ -1,41 +1,55 @@
 # Releasing
 
-## Prereqs (one-time, by maintainer)
+Distribution is **GitHub only** (this repository and its **Releases**). There
+is **no** PyPI project for `declarative-sdk-for-k`.
 
-1. Create the project on PyPI as `declarative-sdk-for-k` if it does not
-   exist yet.
-2. In PyPI, add a trusted publisher for GitHub Actions:
-   owner `msawczynk`, repository `declarative-sdk-for-k`, workflow
-   `.github/workflows/publish.yml`, environment `pypi-publish`.
-   Reference: <https://docs.pypi.org/trusted-publishers/>.
-3. In GitHub repo settings, create protected environment
-   `pypi-publish`, add required reviewers, and leave credentials empty.
-   `publish.yml` uses GitHub OIDC, not a PyPI API token.
+## Install for consumers
 
-## Release ritual
+From a clone (contributors):
+
+```bash
+pip install -e '.[dev]'
+```
+
+From a **tag** without cloning the full repo (pinned version):
+
+```bash
+pip install git+https://github.com/msawczynk/declarative-sdk-for-k.git@v1.0.0
+```
+
+Or download **sdist / wheel** assets attached to the GitHub Release and:
+
+```bash
+pip install path/to/wheel.whl
+```
+
+## Maintainer release ritual
 
 1. Bump `version = "X.Y.Z"` in `pyproject.toml`.
 2. Update `CHANGELOG.md` with a dated `## [X.Y.Z] - YYYY-MM-DD` section.
-3. Commit the release prep.
-4. Create the GitHub release:
+3. Commit the release prep on `main`.
+4. Create the GitHub release (tag `vX.Y.Z`):
 
    ```bash
    gh release create vX.Y.Z --generate-notes
    ```
 
-   If maintainer signing is configured, create the signed tag first and
-   then run `gh release create` against that tag.
-5. Watch `.github/workflows/publish.yml` complete successfully in
-   Actions.
-6. Verify the package and version on PyPI.
+5. Watch **Actions → Release assets** (workflow `publish.yml`) complete; it
+   builds with `python -m build`, runs `twine check`, and uploads `dist/*`
+   to the release via `gh release upload`.
+6. Sanity-check install from git URL or from downloaded wheel in a clean venv.
+
+No PyPI credentials, trusted publishers, or `pypi-publish` environment are
+required.
 
 ## Rollback
 
-1. Tell consumers to install the previous good version:
+1. Tell consumers to pin the previous tag or wheel:
 
    ```bash
-   pip install declarative-sdk-for-k==<prev>
+   pip install git+https://github.com/msawczynk/declarative-sdk-for-k.git@v<prev>
    ```
 
 2. File a short post-mortem with cause, blast radius, and follow-up.
-3. Yank the bad release if needed, but never re-use that version number.
+3. On GitHub, edit the release notes or yank misleading assets if needed;
+   do not re-use the same version number after a bad publish.
