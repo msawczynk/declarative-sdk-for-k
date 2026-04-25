@@ -61,6 +61,8 @@ from keeper_sdk.providers._commander_cli_helpers import (
 _SILENT_FAIL_COMMANDS = {
     ("pam", "project", "import"),
     ("pam", "project", "extend"),
+    ("pam", "connection", "edit"),
+    ("pam", "rbi", "edit"),
     ("ls",),
     ("get",),
     ("record-update",),
@@ -72,6 +74,8 @@ _SILENT_FAIL_MARKERS = (
     "cannot be resolved",
 )
 _SESSION_EXPIRED_CODE = "session_token_expired"
+_ROTATION_APPLY_ENV_VAR = "DSK_EXPERIMENTAL_ROTATION_APPLY"
+_TRUTHY_ENV_VALUES = {"1", "true", "yes", "on"}
 
 
 class CommanderCliProvider(Provider):
@@ -166,7 +170,10 @@ class CommanderCliProvider(Provider):
         introspects its own ``self._manifest_source`` in practice.
         """
         source = manifest if manifest is not None else self._manifest_source
-        return _detect_unsupported_capabilities(source)
+        return _detect_unsupported_capabilities(
+            source,
+            allow_nested_rotation=_rotation_apply_is_enabled(),
+        )
 
     def check_tenant_bindings(self, manifest: Any = None) -> list[str]:
         """Stage-5 online checks: verify every declared binding resolves.
@@ -299,7 +306,10 @@ class CommanderCliProvider(Provider):
         # Last-line defence — CLI should have surfaced these as conflicts
         # already (see unsupported_capabilities above). If an SDK caller
         # bypasses the CLI and hands us a plan directly, we still refuse.
-        hits = _detect_unsupported_capabilities(self._manifest_source)
+        hits = _detect_unsupported_capabilities(
+            self._manifest_source,
+            allow_nested_rotation=_rotation_apply_is_enabled(),
+        )
         if hits:
             raise CapabilityError(
                 reason="manifest declares capabilities the CommanderCliProvider does not implement yet: "
@@ -366,12 +376,20 @@ class CommanderCliProvider(Provider):
                     keeper_uid = ""
                     if synthetic_config and change.resource_type == "pam_configuration":
                         keeper_uid = synthetic_config["config_uid"]
+                    details: dict[str, Any] = {"dry_run": dry_run}
+                    if dry_run:
+                        preview_argvs = _preview_post_import_tuning_argvs(
+                            change, self._manifest_source
+                        )
+                        if preview_argvs:
+                            details["post_import_tuning_argvs"] = preview_argvs
+                            details["post_import_tuning_dry_run"] = True
                     outcomes.append(
                         ApplyOutcome(
                             uid_ref=change.uid_ref or "",
                             keeper_uid=keeper_uid or change.keeper_uid or "",
                             action=change.kind.value,
-                            details={"dry_run": dry_run},
+                            details=details,
                         )
                     )
             finally:
@@ -421,6 +439,14 @@ class CommanderCliProvider(Provider):
                         continue
 
                     live = matches[0]
+                    post_import_argvs = _resolve_post_import_tuning_argvs(
+                        self._manifest_source,
+                        plan=plan,
+                        live_records=live_records,
+                        changes=[change],
+                    ).get(change.uid_ref or "", [])
+                    for argv in post_import_argvs:
+                        self._run_cmd(argv)
                     marker = encode_marker(
                         uid_ref=change.uid_ref or change.title,
                         manifest=plan.manifest_name,
@@ -434,11 +460,16 @@ class CommanderCliProvider(Provider):
                             "keeper_uid": live.keeper_uid,
                         }
                     )
+                    if post_import_argvs:
+                        outcome.details["post_import_tuning_argvs"] = post_import_argvs
+                        outcome.details["post_import_tuning_executed"] = True
                     drift = _field_drift(change.after or {}, live.payload)
                     if drift:
                         outcome.details["field_drift"] = drift
                     else:
                         outcome.details["verified"] = True
+
+                outcomes.extend(self._apply_rotation_settings(plan, live_records))
 
         for change in deletes:
             if not change.keeper_uid:
@@ -503,6 +534,47 @@ class CommanderCliProvider(Provider):
                     uid_ref=change.uid_ref or "",
                     keeper_uid=change.keeper_uid or "",
                     action="noop",
+                )
+            )
+        return outcomes
+
+    # ------------------------------------------------------------------
+
+    def _apply_rotation_settings(
+        self,
+        plan: Plan,
+        live_records: list[LiveRecord],
+    ) -> list[ApplyOutcome]:
+        if not _rotation_apply_is_enabled():
+            return []
+        try:
+            argvs = build_pam_rotation_edit_argvs(
+                self._manifest_source,
+                plan=plan,
+                live_records=live_records,
+            )
+        except ValueError as exc:
+            raise CapabilityError(
+                reason=f"cannot apply resources[].users[].rotation_settings: {exc}",
+                next_action=(
+                    "confirm pam project import/extend created the nested pamUser, "
+                    "parent resource, admin user, and PAM configuration; then rerun plan/apply"
+                ),
+            ) from exc
+
+        live_by_uid = {record.keeper_uid: record for record in live_records}
+        outcomes: list[ApplyOutcome] = []
+        for argv in argvs:
+            self._run_cmd(argv)
+            record_uid = _argv_value(argv, "--record") or ""
+            live = live_by_uid.get(record_uid)
+            uid_ref = _non_empty_str((live.marker or {}).get("uid_ref")) if live else ""
+            outcomes.append(
+                ApplyOutcome(
+                    uid_ref=uid_ref or "",
+                    keeper_uid=record_uid,
+                    action="rotation",
+                    details={"command": argv},
                 )
             )
         return outcomes
@@ -1176,6 +1248,187 @@ def build_post_import_tuning_argvs(
     return [argv] if argv is not None else []
 
 
+def _resolve_post_import_tuning_argvs(
+    manifest: Any,
+    *,
+    plan: Plan,
+    live_records: list[LiveRecord],
+    changes: list[Change],
+) -> dict[str, list[list[str]]]:
+    """Resolve and build post-import tuning argv for changed resources.
+
+    Pure resolver: no Commander calls. It requires live rediscovery because
+    create rows do not carry Keeper UIDs until after import / extend runs.
+    """
+    source = _manifest_source_dict(manifest)
+    if not source:
+        return {}
+    resources = _manifest_resources_by_ref(source)
+    refs = _RotationRefResolver(plan=plan, live_records=live_records)
+    argvs_by_ref: dict[str, list[list[str]]] = {}
+
+    for change in changes:
+        if not change.uid_ref:
+            continue
+        resource = resources.get(change.uid_ref)
+        if resource is None or not _has_post_import_tuning_fields(resource):
+            continue
+        try:
+            record_uid = refs.resolve(
+                uid_ref=change.uid_ref,
+                title=change.title,
+                resource_type=change.resource_type,
+                role="post-import tuning record",
+            )
+            resolved_refs = _resolve_post_import_tuning_refs(source, resource, refs)
+            argvs = build_post_import_tuning_argvs(
+                record_uid,
+                resource,
+                resolved_refs=resolved_refs,
+            )
+        except ValueError as exc:
+            raise CapabilityError(
+                reason=f"post-import tuning could not resolve refs: {exc}",
+                uid_ref=change.uid_ref,
+                resource_type=change.resource_type,
+                next_action=(
+                    "ensure every *_uid_ref used by pam_settings is declared in the "
+                    "manifest and visible after import, then re-run apply"
+                ),
+            ) from exc
+        if argvs:
+            argvs_by_ref[change.uid_ref] = argvs
+    return argvs_by_ref
+
+
+def _resolve_post_import_tuning_refs(
+    source: Mapping[str, Any],
+    resource: Mapping[str, Any],
+    refs: _RotationRefResolver,
+) -> dict[str, str]:
+    resolved: dict[str, str] = {}
+    for uid_ref in _post_import_tuning_uid_refs(resource):
+        resource_type, title = _desired_identity(source, uid_ref)
+        resolved[uid_ref] = refs.resolve(
+            uid_ref=uid_ref,
+            title=title,
+            resource_type=resource_type or "resource",
+            role="post-import tuning reference",
+        )
+    return resolved
+
+
+def _preview_post_import_tuning_argvs(change: Change, manifest: Any) -> list[list[str]]:
+    if not change.uid_ref:
+        return []
+    resource = _manifest_resources_by_ref(_manifest_source_dict(manifest)).get(change.uid_ref)
+    if resource is None or not _has_post_import_tuning_fields(resource):
+        return []
+    resolved_refs = {
+        uid_ref: f"<uid_ref:{uid_ref}>" for uid_ref in _post_import_tuning_uid_refs(resource)
+    }
+    try:
+        return build_post_import_tuning_argvs(
+            f"<record:{change.uid_ref}>",
+            resource,
+            resolved_refs=resolved_refs,
+        )
+    except ValueError:
+        return []
+
+
+def _manifest_source_dict(value: Any) -> dict[str, Any]:
+    if hasattr(value, "model_dump"):
+        dumped = value.model_dump(mode="python", exclude_none=True)
+        return dumped if isinstance(dumped, dict) else {}
+    return value if isinstance(value, dict) else {}
+
+
+def _manifest_resources_by_ref(source: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
+    resources: dict[str, Mapping[str, Any]] = {}
+    for resource in source.get("resources") or []:
+        if not isinstance(resource, Mapping):
+            continue
+        uid_ref = _non_empty_str(resource.get("uid_ref"))
+        if uid_ref:
+            resources[uid_ref] = resource
+    return resources
+
+
+_CONNECTION_TUNING_OPTION_KEYS = frozenset(
+    {
+        "connections",
+        "graphical_session_recording",
+        "text_session_recording",
+    }
+)
+_CONNECTION_TUNING_CONNECTION_KEYS = frozenset(
+    {
+        "administrative_credentials_uid_ref",
+        "launch_credentials_uid_ref",
+        "protocol",
+        "port",
+        "recording_include_keys",
+    }
+)
+_RBI_TUNING_OPTION_KEYS = frozenset(
+    {
+        "remote_browser_isolation",
+        "graphical_session_recording",
+    }
+)
+_RBI_TUNING_CONNECTION_KEYS = frozenset(
+    {
+        "autofill_credentials_uid_ref",
+        "autofill_targets",
+        "allow_url_manipulation",
+        "allowed_url_patterns",
+        "allowed_resource_url_patterns",
+        "recording_include_keys",
+        "disable_copy",
+        "disable_paste",
+        "ignore_server_cert",
+    }
+)
+
+
+def _has_post_import_tuning_fields(resource: Mapping[str, Any]) -> bool:
+    pam_settings = _as_mapping(resource.get("pam_settings"))
+    options = _as_mapping(pam_settings.get("options"))
+    connection = _as_mapping(pam_settings.get("connection"))
+    if resource.get("type") == "pamRemoteBrowser":
+        option_keys = _RBI_TUNING_OPTION_KEYS
+        connection_keys = _RBI_TUNING_CONNECTION_KEYS
+    else:
+        option_keys = _CONNECTION_TUNING_OPTION_KEYS
+        connection_keys = _CONNECTION_TUNING_CONNECTION_KEYS
+    return any(key in options for key in option_keys) or any(
+        key in connection for key in connection_keys
+    )
+
+
+def _post_import_tuning_uid_refs(resource: Mapping[str, Any]) -> list[str]:
+    refs: list[str] = []
+    config_ref = _non_empty_str(resource.get("pam_configuration_uid_ref"))
+    if config_ref:
+        refs.append(config_ref)
+    pam_settings = _as_mapping(resource.get("pam_settings"))
+    connection = _as_mapping(pam_settings.get("connection"))
+    keys: tuple[str, ...]
+    if resource.get("type") == "pamRemoteBrowser":
+        keys = ("autofill_credentials_uid_ref",)
+    else:
+        keys = (
+            "administrative_credentials_uid_ref",
+            "launch_credentials_uid_ref",
+        )
+    for key in keys:
+        uid_ref = _non_empty_str(connection.get(key))
+        if uid_ref and uid_ref not in refs:
+            refs.append(uid_ref)
+    return refs
+
+
 def build_pam_rotation_edit_argvs(
     manifest: Any,
     *,
@@ -1184,10 +1437,11 @@ def build_pam_rotation_edit_argvs(
 ) -> list[list[str]]:
     """Build Commander argv for nested ``pamUser`` rotation settings.
 
-    Pure resolver only: it never calls Keeper and is intentionally not wired
-    into ``apply_plan`` while the provider-capability and preview gates remain
-    in place. Nested users need three proven live UIDs before a rotation edit is
-    safe: the user record, the parent resource record, and the PAM config.
+    Pure resolver: it never calls Keeper. ``apply_plan`` only uses it behind
+    the Commander-only ``DSK_EXPERIMENTAL_ROTATION_APPLY`` opt-in while the
+    public provider-capability and preview gates remain in place. Nested users
+    need three proven live UIDs before a rotation edit is safe: the user
+    record, the parent resource record, and the PAM config.
     """
     source = _manifest_dict(manifest)
     _reject_top_level_user_rotation(source)
@@ -1463,11 +1717,6 @@ _UNSUPPORTED_CAPABILITY_HINTS: tuple[tuple[str, str, str], ...] = (
     # (dotted manifest path fragment, human name, Commander hook the SDK
     # should eventually drive to fulfil this capability)
     (
-        "rotation_settings",
-        "users[].rotation_settings / resources[].users[].rotation_settings",
-        "pam rotation edit --record / --resource / --schedulecron / --on-demand",
-    ),
-    (
         "default_rotation_schedule",
         "pam_configurations[].default_rotation_schedule",
         "no confirmed Commander CLI setter; pam rotation edit --schedule-config only reads config default",
@@ -1513,6 +1762,29 @@ def _reject_top_level_user_rotation(source: Mapping[str, Any]) -> None:
                 f"top-level users[].rotation_settings is unsupported for pamUser '{ident}'; "
                 "nest the pamUser under resources[].users[] so the parent resource UID can be resolved"
             )
+
+
+def _has_top_level_user_rotation(source: Mapping[str, Any]) -> bool:
+    return any(
+        isinstance(user, Mapping)
+        and user.get("type") == "pamUser"
+        and user.get("rotation_settings") is not None
+        for user in source.get("users") or []
+    )
+
+
+def _has_nested_user_rotation(source: Mapping[str, Any]) -> bool:
+    for resource in source.get("resources") or []:
+        if not isinstance(resource, Mapping):
+            continue
+        for user in resource.get("users") or []:
+            if (
+                isinstance(user, Mapping)
+                and user.get("type") == "pamUser"
+                and user.get("rotation_settings") is not None
+            ):
+                return True
+    return False
 
 
 def _rotation_config_ref(
@@ -1583,6 +1855,13 @@ def _desired_identity(source: Mapping[str, Any], uid_ref: str) -> tuple[str | No
     return None, None
 
 
+def _has_resource_rotation(source: Mapping[str, Any]) -> bool:
+    for resource in source.get("resources") or []:
+        if isinstance(resource, Mapping) and resource.get("rotation_settings") is not None:
+            return True
+    return False
+
+
 def _contains_key(node: Any, key: str) -> bool:
     if isinstance(node, dict):
         return key in node or any(_contains_key(value, key) for value in node.values())
@@ -1613,8 +1892,8 @@ def _build_pam_rotation_edit_args(
 ) -> list[str]:
     """Map declarative rotation settings to Commander's `pam rotation edit` argv.
 
-    Pure helper only. `apply_plan` still blocks rotation until the full
-    discovery/apply/outcome contract is proven offline and live.
+    Pure helper only. `apply_plan` calls it only behind the Commander-only
+    `DSK_EXPERIMENTAL_ROTATION_APPLY` opt-in.
     """
     data = _model_dump_dict(settings)
     args = ["pam", "rotation", "edit", "--record", record_uid]
@@ -1641,7 +1920,11 @@ def _build_pam_rotation_edit_args(
     return args
 
 
-def _detect_unsupported_capabilities(manifest: Any) -> list[str]:
+def _detect_unsupported_capabilities(
+    manifest: Any,
+    *,
+    allow_nested_rotation: bool = False,
+) -> list[str]:
     """Return human-readable reasons the manifest exceeds this provider.
 
     Pure detector — does not raise. Returns a list of strings suitable for
@@ -1672,11 +1955,43 @@ def _detect_unsupported_capabilities(manifest: Any) -> list[str]:
                     "mode: reference_existing)"
                 )
 
+    if _has_top_level_user_rotation(source):
+        hits.append(
+            "top-level users[].rotation_settings is not implemented for pamUser "
+            "(Commander hook needs a parent resource; nest the pamUser under resources[].users[])"
+        )
+    if _has_resource_rotation(source):
+        hits.append(
+            "resources[].rotation_settings is not implemented "
+            "(Commander hook for resource rotation requires a proven mapping)"
+        )
+    if _has_nested_user_rotation(source) and not allow_nested_rotation:
+        hits.append(
+            "resources[].users[].rotation_settings is not implemented "
+            "(Commander hook: `pam rotation edit --record / --resource / --schedulecron / --on-demand`; "
+            f"offline experimental path requires {_ROTATION_APPLY_ENV_VAR}=1)"
+        )
+
     for needle, human, hook in _UNSUPPORTED_CAPABILITY_HINTS:
         if _contains_key(source, needle):
             hits.append(f"{human} is not implemented (Commander hook: `{hook}`)")
 
     return hits
+
+
+def _rotation_apply_is_enabled() -> bool:
+    raw = os.environ.get(_ROTATION_APPLY_ENV_VAR, "")
+    return raw.strip().lower() in _TRUTHY_ENV_VALUES
+
+
+def _argv_value(argv: list[str], flag: str) -> str | None:
+    try:
+        index = argv.index(flag)
+    except ValueError:
+        return None
+    if index + 1 >= len(argv):
+        return None
+    return argv[index + 1]
 
 
 __all__ = [

@@ -13,9 +13,11 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 - Offline `pam rotation edit` argv mapping helper and stricter preview
   detection for rotation keys. Rotation remains preview/unsupported
   until live apply is proven.
-- Offline post-import tuning argv helper for a safe subset of
-  `pam connection edit` and `pam rbi edit` fields. Not wired into live
-  apply yet.
+- Offline post-import tuning apply wiring for a safe subset of
+  `pam connection edit` and `pam rbi edit` fields. `apply_plan()` now
+  resolves changed records after rediscovery, executes the mapped edit
+  argv via `_run_cmd()`, and exposes dry-run preview argv without running
+  tuning commands. Live tenant proof is still pending.
 - Bounded in-process Commander session refresh for `session_token_expired`
   during `pam project import` / `extend` and ownership-marker writes.
   This is unit-tested with synthetic exceptions and live-proven through
@@ -29,11 +31,18 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   preserve command, exit code, stdout tail, and stderr tail on SDK
   subprocess failures.
 - Pure `build_pam_rotation_edit_argvs()` resolver for nested `pamUser`
-  rotation settings. It resolves user/resource/config/admin refs but is
-  not wired into apply while rotation remains gated.
+  rotation settings. It resolves user/resource/config/admin refs and is
+  used only by the experimental apply path while rotation remains gated.
+- Experimental Commander apply wiring for nested
+  `resources[].users[].rotation_settings`, guarded by
+  `DSK_EXPERIMENTAL_ROTATION_APPLY=1`. The public provider conflict
+  remains closed by default pending parent live proof.
 - `docs/ISSUE_6_JIT_SUPPORT_BOUNDARY.md` — source-backed JIT decision:
   keep `jit_settings` preview-gated because pinned Commander has import
   and launch helpers, but no safe standalone edit surface.
+- `docs/ISSUE_7_GATEWAY_CREATE_PROJECTS_DESIGN.md` — docs-only design
+  for gateway `mode: create` and top-level `projects[]`; preview gates
+  remain closed until Commander hooks and live proof are available.
 - `docs/COMMANDER.md` post-import tuning field map for connection/RBI
   fields, marking import-supported, helper-only, and unsupported/unknown
   cases.
