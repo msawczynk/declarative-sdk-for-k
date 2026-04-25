@@ -1,6 +1,8 @@
 # SDK Live Smoke
 
-This smoke is an autonomous, no-human-input harness for proving the SDK against a live Keeper tenant through Commander CLI 17.x, while honoring the current "no DAG writes" moratorium by routing all tenant mutations through the CLI rather than `keeper_dag`. The `deploy_watcher` helper path drives the full plan -> apply -> verify -> destroy cycle; the public `EnvLoginHelper` path is release-candidate proof for validate, plan, and sandbox provisioning while the full apply session-refresh gap remains deferred to v1.1.
+This smoke is an autonomous, no-human-input harness for proving the SDK against a live Keeper tenant through Commander CLI 17.x, while honoring the current "no DAG writes" moratorium by routing all tenant mutations through Commander rather than direct `keeper_dag` writes. Both the `deploy_watcher` helper path and the public `EnvLoginHelper` path are wired into the same plan -> apply -> verify -> destroy harness; Issue #3 is live-proven for the full `pamMachine` cycle.
+
+The `pamRemoteBrowser` and `pamUserNestedRotation` scenarios are proof harnesses, not support claims for Issues #5 and #4. A 2026-04-25 `pamRemoteBrowser` live run created records and cleanup passed, but verification failed because Commander `pam rbi edit --remote-browser-isolation` writes DAG `allowedSettings.connections`, which current `discover()` does not read back as manifest-shaped `pam_settings.options.remote_browser_isolation`. Nested rotation now reaches apply and marker verification after `pam rotation edit`, but the follow-up plan still reports updates for the nested `pamUser` and parent `pamMachine`; keep the preview/experimental gates until readback/drift semantics are clean. **Phase 0 / merge gates:** `docs/SDK_DA_COMPLETION_PLAN.md` § Phase 0 and `scripts/agent/phase0_gates.sh` — do not lift preview gates without parent-reviewed live proof per that plan.
 
 ## Prerequisites
 
@@ -30,6 +32,8 @@ python3 scripts/smoke/smoke.py --scenario pamDirectory  # OpenLDAP cycle
 python3 scripts/smoke/smoke.py --scenario pamRemoteBrowser
 python3 scripts/smoke/smoke.py --scenario pamUserNested # machine + nested users[]
 python3 scripts/smoke/smoke.py --login-helper env --scenario pamMachine
+python3 scripts/smoke/smoke.py --login-helper env --scenario pamRemoteBrowser # Issue #5 proof; currently expected to expose RBI readback gap
+DSK_PREVIEW=1 DSK_EXPERIMENTAL_ROTATION_APPLY=1 python3 scripts/smoke/smoke.py --login-helper env --scenario pamUserNestedRotation
 ```
 
 Registered scenarios live in `scripts/smoke/scenarios.py`. Every scenario
@@ -38,7 +42,12 @@ typed-model, planner, and Commander JSON normalization all run without
 a tenant, so scenario drift is caught before you burn a tenant
 round-trip. `pamUserNested` is intentionally a nested `resources[].users[]`
 shape, not a claim that `pamUser` is supported as a standalone
-top-level live-smoke resource.
+top-level live-smoke resource. `pamUserNestedRotation` is an offline
+registry shape and live experimental harness candidate; it binds a
+nested admin `pamUser` to the parent resource through
+`pam_settings.connection`, rotates that same nested admin user, and
+keeps the preview/experimental gates in place without claiming Issue #4
+live support.
 
 `--login-helper deploy_watcher` is the default and preserves the current
 lab-helper path. `--login-helper env` unsets `KEEPER_SDK_LOGIN_HELPER`

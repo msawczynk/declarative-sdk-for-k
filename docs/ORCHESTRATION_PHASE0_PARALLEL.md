@@ -4,6 +4,8 @@ Canonical **repo-local** contract for `declarative-sdk-for-k`. Global style,
 daybook, and drift rules live in user-level Cursor rules + private daybook sync;
 this doc is what **forking agents clone** with the repo.
 
+Portable copy of the cross-repo pattern (same machine): `~/.cursor-daybook-sync/docs/PRODUCT_REPO_ORCHESTRATION.md` (private `cursor-daybook` git).
+
 ## Roles (token-efficient split)
 
 | Role | Owns | Does not own |

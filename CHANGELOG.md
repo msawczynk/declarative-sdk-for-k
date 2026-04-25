@@ -14,6 +14,7 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   consistent `get` readback metadata.
 
 ### Added
+- `scripts/agent/run_parallel_codex.sh` + `scripts/agent/prompts/*.prompt.md` — disjoint Codex CLI slices with logs under `.codex-runs/` (gitignored).
 - `docs/ORCHESTRATION_PHASE0_PARALLEL.md` + `scripts/agent/phase0_gates.sh` — parent vs Codex split, Phase 0 / merge gates scripted (referenced from global Cursor rules + daybook drift-guard).
 - `pamUserNested` smoke scenario — proves nested `resources[].users[]`
   through schema, typed model, planner, and Commander normalization

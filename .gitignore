@@ -19,6 +19,9 @@ venv/
 .vscode/
 *.swp
 
+# Codex parallel runner logs (parent-reviewed only; never commit)
+.codex-runs/
+
 # Testing
 .pytest_cache/
 .coverage
