@@ -24,8 +24,10 @@ if [[ -n "${CODEX_BIN:-}" ]]; then
   _codex="$CODEX_BIN"
 elif command -v codex >/dev/null 2>&1; then
   _codex="$(command -v codex)"
+elif _codex="$(bash "$ROOT/scripts/agent/_codex_resolve.sh" 2>/dev/null)"; then
+  :
 else
-  echo "codex not found. Install Codex CLI or set CODEX_BIN (see docs/CODEX_CLI.md)." >&2
+  echo "codex not found. Install Codex CLI, set CODEX_BIN, or install Cursor ChatGPT extension bundle (see docs/CODEX_CLI.md)." >&2
   exit 69
 fi
 

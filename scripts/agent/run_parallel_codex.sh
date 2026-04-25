@@ -34,13 +34,20 @@ run_one() {
   echo "ok $base"
 }
 
-idx=0
+started=0
 for p in "${prompts[@]}"; do
+  if [[ "$(basename "$p")" == 00-ping.prompt.md && -z "${INCLUDE_PING:-}" ]]; then
+    continue
+  fi
   while [[ "$(jobs -p 2>/dev/null | wc -l | tr -d ' ')" -ge $MAX ]]; do
     sleep 0.3
   done
   run_one "$p" &
-  ((idx++)) || true
+  ((started++)) || true
 done
+if [[ "$started" -eq 0 ]]; then
+  echo "no slice prompts to run (00-ping excluded; set INCLUDE_PING=1 or add 01-*.prompt.md)" >&2
+  exit 66
+fi
 wait
 echo "done — inspect logs under $RUN_DIR"

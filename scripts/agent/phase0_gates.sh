@@ -18,6 +18,7 @@ echo "== phase0_gates: $mode (cwd=$ROOT) =="
 
 bash -n scripts/agent/codex_live_smoke.sh
 bash -n scripts/agent/codex_offline_slice.sh
+bash -n scripts/agent/_codex_resolve.sh
 bash -n scripts/agent/phase0_gates.sh
 bash -n scripts/agent/run_parallel_codex.sh
 

@@ -14,7 +14,7 @@ This repository assumes a **parent orchestrator** (you or your primary Cursor ag
 
 ## Prerequisites
 
-- `codex` binary on `PATH`, **or** set `CODEX_BIN` to the full path (Cursor bundles a build under `~/.cursor/extensions/.../codex`; see `scripts/agent/codex_live_smoke.sh` for an example default).
+- **Codex binary:** on `PATH`, **or** `CODEX_BIN=/path/to/codex`, **or** rely on auto-discovery — `scripts/agent/_codex_resolve.sh` picks the newest `~/.cursor/extensions/openai.chatgpt-*/bin/macos-aarch64/codex` (Cursor ChatGPT extension). `codex_offline_slice.sh` and `codex_live_smoke.sh` call it when `CODEX_BIN` is unset and `codex` is not on `PATH`.
 - `CODEX_MODEL` explicitly set (recommended: `gpt-5.5`) so defaults cannot silently downgrade workers.
 - Repo root as cwd; worker runs with **workspace-write**, **no network** for offline slices (default in `scripts/agent/codex_offline_slice.sh`).
 

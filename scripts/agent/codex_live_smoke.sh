@@ -10,7 +10,13 @@ SCENARIO="$1"
 shift
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-CODEX_BIN="${CODEX_BIN:-$HOME/.cursor/extensions/openai.chatgpt-26.422.30944-darwin-arm64/bin/macos-aarch64/codex}"
+_RESOLVER="$ROOT/scripts/agent/_codex_resolve.sh"
+if [[ -z "${CODEX_BIN:-}" ]]; then
+  CODEX_BIN="$(bash "$_RESOLVER")" || {
+    echo "codex not found — set CODEX_BIN or install Cursor ChatGPT extension (see docs/CODEX_CLI.md)." >&2
+    exit 69
+  }
+fi
 CODEX_MODEL="${CODEX_MODEL:-gpt-5.5}"
 LAB_DIR="${LAB_DIR:-/Users/martin/Downloads/Cursor tests/keeper-vault-rbi-pam-testenv}"
 SMOKE_ENV="${CODEX_SMOKE_ENV:-}"
