@@ -97,3 +97,33 @@ def test_sdk_constraint_error_preserves_failure_details(
     assert "command:" in message
     assert "provider stdout" in message
     assert "next_action: fix tenant role" in message
+
+
+def test_cleanup_falls_back_to_sandbox_folder(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[str] = []
+
+    def fake_teardown_records(_admin_params: object, folder_uid: str, *, manager: str) -> list[str]:
+        calls.append(folder_uid)
+        assert manager == smoke.MANAGER_NAME
+        if folder_uid == "stale-managed-folder":
+            raise RuntimeError("No such folder or record")
+        return ["removed-record"]
+
+    monkeypatch.setattr(smoke.sandbox, "teardown_records", fake_teardown_records)
+
+    removed = smoke._teardown_records_with_fallback(
+        {
+            "admin_params": object(),
+            "managed_folder_uid": "stale-managed-folder",
+            "sf_uid": "sandbox-folder",
+        }
+    )
+
+    assert removed == ["removed-record"]
+    assert calls == ["stale-managed-folder", "sandbox-folder"]
+
+
+def test_cleanup_deduplicates_candidate_folder_uids() -> None:
+    assert smoke._candidate_cleanup_folder_uids(
+        {"managed_folder_uid": "same-folder", "sf_uid": "same-folder"}
+    ) == ["same-folder"]

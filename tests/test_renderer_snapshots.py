@@ -1,7 +1,7 @@
 """RichRenderer snapshot tests.
 
 These are layout-only regression guards. Downstream agents must use
-``dsk plan --json`` for contracts (per LESSONS.md 2026-04-24).
+``dsk plan --json`` for contracts.
 """
 
 from __future__ import annotations

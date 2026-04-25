@@ -73,6 +73,14 @@ project, rediscovers records, resolves live Keeper UIDs, and runs mapped
 is still pending, so treat this as offline apply wiring until a smoke run proves
 the Commander edit path end-to-end.
 
+2026-04-25 live smoke status for Issue #5: `pamRemoteBrowser` with
+`--login-helper env` created records and teardown-only cleanup passed, but
+verification failed before clean re-plan. Pinned Commander
+`PAMRbiEditCommand` accepts `--remote-browser-isolation`, yet writes the record
+resource DAG as `allowedSettings.connections`; current SDK `discover()` reads
+Commander `get --format json` record payloads and does not reconstruct that DAG
+state as manifest-shaped `pam_settings.options.remote_browser_isolation`.
+
 Status vocabulary:
 
 - **Import-supported** means the field is rendered into `pam_data` for
@@ -101,7 +109,7 @@ Status vocabulary:
 | SFTP block | `resources[].pam_settings.connection.sftp.*` | Import-supported only | `pam project import/extend` | No post-import edit flag in the pinned Commander matrix. |
 | Port forward | `resources[].pam_settings.port_forward.port`, `reuse_port` | Import-supported only | `pam project import/extend` | No post-import edit flag in the pinned Commander matrix. |
 | RBI URL | `resources[type=pamRemoteBrowser].url` | Import-supported by current model/examples; tuning unsupported | `pam project import/extend` | `pam rbi edit` has no URL flag in the pinned matrix. |
-| RBI enablement | `resources[type=pamRemoteBrowser].pam_settings.options.remote_browser_isolation` | Tuning-supported (offline apply-wired); import support unknown | `pam rbi edit --remote-browser-isolation` | Offline apply wiring only; live proof pending. |
+| RBI enablement | `resources[type=pamRemoteBrowser].pam_settings.options.remote_browser_isolation` | Tuning-supported (offline apply-wired); import support unknown | `pam rbi edit --remote-browser-isolation` | Live smoke exposed a readback gap: Commander maps this to DAG `allowedSettings.connections`; `discover()` cannot verify it yet. |
 | RBI recording | `resources[type=pamRemoteBrowser].pam_settings.options.graphical_session_recording` | Tuning-supported (offline apply-wired); import support unknown | `pam rbi edit --connections-recording` | Same flag text as connection recording. |
 | RBI autofill credential | `resources[type=pamRemoteBrowser].pam_settings.connection.autofill_credentials_uid_ref` | Tuning-supported (offline apply-wired); import support unknown | `pam rbi edit --autofill-credentials` | Provider fails loudly if the referenced credential cannot be resolved after rediscovery. |
 | RBI autofill targets | `resources[type=pamRemoteBrowser].pam_settings.connection.autofill_targets` | Tuning-supported (offline apply-wired); import support unknown | `pam rbi edit --autofill-targets` | Commander supports repeated flags; current model is scalar, so list support needs a model/schema change before claiming contract support. |

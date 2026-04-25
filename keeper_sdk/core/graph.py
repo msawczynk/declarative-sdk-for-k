@@ -1,5 +1,12 @@
 """Dependency graph on ``uid_ref``.
 
+Convention (read before changing edges): a directed edge ``A -> B`` means
+**A depends on B** — B is a prerequisite of A. :func:`execution_order` lists
+nodes so dependencies appear before dependents. This is easy to invert when
+English talks about a resource "owning" nested ``pamUser`` rows; containment
+is modeled with **child -> parent** edges so nested users sort *after* their
+host.
+
 Edges are built from the fixed reference-bearing fields defined in the schema
 (``*_uid_ref`` keys). We intentionally do not guess by-title references — the
 manifest is expected to be canonicalised before this stage.
@@ -91,7 +98,32 @@ def build_graph(manifest: Manifest) -> nx.DiGraph:
     _walk_collection(data.get("gateways") or [])
     _walk_collection(data.get("pam_configurations") or [])
     _walk_collection(data.get("projects") or [])
-    _walk_collection(data.get("resources") or [])
+    # Resources: do not add resource -> nested-user edges for uid_refs that
+    # already live under resources[].users[]. The resource block may still
+    # reference those children (e.g. administrative_credentials_uid_ref); the
+    # true create order is parent resource first, then nested pamUser rows.
+    # Keeping those edges would invert order and can cycle with user -> parent.
+    for item in data.get("resources") or []:
+        owner = _owner_ref(item)
+        if owner is None:
+            continue
+        nested_user_refs = frozenset(
+            str(u["uid_ref"])
+            for u in (item.get("users") or [])
+            if isinstance(u, dict)
+            and isinstance(u.get("uid_ref"), str)
+            and str(u["uid_ref"]).strip()
+        )
+        for target in _iter_refs(item):
+            if target in nested_user_refs:
+                continue
+            if target not in owners:
+                raise RefError(
+                    reason=f"reference to unknown uid_ref '{target}' from '{owner}'",
+                    uid_ref=owner,
+                    next_action="add the target object or fix the uid_ref",
+                )
+            graph.add_edge(owner, target)
     _walk_collection(data.get("users") or [])
 
     shared_folders = data.get("shared_folders") or {}
@@ -111,7 +143,8 @@ def build_graph(manifest: Manifest) -> nx.DiGraph:
             if user_uid_ref in owners:
                 graph.add_edge(user_uid_ref, sf_users_uid_ref)
 
-    # nested users inherit their parent resource as owner
+    # Nested pamUser rows are created under a parent resource: each user depends
+    # on its parent (user_ref -> owner), not the reverse.
     for resource in data.get("resources") or []:
         owner = resource.get("uid_ref")
         for user in resource.get("users") or []:
@@ -125,9 +158,8 @@ def build_graph(manifest: Manifest) -> nx.DiGraph:
                     )
                 if user_ref:
                     graph.add_edge(user_ref, target)
-            # resource implicitly owns its nested users
             if owner and user_ref and user_ref in owners and user_ref != owner:
-                graph.add_edge(owner, user_ref)
+                graph.add_edge(user_ref, owner)
 
     return graph
 

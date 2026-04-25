@@ -37,7 +37,10 @@ Resolved high-priority test gaps (H-series, new file `tests/test_h_series_gaps.p
 This document records the `sdk-completion` branch landing, 20 tasks (W1–W20),
 and the reconciliation against the design-of-record at
 `../keeper-pam-declarative/`. It is intended for reviewers and future agents
-picking up this work.
+picking up this work. Current orchestration lives in
+[`docs/ORCHESTRATION_PHASE0_PARALLEL.md`](docs/ORCHESTRATION_PHASE0_PARALLEL.md);
+daybook continuity is handled by the private global sync, not by a repo-local
+daybook file.
 
 ## Scope
 
@@ -92,7 +95,7 @@ contract gaps listed below are closed.
 
 ## Out of scope for this branch
 
-Deliberately deferred (captured in JOURNAL.md for follow-up):
+Deliberately deferred (tracked in issues / this checklist for follow-up):
 
 - **Live acme-lab smoke.** Plan specified Phase C tasks run a live smoke
   against the tenant `msawczyn+lab@acme-demo.com` using the ephemeral
@@ -114,8 +117,7 @@ Deliberately deferred (captured in JOURNAL.md for follow-up):
 
 ## Non-negotiable constraints honored
 
-- **No direct `keeper_dag` writes anywhere** (LESSONS.md 2026-04-23
-  `[keeper-dag]`). Every tenant-side state change in the Commander
+- **No direct `keeper_dag` writes anywhere** (project invariant). Every tenant-side state change in the Commander
   provider routes through `subprocess.run([self._bin, ...])` against
   the `keeper` CLI. Unit tests mock `_run_cmd` and `shutil.which`; no
   test invokes the real CLI.

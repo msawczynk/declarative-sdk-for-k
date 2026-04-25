@@ -31,12 +31,13 @@ Agent-first Python SDK + CLI (`dsk`) for deterministic `validate -> plan -> appl
 ├── V1_GA_CHECKLIST.md                      # Blocking v1.0.0 checklist and hardening backlog.
 ├── docs/                                   # Focused docs for operator and agent workflows.
 │   ├── CAPABILITY_MATRIX.md                # Generated Commander capability mirror.
+│   ├── CODEX_CLI.md                        # Default local Codex CLI orchestration (offline + smoke pointers).
 │   ├── CODEX_GITHUB.md                     # GitHub issue/comment/action pattern for scoped Codex tasks.
 │   ├── COMMANDER.md                        # Version pin, CLI/API usage, drift policy, post-import tuning field map.
-│   ├── DAYBOOK.md                          # Canonical daybook repo, sync, main agent vs worker/subagent contract.
 │   ├── ISSUE_6_JIT_SUPPORT_BOUNDARY.md     # JIT apply boundary decision against pinned Commander.
 │   ├── ISSUE_7_GATEWAY_CREATE_PROJECTS_DESIGN.md # Gateway create / projects[] design boundary.
 │   ├── LOGIN.md                            # `EnvLoginHelper` + custom login-helper contract.
+│   ├── ORCHESTRATION_PHASE0_PARALLEL.md     # Phase 0 clean-tree + parallel Codex workflow; daybook sync is private/global.
 │   ├── RELEASING.md                        # Maintainer release ritual (GitHub-only; no PyPI).
 │   ├── SDK_DA_COMPLETION_PLAN.md           # Devil's-advocate completion gates, phases, and stop conditions.
 │   ├── SDK_COMPLETION_PLAN.md              # Parent/Codex orchestration plan for completing SDK support.
@@ -80,7 +81,9 @@ Agent-first Python SDK + CLI (`dsk`) for deterministic `validate -> plan -> appl
 │       └── mock.py                         # Offline mock provider used by tests/examples CI.
 ├── pyproject.toml                          # Packaging, deps, scripts, lint/type/test config.
 ├── scripts/                                # Maintenance and live-smoke tooling.
-│   ├── agent/                              # Agent orchestration wrappers.
+│   ├── agent/                              # Codex CLI orchestration wrappers; see docs/CODEX_CLI.md.
+│   │   ├── README.md                       # When to use offline vs live-smoke scripts.
+│   │   ├── codex_offline_slice.sh          # Default offline `codex exec` (no network, workspace-write).
 │   │   └── codex_live_smoke.sh             # Whitelisted Codex live-smoke runner with network/redaction rules.
 │   ├── smoke/                              # Live-smoke harness and scenario registry.
 │   │   ├── .commander-config-testuser2.json# Local smoke helper config fixture.

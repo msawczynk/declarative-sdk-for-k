@@ -7,6 +7,10 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Changed
+- Autonomous orchestration pass: parallel `run_parallel_codex.sh` (slices 01–03)
+  aligned GitHub issue template + `CODEX_GITHUB`, smoke README scenario matrix,
+  root docs with `ORCHESTRATION_PHASE0_PARALLEL`; parent ran `phase0_gates.sh full`
+  + `ruff format` on touched Python.
 - RBI discover DAG merge (`allowedSettings` → `pam_settings.options`) now
   delegates to `_merge_rbi_dag_options_into_pam_settings` in
   `_commander_cli_helpers.py`, with unit tests for tri-state / default

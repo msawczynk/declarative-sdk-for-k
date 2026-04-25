@@ -42,7 +42,7 @@ Under the hood `EnvLoginHelper`:
   so persistent-login state such as `device_token` and `clone_code` is
   reused instead of forcing a fresh device-registration flow,
 - handles the TOTP edge-of-window race (sleeps into the next window
-  when within 5 s of the boundary — see `LESSONS.md` 2026-04-23),
+  when within 5 s of the boundary — see unit tests for `EnvLoginHelper`),
 - implements Commander's step-based `LoginUi` protocol
   (`on_password`, `on_two_factor`, `on_device_approval`,
   `on_sso_redirect`, `on_sso_data_key`) and answers two-factor /

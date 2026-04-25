@@ -167,6 +167,42 @@ def _index_live(
     return by_uid_ref, by_title
 
 
+def _pam_remote_browser_settings_equivalent(live_ps: Any, desired_ps: Any) -> bool:
+    """True when every ``pam_settings`` option/connection key set on *desired* matches *live*."""
+    if not isinstance(desired_ps, dict):
+        return live_ps == desired_ps
+    live_ps = live_ps if isinstance(live_ps, dict) else {}
+    for section in ("options", "connection"):
+        desired_sec = desired_ps.get(section)
+        if not isinstance(desired_sec, dict):
+            continue
+        live_sec = live_ps.get(section)
+        live_sec = live_sec if isinstance(live_sec, dict) else {}
+        for k, want in desired_sec.items():
+            if want is None:
+                continue
+            if live_sec.get(k) != want:
+                return False
+    return True
+
+
+def _field_diff_pam_remote_browser(live: dict[str, Any], desired: dict[str, Any]) -> list[str]:
+    """Like :func:`_field_diff` but treats ``pam_settings`` as a partial overlay for RBI."""
+    keys: set[str] = set(live) | set(desired)
+    changed: list[str] = []
+    for key in keys:
+        if key in _DIFF_IGNORED_FIELDS:
+            continue
+        if key not in desired:
+            continue
+        if key == "pam_settings":
+            if not _pam_remote_browser_settings_equivalent(live.get(key), desired.get(key)):
+                changed.append(key)
+        elif live.get(key) != desired.get(key):
+            changed.append(key)
+    return sorted(changed)
+
+
 def _classify_desired(
     *,
     uid_ref: str,
@@ -236,7 +272,10 @@ def _classify_desired(
             reason="adoption: write ownership marker",
         )
 
-    diff_fields = _field_diff(live.payload, payload)
+    if resource_type == "pamRemoteBrowser":
+        diff_fields = _field_diff_pam_remote_browser(live.payload, payload)
+    else:
+        diff_fields = _field_diff(live.payload, payload)
     if not diff_fields:
         return Change(
             kind=ChangeKind.NOOP,

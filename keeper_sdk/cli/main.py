@@ -120,13 +120,14 @@ def validate(ctx: click.Context, manifest_path: Path, emit_canonical: bool, onli
             sys.exit(EXIT_CAPABILITY)
 
         gaps: list[str] = getattr(provider, "unsupported_capabilities", lambda _m: [])(manifest)
+        stage4_failed = False
         if gaps:
             click.echo("capability gaps (will appear as plan conflicts):", err=True)
             for reason in gaps:
                 click.echo(f"  - {reason}", err=True)
+            stage4_failed = True
 
         live_gateway_names = {record.title for record in live if record.resource_type == "gateway"}
-        stage4_failed = False
         for gateway in manifest.gateways:
             if gateway.mode != "reference_existing":
                 continue

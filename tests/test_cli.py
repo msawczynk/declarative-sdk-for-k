@@ -87,6 +87,37 @@ def test_validate_online_warns_on_missing_gateway(
     assert "stage 4" in result.output
 
 
+def test_validate_online_fails_on_provider_capability_gap(
+    minimal_manifest_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manifest = load_manifest(minimal_manifest_path)
+
+    class GapProvider(MockProvider):
+        def unsupported_capabilities(self, manifest=None) -> list[str]:
+            return ["rotation_settings requires pam rotation edit"]
+
+    provider = GapProvider(manifest.name)
+    provider.seed(
+        [
+            LiveRecord(
+                keeper_uid="LIVE_GW_UID",
+                title="Acme Lab Gateway",
+                resource_type="gateway",
+                payload={"name": "Acme Lab Gateway"},
+                marker=None,
+            )
+        ]
+    )
+
+    monkeypatch.setattr(cli_main_module, "MockProvider", lambda manifest_name: provider)
+
+    result = _run(["validate", str(minimal_manifest_path), "--online"])
+    assert result.exit_code == EXIT_CAPABILITY, result.output
+    assert "capability gaps" in result.output
+    assert "rotation_settings requires pam rotation edit" in result.output
+
+
 def test_validate_without_online_unchanged(minimal_manifest_path: Path) -> None:
     result = _run(["validate", str(minimal_manifest_path)])
     assert result.exit_code == 0, result.output

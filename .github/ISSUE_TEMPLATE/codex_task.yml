@@ -23,7 +23,7 @@ body:
     validations:
       required: true
   - type: textarea
-    id: success
+    id: success_criteria
     attributes:
       label: Success Criteria
       description: Observable checks that make the task done.
@@ -34,7 +34,7 @@ body:
     validations:
       required: true
   - type: textarea
-    id: commands
+    id: allowed_commands
     attributes:
       label: Allowed Commands
       description: Commands Codex may run. Do not include live Keeper commands unless explicitly intended.
@@ -58,10 +58,10 @@ body:
     attributes:
       label: Required Done Report
       value: |
-        Return:
-        - CHG: files changed
-        - tests: exact commands + result
-        - risks: remaining blockers or live-proof needs
-        - TOKEN: clean | finding=<one-line>
+        DONE
+        CHG: <files changed>
+        tests: <exact commands and PASS/FAIL>
+        risks: <remaining risk, live-proof need, or "none">
+        TOKEN: clean | finding=<one-line>
     validations:
       required: true

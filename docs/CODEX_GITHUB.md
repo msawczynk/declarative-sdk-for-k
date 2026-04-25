@@ -20,7 +20,7 @@ Use **this document** when a task is clear enough to hand off **without** a live
 
 3. **GitHub issue as task packet**
    - Use the `Codex task` issue template.
-   - The issue must include task, scope, success criteria, allowed commands, and live-access policy.
+   - The issue fields map to the workflow inputs `task`, `scope`, `success_criteria`, `allowed_commands`, and `live_access`.
    - Parent reviews the result and owns support claims, live proof, release, and merge decisions.
 
 ## Recommended First Workflow

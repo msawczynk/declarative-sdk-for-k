@@ -3,6 +3,9 @@
 Derived from the 2026-04-24 devil's-advocate audit (see `AUDIT.md`).
 Items are **blocking** unless marked `[hardening]`. Check them off in
 PRs that close them so the next agent can tell at a glance what's left.
+Agent orchestration lives in
+[`docs/ORCHESTRATION_PHASE0_PARALLEL.md`](./docs/ORCHESTRATION_PHASE0_PARALLEL.md);
+daybook continuity is private/global sync, not a repo-local doc.
 
 ## Shipping gates
 
@@ -11,7 +14,7 @@ PRs that close them so the next agent can tell at a glance what's left.
       `rotation_settings`, `jit_settings`, `gateway.mode: create`,
       and top-level `projects[]` in `keeper_sdk/core/preview.py`;
       covered by `tests/test_preview_gate.py` (14 cases; see also
-      JOURNAL Week 2 "What shipped").
+      2026-04-24 capability-mirror work).
 - [x] Examples under `examples/` now validate clean with no preview
       flag and pass a `--provider mock` no-conflict `plan` check in CI;
       Commander live-smoke covers the same resource shapes via
@@ -22,11 +25,11 @@ PRs that close them so the next agent can tell at a glance what's left.
       and fails at stage 3 (`tests/test_uid_ref_gate.py::test_validate_rejects_cross_manifest_pam_configuration_uid_ref`).
 - [x] DOR reframed as capability mirror; drift enforced by CI
       (`drift-check` job), see `docs/CAPABILITY_MATRIX.md`,
-      `scripts/sync_upstream.py`, and JOURNAL Week 3 "What shipped".
+      `scripts/sync_upstream.py`, and the 2026-04-24 DOR reframe).
 
 ### 2. Upstream DOR reconciliation
 - [x] Upstream DOR reconciliation — SUPERSEDED 2026-04-24 by
-      capability-mirror reframe (see JOURNAL Week 3 +
+      capability-mirror reframe (see 2026-04-24 audit +
       `docs/CAPABILITY_MATRIX.md` + `scripts/sync_upstream.py`). The 7
       contradictions resolve by definition because the DOR now
       reflects, not prescribes, upstream.
@@ -59,7 +62,7 @@ PRs that close them so the next agent can tell at a glance what's left.
       + sandbox provisioning all green via `--login-helper env` on
       2026-04-25 (tracked in this checklist + smoke docs). End-to-end apply blocked on
       separate Commander-CLI session-refresh gap (deferred, see
-      JOURNAL).
+      `AUDIT.md` / deferred Commander session-refresh gap).
 
 ### 5. `validate --online` completeness
 - [x] Stage 5 actually verifies pam_configuration presence,

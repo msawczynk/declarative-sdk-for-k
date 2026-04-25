@@ -254,7 +254,7 @@ def run_smoke(
         raise SmokeError(f"scenario post-apply verifier failed: {exc}") from exc
     _mark(state, f"marker verification OK ({_ACTIVE_SCENARIO.name})")
 
-    rc_plan2 = _sdk_allow([0], ["plan", str(manifest_path)], env=env)
+    rc_plan2 = _sdk_allow([0], ["plan", "--json", str(manifest_path)], env=env)
     if rc_plan2 != 0:
         raise SmokeError(f"re-plan expected 0 (noop), got {rc_plan2}; drift present")
     _mark(state, "re-plan clean")
@@ -533,6 +533,27 @@ def _remove_project_tree(argv_prefix: list[str], *, env: dict[str, str], project
     )
 
 
+def _candidate_cleanup_folder_uids(state: dict[str, Any]) -> list[str]:
+    candidates: list[str] = []
+    for key in ("managed_folder_uid", "sf_uid"):
+        value = state.get(key)
+        if isinstance(value, str) and value and value not in candidates:
+            candidates.append(value)
+    return candidates
+
+
+def _teardown_records_with_fallback(state: dict[str, Any]) -> list[Any]:
+    admin_params = state["admin_params"]
+    errors: list[str] = []
+    for folder_uid in _candidate_cleanup_folder_uids(state):
+        try:
+            return sandbox.teardown_records(admin_params, folder_uid, manager=MANAGER_NAME)
+        except Exception as exc:  # pragma: no cover - exercised via unit test with fake sandbox
+            errors.append(f"{folder_uid}: {exc}")
+            log.warning("cleanup failed for folder %s; trying fallback if available", folder_uid)
+    raise SmokeError("cleanup failed for all candidate folders: " + "; ".join(errors))
+
+
 def _mark(state: dict[str, Any], message: str) -> None:
     state.setdefault("passed", []).append(message)
 
@@ -597,9 +618,13 @@ def _print_post_mortem(state: dict[str, Any], exc: BaseException) -> None:
         "failed": str(exc),
     }
     admin_params = state.get("admin_params")
-    sf_uid = state.get("managed_folder_uid") or state.get("sf_uid")
-    if admin_params and sf_uid:
-        payload["shared_folder_contents"] = _current_sf_contents(admin_params, sf_uid)
+    for sf_uid in _candidate_cleanup_folder_uids(state):
+        if not admin_params:
+            break
+        contents = _current_sf_contents(admin_params, sf_uid)
+        payload["shared_folder_contents"] = contents
+        if not (len(contents) == 1 and "error" in contents[0]):
+            break
     print(json.dumps(payload, indent=2), file=sys.stderr)
 
 
@@ -678,11 +703,7 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         if needs_cleanup and state.get("admin_params") and state.get("sf_uid"):
             try:
-                removed = sandbox.teardown_records(
-                    state["admin_params"],
-                    state.get("managed_folder_uid") or state["sf_uid"],
-                    manager=MANAGER_NAME,
-                )
+                removed = _teardown_records_with_fallback(state)
                 if removed:
                     log.info("cleanup removed %d record(s): %s", len(removed), removed)
             except Exception as cleanup_exc:  # pragma: no cover - live-only path

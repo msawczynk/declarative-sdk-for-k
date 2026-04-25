@@ -72,8 +72,7 @@ class EnvLoginHelper:
     TOTP_SAFETY_MARGIN_SECONDS = 5
     """If we're inside the last N seconds of a TOTP window, sleep to the
     next one before logging in — Commander sometimes sends a code that
-    expires mid-flight and the login silently fails. See LESSONS.md
-    2026-04-23 `[keeper] TOTP expiry race`.
+    expires mid-flight and the login silently fails.
     """
 
     def load_keeper_creds(self) -> dict[str, str]:
@@ -111,8 +110,7 @@ class EnvLoginHelper:
         so persistent-login state (``device_token``, ``clone_code``) is
         reused. Without this load, every invocation triggers a fresh
         device registration that blocks on the tenant's device-approval
-        queue — see LESSONS.md 2026-04-25 ``[keeper] EnvLoginHelper
-        persistent-login``.
+        device-approval queue without loading on-disk config.
         """
         try:
             import json
@@ -209,8 +207,7 @@ class _AutoLoginUi:
     matched no real protocol method and caused ``api.login`` to hang
     waiting for a step that never completed. The current implementation
     mirrors the lab's ``deploy_watcher.AutoUI`` (proven against this
-    tenant) — see LESSONS.md 2026-04-25 ``[keeper] EnvLoginHelper UI
-    contract``.
+    tenant).
 
     The class is constructed dynamically so the SDK doesn't import
     ``keepercommander.auth.login_steps`` at module load time

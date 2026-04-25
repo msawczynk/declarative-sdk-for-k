@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import subprocess
 import sys
@@ -11,7 +12,7 @@ from pathlib import Path
 import pytest
 
 from keeper_sdk.core.diff import Change, ChangeKind
-from keeper_sdk.core.errors import CapabilityError
+from keeper_sdk.core.errors import CapabilityError, CollisionError
 from keeper_sdk.core.interfaces import LiveRecord
 from keeper_sdk.core.metadata import encode_marker, serialize_marker
 from keeper_sdk.core.models import RotationScheduleOnDemand, RotationSettings
@@ -221,6 +222,138 @@ def test_run_cmd_refreshes_pam_config_list_in_process(
     assert seen == params
 
 
+def test_run_cmd_routes_pam_rotation_edit_in_process(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
+    params = object()
+    sync_calls: list[object] = []
+    seen: list[tuple[object, dict[str, object]]] = []
+
+    def fail_subprocess(*_args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        raise AssertionError("rotation edit must not call subprocess")
+
+    def fake_get_params(self: CommanderCliProvider) -> object:
+        self._keeper_params = params
+        self._keeper_login_attempted = True
+        return params
+
+    class _FakeRotationEdit:
+        def get_parser(self) -> argparse.ArgumentParser:
+            parser = argparse.ArgumentParser(prog="pam rotation edit")
+            parser.add_argument("--record", dest="record_name", required=True)
+            parser.add_argument("--config", dest="config")
+            parser.add_argument("--resource", dest="resource")
+            parser.add_argument("--admin-user", dest="admin")
+            parser.add_argument("--rotation-profile", dest="rotation_profile")
+            parser.add_argument("--schedulecron", dest="schedule_cron_data", action="append")
+            parser.add_argument("--enable", dest="enable", action="store_true")
+            parser.add_argument("--force", dest="force", action="store_true")
+            return parser
+
+        def execute(self, params: object, **kwargs: object) -> None:
+            seen.append((params, kwargs))
+            print("rotation ok")
+
+    monkeypatch.setattr("keeper_sdk.providers.commander_cli.subprocess.run", fail_subprocess)
+    monkeypatch.setattr(CommanderCliProvider, "_get_keeper_params", fake_get_params)
+    import keepercommander.api as keeper_api
+
+    monkeypatch.setattr(keeper_api, "sync_down", lambda call_params: sync_calls.append(call_params))
+    monkeypatch.setitem(
+        sys.modules,
+        "keepercommander.commands.discoveryrotation",
+        types.SimpleNamespace(PAMCreateRecordRotationCommand=_FakeRotationEdit),
+    )
+
+    provider = CommanderCliProvider(folder_uid="folder-uid")
+    output = provider._run_cmd(
+        [
+            "pam",
+            "rotation",
+            "edit",
+            "--record",
+            "USER_UID",
+            "--config",
+            "CFG_UID",
+            "--resource",
+            "RES_UID",
+            "--admin-user",
+            "ADMIN_UID",
+            "--rotation-profile",
+            "general",
+            "--schedulecron",
+            "30 18 * * *",
+            "--enable",
+            "--force",
+        ]
+    )
+
+    assert output.strip() == "rotation ok"
+    assert sync_calls == [params]
+    assert seen == [
+        (
+            params,
+            {
+                "record_name": "USER_UID",
+                "config": "CFG_UID",
+                "resource": "RES_UID",
+                "admin": "ADMIN_UID",
+                "rotation_profile": "general",
+                "schedule_cron_data": ["30 18 * * *"],
+                "enable": True,
+                "force": True,
+            },
+        )
+    ]
+
+
+def test_run_cmd_wraps_in_process_pam_rotation_edit_exception(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
+
+    def fail_subprocess(*_args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        raise AssertionError("rotation edit must not call subprocess")
+
+    class _FakeRotationEdit:
+        def get_parser(self) -> argparse.ArgumentParser:
+            parser = argparse.ArgumentParser(prog="pam rotation edit")
+            parser.add_argument("--record", dest="record_name", required=True)
+            parser.add_argument("--force", dest="force", action="store_true")
+            return parser
+
+        def execute(self, params: object, **kwargs: object) -> None:
+            print("stdout before rotation failure")
+            print("stderr before rotation failure", file=sys.stderr)
+            raise RuntimeError("rotation failed")
+
+    monkeypatch.setattr("keeper_sdk.providers.commander_cli.subprocess.run", fail_subprocess)
+    monkeypatch.setitem(
+        sys.modules,
+        "keepercommander.commands.discoveryrotation",
+        types.SimpleNamespace(PAMCreateRecordRotationCommand=_FakeRotationEdit),
+    )
+    import keepercommander.api as keeper_api
+
+    monkeypatch.setattr(keeper_api, "sync_down", lambda _params: None)
+
+    provider = CommanderCliProvider(folder_uid="folder-uid")
+    provider._keeper_params = object()
+
+    with pytest.raises(CapabilityError) as exc_info:
+        provider._run_cmd(["pam", "rotation", "edit", "--record", "USER_UID", "--force"])
+
+    assert "in-process keeper pam rotation edit failed" in exc_info.value.reason
+    assert "RuntimeError: rotation failed" in exc_info.value.reason
+    assert "stdout before rotation failure" in exc_info.value.context["stdout"]
+    assert "stderr before rotation failure" in exc_info.value.context["stderr"]
+
+
 def test_build_pam_rotation_edit_args_for_cron_settings() -> None:
     args = _build_pam_rotation_edit_args(
         record_uid="user-uid",
@@ -424,6 +557,54 @@ def test_build_pam_rotation_edit_argvs_uses_plan_uids_when_live_omitted() -> Non
     assert argvs[0][argvs[0].index("--resource") + 1] == "RES_UID"
     assert argvs[0][argvs[0].index("--config") + 1] == "CFG_UID"
     assert argvs[0][argvs[0].index("--admin-user") + 1] == "ADMIN_UID"
+
+
+def test_build_pam_rotation_edit_argvs_uses_unique_title_parent_type_fallback() -> None:
+    manifest = _rotation_manifest()
+    manifest["resources"][0]["type"] = "pamMachine"
+    live = [
+        (
+            LiveRecord(
+                keeper_uid="RES_UID",
+                title="db-prod",
+                resource_type="pamDatabase",
+            )
+            if record.keeper_uid == "RES_UID"
+            else record
+        )
+        for record in _rotation_live_records()
+    ]
+
+    argvs = build_pam_rotation_edit_argvs(manifest, live_records=live)
+
+    assert argvs[0][argvs[0].index("--resource") + 1] == "RES_UID"
+
+
+def test_build_pam_rotation_edit_argvs_rejects_duplicate_title_parent_fallback() -> None:
+    manifest = _rotation_manifest()
+    manifest["resources"][0]["type"] = "pamMachine"
+    live = [
+        (
+            LiveRecord(
+                keeper_uid="RES_UID",
+                title="db-prod",
+                resource_type="pamDatabase",
+            )
+            if record.keeper_uid == "RES_UID"
+            else record
+        )
+        for record in _rotation_live_records()
+    ]
+    live.append(
+        LiveRecord(
+            keeper_uid="RES_UID_2",
+            title="db-prod",
+            resource_type="pamDirectory",
+        )
+    )
+
+    with pytest.raises(ValueError, match="duplicate live parent resource match"):
+        build_pam_rotation_edit_argvs(manifest, live_records=live)
 
 
 def test_build_pam_rotation_edit_argvs_rejects_missing_parent_config_ref() -> None:
@@ -797,7 +978,7 @@ def _rotation_apply_run_recorder(calls: list[list[str]]):
         calls.append(args)
         if args[:3] == ["pam", "project", "import"]:
             return ""
-        if args[:3] == ["pam", "rotation", "edit"]:
+        if args[:3] in (["pam", "connection", "edit"], ["pam", "rotation", "edit"]):
             return ""
         key = tuple(args)
         if key in command_map:
@@ -861,6 +1042,193 @@ def test_apply_runs_nested_rotation_after_post_import_discovery(
     assert rotation_outcomes[0].details["command"] == rotation_call
 
 
+def test_apply_uses_unique_title_parent_type_fallback_for_marker_tuning_and_rotation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.utc_timestamp", lambda: "2026-04-24T12:34:56Z"
+    )
+    monkeypatch.setenv("DSK_EXPERIMENTAL_ROTATION_APPLY", "1")
+    manifest = _rotation_manifest()
+    manifest["resources"][0]["type"] = "pamMachine"
+    manifest["resources"][0]["pam_settings"] = {"options": {"connections": "off"}}
+    calls: list[list[str]] = []
+    monkeypatch.setattr(
+        CommanderCliProvider,
+        "_run_cmd",
+        _rotation_apply_run_recorder(calls),
+    )
+    _install_fake_write_marker(monkeypatch, calls)
+
+    def fake_discover(self: CommanderCliProvider) -> list[LiveRecord]:
+        calls.append(["__discover__"])
+        return [
+            LiveRecord(
+                keeper_uid="CFG_UID",
+                title="Lab Config",
+                resource_type="pam_configuration",
+            ),
+            LiveRecord(
+                keeper_uid="RES_UID",
+                title="db-prod",
+                resource_type="pamDatabase",
+            ),
+            LiveRecord(
+                keeper_uid="USER_UID",
+                title="db-user",
+                resource_type="pamUser",
+            ),
+            LiveRecord(
+                keeper_uid="ADMIN_UID",
+                title="admin-user",
+                resource_type="pamUser",
+            ),
+        ]
+
+    monkeypatch.setattr(CommanderCliProvider, "discover", fake_discover)
+    provider = CommanderCliProvider(folder_uid="folder-uid", manifest_source=manifest)
+    plan = Plan(
+        manifest_name="customer-prod",
+        changes=[
+            Change(
+                kind=ChangeKind.CREATE,
+                uid_ref="cfg.local",
+                resource_type="pam_configuration",
+                title="Lab Config",
+                after={"title": "Lab Config"},
+            ),
+            Change(
+                kind=ChangeKind.CREATE,
+                uid_ref="res.db",
+                resource_type="pamMachine",
+                title="db-prod",
+                after={"title": "db-prod"},
+            ),
+            Change(
+                kind=ChangeKind.CREATE,
+                uid_ref="usr.db",
+                resource_type="pamUser",
+                title="db-user",
+                after={"title": "db-user"},
+            ),
+            Change(
+                kind=ChangeKind.CREATE,
+                uid_ref="usr.admin",
+                resource_type="pamUser",
+                title="admin-user",
+                after={"title": "admin-user"},
+            ),
+        ],
+        order=["cfg.local", "res.db", "usr.db", "usr.admin"],
+    )
+
+    outcomes = provider.apply_plan(plan)
+
+    tuning_call = [
+        "pam",
+        "connection",
+        "edit",
+        "--configuration",
+        "CFG_UID",
+        "--connections",
+        "off",
+        "RES_UID",
+    ]
+    rotation_call = [
+        "pam",
+        "rotation",
+        "edit",
+        "--record",
+        "USER_UID",
+        "--config",
+        "CFG_UID",
+        "--resource",
+        "RES_UID",
+        "--admin-user",
+        "ADMIN_UID",
+        "--rotation-profile",
+        "general",
+        "--schedulecron",
+        "30 18 * * *",
+        "--complexity",
+        "32,5,5,5,5",
+        "--enable",
+        "--force",
+    ]
+    assert tuning_call in calls
+    assert rotation_call in calls
+    parent_marker_call = next(
+        call for call in calls if call[:3] == ["record-update", "--record", "RES_UID"]
+    )
+    _, payload = parent_marker_call[4].split("=", 1)
+    assert json.loads(payload) == encode_marker(
+        uid_ref="res.db",
+        manifest="customer-prod",
+        resource_type="pamMachine",
+        last_applied_at="2026-04-24T12:34:56Z",
+    )
+    outcomes_by_ref = {outcome.uid_ref: outcome for outcome in outcomes if outcome.uid_ref}
+    assert outcomes_by_ref["res.db"].details["post_import_tuning_argvs"] == [tuning_call]
+    assert outcomes_by_ref["res.db"].details["marker_written"] is True
+
+
+def test_apply_rejects_duplicate_title_parent_type_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
+    calls: list[list[str]] = []
+    monkeypatch.setattr(
+        CommanderCliProvider,
+        "_run_cmd",
+        _rotation_apply_run_recorder(calls),
+    )
+
+    def fake_discover(self: CommanderCliProvider) -> list[LiveRecord]:
+        return [
+            LiveRecord(
+                keeper_uid="RES_UID_1",
+                title="machine-prod",
+                resource_type="pamDatabase",
+            ),
+            LiveRecord(
+                keeper_uid="RES_UID_2",
+                title="machine-prod",
+                resource_type="pamDirectory",
+            ),
+        ]
+
+    monkeypatch.setattr(CommanderCliProvider, "discover", fake_discover)
+    provider = CommanderCliProvider(
+        folder_uid="folder-uid",
+        manifest_source={
+            "version": "1",
+            "name": "customer-prod",
+            "resources": [{"uid_ref": "res.host", "type": "pamMachine", "title": "machine-prod"}],
+        },
+    )
+    plan = Plan(
+        manifest_name="customer-prod",
+        changes=[
+            Change(
+                kind=ChangeKind.CREATE,
+                uid_ref="res.host",
+                resource_type="pamMachine",
+                title="machine-prod",
+                after={"title": "machine-prod"},
+            )
+        ],
+        order=["res.host"],
+    )
+
+    with pytest.raises(CollisionError, match="live tenant has 2 records titled 'machine-prod'"):
+        provider.apply_plan(plan)
+
+
 def test_apply_rotation_dry_run_does_not_execute_rotation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -888,7 +1256,58 @@ def test_apply_rotation_dry_run_does_not_execute_rotation(
     assert calls[0][:3] == ["pam", "project", "import"]
     assert calls[0][-1] == "--dry-run"
     assert {outcome.action for outcome in outcomes} == {"create"}
-    assert all(outcome.details == {"dry_run": True} for outcome in outcomes)
+    outcomes_by_ref = {outcome.uid_ref: outcome for outcome in outcomes}
+    assert outcomes_by_ref["cfg.local"].details == {"dry_run": True}
+    assert outcomes_by_ref["res.db"].details == {"dry_run": True}
+    assert outcomes_by_ref["usr.admin"].details == {"dry_run": True}
+    assert outcomes_by_ref["usr.db"].details == {
+        "dry_run": True,
+        "rotation_argvs": [
+            [
+                "pam",
+                "rotation",
+                "edit",
+                "--record",
+                "<record:usr.db>",
+                "--config",
+                "<uid_ref:cfg.local>",
+                "--resource",
+                "<uid_ref:res.db>",
+                "--admin-user",
+                "<uid_ref:usr.admin>",
+                "--rotation-profile",
+                "general",
+                "--schedulecron",
+                "30 18 * * *",
+                "--complexity",
+                "32,5,5,5,5",
+                "--enable",
+                "--force",
+            ]
+        ],
+        "rotation_dry_run": True,
+    }
+
+
+def test_apply_rotation_dry_run_stays_blocked_without_experimental_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
+    monkeypatch.delenv("DSK_EXPERIMENTAL_ROTATION_APPLY", raising=False)
+    monkeypatch.setattr(
+        CommanderCliProvider,
+        "_run_cmd",
+        lambda self, args: pytest.fail(f"unexpected command: {args}"),
+    )
+    provider = CommanderCliProvider(folder_uid="folder-uid", manifest_source=_rotation_manifest())
+
+    with pytest.raises(CapabilityError) as exc_info:
+        provider.apply_plan(_rotation_apply_plan(), dry_run=True)
+
+    assert "resources[].users[].rotation_settings is not implemented" in exc_info.value.reason
+    assert "DSK_EXPERIMENTAL_ROTATION_APPLY=1" in exc_info.value.reason
 
 
 def test_apply_rotation_missing_live_ref_becomes_capability_error(
@@ -1066,6 +1485,97 @@ def test_discover_uses_ls_details_when_get_type_missing(monkeypatch: pytest.Monk
     records = provider.discover()
 
     assert records[0].resource_type == "pamUser"
+
+
+def test_discover_reads_project_resources_and_users_with_dedupe(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
+    calls: list[list[str]] = []
+
+    def recorder(self: CommanderCliProvider, args: list[str]) -> str:
+        calls.append(args)
+        if args == ["ls", "--format", "json", "PAM Environments"]:
+            return json.dumps(
+                [{"type": "folder", "uid": "project-folder", "name": "customer-prod"}]
+            )
+        if args == ["ls", "--format", "json", "project-folder"]:
+            return json.dumps(
+                [
+                    {
+                        "type": "folder",
+                        "uid": "resources-folder",
+                        "name": "customer-prod - Resources",
+                    },
+                    {"type": "folder", "uid": "users-folder", "name": "customer-prod - Users"},
+                ]
+            )
+        if args == ["ls", "resources-folder", "--format", "json"]:
+            return json.dumps(
+                [
+                    {
+                        "type": "record",
+                        "uid": "MACHINE_UID",
+                        "name": "machine-prod",
+                        "details": "Type: pamMachine, Description: ...",
+                    },
+                    {
+                        "type": "record",
+                        "uid": "DUP_UID",
+                        "name": "shared-admin",
+                        "details": "Type: pamUser, Description: ...",
+                    },
+                ]
+            )
+        if args == ["ls", "users-folder", "--format", "json"]:
+            return json.dumps(
+                [
+                    {
+                        "type": "record",
+                        "uid": "DUP_UID",
+                        "name": "shared-admin",
+                        "details": "Type: pamUser, Description: ...",
+                    },
+                    {
+                        "type": "record",
+                        "uid": "ADMIN_UID",
+                        "name": "admin-user",
+                        "details": "Type: pamUser, Description: ...",
+                    },
+                ]
+            )
+        if args[:1] == ["get"]:
+            uid = args[1]
+            title = {"MACHINE_UID": "machine-prod", "DUP_UID": "shared-admin"}.get(
+                uid, "admin-user"
+            )
+            return json.dumps(
+                {
+                    "record_uid": uid,
+                    "title": title,
+                    "type": "pamMachine" if uid == "MACHINE_UID" else "pamUser",
+                    "fields": [],
+                    "custom": [],
+                }
+            )
+        raise AssertionError(f"unexpected command: {args}")
+
+    monkeypatch.setattr(CommanderCliProvider, "_run_cmd", recorder)
+    provider = CommanderCliProvider(
+        folder_uid=None,
+        manifest_source={"version": "1", "name": "customer-prod"},
+    )
+
+    records = provider.discover()
+
+    assert [record.keeper_uid for record in records] == ["MACHINE_UID", "DUP_UID", "ADMIN_UID"]
+    assert [call for call in calls if call == ["get", "DUP_UID", "--format", "json"]] == [
+        ["get", "DUP_UID", "--format", "json"]
+    ]
+    assert provider.last_resolved_folder_uid == "resources-folder"
+    assert provider.last_resolved_users_folder_uid == "users-folder"
 
 
 def test_discover_raises_on_non_json_ls(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1746,6 +2256,205 @@ def test_apply_post_import_tuning_raises_on_unresolved_credential_ref(
     assert "post-import tuning could not resolve refs" in exc_info.value.reason
     assert "usr.admin" in exc_info.value.reason
     assert all(call[:2] != ["record-update", "--record"] for call in calls)
+
+
+def test_apply_post_import_tuning_resolves_user_from_project_users_folder(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.utc_timestamp", lambda: "2026-04-24T12:34:56Z"
+    )
+
+    calls: list[list[str]] = []
+    project_entries = [
+        {"type": "folder", "uid": "resources-folder", "name": "customer-prod - Resources"},
+        {"type": "folder", "uid": "users-folder", "name": "customer-prod - Users"},
+    ]
+
+    def recorder(self: CommanderCliProvider, args: list[str]) -> str:
+        calls.append(args)
+        if args == ["ls", "--format", "json", "PAM Environments"]:
+            return json.dumps(
+                [{"type": "folder", "uid": "project-folder", "name": "customer-prod"}]
+            )
+        if args in (
+            ["ls", "--format", "json", "PAM Environments/customer-prod"],
+            ["ls", "--format", "json", "project-folder"],
+        ):
+            return json.dumps(project_entries)
+        if args in (
+            [
+                "ls",
+                "--format",
+                "json",
+                "PAM Environments/customer-prod/customer-prod - Resources",
+            ],
+            [
+                "ls",
+                "--format",
+                "json",
+                "PAM Environments/customer-prod/customer-prod - Users",
+            ],
+        ):
+            return json.dumps([])
+        if args[:4] == ["secrets-manager", "share", "add", "--app"]:
+            return ""
+        if args == ["pam", "gateway", "list", "--format", "json"]:
+            return json.dumps(
+                {
+                    "gateways": [
+                        {
+                            "ksm_app_name": "Lab GW Application",
+                            "ksm_app_uid": "APP_UID",
+                            "gateway_name": "Lab GW Rocky",
+                            "gateway_uid": "GW_UID",
+                        }
+                    ]
+                }
+            )
+        if args == ["pam", "config", "list", "--format", "json"]:
+            return json.dumps(
+                {
+                    "configurations": [
+                        {
+                            "uid": "CFG_UID",
+                            "config_name": "Local Config",
+                            "shared_folder": {"name": "Lab GW Folder", "uid": "SF_UID"},
+                            "gateway_uid": "GW_UID",
+                        }
+                    ]
+                }
+            )
+        if args[:4] == ["pam", "project", "extend", "--config"]:
+            return ""
+        if args == ["ls", "resources-folder", "--format", "json"]:
+            return json.dumps(
+                [
+                    {
+                        "type": "record",
+                        "uid": "MACHINE_UID",
+                        "name": "machine-prod",
+                        "details": "Type: pamMachine, Description: ...",
+                    }
+                ]
+            )
+        if args == ["ls", "users-folder", "--format", "json"]:
+            return json.dumps(
+                [
+                    {
+                        "type": "record",
+                        "uid": "ADMIN_UID",
+                        "name": "admin-user",
+                        "details": "Type: pamUser, Description: ...",
+                    }
+                ]
+            )
+        if args == ["get", "MACHINE_UID", "--format", "json"]:
+            return json.dumps(
+                {
+                    "record_uid": "MACHINE_UID",
+                    "title": "machine-prod",
+                    "type": "pamMachine",
+                    "fields": [],
+                    "custom": [],
+                }
+            )
+        if args == ["get", "ADMIN_UID", "--format", "json"]:
+            return json.dumps(
+                {
+                    "record_uid": "ADMIN_UID",
+                    "title": "admin-user",
+                    "type": "pamUser",
+                    "fields": [],
+                    "custom": [],
+                }
+            )
+        if args[:3] == ["pam", "connection", "edit"]:
+            return ""
+        raise AssertionError(f"unexpected command: {args}")
+
+    monkeypatch.setattr(CommanderCliProvider, "_run_cmd", recorder)
+    _install_fake_write_marker(monkeypatch, calls)
+    provider = CommanderCliProvider(
+        folder_uid=None,
+        manifest_source={
+            "version": "1",
+            "name": "customer-prod",
+            "gateways": [{"uid_ref": "gw", "name": "Lab GW Rocky", "mode": "reference_existing"}],
+            "pam_configurations": [
+                {
+                    "uid_ref": "cfg.local",
+                    "title": "Local Config",
+                    "environment": "local",
+                    "gateway_uid_ref": "gw",
+                }
+            ],
+            "resources": [
+                {
+                    "uid_ref": "prod-machine",
+                    "type": "pamMachine",
+                    "title": "machine-prod",
+                    "pam_configuration_uid_ref": "cfg.local",
+                    "pam_settings": {
+                        "options": {"connections": "on"},
+                        "connection": {"administrative_credentials_uid_ref": "usr.admin"},
+                    },
+                    "users": [{"uid_ref": "usr.admin", "type": "pamUser", "title": "admin-user"}],
+                }
+            ],
+        },
+    )
+    plan = Plan(
+        manifest_name="customer-prod",
+        changes=[
+            Change(
+                kind=ChangeKind.CREATE,
+                uid_ref="cfg.local",
+                resource_type="pam_configuration",
+                title="Local Config",
+                after={"title": "Local Config"},
+            ),
+            Change(
+                kind=ChangeKind.CREATE,
+                uid_ref="prod-machine",
+                resource_type="pamMachine",
+                title="machine-prod",
+                after={"title": "machine-prod"},
+            ),
+            Change(
+                kind=ChangeKind.CREATE,
+                uid_ref="usr.admin",
+                resource_type="pamUser",
+                title="admin-user",
+                after={"title": "admin-user"},
+            ),
+        ],
+        order=["cfg.local", "prod-machine", "usr.admin"],
+    )
+
+    outcomes = provider.apply_plan(plan)
+
+    expected = [
+        "pam",
+        "connection",
+        "edit",
+        "--configuration",
+        "CFG_UID",
+        "--connections",
+        "on",
+        "--admin-user",
+        "ADMIN_UID",
+        "MACHINE_UID",
+    ]
+    assert expected in calls
+    assert calls.index(["ls", "users-folder", "--format", "json"]) < calls.index(expected)
+    outcomes_by_ref = {outcome.uid_ref: outcome for outcome in outcomes}
+    assert outcomes_by_ref["prod-machine"].details["post_import_tuning_argvs"] == [expected]
+    assert outcomes_by_ref["prod-machine"].details["post_import_tuning_executed"] is True
+    assert outcomes_by_ref["usr.admin"].details["marker_written"] is True
 
 
 def test_apply_post_import_tuning_noop_without_tuning_fields(
@@ -2440,6 +3149,8 @@ def test_apply_reference_existing_splits_to_extend(monkeypatch: pytest.MonkeyPat
                     }
                 ]
             )
+        if args == ["ls", "users-folder", "--format", "json"]:
+            return json.dumps([])
         if args == ["get", "keeper-created-uid", "--format", "json"]:
             return json.dumps(
                 {

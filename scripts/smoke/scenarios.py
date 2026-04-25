@@ -183,6 +183,33 @@ def _pam_user_nested_resources(pam_config_uid_ref: str, title_prefix: str) -> li
     ]
 
 
+def _pam_user_nested_rotation_resources(
+    pam_config_uid_ref: str, title_prefix: str
+) -> list[dict[str, Any]]:
+    resources = _pam_user_nested_resources(pam_config_uid_ref, title_prefix)
+    admin_uid_ref = f"{title_prefix}-pam-admin-1"
+    resources[0]["pam_settings"] = {
+        "options": {"connections": "on", "rotation": "on"},
+        "connection": {
+            "protocol": "ssh",
+            "port": "22",
+            "administrative_credentials_uid_ref": admin_uid_ref,
+        },
+    }
+    user = resources[0]["users"][0]
+    user["uid_ref"] = admin_uid_ref
+    user["title"] = f"{title_prefix}-pam-admin-1"
+    user["login"] = "sdk-smoke-admin"
+    user["password"] = "offline-smoke-admin-password"
+    user["rotation_settings"] = {
+        "rotation": "general",
+        "enabled": "on",
+        "schedule": {"type": "CRON", "cron": "30 18 * * *"},
+        "password_complexity": "32,5,5,5,5",
+    }
+    return resources
+
+
 # ---------------------------------------------------------------------------
 # Post-apply verifiers. Called with discovered LiveRecord list; raise
 # AssertionError on type-specific invariant violation.
@@ -282,6 +309,18 @@ _SCENARIOS: dict[str, ScenarioSpec] = {
             "Nested pamUser shape: a Linux machine with resources[].users[]. "
             "Offline gate proves schema/model/planner/normalize support without "
             "claiming standalone top-level pamUser live support."
+        ),
+    ),
+    "pamUserNestedRotation": ScenarioSpec(
+        name="pamUserNestedRotation",
+        resource_type="pamMachine",
+        build_resources=_pam_user_nested_rotation_resources,
+        verify=_verify_pam_user_nested,
+        description=(
+            "Experimental nested admin pamUser rotation shape with the parent "
+            "admin credential bound through pam_settings.connection. Requires "
+            "DSK_PREVIEW plus DSK_EXPERIMENTAL_ROTATION_APPLY; not a live "
+            "support claim."
         ),
     ),
 }

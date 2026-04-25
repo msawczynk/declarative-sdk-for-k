@@ -1,18 +1,21 @@
 # declarative-sdk-for-k
 
-> `dsk` — a declarative, agent-first SDK covering the full K surface:
-> vault records, shared folders, teams, roles, enterprise config, KSM
-> apps, PAM (machines / databases / directories / users / remote
-> browsers), compliance, rotation, migration.
+> `dsk` — a declarative, agent-first SDK for Keeper tenant state:
+> GA PAM lifecycle for machines, databases, directories, nested users,
+> and remote browsers, plus scoped shared-folder, KSM, and typed-record
+> surfaces. Rotation settings, JIT, gateway create, and RBI tuning remain
+> preview-gated until live proof is complete.
 
 Pure-Python core, no network I/O until you reach a provider. Machine-
 readable everywhere (`--json`, typed exit codes, `next_action` on
 every error). Designed so an LLM agent can plan, apply, and recover
 from failure without a human in the loop.
 
-**If you are an agent or LLM**: start at [`AGENTS.md`](AGENTS.md) and
-[`docs/DAYBOOK.md`](docs/DAYBOOK.md) for the command table, exit-code contract,
-JSON shapes, and daybook discipline. This README is optimised for humans.
+**If you are an agent or LLM**: start at [`AGENTS.md`](AGENTS.md) for the
+command table, exit-code contract, and JSON shapes. For scoped
+implementation flow, use
+[`docs/ORCHESTRATION_PHASE0_PARALLEL.md`](docs/ORCHESTRATION_PHASE0_PARALLEL.md);
+daybook continuity lives in the private global sync, not this repo.
 
 ## Capability scope
 
@@ -46,8 +49,8 @@ keeper_sdk/                          # import path stable through 1.x
 tests/                               # ~231 passing tests + 2 expected v1.1 deferrals (run pytest)
 docs/
   COMMANDER.md                       # pinned Commander version + capability matrix
-  DAYBOOK.md                         # canonical daybook repo + sync + main vs worker rules
   LOGIN.md                           # login helper contract + 30-line skeleton
+  ORCHESTRATION_PHASE0_PARALLEL.md   # Phase 0 + parallel agent workflow
   VALIDATION_STAGES.md               # validate/plan/apply exit-code contract
 AGENTS.md                            # agent-first operating manual
 ```
@@ -162,5 +165,4 @@ CLI smokes exercise `validate`, `export`, `plan` exit codes (`0`/`2`/`4`),
 `apply --dry-run` equivalence to `plan`, and JSON output. Live-smoke
 variants live under `scripts/smoke/` and can be selected with
 `--scenario` plus `--login-helper deploy_watcher|env`.
-
 
