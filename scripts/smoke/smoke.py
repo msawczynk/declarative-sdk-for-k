@@ -117,6 +117,11 @@ def run_smoke(
         _mark(state, "admin auth OK")
         ident = identity.ensure_sdktest_identity()
         _mark(state, f"test identity OK ({ident['email']})")
+        # `ensure_sdktest_identity()` performs its own admin login. On some
+        # tenants that invalidates the earlier in-process session, so refresh
+        # before sandbox provisioning uses `admin_params`.
+        admin_params = identity.admin_login()
+        _mark(state, "admin auth refreshed after identity bootstrap")
     except Exception as exc:  # pragma: no cover - live-only path
         raise PreflightError(f"auth bootstrap failed: {exc}") from exc
 

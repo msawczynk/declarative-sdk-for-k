@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 import types
 from pathlib import Path
@@ -87,6 +88,137 @@ def _install_fake_write_marker(monkeypatch: pytest.MonkeyPatch, calls: list[list
         )
 
     monkeypatch.setattr(CommanderCliProvider, "_write_marker", fake_write_marker)
+
+
+def test_run_cmd_retries_subprocess_once_on_session_expiry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
+    calls: list[list[str]] = []
+
+    def fake_run(cmd: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls.append(cmd)
+        if len(calls) == 1:
+            return subprocess.CompletedProcess(
+                cmd,
+                1,
+                stdout="",
+                stderr="session_token_expired: refresh needed",
+            )
+        return subprocess.CompletedProcess(cmd, 0, stdout="deleted", stderr="")
+
+    monkeypatch.setattr("keeper_sdk.providers.commander_cli.subprocess.run", fake_run)
+
+    provider = CommanderCliProvider(
+        folder_uid="folder-uid",
+        config_file="/tmp/config.json",
+        keeper_password="secret",
+    )
+
+    assert provider._run_cmd(["rm", "--force", "UID"]) == "deleted"
+    assert len(calls) == 2
+    assert calls[0] == calls[1]
+    assert calls[0][:4] == ["keeper", "--batch-mode", "--config", "/tmp/config.json"]
+
+
+def test_run_cmd_does_not_retry_subprocess_non_session_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
+    calls: list[list[str]] = []
+
+    def fake_run(cmd: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls.append(cmd)
+        return subprocess.CompletedProcess(cmd, 1, stdout="", stderr="permission denied")
+
+    monkeypatch.setattr("keeper_sdk.providers.commander_cli.subprocess.run", fake_run)
+
+    provider = CommanderCliProvider(folder_uid="folder-uid")
+
+    with pytest.raises(CapabilityError, match="keeper rm --force UID failed"):
+        provider._run_cmd(["rm", "--force", "UID"])
+
+    assert len(calls) == 1
+
+
+def test_run_cmd_routes_pam_gateway_list_in_process(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
+    seen: list[tuple[object, str]] = []
+
+    def fake_get_params(self: CommanderCliProvider) -> object:
+        self._keeper_params = object()
+        self._keeper_login_attempted = True
+        return self._keeper_params
+
+    class _FakeGatewayList:
+        def execute(self, params: object, **kwargs: object) -> str:
+            seen.append((params, str(kwargs["format"])))
+            return '{"gateways":[]}'
+
+    monkeypatch.setattr(CommanderCliProvider, "_get_keeper_params", fake_get_params)
+    import keepercommander.api as keeper_api
+
+    monkeypatch.setattr(keeper_api, "sync_down", lambda _params: None)
+    monkeypatch.setitem(
+        sys.modules,
+        "keepercommander.commands.discoveryrotation",
+        types.SimpleNamespace(PAMGatewayListCommand=_FakeGatewayList),
+    )
+
+    provider = CommanderCliProvider(folder_uid="folder-uid")
+
+    assert provider._run_cmd(["pam", "gateway", "list", "--format", "json"]) == '{"gateways":[]}'
+    assert len(seen) == 1
+    assert seen[0][1] == "json"
+
+
+def test_run_cmd_refreshes_pam_config_list_in_process(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
+    params = [object(), object()]
+    seen: list[object] = []
+
+    def fake_get_params(self: CommanderCliProvider) -> object:
+        param = params[len(seen)]
+        self._keeper_params = param
+        self._keeper_login_attempted = True
+        return param
+
+    class _FakeConfigList:
+        def execute(self, params: object, **kwargs: object) -> str:
+            seen.append(params)
+            assert kwargs["format"] == "json"
+            if len(seen) == 1:
+                raise RuntimeError("session token expired")
+            return '{"configurations":[]}'
+
+    monkeypatch.setattr(CommanderCliProvider, "_get_keeper_params", fake_get_params)
+    import keepercommander.api as keeper_api
+
+    monkeypatch.setattr(keeper_api, "sync_down", lambda _params: None)
+    monkeypatch.setitem(
+        sys.modules,
+        "keepercommander.commands.discoveryrotation",
+        types.SimpleNamespace(PAMConfigurationListCommand=_FakeConfigList),
+    )
+
+    provider = CommanderCliProvider(folder_uid="folder-uid")
+
+    assert (
+        provider._run_cmd(["pam", "config", "list", "--format", "json"]) == '{"configurations":[]}'
+    )
+    assert seen == params
 
 
 def test_build_pam_rotation_edit_args_for_cron_settings() -> None:

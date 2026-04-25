@@ -18,8 +18,11 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   apply yet.
 - Bounded in-process Commander session refresh for `session_token_expired`
   during `pam project import` / `extend` and ownership-marker writes.
-  This is unit-tested with synthetic exceptions; live proof is still
-  pending.
+  This is unit-tested with synthetic exceptions and live-proven through
+  `scripts/smoke/smoke.py --login-helper env --scenario pamMachine`.
+- In-process PAM gateway/config JSON listing for the Commander provider,
+  with `sync_down` and bounded session refresh. This avoids stale
+  subprocess Commander sessions during reference-existing apply.
 - `docs/SDK_COMPLETION_PLAN.md` — devil's-advocate completion plan for
   parent orchestration plus Codex worker slices.
 - Smoke-runner diagnostics now identify the active SDK auth path and

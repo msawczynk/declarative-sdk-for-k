@@ -69,7 +69,7 @@ def test_run_cmd_nonzero_exit_raises_capability_error(monkeypatch: pytest.Monkey
     monkeypatch.setattr(subprocess, "run", fake_run)
 
     with pytest.raises(CapabilityError) as exc:
-        provider._run_cmd(["pam", "gateway", "list", "--format", "json"])
+        provider._run_cmd(["ls", "folder-uid", "--format", "json"])
     assert "rc=9" in exc.value.reason
     assert exc.value.context["stderr"].endswith("totp required\n")
 

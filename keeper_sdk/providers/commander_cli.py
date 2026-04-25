@@ -910,6 +910,11 @@ class CommanderCliProvider(Provider):
             and args[2] in {"import", "extend"}
         ):
             return self._run_pam_project_in_process(args)
+        if args in (
+            ["pam", "gateway", "list", "--format", "json"],
+            ["pam", "config", "list", "--format", "json"],
+        ):
+            return self._run_pam_list_in_process(args)
 
         # --batch-mode suppresses interactive prompts (password, 2FA,
         # confirmations). stdin=DEVNULL is belt-and-braces — if Commander ever
@@ -920,14 +925,21 @@ class CommanderCliProvider(Provider):
         env = os.environ.copy()
         if self._password:
             env["KEEPER_PASSWORD"] = self._password
-        result = subprocess.run(
-            base + args,
-            check=False,
-            capture_output=True,
-            text=True,
-            stdin=subprocess.DEVNULL,
-            env=env,
-        )
+        result = None
+        for attempt in range(2):
+            result = subprocess.run(
+                base + args,
+                check=False,
+                capture_output=True,
+                text=True,
+                stdin=subprocess.DEVNULL,
+                env=env,
+            )
+            if result.returncode == 0 or attempt == 1:
+                break
+            if not _is_retryable_keeper_session_text(result.stdout, result.stderr):
+                break
+        assert result is not None
         if result.returncode != 0:
             raise CapabilityError(
                 reason=f"keeper {' '.join(args)} failed (rc={result.returncode})",
@@ -955,6 +967,53 @@ class CommanderCliProvider(Provider):
     # ------------------------------------------------------------------
     # In-process invocation of `pam project import` / `pam project extend`.
     # ------------------------------------------------------------------
+
+    def _run_pam_list_in_process(self, args: list[str]) -> str:
+        """Run PAM list commands in-process so they share refreshable auth."""
+        stdout = ""
+        stderr = ""
+
+        def run_once() -> str:
+            nonlocal stdout, stderr
+            params = self._get_keeper_params()
+            buf_out = io.StringIO()
+            buf_err = io.StringIO()
+            err_log_handler = logging.StreamHandler(buf_err)
+            err_log_handler.setLevel(logging.WARNING)
+            root_logger = logging.getLogger()
+            root_logger.addHandler(err_log_handler)
+            result: Any = None
+            try:
+                from keepercommander import api  # type: ignore[import-not-found]
+
+                api.sync_down(params)
+                with contextlib.redirect_stdout(buf_out), contextlib.redirect_stderr(buf_err):
+                    if args[:3] == ["pam", "gateway", "list"]:
+                        from keepercommander.commands.discoveryrotation import (  # type: ignore
+                            PAMGatewayListCommand,
+                        )
+
+                        result = PAMGatewayListCommand().execute(params, format="json")
+                    else:
+                        from keepercommander.commands.discoveryrotation import (  # type: ignore
+                            PAMConfigurationListCommand,
+                        )
+
+                        result = PAMConfigurationListCommand().execute(params, format="json")
+            finally:
+                stdout = buf_out.getvalue()
+                stderr = buf_err.getvalue()
+                root_logger.removeHandler(err_log_handler)
+            return result if isinstance(result, str) and result else stdout
+
+        try:
+            return self._with_keeper_session_refresh(run_once)
+        except Exception as exc:
+            raise CapabilityError(
+                reason=f"in-process keeper {' '.join(args)} failed: {type(exc).__name__}: {exc}",
+                context={"stdout": stdout[-6000:], "stderr": stderr[-4000:]},
+                next_action="inspect the Commander output above and retry",
+            ) from exc
 
     def _run_pam_project_in_process(self, args: list[str]) -> str:
         """Parse argv for pam project {import,extend} and call the
@@ -1085,6 +1144,11 @@ def _is_retryable_keeper_session_error(exc: BaseException) -> bool:
     if isinstance(result_code, str) and result_code == _SESSION_EXPIRED_CODE:
         return True
     text = f"{type(exc).__name__}: {exc}".casefold()
+    return _SESSION_EXPIRED_CODE in text or ("session token" in text and "expired" in text)
+
+
+def _is_retryable_keeper_session_text(stdout: str | None, stderr: str | None) -> bool:
+    text = f"{stdout or ''}\n{stderr or ''}".casefold()
     return _SESSION_EXPIRED_CODE in text or ("session token" in text and "expired" in text)
 
 

@@ -43,7 +43,7 @@ keeper_sdk/                          # import path stable through 1.x
   providers/                         # MockProvider, CommanderCliProvider
   auth/                              # LoginHelper protocol + EnvLoginHelper reference impl
   cli/                               # `dsk` (validate / export / plan / diff / apply / import)
-tests/                               # 198 passing tests + 2 expected v1.1 deferrals
+tests/                               # 202 passing tests + 2 expected v1.1 deferrals
 docs/
   COMMANDER.md                       # pinned Commander version + capability matrix
   LOGIN.md                           # login helper contract + 30-line skeleton
@@ -101,7 +101,7 @@ Core + mock: complete. Commander provider: discover, plan, apply
 capability check. Capability gaps (rotation, JIT, gateway `mode: create`)
 surface as plan-time CONFLICT rows rather than silent drops, so
 `plan == apply --dry-run == apply` for every manifest + provider pair.
-Current local suite: 198 passing tests + 2 expected v1.1 deferrals.
+Current local suite: 202 passing tests + 2 expected v1.1 deferrals.
 Live `EnvLoginHelper` smoke proved the login contract (validate, plan,
 and sandbox provisioning); full apply is deferred behind a Commander
 session-refresh gap tracked for v1.1.
