@@ -6,9 +6,18 @@ Devil's-advocate execution gate: use
 [`docs/SDK_DA_COMPLETION_PLAN.md`](./SDK_DA_COMPLETION_PLAN.md) as the
 current completion contract when this roadmap conflicts with live evidence.
 
+**Parent / child + devil's advocate:** the orchestrator plays **parent**
+(adversarial review, gate lifts, live proof) vs **child** workers (Codex CLI,
+narrow agents). Learning from what the parent catches belongs in personal
+daybook `LESSONS` / `JOURNAL` (Downloads workspace methodology section), not
+only in PR comments.
+
+**Operational contract (repo-local):** [`docs/ORCHESTRATION_PHASE0_PARALLEL.md`](./ORCHESTRATION_PHASE0_PARALLEL.md) + `scripts/agent/phase0_gates.sh` — mirrored in global Cursor rules + daybook drift-guard so every workspace sees the same parent/script/Codex split.
+
 This plan is written for a parent orchestrator plus cheap Codex workers:
 
 - Parent owns live-test design, credential boundaries, GitHub release assets, roadmap decisions, merge safety, and final review.
+- **Codex CLI (`codex exec`) is the default worker** for scoped offline implementation; GitHub Codex (issues, Actions, `@codex`) is optional for async packetized work — see [`docs/CODEX_CLI.md`](./CODEX_CLI.md).
 - Codex owns scoped implementation slices and can run live smoke only when explicitly delegated through a whitelisted harness command.
 - Every Codex task returns a branch/patch, test output, caveats, and next steps. Parent verifies before merge.
 
@@ -92,22 +101,15 @@ Risk gates before merge:
 
 ## Operating Model
 
-### Daybook and dedicated memory repo
-
-Orchestration memory is **not** only in this repo: read
-[`docs/DAYBOOK.md`](./DAYBOOK.md) for the GitHub daybook (`msawczynk/cursor-daybook`),
-`sync_daybook.sh`, and the split between **main agent** (read/write/sync) and
-**workers/subagents** (`AGENT_PREAMBLE.md`, silent read, lesson candidates).
-
 ### Cost-Optimized Orchestration And Checks
 
 Cost target: spend cheap worker tokens on exploration/execution, spend parent tokens on review, gates, and decisions.
 
 Worker tiers:
 
-1. **Offline Codex implementation worker** — default for code/docs/tests. Runs focused tests only, no network, no live Keeper calls.
-2. **Live Codex smoke worker** — allowed for cloud-code proof when parent gives one exact smoke command, enables network, and forbids secret/env printing. It may use existing lab credentials only through the smoke harness; it must not inspect or modify credential files except through the harness.
-3. **Parent** — runs final diff review, full local checks once per integrated branch, classifies live results, updates issues/daybook, and merges/releases.
+1. **Offline Codex CLI worker** — **default first** for code/docs/tests. Parent invokes `scripts/agent/codex_offline_slice.sh` with a prompt file (task + scope + DONE contract per [`.github/codex/prompts/scoped-task.md`](../.github/codex/prompts/scoped-task.md)). No network, no live Keeper calls; focused `pytest` / `ruff` only as allowed in the prompt.
+2. **Live Codex smoke worker** — `scripts/agent/codex_live_smoke.sh` (or one explicit `scripts/smoke/smoke.py` line in the prompt). Network on; one harness command; no secret/env printing; no credential file inspection outside the harness.
+3. **Parent** — runs final diff review, full local checks once per integrated branch, classifies live results, updates issues, and merges/releases.
 
 Check budget:
 
@@ -127,9 +129,9 @@ Live smoke command rules:
 
 For each work package:
 
-1. Read issue, code, `JOURNAL.md`, and latest CI state.
+1. Read issue, code, and latest CI state.
 2. Create/refresh a GitHub issue with acceptance criteria.
-3. Spawn 1-3 Codex workers in isolated branches/worktrees.
+3. Spawn 1-3 **Codex CLI** workers (preferred) or GitHub-isolated branches/worktrees — same DONE contract; see [`docs/CODEX_CLI.md`](./CODEX_CLI.md).
 4. Give each worker one narrow slice; if live proof is needed, give one whitelisted harness command, not credentials.
 5. Review returned diff like a PR: correctness first, then tests/docs.
 6. Run parent checks:
@@ -141,7 +143,7 @@ For each work package:
    - `python3 scripts/sync_upstream.py --check` when capability mirror touched.
 7. Open PR, wait CI, merge only green.
 8. Parent delegates or runs live smoke for tenant-sensitive items, then reviews the transcript.
-9. Update `CHANGELOG.md`, `SCAFFOLD.md`, issues, daybook.
+9. Update `CHANGELOG.md`, `SCAFFOLD.md`, and issues.
 
 ### Codex Rules
 
@@ -693,10 +695,12 @@ Tasks:
 
 ## Codex Prompt Template
 
+**Run locally:** save the filled template as `task.md`, then `CODEX_MODEL=gpt-5.5 scripts/agent/codex_offline_slice.sh task.md` (see [`docs/CODEX_CLI.md`](./CODEX_CLI.md)). Align the final DONE block with [`.github/codex/prompts/scoped-task.md`](../.github/codex/prompts/scoped-task.md) when you want the stricter footer.
+
 Use this exact shape for worker prompts:
 
 ```text
-PREAMBLE: Read `/Users/martin/Downloads/.cursor/skills/AGENT_PREAMBLE.md` first and follow it.
+PREAMBLE: If your orchestrator uses a worker preamble file, read it first and follow it.
 Work in repo `/Users/martin/Downloads/Cursor tests/declarative-sdk-for-k`.
 
 Task: <one narrow task>.
@@ -730,8 +734,8 @@ CAVEATS:
 - <unknowns>
 NEXT:
 - <exact parent merge/test/live step>
-LESSONS ADDED:
-- <none or text>
+ORCHESTRATION NOTES:
+- <none or brief follow-ups for parent>
 ```
 
 ## First Five Codex Jobs
@@ -851,4 +855,4 @@ Stop and return to parent when:
 - Main CI green.
 - Live smoke matrix green for all supported mutating surfaces.
 - GitHub Release asset workflow green on the latest tag.
-- `README.md`, `SCAFFOLD.md`, `CHANGELOG.md`, `docs/CAPABILITY_MATRIX.md`, and daybook match reality.
+- `README.md`, `SCAFFOLD.md`, `CHANGELOG.md`, and `docs/CAPABILITY_MATRIX.md` match reality.

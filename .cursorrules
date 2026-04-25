@@ -1,57 +1,29 @@
 # Keeper Declarative SDK — Cursor Rules
 
-## Project Context
-This is a Python SDK + CLI for declarative management of Keeper Security vault resources.
-The core idea: YAML manifests describe desired state → the engine diffs against actual state → applies changes via Commander CLI or Service Mode REST API.
+This file is intentionally thin. The old copy drifted from the real tree and
+misled agents toward removed modules. Use these repo-local sources instead:
 
-Think of it as a mini-Terraform for Keeper internals (PAM configs, gateway bindings, shared folders, connections, rotation settings).
+- `AGENTS.md` — agent operating manual, command table, exit codes, guardrails.
+- `SCAFFOLD.md` — current folder map, where to land work, design reconciliation.
+- `docs/SDK_COMPLETION_PLAN.md` — roadmap, parent/Codex split, live-proof gates.
+- `docs/CODEX_CLI.md` — default local `codex exec` orchestration (offline slice + live smoke pointers).
+- `docs/ORCHESTRATION_PHASE0_PARALLEL.md` — Phase 0 gates, parent vs Codex split, parallel feature tracks (canonical for this repo).
+- `docs/VALIDATION_STAGES.md` — validation stages and exit-code contract.
 
-## Architecture
-- `keeper_sdk/manifest.py` — YAML/JSON parsing + JSON Schema validation
-- `keeper_sdk/graph.py` — Dependency DAG builder (topological sort for resource ordering)
-- `keeper_sdk/state.py` — Local state store (JSON file mapping logical names → Keeper UIDs)
-- `keeper_sdk/diff.py` — Desired vs actual state comparison
-- `keeper_sdk/plan.py` — Generates ordered create/update/delete operations
-- `keeper_sdk/executor.py` — Runs the plan through a backend
-- `keeper_sdk/backends/` — Pluggable backends (commander_cli.py, ksm_sdk.py, service_mode.py)
-- `keeper_sdk/resources/` — Resource type definitions with schemas
-- `keeper_sdk/cli.py` — Click-based CLI (plan, apply, export, destroy)
+Current architecture:
 
-## Conventions
-- Python 3.10+ (match statements OK, union types with `X | Y` OK)
-- Use `pydantic` for manifest models and validation
-- Use `click` for CLI
-- Use `networkx` for the dependency DAG
-- Type hints everywhere, `mypy --strict` clean
-- Tests with `pytest`, fixtures in `tests/conftest.py`
-- Commander CLI calls go through `subprocess.run` with structured output parsing
-- Service Mode calls go through `httpx` (async-capable)
-- State file: `.keeper-sdk-state.json` in working directory
-- Manifest files: `*.keeper.yaml` or `*.keeper.json`
+- Python 3.11+.
+- `keeper_sdk/core/` — manifest, schema, models, graph, diff, planner, preview, redact.
+- `keeper_sdk/cli/` — `dsk` Click entrypoint and Rich renderer.
+- `keeper_sdk/providers/` — `MockProvider` and Commander-backed live provider.
+- `scripts/smoke/` — committed live-smoke harness; no ad hoc Keeper mutation commands.
+- `.github/codex/` and `.github/workflows/codex-task.yml` — scoped GitHub Codex task scaffolding.
+- `scripts/agent/` — `codex_offline_slice.sh` (offline), `codex_live_smoke.sh` (one harness command), `phase0_gates.sh` (quick|full merge gates).
 
-## Keeper-Specific Knowledge
-- TWO existing Terraform providers: `keeper-security/secretsmanager` (KSM) and `Keeper-Security/keeper` (Admin)
-- Commander CLI is the Python package `keepercommander` — batch mode with `keeper --batch-mode`
-- Commander Service Mode is an HTTP API (REST) running on localhost when Commander is in service mode
-- KSM SDK: `keeper_secrets_manager_core` Python package, auth via `KEEPER_CREDENTIAL` env var
-- `folder_uid` is always required for record creation — folders are NOT created by Terraform today
-- UIDs are opaque strings assigned by Keeper — we must capture them from create operations and store in state
-- PAM resources have a dependency chain: shared_folder → gateway_config → pam_configuration → connection → rotation_settings
+Hard rules:
 
-## Code Style
-- No wildcard imports
-- Docstrings on all public functions (Google style)
-- Error messages should say what went wrong AND what to do about it
-- All Commander CLI output parsing should be behind an abstraction (so we can swap to Service Mode)
-- Resource definitions should be declarative (pydantic models with field metadata for Keeper field mappings)
-
-## Testing Strategy
-- Unit tests: mock Commander/KSM calls, test graph resolution, diff logic, plan generation
-- Integration tests: use a real Keeper vault (skipped in CI unless `KEEPER_CREDENTIAL` is set)
-- Fixture manifests in `tests/fixtures/` as YAML files
-
-## File Naming
-- Source: `keeper_sdk/<module>.py`
-- Tests: `tests/test_<module>.py`
-- Fixtures: `tests/fixtures/<name>.keeper.yaml`
-- Examples: `examples/<use-case>/environment.keeper.yaml`
+- Preserve preview/provider gates until parent-reviewed live proof passes.
+- Do not write direct Keeper DAG state from SDK or lab scripts; route live mutation through Commander surfaces.
+- Prefer Codex/cheap workers for scoped offline edits; parent owns live proof, gate lifts, release, GitHub safety, and final review.
+- Keep tests focused to the touched area first; run broad checks only when risk or release scope requires it.
+- **Token / style (all agents):** user-facing replies → **caveman-ultra** (terse, fragments, `→`, abbrev, no filler). Internal reasoning → **wenyan-ultra** where the product has a separate thinking channel — no English prose paragraphs there. Spawned workers (Codex, Task): prepend `AGENT_PREAMBLE.md` when orchestrator has it (`~/.cursor/skills/AGENT_PREAMBLE.md` in maintainer workspace). Phase handoff → quick pass against `token-economy.mdc` checklist when that rule is loaded.

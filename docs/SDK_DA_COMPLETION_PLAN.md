@@ -11,6 +11,12 @@ one of:
 - `preview-gated`: schema/model surface exists, but support is not claimed.
 - `upstream-gap`: pinned upstream lacks a safe writer/readback path.
 
+**Learning loop (process, not duplicated here):** **child** = narrow implementer
+(Codex / worker); **parent** = adversarial reviewer who runs a devil's-advocate
+checklist before merge or gate-lift; capture durable misses in personal daybook
+`LESSONS.md` and decisions in `JOURNAL.md` (Downloads workspace — section *Parent
+/ child + devil's advocate*).
+
 ## Current Truth
 
 Shipped and proven:
@@ -63,7 +69,7 @@ Tasks:
    - Commander provider rotation/discover fixes,
    - smoke scenario/docs,
    - validation/docs hardening.
-2. Re-run focused checks:
+2. Re-run focused checks (or **`scripts/agent/phase0_gates.sh quick`** — same commands bundled):
    - `python3 -m pytest -q tests/test_cli.py tests/test_commander_cli.py tests/test_smoke_scenarios.py tests/test_smoke_args.py`
    - `python3 -m ruff check keeper_sdk/cli/main.py keeper_sdk/providers/commander_cli.py tests/test_cli.py tests/test_commander_cli.py`
    - `bash -n scripts/agent/codex_live_smoke.sh`
@@ -322,6 +328,8 @@ Acceptance:
 
 ### Codex / GitHub Work Queue
 
+**Prefer local Codex CLI** for the default inner loop (`codex exec` via `scripts/agent/codex_offline_slice.sh` and the DONE contract in `.github/codex/prompts/scoped-task.md`). Full pattern: [`docs/CODEX_CLI.md`](./CODEX_CLI.md).
+
 Use GitHub issues for hands-off work only when each issue has:
 
 - task,
@@ -335,12 +343,12 @@ Use `.github/workflows/codex-task.yml` for manual Codex Action runs after
 `OPENAI_API_KEY` is configured. Keep `contents: read`; upload patch artifacts;
 parent applies/reviews locally. Do not auto-push Codex output to `main`.
 
-Local Codex:
+Local Codex CLI:
 
-- Use `--model gpt-5.5`.
-- Use no network by default.
+- Use `scripts/agent/codex_offline_slice.sh` + a prompt file for offline slices; set `CODEX_MODEL=gpt-5.5` (and `CODEX_BIN` if `codex` is not on `PATH`).
+- Use no network by default (offline script does not enable sandbox network).
 - Use `scripts/agent/codex_live_smoke.sh` only for one whitelisted smoke command.
-- Smoke-only workers skip daybook/preamble to avoid token leaks.
+- Smoke-only workers skip private preamble/orchestration files to avoid token leaks.
 
 ### Parent Review Loop
 
@@ -352,7 +360,7 @@ For each task:
 4. Run focused tests.
 5. Run one live proof only when the code is locally green.
 6. Classify result: `supported`, `preview-gated`, or `upstream-gap`.
-7. Update docs/scaffold/changelog/daybook.
+7. Update docs, scaffold, and changelog.
 
 Stop after three failed attempts on the same live blocker. Write down the exact
 new blocker instead of continuing speculative patches.
@@ -368,7 +376,7 @@ The SDK is complete when all are true:
 - Live smoke matrix is green for supported mutating surfaces.
 - Unsupported capabilities fail in validate/plan/apply with clear next actions.
 - Docs and scaffold match current behavior.
-- Daybook and issue state match current behavior.
+- GitHub issue state matches current behavior.
 
 The SDK is not complete if:
 

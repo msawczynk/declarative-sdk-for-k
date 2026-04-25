@@ -209,24 +209,29 @@ See `docs/LOGIN.md` for the 30-line helper skeleton.
    them.** Validation passes; `apply` converts them to CONFLICT rows;
    the tenant state is unchanged but the manifest contains a lie.
 
+## Orchestration — use Codex CLI first
+
+Canonical split + Phase 0 + parallel tracks: **[`docs/ORCHESTRATION_PHASE0_PARALLEL.md`](./docs/ORCHESTRATION_PHASE0_PARALLEL.md)**. Non-agentic gates: **`scripts/agent/phase0_gates.sh quick`** (iterate) and **`full`** (pre-merge).
+
+For **scoped implementation** (new tests, provider wiring, docs), the default workflow is **parent delegates to Codex CLI**, not a single long Cursor turn:
+
+1. Parent writes a prompt file: task, **hard file scope**, success criteria, **allowed commands** (e.g. `python3 -m pytest -q tests/test_foo.py`, `ruff check path`), and the DONE footer from `.github/codex/prompts/scoped-task.md`.
+2. Parent runs `scripts/agent/codex_offline_slice.sh` against that file (see [`docs/CODEX_CLI.md`](./docs/CODEX_CLI.md)).
+3. Parent reviews the patch, runs **`phase0_gates.sh`** (or full CI parity), owns **live smoke** and **gate lifts**, **pushes to GitHub**.
+
+GitHub Codex (issues, Actions) is optional for async work — [`docs/CODEX_GITHUB.md`](./docs/CODEX_GITHUB.md).
+
+**Token / style (every agent, including workers):** user-visible text → **caveman-ultra** (short, fragments, abbrev, `→`). Hidden reasoning → **wenyan-ultra** only where the product separates thinking from chat — never paste 文言 to humans. Workers: prepend maintainer `AGENT_PREAMBLE.md` when available; see [`.cursorrules`](./.cursorrules) and [`docs/CODEX_CLI.md`](./docs/CODEX_CLI.md) § token efficiency.
+
 ## Where to read next
 
-- **[`docs/DAYBOOK.md`](./docs/DAYBOOK.md)** — **read first** for daybook rules:
-  canonical repo [msawczynk/cursor-daybook](https://github.com/msawczynk/cursor-daybook),
-  `sync_daybook.sh` after edits, **main agent** vs **worker/subagent** duties.
-- **Canonical entrypoints (orchestrator machine):**
-  `/Users/martin/Downloads/JOURNAL.md` · `/Users/martin/Downloads/LESSONS.md`
-  (usually symlinks into `~/.cursor-daybook-sync`). **Main agent:** read at
-  session start, update on phase boundaries, **sync after changing** either
-  file. **Subagents / Codex / Task workers:** boot from
-  `/Users/martin/Downloads/.cursor/skills/AGENT_PREAMBLE.md` — read daybook
-  **silently**, stay in scope, return `LESSON CANDIDATE:` / `JOURNAL CANDIDATE:`
-  unless daybook edits are whitelisted; parent runs `sync_daybook.sh`.
 - `README.md` — human-oriented overview.
 - `docs/COMMANDER.md` — pinned Commander version + capability matrix.
 - `docs/SDK_DA_COMPLETION_PLAN.md` — current devil's-advocate completion
   gates, phases, and stop conditions.
 - `docs/SDK_COMPLETION_PLAN.md` — parent/Codex orchestration roadmap.
+- `docs/CODEX_CLI.md` — local `codex exec` as default worker; scripts under `scripts/agent/`.
+- `docs/ORCHESTRATION_PHASE0_PARALLEL.md` — Phase 0 clean tree, parallel Codex slices, scripted gates.
 - `docs/LOGIN.md` — custom-helper contract.
 - `V1_GA_CHECKLIST.md` — roadmap toward v1.0.0 GA.
 - `AUDIT.md` — milestone history + reconciliation with the upstream DOR.
