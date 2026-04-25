@@ -534,6 +534,40 @@ def test_unsupported_nested_rotation_settings_gate_stays_closed(
     assert "pam rotation edit" in reasons[0]
 
 
+def test_unsupported_nested_rotation_settings_opens_with_experimental_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = _provider(monkeypatch)
+    monkeypatch.setenv("DSK_EXPERIMENTAL_ROTATION_APPLY", "1")
+
+    assert provider.unsupported_capabilities(_rotation_manifest()) == []
+
+
+def test_unsupported_top_level_rotation_stays_closed_with_experimental_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = _provider(monkeypatch)
+    monkeypatch.setenv("DSK_EXPERIMENTAL_ROTATION_APPLY", "1")
+
+    reasons = provider.unsupported_capabilities(
+        {
+            "version": "1",
+            "name": "customer-prod",
+            "users": [
+                {
+                    "uid_ref": "usr.top",
+                    "type": "pamUser",
+                    "title": "top-user",
+                    "rotation_settings": {"rotation": "general", "enabled": "on"},
+                }
+            ],
+        }
+    )
+
+    assert len(reasons) == 1
+    assert "top-level users[].rotation_settings" in reasons[0]
+
+
 def test_build_post_import_tuning_argvs_for_connection_declared_subset() -> None:
     resource = {
         "type": "pamMachine",
@@ -717,6 +751,173 @@ def _apply_recorder(
         raise AssertionError(f"unexpected command: {args}")
 
     return recorder
+
+
+def _rotation_apply_plan() -> Plan:
+    return Plan(
+        manifest_name="customer-prod",
+        changes=[
+            Change(
+                kind=ChangeKind.CREATE,
+                uid_ref="cfg.local",
+                resource_type="pam_configuration",
+                title="Lab Config",
+                after={"title": "Lab Config"},
+            ),
+            Change(
+                kind=ChangeKind.CREATE,
+                uid_ref="res.db",
+                resource_type="pamDatabase",
+                title="db-prod",
+                after={"title": "db-prod"},
+            ),
+            Change(
+                kind=ChangeKind.CREATE,
+                uid_ref="usr.db",
+                resource_type="pamUser",
+                title="db-user",
+                after={"title": "db-user"},
+            ),
+            Change(
+                kind=ChangeKind.CREATE,
+                uid_ref="usr.admin",
+                resource_type="pamUser",
+                title="admin-user",
+                after={"title": "admin-user"},
+            ),
+        ],
+        order=["cfg.local", "res.db", "usr.db", "usr.admin"],
+    )
+
+
+def _rotation_apply_run_recorder(calls: list[list[str]]):
+    command_map = _resolved_tree_entries(project_name="customer-prod")
+
+    def recorder(self: CommanderCliProvider, args: list[str]) -> str:
+        calls.append(args)
+        if args[:3] == ["pam", "project", "import"]:
+            return ""
+        if args[:3] == ["pam", "rotation", "edit"]:
+            return ""
+        key = tuple(args)
+        if key in command_map:
+            return json.dumps(command_map[key])
+        raise AssertionError(f"unexpected command: {args}")
+
+    return recorder
+
+
+def test_apply_runs_nested_rotation_after_post_import_discovery(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
+    monkeypatch.setenv("DSK_EXPERIMENTAL_ROTATION_APPLY", "1")
+    calls: list[list[str]] = []
+    monkeypatch.setattr(
+        CommanderCliProvider,
+        "_run_cmd",
+        _rotation_apply_run_recorder(calls),
+    )
+    _install_fake_write_marker(monkeypatch, calls)
+
+    def fake_discover(self: CommanderCliProvider) -> list[LiveRecord]:
+        calls.append(["__discover__"])
+        return _rotation_live_records()
+
+    monkeypatch.setattr(CommanderCliProvider, "discover", fake_discover)
+    provider = CommanderCliProvider(folder_uid="folder-uid", manifest_source=_rotation_manifest())
+
+    outcomes = provider.apply_plan(_rotation_apply_plan())
+
+    rotation_call = next(call for call in calls if call[:3] == ["pam", "rotation", "edit"])
+    assert calls.index(["__discover__"]) < calls.index(rotation_call)
+    assert rotation_call == [
+        "pam",
+        "rotation",
+        "edit",
+        "--record",
+        "USER_UID",
+        "--config",
+        "CFG_UID",
+        "--resource",
+        "RES_UID",
+        "--admin-user",
+        "ADMIN_UID",
+        "--rotation-profile",
+        "general",
+        "--schedulecron",
+        "30 18 * * *",
+        "--complexity",
+        "32,5,5,5,5",
+        "--enable",
+        "--force",
+    ]
+    rotation_outcomes = [outcome for outcome in outcomes if outcome.action == "rotation"]
+    assert len(rotation_outcomes) == 1
+    assert rotation_outcomes[0].uid_ref == "usr.db"
+    assert rotation_outcomes[0].keeper_uid == "USER_UID"
+    assert rotation_outcomes[0].details["command"] == rotation_call
+
+
+def test_apply_rotation_dry_run_does_not_execute_rotation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
+    monkeypatch.setenv("DSK_EXPERIMENTAL_ROTATION_APPLY", "1")
+    calls: list[list[str]] = []
+    monkeypatch.setattr(
+        CommanderCliProvider,
+        "_run_cmd",
+        _rotation_apply_run_recorder(calls),
+    )
+    monkeypatch.setattr(
+        CommanderCliProvider,
+        "discover",
+        lambda self: pytest.fail("dry-run must not discover live records"),
+    )
+    provider = CommanderCliProvider(folder_uid="folder-uid", manifest_source=_rotation_manifest())
+
+    outcomes = provider.apply_plan(_rotation_apply_plan(), dry_run=True)
+
+    assert all(call[:3] != ["pam", "rotation", "edit"] for call in calls)
+    assert all(call != ["__discover__"] for call in calls)
+    assert calls[0][:3] == ["pam", "project", "import"]
+    assert calls[0][-1] == "--dry-run"
+    assert {outcome.action for outcome in outcomes} == {"create"}
+    assert all(outcome.details == {"dry_run": True} for outcome in outcomes)
+
+
+def test_apply_rotation_missing_live_ref_becomes_capability_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
+    monkeypatch.setenv("DSK_EXPERIMENTAL_ROTATION_APPLY", "1")
+    calls: list[list[str]] = []
+    monkeypatch.setattr(
+        CommanderCliProvider,
+        "_run_cmd",
+        _rotation_apply_run_recorder(calls),
+    )
+    _install_fake_write_marker(monkeypatch, calls)
+
+    def fake_discover(self: CommanderCliProvider) -> list[LiveRecord]:
+        return [record for record in _rotation_live_records() if record.keeper_uid != "USER_UID"]
+
+    monkeypatch.setattr(CommanderCliProvider, "discover", fake_discover)
+    provider = CommanderCliProvider(folder_uid="folder-uid", manifest_source=_rotation_manifest())
+
+    with pytest.raises(CapabilityError) as exc_info:
+        provider.apply_plan(_rotation_apply_plan())
+
+    assert "cannot apply resources[].users[].rotation_settings" in exc_info.value.reason
+    assert "missing live nested pamUser" in exc_info.value.reason
+    assert "pam project import/extend created" in exc_info.value.next_action
 
 
 def test_discover_requires_folder_uid(monkeypatch: pytest.MonkeyPatch) -> None:

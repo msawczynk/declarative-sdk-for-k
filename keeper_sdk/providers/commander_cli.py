@@ -74,6 +74,8 @@ _SILENT_FAIL_MARKERS = (
     "cannot be resolved",
 )
 _SESSION_EXPIRED_CODE = "session_token_expired"
+_ROTATION_APPLY_ENV_VAR = "DSK_EXPERIMENTAL_ROTATION_APPLY"
+_TRUTHY_ENV_VALUES = {"1", "true", "yes", "on"}
 
 
 class CommanderCliProvider(Provider):
@@ -168,7 +170,10 @@ class CommanderCliProvider(Provider):
         introspects its own ``self._manifest_source`` in practice.
         """
         source = manifest if manifest is not None else self._manifest_source
-        return _detect_unsupported_capabilities(source)
+        return _detect_unsupported_capabilities(
+            source,
+            allow_nested_rotation=_rotation_apply_is_enabled(),
+        )
 
     def check_tenant_bindings(self, manifest: Any = None) -> list[str]:
         """Stage-5 online checks: verify every declared binding resolves.
@@ -301,7 +306,10 @@ class CommanderCliProvider(Provider):
         # Last-line defence — CLI should have surfaced these as conflicts
         # already (see unsupported_capabilities above). If an SDK caller
         # bypasses the CLI and hands us a plan directly, we still refuse.
-        hits = _detect_unsupported_capabilities(self._manifest_source)
+        hits = _detect_unsupported_capabilities(
+            self._manifest_source,
+            allow_nested_rotation=_rotation_apply_is_enabled(),
+        )
         if hits:
             raise CapabilityError(
                 reason="manifest declares capabilities the CommanderCliProvider does not implement yet: "
@@ -461,6 +469,8 @@ class CommanderCliProvider(Provider):
                     else:
                         outcome.details["verified"] = True
 
+                outcomes.extend(self._apply_rotation_settings(plan, live_records))
+
         for change in deletes:
             if not change.keeper_uid:
                 outcomes.append(
@@ -524,6 +534,47 @@ class CommanderCliProvider(Provider):
                     uid_ref=change.uid_ref or "",
                     keeper_uid=change.keeper_uid or "",
                     action="noop",
+                )
+            )
+        return outcomes
+
+    # ------------------------------------------------------------------
+
+    def _apply_rotation_settings(
+        self,
+        plan: Plan,
+        live_records: list[LiveRecord],
+    ) -> list[ApplyOutcome]:
+        if not _rotation_apply_is_enabled():
+            return []
+        try:
+            argvs = build_pam_rotation_edit_argvs(
+                self._manifest_source,
+                plan=plan,
+                live_records=live_records,
+            )
+        except ValueError as exc:
+            raise CapabilityError(
+                reason=f"cannot apply resources[].users[].rotation_settings: {exc}",
+                next_action=(
+                    "confirm pam project import/extend created the nested pamUser, "
+                    "parent resource, admin user, and PAM configuration; then rerun plan/apply"
+                ),
+            ) from exc
+
+        live_by_uid = {record.keeper_uid: record for record in live_records}
+        outcomes: list[ApplyOutcome] = []
+        for argv in argvs:
+            self._run_cmd(argv)
+            record_uid = _argv_value(argv, "--record") or ""
+            live = live_by_uid.get(record_uid)
+            uid_ref = _non_empty_str((live.marker or {}).get("uid_ref")) if live else ""
+            outcomes.append(
+                ApplyOutcome(
+                    uid_ref=uid_ref or "",
+                    keeper_uid=record_uid,
+                    action="rotation",
+                    details={"command": argv},
                 )
             )
         return outcomes
@@ -1385,10 +1436,11 @@ def build_pam_rotation_edit_argvs(
 ) -> list[list[str]]:
     """Build Commander argv for nested ``pamUser`` rotation settings.
 
-    Pure resolver only: it never calls Keeper and is intentionally not wired
-    into ``apply_plan`` while the provider-capability and preview gates remain
-    in place. Nested users need three proven live UIDs before a rotation edit is
-    safe: the user record, the parent resource record, and the PAM config.
+    Pure resolver: it never calls Keeper. ``apply_plan`` only uses it behind
+    the Commander-only ``DSK_EXPERIMENTAL_ROTATION_APPLY`` opt-in while the
+    public provider-capability and preview gates remain in place. Nested users
+    need three proven live UIDs before a rotation edit is safe: the user
+    record, the parent resource record, and the PAM config.
     """
     source = _manifest_dict(manifest)
     _reject_top_level_user_rotation(source)
@@ -1664,11 +1716,6 @@ _UNSUPPORTED_CAPABILITY_HINTS: tuple[tuple[str, str, str], ...] = (
     # (dotted manifest path fragment, human name, Commander hook the SDK
     # should eventually drive to fulfil this capability)
     (
-        "rotation_settings",
-        "users[].rotation_settings / resources[].users[].rotation_settings",
-        "pam rotation edit --record / --resource / --schedulecron / --on-demand",
-    ),
-    (
         "default_rotation_schedule",
         "pam_configurations[].default_rotation_schedule",
         "no confirmed Commander CLI setter; pam rotation edit --schedule-config only reads config default",
@@ -1714,6 +1761,29 @@ def _reject_top_level_user_rotation(source: Mapping[str, Any]) -> None:
                 f"top-level users[].rotation_settings is unsupported for pamUser '{ident}'; "
                 "nest the pamUser under resources[].users[] so the parent resource UID can be resolved"
             )
+
+
+def _has_top_level_user_rotation(source: Mapping[str, Any]) -> bool:
+    return any(
+        isinstance(user, Mapping)
+        and user.get("type") == "pamUser"
+        and user.get("rotation_settings") is not None
+        for user in source.get("users") or []
+    )
+
+
+def _has_nested_user_rotation(source: Mapping[str, Any]) -> bool:
+    for resource in source.get("resources") or []:
+        if not isinstance(resource, Mapping):
+            continue
+        for user in resource.get("users") or []:
+            if (
+                isinstance(user, Mapping)
+                and user.get("type") == "pamUser"
+                and user.get("rotation_settings") is not None
+            ):
+                return True
+    return False
 
 
 def _rotation_config_ref(
@@ -1814,8 +1884,8 @@ def _build_pam_rotation_edit_args(
 ) -> list[str]:
     """Map declarative rotation settings to Commander's `pam rotation edit` argv.
 
-    Pure helper only. `apply_plan` still blocks rotation until the full
-    discovery/apply/outcome contract is proven offline and live.
+    Pure helper only. `apply_plan` calls it only behind the Commander-only
+    `DSK_EXPERIMENTAL_ROTATION_APPLY` opt-in.
     """
     data = _model_dump_dict(settings)
     args = ["pam", "rotation", "edit", "--record", record_uid]
@@ -1842,7 +1912,11 @@ def _build_pam_rotation_edit_args(
     return args
 
 
-def _detect_unsupported_capabilities(manifest: Any) -> list[str]:
+def _detect_unsupported_capabilities(
+    manifest: Any,
+    *,
+    allow_nested_rotation: bool = False,
+) -> list[str]:
     """Return human-readable reasons the manifest exceeds this provider.
 
     Pure detector — does not raise. Returns a list of strings suitable for
@@ -1873,11 +1947,38 @@ def _detect_unsupported_capabilities(manifest: Any) -> list[str]:
                     "mode: reference_existing)"
                 )
 
+    if _has_top_level_user_rotation(source):
+        hits.append(
+            "top-level users[].rotation_settings is not implemented for pamUser "
+            "(Commander hook needs a parent resource; nest the pamUser under resources[].users[])"
+        )
+    if _has_nested_user_rotation(source) and not allow_nested_rotation:
+        hits.append(
+            "resources[].users[].rotation_settings is not implemented "
+            "(Commander hook: `pam rotation edit --record / --resource / --schedulecron / --on-demand`; "
+            f"offline experimental path requires {_ROTATION_APPLY_ENV_VAR}=1)"
+        )
+
     for needle, human, hook in _UNSUPPORTED_CAPABILITY_HINTS:
         if _contains_key(source, needle):
             hits.append(f"{human} is not implemented (Commander hook: `{hook}`)")
 
     return hits
+
+
+def _rotation_apply_is_enabled() -> bool:
+    raw = os.environ.get(_ROTATION_APPLY_ENV_VAR, "")
+    return raw.strip().lower() in _TRUTHY_ENV_VALUES
+
+
+def _argv_value(argv: list[str], flag: str) -> str | None:
+    try:
+        index = argv.index(flag)
+    except ValueError:
+        return None
+    if index + 1 >= len(argv):
+        return None
+    return argv[index + 1]
 
 
 __all__ = [

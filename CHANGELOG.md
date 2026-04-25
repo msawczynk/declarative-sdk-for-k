@@ -33,6 +33,10 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 - Pure `build_pam_rotation_edit_argvs()` resolver for nested `pamUser`
   rotation settings. It resolves user/resource/config/admin refs but is
   not wired into apply while rotation remains gated.
+- Experimental Commander apply wiring for nested
+  `resources[].users[].rotation_settings`, guarded by
+  `DSK_EXPERIMENTAL_ROTATION_APPLY=1`. The public provider conflict
+  remains closed by default pending parent live proof.
 - `docs/ISSUE_6_JIT_SUPPORT_BOUNDARY.md` — source-backed JIT decision:
   keep `jit_settings` preview-gated because pinned Commander has import
   and launch helpers, but no safe standalone edit surface.
