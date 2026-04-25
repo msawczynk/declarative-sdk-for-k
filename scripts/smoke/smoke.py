@@ -502,14 +502,21 @@ def _share_ksm_app_folder(admin_params: Any, *, app_uid: str, folder_uid: str) -
         text=True,
         stdin=subprocess.DEVNULL,
     )
+    text = "\n".join(part for part in (result.stdout, result.stderr) if part)
+    text_cf = text.casefold()
     if result.returncode == 0:
+        if "is not a record nor shared folder" in text_cf:
+            raise SmokeError(
+                f"share-add rejected folder {folder_uid} for app {app_uid}: "
+                f"sync/cache issue (keeper stdout). Try `keeper sync-down` then re-run smoke."
+            )
         return
-    text = "\n".join(part for part in (result.stdout, result.stderr) if part).casefold()
-    if "already" in text:
+    if "already" in text_cf:
         log.info("KSM app %s already bound to folder %s", app_uid, folder_uid)
         return
     raise SmokeError(
-        f"share-add failed for app {app_uid} -> folder {folder_uid} (rc={result.returncode})"
+        f"share-add failed for app {app_uid} -> folder {folder_uid} (rc={result.returncode}); "
+        f"stderr={result.stderr!r} stdout_tail={text[-800:]!r}"
     )
 
 

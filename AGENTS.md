@@ -79,6 +79,17 @@ For the per-stage breakdown of what `validate` checks and which exit
 code fires for which failure (schema vs reference vs capability vs
 binding), read [`docs/VALIDATION_STAGES.md`](./docs/VALIDATION_STAGES.md).
 
+## Autonomous execution (maintainer grant)
+
+Maintainers grant **standing permission** to run this repo’s scripted gates and
+live smoke (`scripts/agent/phase0_gates.sh`, `scripts/smoke/smoke.py`,
+`scripts/agent/codex_live_smoke.sh` when scoped) without asking for approval
+before each command—**when** the lab machine already has Commander + the
+expected `keeper-vault-rbi-pam-testenv` configs (see `scripts/smoke/README.md`).
+Agents still must not echo secrets, must use the smoke harness (not ad-hoc
+tenant edits), and must treat failures as evidence (fix, document, or stop per
+`docs/SDK_DA_COMPLETION_PLAN.md`).
+
 ## Agent playbook
 
 ### A. "Apply this manifest"

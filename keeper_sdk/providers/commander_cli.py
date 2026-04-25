@@ -451,6 +451,11 @@ class CommanderCliProvider(Provider):
                             project_name=plan.manifest_name,
                             gateway_app_uid=synthetic_config["app_uid"],
                         )
+                        # Scaffold uses subprocess `keeper` while earlier stage-5
+                        # work may have warmed in-process KeeperParams. Idle or
+                        # alternate sessions can leave cached params stale for the
+                        # graph-heavy `pam project extend` call (session_token_expired).
+                        self._invalidate_keeper_params()
                         self._folder_uid = scaffold["resources_uid"]
                         self.last_resolved_folder_uid = scaffold["resources_uid"]
                         self.last_resolved_users_folder_uid = scaffold["users_uid"]
@@ -1403,10 +1408,18 @@ class CommanderCliProvider(Provider):
 
 
 def _is_retryable_keeper_session_error(exc: BaseException) -> bool:
-    result_code = getattr(exc, "result_code", None)
-    if isinstance(result_code, str) and result_code == _SESSION_EXPIRED_CODE:
-        return True
-    text = f"{type(exc).__name__}: {exc}".casefold()
+    """True when *exc* or its ``__cause__`` chain signals a refreshable session."""
+    parts: list[str] = []
+    cur: BaseException | None = exc
+    for _ in range(8):
+        if cur is None:
+            break
+        result_code = getattr(cur, "result_code", None)
+        if isinstance(result_code, str) and result_code == _SESSION_EXPIRED_CODE:
+            return True
+        parts.append(f"{type(cur).__name__}: {cur}")
+        cur = cur.__cause__ or getattr(cur, "original_error", None)
+    text = "\n".join(parts).casefold()
     return _SESSION_EXPIRED_CODE in text or ("session token" in text and "expired" in text)
 
 
