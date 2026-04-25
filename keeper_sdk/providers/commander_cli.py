@@ -78,6 +78,64 @@ _SILENT_FAIL_MARKERS = (
 _SESSION_EXPIRED_CODE = "session_token_expired"
 _ROTATION_APPLY_ENV_VAR = "DSK_EXPERIMENTAL_ROTATION_APPLY"
 _TRUTHY_ENV_VALUES = {"1", "true", "yes", "on"}
+# In-process PAM import / marker writes require a floor documented in docs/COMMANDER.md.
+_MIN_KEEPERCOMMANDER_VERSION = (17, 2, 13)
+
+
+def _semver_tuple_at_least(installed: tuple[int, ...], minimum: tuple[int, ...]) -> bool:
+    span = max(len(installed), len(minimum))
+    for i in range(span):
+        a = installed[i] if i < len(installed) else 0
+        b = minimum[i] if i < len(minimum) else 0
+        if a > b:
+            return True
+        if a < b:
+            return False
+    return True
+
+
+def _keepercommander_installed_tuple() -> tuple[int, ...]:
+    from importlib.metadata import PackageNotFoundError, version
+
+    try:
+        raw = version("keepercommander")
+    except PackageNotFoundError:
+        return ()
+    parts: list[int] = []
+    for segment in raw.strip().split("."):
+        digits = ""
+        for ch in segment:
+            if ch.isdigit():
+                digits += ch
+            else:
+                break
+        if not digits:
+            break
+        parts.append(int(digits))
+    return tuple(parts)
+
+
+def _ensure_keepercommander_version_for_apply() -> None:
+    installed = _keepercommander_installed_tuple()
+    if not installed:
+        raise CapabilityError(
+            reason="keepercommander Python package is not installed",
+            next_action="pip install 'keepercommander>=17.2.13,<18'",
+        )
+    if not _semver_tuple_at_least(installed, _MIN_KEEPERCOMMANDER_VERSION):
+        iv = ".".join(str(x) for x in installed)
+        mv = ".".join(str(x) for x in _MIN_KEEPERCOMMANDER_VERSION)
+        raise CapabilityError(
+            reason=(
+                f"keepercommander {iv} is below the minimum {mv} required for "
+                "CommanderCliProvider in-process apply paths"
+            ),
+            next_action=(
+                "upgrade with pip install -U 'keepercommander>=17.2.13,<18' "
+                "and read docs/COMMANDER.md for the pin rationale"
+            ),
+            context={"installed": installed, "required": _MIN_KEEPERCOMMANDER_VERSION},
+        )
 
 
 class CommanderCliProvider(Provider):
@@ -428,6 +486,8 @@ class CommanderCliProvider(Provider):
                 ),
             )
 
+        _ensure_keepercommander_version_for_apply()
+
         outcomes: list[ApplyOutcome] = []
         creates_updates = [
             c for c in plan.ordered() if c.kind in (ChangeKind.CREATE, ChangeKind.UPDATE)
@@ -519,7 +579,14 @@ class CommanderCliProvider(Provider):
                 temp_path.unlink(missing_ok=True)
 
             if not dry_run:
-                live_records = self.discover()
+                try:
+                    live_records = self.discover()
+                except CapabilityError as exc:
+                    raise CapabilityError(
+                        reason=f"discover() after pam import/extend failed: {exc.reason}",
+                        next_action=exc.next_action,
+                        context={**exc.context, "partial_outcomes": list(outcomes)},
+                    ) from exc
                 live_by_key, live_by_title = _index_live_records_for_title_matching(live_records)
 
                 now = utc_timestamp()
@@ -528,78 +595,104 @@ class CommanderCliProvider(Provider):
                 # future drift into a loud failure rather than a silent
                 # mis-association of markers to changes.
                 for change, outcome in zip(creates_updates, outcomes, strict=True):
-                    if synthetic_config and change.resource_type == "pam_configuration":
+                    try:
+                        if synthetic_config and change.resource_type == "pam_configuration":
+                            outcome.details.update(
+                                {
+                                    "marker_written": True,
+                                    "keeper_uid": synthetic_config["config_uid"],
+                                    "verified": True,
+                                    "reused_existing": True,
+                                }
+                            )
+                            continue
+                        exact_matches = live_by_key.get((change.resource_type, change.title), [])
+                        matches = exact_matches or _live_matches_by_identity(
+                            live_by_key=live_by_key,
+                            live_by_title=live_by_title,
+                            resource_type=change.resource_type,
+                            title=change.title,
+                        )
+                        if len(matches) > 1:
+                            match_label = (
+                                f"{change.resource_type} records" if exact_matches else "records"
+                            )
+                            raise CollisionError(
+                                reason=(
+                                    f"live tenant has {len(matches)} {match_label} titled "
+                                    f"'{change.title}' after apply"
+                                ),
+                                uid_ref=change.uid_ref,
+                                resource_type=change.resource_type,
+                                next_action=(
+                                    "rename duplicates or add ownership markers so matching "
+                                    "is unambiguous"
+                                ),
+                                context={"live_identifiers": [live.keeper_uid for live in matches]},
+                            )
+                        if not matches:
+                            outcome.details.update(
+                                {
+                                    "marker_written": False,
+                                    "reason": "record not found after apply",
+                                }
+                            )
+                            continue
+
+                        live = matches[0]
+                        post_import_argvs = _resolve_post_import_tuning_argvs(
+                            self._manifest_source,
+                            plan=plan,
+                            live_records=live_records,
+                            changes=[change],
+                        ).get(change.uid_ref or "", [])
+                        for argv in post_import_argvs:
+                            self._run_cmd(argv)
+                        marker = encode_marker(
+                            uid_ref=change.uid_ref or change.title,
+                            manifest=plan.manifest_name,
+                            resource_type=change.resource_type,
+                            last_applied_at=now,
+                        )
+                        self._write_marker(live.keeper_uid, marker)
                         outcome.details.update(
                             {
                                 "marker_written": True,
-                                "keeper_uid": synthetic_config["config_uid"],
-                                "verified": True,
-                                "reused_existing": True,
+                                "keeper_uid": live.keeper_uid,
                             }
                         )
-                        continue
-                    exact_matches = live_by_key.get((change.resource_type, change.title), [])
-                    matches = exact_matches or _live_matches_by_identity(
-                        live_by_key=live_by_key,
-                        live_by_title=live_by_title,
-                        resource_type=change.resource_type,
-                        title=change.title,
-                    )
-                    if len(matches) > 1:
-                        match_label = (
-                            f"{change.resource_type} records" if exact_matches else "records"
-                        )
-                        raise CollisionError(
+                        if post_import_argvs:
+                            outcome.details["post_import_tuning_argvs"] = post_import_argvs
+                            outcome.details["post_import_tuning_executed"] = True
+                        drift = _field_drift(change.after or {}, live.payload)
+                        if drift:
+                            outcome.details["field_drift"] = drift
+                        else:
+                            outcome.details["verified"] = True
+                    except CapabilityError as exc:
+                        outcome.details["apply_failed"] = True
+                        outcome.details["apply_failure_reason"] = exc.reason
+                        if exc.next_action:
+                            outcome.details["apply_failure_next_action"] = exc.next_action
+                        raise CapabilityError(
                             reason=(
-                                f"live tenant has {len(matches)} {match_label} titled "
-                                f"'{change.title}' after apply"
+                                f"apply stopped mid-batch while processing "
+                                f"{change.resource_type} uid_ref={change.uid_ref!r}: {exc.reason}"
                             ),
                             uid_ref=change.uid_ref,
                             resource_type=change.resource_type,
-                            next_action="rename duplicates or add ownership markers so matching is unambiguous",
-                            context={"live_identifiers": [live.keeper_uid for live in matches]},
-                        )
-                    if not matches:
-                        outcome.details.update(
-                            {
-                                "marker_written": False,
-                                "reason": "record not found after apply",
-                            }
-                        )
-                        continue
+                            next_action=exc.next_action,
+                            context={**exc.context, "partial_outcomes": list(outcomes)},
+                        ) from exc
 
-                    live = matches[0]
-                    post_import_argvs = _resolve_post_import_tuning_argvs(
-                        self._manifest_source,
-                        plan=plan,
-                        live_records=live_records,
-                        changes=[change],
-                    ).get(change.uid_ref or "", [])
-                    for argv in post_import_argvs:
-                        self._run_cmd(argv)
-                    marker = encode_marker(
-                        uid_ref=change.uid_ref or change.title,
-                        manifest=plan.manifest_name,
-                        resource_type=change.resource_type,
-                        last_applied_at=now,
-                    )
-                    self._write_marker(live.keeper_uid, marker)
-                    outcome.details.update(
-                        {
-                            "marker_written": True,
-                            "keeper_uid": live.keeper_uid,
-                        }
-                    )
-                    if post_import_argvs:
-                        outcome.details["post_import_tuning_argvs"] = post_import_argvs
-                        outcome.details["post_import_tuning_executed"] = True
-                    drift = _field_drift(change.after or {}, live.payload)
-                    if drift:
-                        outcome.details["field_drift"] = drift
-                    else:
-                        outcome.details["verified"] = True
-
-                outcomes.extend(self._apply_rotation_settings(plan, live_records))
+                try:
+                    outcomes.extend(self._apply_rotation_settings(plan, live_records))
+                except CapabilityError as exc:
+                    raise CapabilityError(
+                        reason=f"rotation apply failed after resource writes: {exc.reason}",
+                        next_action=exc.next_action,
+                        context={**exc.context, "partial_outcomes": list(outcomes)},
+                    ) from exc
 
         for change in deletes:
             if not change.keeper_uid:

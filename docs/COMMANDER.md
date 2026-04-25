@@ -15,8 +15,12 @@ have on disk, and the subset of Commander capabilities the SDK relies on.
 
 The SDK works with any `keeper` binary ≥ `17.1.14`, but **requires the Python
 module at `17.2.13` or newer** for the in-process code paths (`pam project
-import`/`extend`, `_write_marker`). If `pip show keepercommander` reports an
-older version, `apply` will fail early with a `CapabilityError`.
+import`/`extend`, `_write_marker`). `CommanderCliProvider.apply_plan()` reads
+`importlib.metadata.version("keepercommander")` and raises `CapabilityError`
+before mutating the tenant when the installed wheel is below that floor (see
+`tests/test_commander_cli.py::test_apply_rejects_keepercommander_below_minimum`).
+If `pip show keepercommander` reports an older version, `apply` will fail with
+that gate even when the `keeper` binary is newer.
 
 ## Why two versions matter
 

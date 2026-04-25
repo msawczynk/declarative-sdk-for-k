@@ -230,8 +230,12 @@ Purpose: make "complete" mean robust, not just feature-rich.
 Tasks:
 
 1. Resolve remaining `xfail`s only when behavior exists:
-   - Commander version mismatch gate.
-   - Partial-apply rollback/reporting.
+   - Commander version mismatch gate — **offline done** (`apply_plan` reads
+     `importlib.metadata.version("keepercommander")`; test
+     `test_apply_rejects_keepercommander_below_minimum`).
+   - Partial-apply rollback/reporting — **offline done** (`partial_outcomes` on
+     `CapabilityError` + per-row `apply_failed` details; test
+     `test_apply_partial_failure_records_outcomes_then_raises`).
 2. Add duplicate-title and duplicate-config checks where live lookups use names.
 3. Add two-writer race coverage:
    - plan clean,

@@ -65,13 +65,6 @@ def test_adoption_race_unmanaged_record_emits_conflict() -> None:
         assert "unmanaged record with matching title" in (target.reason or "")
 
 
-def test_partial_apply_rollback_records_outcome_then_raises() -> None:
-    pytest.xfail(
-        "deferred to v1.1 — see DOR TEST_PLAN.md partial-apply rollback scenario; "
-        "create/update paths do not yet append a failed outcome before re-raising"
-    )
-
-
 def test_ksm_rotation_mid_apply_does_not_invalidate_session(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -110,13 +103,6 @@ def test_ksm_rotation_mid_apply_does_not_invalidate_session(
     assert len(calls) == 1
     assert "re-login" in exc_info.value.next_action
     assert exc_info.value.context == {"stderr": "session expired"}
-
-
-def test_commander_version_mismatch_surfaces_capability_error() -> None:
-    pytest.xfail(
-        "deferred to v1.1 — see DOR TEST_PLAN.md Commander version mismatch scenario; "
-        "the provider has a documented pin but no production version gate yet"
-    )
 
 
 def test_stale_marker_cleanup_strips_unmanaged_when_record_gone() -> None:

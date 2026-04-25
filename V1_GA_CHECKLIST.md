@@ -120,9 +120,11 @@ and `tests/test_smoke_scenarios.py`.
 - [x] Expand `redact()` patterns (bearer tokens, JWTs, KSM URLs).
 - [x] `tests/test_perf.py` → add `resource.getrusage` memory
       assertions (currently prints only).
-- [x] Map DOR `TEST_PLAN.md` scenarios to SDK tests (`tests/test_dor_scenarios.py`;
-      6 scenarios covered, 2 marked `xfail` for deferred v1.1 gaps:
-      partial-apply rollback, Commander version mismatch).
+- [x] Map DOR `TEST_PLAN.md` scenarios to SDK tests (`tests/test_dor_scenarios.py`
+      plus `tests/test_commander_cli.py` for Commander-specific apply paths).
+      Partial-apply outcomes + `keepercommander` floor gate are covered in
+      `test_commander_cli.py` (`test_apply_partial_failure_records_outcomes_then_raises`,
+      `test_apply_rejects_keepercommander_below_minimum`).
 - [ ] Module rename from `keeper_sdk` → `declarative_sdk_k` (breaking, v2.0.0;
       will ship a shim module so `import keeper_sdk` keeps working for
       one minor cycle).

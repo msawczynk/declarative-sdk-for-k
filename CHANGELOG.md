@@ -7,6 +7,10 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- `CommanderCliProvider.apply_plan()` — runtime `keepercommander` floor check
+  (`17.2.13` via `importlib.metadata`) plus `CapabilityError.context["partial_outcomes"]`
+  when post-import `discover()`, marker tuning, marker write, or rotation apply
+  fails after earlier creates succeeded (offline tests in `test_commander_cli.py`).
 - `scripts/agent/run_smoke_matrix.sh` — sequential live run of every smoke
   scenario with `python3 -u` and per-scenario logs under `.smoke-runs/`
   (gitignored); optional `SMOKE_LOGIN_HELPER` / `--login-helper`.
@@ -26,7 +30,8 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   on graph APIs; walk `__cause__` when detecting retryable session errors.
 - Smoke: fail KSM `share add` when stdout reports folder is not a record/shared
   folder even if rc=0; include stderr/stdout tail on non-zero share failures.
-- `docs/COMMANDER.md` — SDK_DA §P3.1 readback bucket vocabulary aligned with Issue #5 RBI dirty-readback status.
+- `docs/COMMANDER.md` — SDK_DA §P3.1 readback bucket vocabulary; runtime
+  `keepercommander` floor on `apply_plan()`; Issue #5 RBI dirty-readback status.
 - Autonomous orchestration pass: parallel `run_parallel_codex.sh` (slices 01–03)
   aligned GitHub issue template + `CODEX_GITHUB`, smoke README scenario matrix,
   root docs with `ORCHESTRATION_PHASE0_PARALLEL`; parent ran `phase0_gates.sh full`

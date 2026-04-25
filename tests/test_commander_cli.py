@@ -3212,3 +3212,128 @@ def test_apply_reference_existing_splits_to_extend(monkeypatch: pytest.MonkeyPat
     assert outcomes[0].details["reused_existing"] is True
     assert outcomes[0].details["marker_written"] is True
     assert outcomes[1].details["marker_written"] is True
+
+
+def test_apply_rejects_keepercommander_below_minimum(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """DOR / SDK_DA Phase 4 — Commander Python module must meet the documented floor."""
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli._keepercommander_installed_tuple",
+        lambda: (17, 2, 12),
+    )
+    provider = CommanderCliProvider(folder_uid="folder-uid")
+    plan = Plan(manifest_name="empty", changes=[], order=[])
+
+    with pytest.raises(CapabilityError, match="below the minimum"):
+        provider.apply_plan(plan)
+
+
+def test_apply_partial_failure_records_outcomes_then_raises(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Mid-batch CapabilityError leaves prior create outcomes inspectable on the exception."""
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.utc_timestamp", lambda: "2026-04-26T00:00:00Z"
+    )
+    calls: list[list[str]] = []
+    monkeypatch.setattr(
+        CommanderCliProvider,
+        "_run_cmd",
+        _apply_recorder(
+            calls,
+            project_name="dor-partial",
+            discovered_entries=[
+                {
+                    "type": "record",
+                    "uid": "uid-a",
+                    "name": "db-a",
+                    "details": "Type: pamDatabase, Description: ...",
+                },
+                {
+                    "type": "record",
+                    "uid": "uid-b",
+                    "name": "db-b",
+                    "details": "Type: pamDatabase, Description: ...",
+                },
+            ],
+            get_payloads={
+                "uid-a": {
+                    "record_uid": "uid-a",
+                    "title": "db-a",
+                    "type": "pamDatabase",
+                    "fields": [],
+                    "custom": [],
+                },
+                "uid-b": {
+                    "record_uid": "uid-b",
+                    "title": "db-b",
+                    "type": "pamDatabase",
+                    "fields": [],
+                    "custom": [],
+                },
+            },
+            monkeypatch=None,
+        ),
+    )
+    marker_calls = {"count": 0}
+
+    def fail_second_marker(self: CommanderCliProvider, keeper_uid: str, marker: dict) -> None:
+        marker_calls["count"] += 1
+        if marker_calls["count"] == 2:
+            raise CapabilityError(
+                reason="simulated marker write failure",
+                next_action="retry after fixing the vault session",
+            )
+
+    monkeypatch.setattr(CommanderCliProvider, "_write_marker", fail_second_marker)
+
+    provider = CommanderCliProvider(
+        folder_uid="folder-uid",
+        manifest_source={
+            "version": "1",
+            "name": "dor-partial",
+            "resources": [
+                {"uid_ref": "prod-a", "type": "pamDatabase", "title": "db-a"},
+                {"uid_ref": "prod-b", "type": "pamDatabase", "title": "db-b"},
+            ],
+        },
+    )
+    plan = Plan(
+        manifest_name="dor-partial",
+        changes=[
+            Change(
+                kind=ChangeKind.CREATE,
+                uid_ref="prod-a",
+                resource_type="pamDatabase",
+                title="db-a",
+                after={"title": "db-a"},
+            ),
+            Change(
+                kind=ChangeKind.CREATE,
+                uid_ref="prod-b",
+                resource_type="pamDatabase",
+                title="db-b",
+                after={"title": "db-b"},
+            ),
+        ],
+        order=["prod-a", "prod-b"],
+    )
+
+    with pytest.raises(CapabilityError) as exc_info:
+        provider.apply_plan(plan)
+
+    partial = exc_info.value.context.get("partial_outcomes")
+    assert partial is not None
+    assert len(partial) == 2
+    assert partial[0].details["marker_written"] is True
+    assert partial[0].details["verified"] is True
+    assert partial[1].details["apply_failed"] is True
+    assert "simulated marker write failure" in partial[1].details["apply_failure_reason"]
+    assert marker_calls["count"] == 2
