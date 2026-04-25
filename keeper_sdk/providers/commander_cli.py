@@ -31,7 +31,7 @@ import os
 import shutil
 import subprocess
 import tempfile
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -71,6 +71,7 @@ _SILENT_FAIL_MARKERS = (
     "No such folder or record",
     "cannot be resolved",
 )
+_SESSION_EXPIRED_CODE = "session_token_expired"
 
 
 class CommanderCliProvider(Provider):
@@ -818,7 +819,6 @@ class CommanderCliProvider(Provider):
         the pam project import/extend path; reuse them.
         """
         payload = serialize_marker(marker)
-        params = self._get_keeper_params()
         try:
             from keepercommander import api, record_management, vault  # type: ignore
         except ImportError as exc:
@@ -827,28 +827,40 @@ class CommanderCliProvider(Provider):
                 next_action="install Commander Python package in the same interpreter as the SDK",
             ) from exc
 
-        api.sync_down(params)
-        record = vault.KeeperRecord.load(params, keeper_uid)
-        if not isinstance(record, vault.TypedRecord):
+        def write_once() -> None:
+            params = self._get_keeper_params()
+            api.sync_down(params)
+            record = vault.KeeperRecord.load(params, keeper_uid)
+            if not isinstance(record, vault.TypedRecord):
+                raise CapabilityError(
+                    reason=f"cannot write ownership marker: record {keeper_uid} is not a TypedRecord",
+                    next_action="confirm the record type and retry",
+                )
+
+            existing = None
+            for field in record.custom:
+                if (field.label or "") == MARKER_FIELD_LABEL:
+                    existing = field
+                    break
+            if existing is not None:
+                existing.type = "text"
+                existing.value = [payload]
+            else:
+                new_field = vault.TypedField.new_field("text", payload, MARKER_FIELD_LABEL)
+                record.custom.append(new_field)
+
+            record_management.update_record(params, record)
+            api.sync_down(params)
+
+        try:
+            self._with_keeper_session_refresh(write_once)
+        except CapabilityError:
+            raise
+        except Exception as exc:
             raise CapabilityError(
-                reason=f"cannot write ownership marker: record {keeper_uid} is not a TypedRecord",
-                next_action="confirm the record type and retry",
-            )
-
-        existing = None
-        for field in record.custom:
-            if (field.label or "") == MARKER_FIELD_LABEL:
-                existing = field
-                break
-        if existing is not None:
-            existing.type = "text"
-            existing.value = [payload]
-        else:
-            new_field = vault.TypedField.new_field("text", payload, MARKER_FIELD_LABEL)
-            record.custom.append(new_field)
-
-        record_management.update_record(params, record)
-        api.sync_down(params)
+                reason=f"cannot write ownership marker: {type(exc).__name__}: {exc}",
+                next_action="inspect the Commander output above and retry",
+            ) from exc
 
     def _resolve_project_resources_folder(self, project_name: str) -> str:
         # Commander's `ls <path>` returns the CHILDREN of that path, not the
@@ -952,48 +964,73 @@ class CommanderCliProvider(Provider):
         """
         subcmd = args[2]
         parsed = _parse_pam_project_args(args[3:])
-        params = self._get_keeper_params()
 
-        buf_out = io.StringIO()
-        buf_err = io.StringIO()
-        err_log_handler = logging.StreamHandler(buf_err)
-        err_log_handler.setLevel(logging.WARNING)
-        root_logger = logging.getLogger()
-        root_logger.addHandler(err_log_handler)
+        stdout = ""
+        stderr = ""
+
+        def run_once() -> str:
+            nonlocal stdout, stderr
+            params = self._get_keeper_params()
+            buf_out = io.StringIO()
+            buf_err = io.StringIO()
+            err_log_handler = logging.StreamHandler(buf_err)
+            err_log_handler.setLevel(logging.WARNING)
+            root_logger = logging.getLogger()
+            root_logger.addHandler(err_log_handler)
+            try:
+                with contextlib.redirect_stdout(buf_out), contextlib.redirect_stderr(buf_err):
+                    if subcmd == "import":
+                        from keepercommander.commands.pam_import.edit import (
+                            PAMProjectImportCommand,
+                        )
+
+                        cmd = PAMProjectImportCommand()
+                        cmd.execute(
+                            params,
+                            project_name=parsed.get("name"),
+                            file_name=parsed.get("file"),
+                            dry_run=parsed.get("dry_run", False),
+                        )
+                    else:
+                        from keepercommander.commands.pam_import.extend import (
+                            PAMProjectExtendCommand,
+                        )
+
+                        cmd = PAMProjectExtendCommand()
+                        cmd.execute(
+                            params,
+                            config=parsed.get("config"),
+                            file_name=parsed.get("file"),
+                            dry_run=parsed.get("dry_run", False),
+                        )
+            finally:
+                stdout = buf_out.getvalue()
+                stderr = buf_err.getvalue()
+                root_logger.removeHandler(err_log_handler)
+            return stdout
+
         try:
-            with contextlib.redirect_stdout(buf_out), contextlib.redirect_stderr(buf_err):
-                if subcmd == "import":
-                    from keepercommander.commands.pam_import.edit import PAMProjectImportCommand
-
-                    cmd = PAMProjectImportCommand()
-                    cmd.execute(
-                        params,
-                        project_name=parsed.get("name"),
-                        file_name=parsed.get("file"),
-                        dry_run=parsed.get("dry_run", False),
-                    )
-                else:
-                    from keepercommander.commands.pam_import.extend import PAMProjectExtendCommand
-
-                    cmd = PAMProjectExtendCommand()
-                    cmd.execute(
-                        params,
-                        config=parsed.get("config"),
-                        file_name=parsed.get("file"),
-                        dry_run=parsed.get("dry_run", False),
-                    )
+            return self._with_keeper_session_refresh(run_once)
         except Exception as exc:
-            stdout = buf_out.getvalue()
-            stderr = buf_err.getvalue()
             raise CapabilityError(
                 reason=f"in-process keeper pam project {subcmd} failed: {type(exc).__name__}: {exc}",
                 context={"stdout": stdout[-6000:], "stderr": stderr[-4000:]},
                 next_action="inspect the Commander output above and retry",
             ) from exc
-        finally:
-            root_logger.removeHandler(err_log_handler)
 
-        return buf_out.getvalue()
+    def _with_keeper_session_refresh(self, operation: Callable[[], Any]) -> Any:
+        """Run an in-process Commander operation, re-login once on session expiry."""
+        try:
+            return operation()
+        except Exception as exc:
+            if not _is_retryable_keeper_session_error(exc):
+                raise
+            self._invalidate_keeper_params()
+        return operation()
+
+    def _invalidate_keeper_params(self) -> None:
+        self._keeper_params = None
+        self._keeper_login_attempted = False
 
     def _get_keeper_params(self) -> Any:
         if self._keeper_params is not None:
@@ -1041,6 +1078,14 @@ class CommanderCliProvider(Provider):
             ) from exc
         self._keeper_params = params
         return params
+
+
+def _is_retryable_keeper_session_error(exc: BaseException) -> bool:
+    result_code = getattr(exc, "result_code", None)
+    if isinstance(result_code, str) and result_code == _SESSION_EXPIRED_CODE:
+        return True
+    text = f"{type(exc).__name__}: {exc}".casefold()
+    return _SESSION_EXPIRED_CODE in text or ("session token" in text and "expired" in text)
 
 
 def build_post_import_tuning_argvs(
