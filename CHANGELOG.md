@@ -6,7 +6,23 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-04-26
+
+Tag policy decision: annotated-only, GitHub-only repo (no PyPI, no `git
+verify-tag` consumer flow). Sigstore/cosign of `dist/*` in `publish.yml`
+is the cheap upgrade path if supply-chain requirements change.
+
 ### Added
+- 12 per-folder `SCAFFOLD.md` files under `keeper_sdk/{,core,cli,providers,auth}`,
+  `tests/`, `docs/`, `examples/`, `scripts/{,agent,smoke}`, and `.github/`. Each
+  provides local module map, hard rules, "where to land new work" table, and
+  reconciliation rows so agents landing in any directory get scoped context
+  without re-reading the root scaffold.
+- `RECONCILIATION.md` — root cross-check vs `V1_GA_CHECKLIST.md`,
+  `docs/SDK_DA_COMPLETION_PLAN.md`, `AUDIT.md`, `REVIEW.md`. Records every
+  shipped / preview-gated / upstream-gap / deferred row, proves no silent
+  drops, lists open questions. Single page agents read before proposing
+  new features.
 - `CommanderCliProvider.apply_plan()` — runtime `keepercommander` floor check
   (`17.2.13` via `importlib.metadata`) plus `CapabilityError.context["partial_outcomes"]`
   when post-import `discover()`, marker tuning, marker write, or rotation apply
@@ -18,7 +34,29 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   phases mapped to `phase0_gates.sh`, Codex scripts, live smoke commands, and
   gate-lift stop conditions.
 
+### Fixed
+- `scripts/smoke/smoke.py` — post-destroy folder sweep + manifest-empty
+  re-discover for verify. Empty-manifest plans omit gateways /
+  `pam_configurations`; combined with `reference_existing` scaffolds,
+  Commander could leave SDK-marked `pam_configuration` rows under the
+  project Resources/Users folders that never appeared as DELETE rows.
+  Smoke now sweeps both folders via `sandbox.teardown_records(manager=…)`
+  (tolerant of "No such folder" since destroy may have removed the tree)
+  and re-discovers with an empty `manifest_source` so `discover()` skips
+  the synthetic reference-config `LiveRecord` that always carries the
+  marker. Pairs with the manifest-aware RBI discover from `e71fb46`.
+
 ### Changed
+- `V1_GA_CHECKLIST.md` — drop signed-`v1.0.0`-tag blocker; record
+  annotated-only tag policy with rationale (GitHub-only repo, no PyPI,
+  no documented `git verify-tag` consumer flow). Sigstore/cosign of
+  `dist/*` in `publish.yml` is the upgrade path if supply-chain
+  requirements change.
+- `SCAFFOLD.md` — refreshed to link the 12 per-folder SCAFFOLDs and
+  add new tree entries (`scripts/agent/_codex_resolve.sh`,
+  `run_parallel_codex.sh`, `prompts/`, `tests/test_errors.py`,
+  `tests/test_rbi_readback.py`); reconciliation row for the `v1.0.0`
+  tag flipped `EXTERNAL-GAP` → `SHIPPED-by-policy`.
 - `compute_diff` — ``pamUser`` field drift uses semantic equality for
   ``rotation_settings`` (CRON normalization, ``enabled`` bool vs ``on``/``off``,
   extra schedule keys) so live re-plan is not blocked by readback-only shape
