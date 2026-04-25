@@ -6,6 +6,13 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- RBI discover DAG merge (`allowedSettings` → `pam_settings.options`) now
+  delegates to `_merge_rbi_dag_options_into_pam_settings` in
+  `_commander_cli_helpers.py`, with unit tests for tri-state / default
+  handling. Discover passes `folder_uid` on each `ls` listing row for
+  consistent `get` readback metadata.
+
 ### Added
 - `pamUserNested` smoke scenario — proves nested `resources[].users[]`
   through schema, typed model, planner, and Commander normalization

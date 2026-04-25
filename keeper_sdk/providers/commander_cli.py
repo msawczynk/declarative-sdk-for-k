@@ -1,7 +1,8 @@
-"""Commander-CLI backed provider.
+"""Commander-backed provider.
 
-Wraps the ``keeper`` CLI (Commander) via subprocess. This provider is the
-production path today: Commander already implements record I/O, rotation
+Wraps Commander via subprocess for simple commands and direct in-process
+command classes for PAM commands that need the logged-in session. This provider
+is the production path today: Commander already implements record I/O, rotation
 wiring, KSM binding, gateway registration, and share graph, so we reuse it
 instead of re-implementing.
 
@@ -51,6 +52,7 @@ from keeper_sdk.providers._commander_cli_helpers import (
     _field_drift,
     _has_existing,
     _load_json,
+    _merge_rbi_dag_options_into_pam_settings,
     _pam_configuration_uid_ref,
     _parse_pam_project_args,
     _payload_for_extend,
@@ -93,6 +95,7 @@ class CommanderCliProvider(Provider):
         self._bin = keeper_bin or os.environ.get("KEEPER_BIN", "keeper")
         self._folder_uid = folder_uid or os.environ.get("KEEPER_DECLARATIVE_FOLDER")
         self.last_resolved_folder_uid: str | None = None
+        self.last_resolved_users_folder_uid: str | None = None
         self._config = config_file or os.environ.get("KEEPER_CONFIG")
         # Commander's persistent-login still needs the master password on
         # subprocess invocation to unlock the local key; honor --batch-mode by
@@ -102,7 +105,7 @@ class CommanderCliProvider(Provider):
         # In-process Commander session — lazily established the first time a
         # subcommand can't run reliably via subprocess (e.g. `pam project
         # import` / `extend` hit persistent-login re-auth prompts in batch
-        # mode; see LESSONS [keeper-cli] 2026-04-24). Params are cached for
+        # mode). Params are cached for
         # the lifetime of the provider.
         self._keeper_params: Any | None = None
         self._keeper_login_attempted = False
@@ -117,10 +120,8 @@ class CommanderCliProvider(Provider):
     # ------------------------------------------------------------------
 
     def discover(self) -> list[LiveRecord]:
-        project_name = self._manifest_name()
-        if project_name:
-            self._maybe_resolve_project_resources_folder(project_name)
-        if not self._folder_uid:
+        folder_uids = self._discover_folder_uids()
+        if not folder_uids:
             raise CapabilityError(
                 reason=(
                     "CommanderCliProvider has no folder_uid for discover(); "
@@ -129,33 +130,123 @@ class CommanderCliProvider(Provider):
                 ),
                 next_action="pass --folder-uid (or KEEPER_DECLARATIVE_FOLDER), or call apply_plan() first",
             )
-        payload = self._run_cmd(["ls", self._folder_uid, "--format", "json"])
-        entries = _load_json(payload, command="ls --format json")
-        if not isinstance(entries, list):
-            raise CapabilityError(
-                reason="Commander returned non-array JSON from `ls --format json`"
-            )
 
         records: list[LiveRecord] = []
-        for entry in entries:
-            if not isinstance(entry, dict) or entry.get("type") != "record":
-                continue
-            keeper_uid = entry.get("uid")
-            if not keeper_uid:
-                continue
-            item_payload = self._run_cmd(["get", keeper_uid, "--format", "json"])
-            item = _load_json(item_payload, command="get --format json")
-            if not isinstance(item, dict):
+        seen_uids: set[str] = set()
+        for folder_uid in folder_uids:
+            payload = self._run_cmd(["ls", folder_uid, "--format", "json"])
+            entries = _load_json(payload, command="ls --format json")
+            if not isinstance(entries, list):
                 raise CapabilityError(
-                    reason="Commander returned non-object JSON from `get --format json`"
+                    reason="Commander returned non-array JSON from `ls --format json`"
                 )
-            record = _record_from_get(item, listing_entry=entry)
-            if record is not None:
-                records.append(record)
+            for entry in entries:
+                if not isinstance(entry, dict) or entry.get("type") != "record":
+                    continue
+                keeper_uid = entry.get("uid")
+                if not keeper_uid:
+                    continue
+                keeper_uid = str(keeper_uid)
+                if keeper_uid in seen_uids:
+                    continue
+                seen_uids.add(keeper_uid)
+                listing_entry = dict(entry)
+                listing_entry.setdefault("folder_uid", folder_uid)
+                item_payload = self._run_cmd(["get", keeper_uid, "--format", "json"])
+                item = _load_json(item_payload, command="get --format json")
+                if not isinstance(item, dict):
+                    raise CapabilityError(
+                        reason="Commander returned non-object JSON from `get --format json`"
+                    )
+                record = _record_from_get(item, listing_entry=listing_entry)
+                if record is not None:
+                    records.append(record)
         config_record = self._synthetic_reference_configuration_record()
         if config_record is not None:
             records.append(config_record)
+        if self._keeper_params is not None:
+            self._enrich_pam_remote_browser_dag_options(records)
         return records
+
+    def _resolve_pam_configuration_keeper_uid(
+        self, live: LiveRecord, records: list[LiveRecord]
+    ) -> str | None:
+        """Resolve manifest ``pam_configuration_uid_ref`` to a live pam_configuration UID."""
+        marker = live.marker or {}
+        uid_ref = marker.get("uid_ref")
+        if not isinstance(uid_ref, str) or not uid_ref.strip():
+            return None
+        ms = self._manifest_source
+        if not isinstance(ms, dict):
+            return None
+        pam_cfg_ref: str | None = None
+        for res in ms.get("resources") or []:
+            if isinstance(res, dict) and res.get("uid_ref") == uid_ref:
+                pref = res.get("pam_configuration_uid_ref")
+                if isinstance(pref, str) and pref.strip():
+                    pam_cfg_ref = pref.strip()
+                break
+        if not pam_cfg_ref:
+            return None
+        for lr in records:
+            if lr.resource_type != "pam_configuration":
+                continue
+            m = lr.marker or {}
+            if m.get("uid_ref") == pam_cfg_ref:
+                return str(lr.keeper_uid)
+        return None
+
+    def _enrich_pam_remote_browser_dag_options(self, records: list[LiveRecord]) -> None:
+        """Merge DAG ``allowedSettings`` into discovered RBI ``pam_settings.options``.
+
+        Commander's ``pam rbi edit --remote-browser-isolation`` persists the RBI
+        toggle on the resource vertex as ``allowedSettings.connections``; session
+        recording uses ``allowedSettings.sessionRecording``. When an in-process
+        ``KeeperParams`` session exists (for example after apply), map those
+        tri-states back onto manifest-shaped ``pam_settings.options`` so smoke
+        verify and re-plan can see post-tuning state without direct DAG writes
+        from the SDK.
+        """
+        try:
+            from keepercommander.commands.tunnel.port_forward.tunnel_helpers import (  # type: ignore
+                get_keeper_tokens,
+            )
+            from keepercommander.commands.tunnel.port_forward.TunnelGraph import (  # type: ignore
+                TunnelDAG,
+            )
+        except ImportError:
+            return
+        if self._keeper_params is None:
+            return
+        params = self._keeper_params
+        encrypted_session_token, encrypted_transmission_key, transmission_key = get_keeper_tokens(
+            params
+        )
+        tdag_cache: dict[str, Any] = {}
+        for live in records:
+            if live.resource_type != "pamRemoteBrowser":
+                continue
+            cfg_uid = self._resolve_pam_configuration_keeper_uid(live, records)
+            if not cfg_uid:
+                continue
+            if cfg_uid not in tdag_cache:
+                tdag_cache[cfg_uid] = TunnelDAG(
+                    params,
+                    encrypted_session_token,
+                    encrypted_transmission_key,
+                    cfg_uid,
+                    transmission_key=transmission_key,
+                )
+            tdag = tdag_cache[cfg_uid]
+            if tdag is None or not getattr(tdag.linking_dag, "has_graph", False):
+                continue
+            rid = str(live.keeper_uid)
+            connections = tdag.get_resource_setting(rid, "allowedSettings", "connections")
+            session_rec = tdag.get_resource_setting(rid, "allowedSettings", "sessionRecording")
+            ps = live.payload.setdefault("pam_settings", {})
+            _merge_rbi_dag_options_into_pam_settings(
+                ps, connections=connections, session_recording=session_rec
+            )
 
     def unsupported_capabilities(self, manifest: Any = None) -> list[str]:
         """Enumerate manifest-declared capabilities this provider cannot drive.
@@ -327,6 +418,11 @@ class CommanderCliProvider(Provider):
         deletes = plan.deletes
 
         if creates_updates:
+            rotation_preview_argvs = (
+                _preview_rotation_argvs_by_ref(self._manifest_source)
+                if dry_run and _rotation_apply_is_enabled()
+                else {}
+            )
             payload = to_pam_import_json(self._manifest_source)
             with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as handle:
                 cmd = ["pam", "project", "extend" if _has_existing(creates_updates) else "import"]
@@ -340,6 +436,7 @@ class CommanderCliProvider(Provider):
                         )
                         self._folder_uid = scaffold["resources_uid"]
                         self.last_resolved_folder_uid = scaffold["resources_uid"]
+                        self.last_resolved_users_folder_uid = scaffold["users_uid"]
                         payload = _payload_for_extend(
                             payload,
                             resources_folder_name=scaffold["resources_name"],
@@ -384,6 +481,10 @@ class CommanderCliProvider(Provider):
                         if preview_argvs:
                             details["post_import_tuning_argvs"] = preview_argvs
                             details["post_import_tuning_dry_run"] = True
+                        rotation_argvs = rotation_preview_argvs.get(change.uid_ref or change.title)
+                        if rotation_argvs:
+                            details["rotation_argvs"] = rotation_argvs
+                            details["rotation_dry_run"] = True
                     outcomes.append(
                         ApplyOutcome(
                             uid_ref=change.uid_ref or "",
@@ -397,9 +498,7 @@ class CommanderCliProvider(Provider):
 
             if not dry_run:
                 live_records = self.discover()
-                live_by_key: dict[tuple[str, str], list[LiveRecord]] = {}
-                for live in live_records:
-                    live_by_key.setdefault((live.resource_type, live.title), []).append(live)
+                live_by_key, live_by_title = _index_live_records_for_title_matching(live_records)
 
                 now = utc_timestamp()
                 # outcomes is built by iterating creates_updates in the same
@@ -417,11 +516,20 @@ class CommanderCliProvider(Provider):
                             }
                         )
                         continue
-                    matches = live_by_key.get((change.resource_type, change.title), [])
+                    exact_matches = live_by_key.get((change.resource_type, change.title), [])
+                    matches = exact_matches or _live_matches_by_identity(
+                        live_by_key=live_by_key,
+                        live_by_title=live_by_title,
+                        resource_type=change.resource_type,
+                        title=change.title,
+                    )
                     if len(matches) > 1:
+                        match_label = (
+                            f"{change.resource_type} records" if exact_matches else "records"
+                        )
                         raise CollisionError(
                             reason=(
-                                f"live tenant has {len(matches)} {change.resource_type} records titled "
+                                f"live tenant has {len(matches)} {match_label} titled "
                                 f"'{change.title}' after apply"
                             ),
                             uid_ref=change.uid_ref,
@@ -591,11 +699,26 @@ class CommanderCliProvider(Provider):
         except CapabilityError:
             return None
 
+    def _discover_folder_uids(self) -> list[str]:
+        project_name = self._manifest_name()
+        if project_name:
+            self._maybe_resolve_project_resources_folder(project_name)
+
+        folder_uids: list[str] = []
+        for folder_uid in (self._folder_uid, self.last_resolved_users_folder_uid):
+            if folder_uid and folder_uid not in folder_uids:
+                folder_uids.append(folder_uid)
+        return folder_uids
+
     def _synthetic_reference_configuration_record(self) -> LiveRecord | None:
         if not _uses_reference_existing(self._manifest_source):
             return None
         project_name = self._manifest_name()
-        if not project_name or not self._maybe_resolve_project_resources_folder(project_name):
+        if not project_name:
+            return None
+        if not self.last_resolved_folder_uid and not self._maybe_resolve_project_resources_folder(
+            project_name
+        ):
             return None
 
         payload = to_pam_import_json(self._manifest_source)
@@ -935,6 +1058,9 @@ class CommanderCliProvider(Provider):
             ) from exc
 
     def _resolve_project_resources_folder(self, project_name: str) -> str:
+        return self._resolve_project_scaffold_folders(project_name)["resources_uid"]
+
+    def _resolve_project_scaffold_folders(self, project_name: str) -> dict[str, str]:
         # Commander's `ls <path>` returns the CHILDREN of that path, not the
         # path entry itself. So `ls "PAM Environments"` already gives us the
         # project folders directly — no extra layer to strip.
@@ -962,7 +1088,13 @@ class CommanderCliProvider(Provider):
             )
         self._folder_uid = resources_uid
         self.last_resolved_folder_uid = resources_uid
-        return resources_uid
+        users_name = f"{project_name} - Users"
+        users_uid = _entry_uid_by_name(resources_entries, users_name)
+        self.last_resolved_users_folder_uid = users_uid
+        return {
+            "resources_uid": resources_uid,
+            "users_uid": users_uid or "",
+        }
 
     def _run_cmd(self, args: list[str]) -> str:
         # `pam project import` / `pam project extend` can't run reliably under
@@ -982,6 +1114,8 @@ class CommanderCliProvider(Provider):
             and args[2] in {"import", "extend"}
         ):
             return self._run_pam_project_in_process(args)
+        if args[:3] == ["pam", "rotation", "edit"]:
+            return self._run_pam_rotation_edit_in_process(args)
         if args in (
             ["pam", "gateway", "list", "--format", "json"],
             ["pam", "config", "list", "--format", "json"],
@@ -1037,7 +1171,7 @@ class CommanderCliProvider(Provider):
         return any(marker in stderr for marker in _SILENT_FAIL_MARKERS)
 
     # ------------------------------------------------------------------
-    # In-process invocation of `pam project import` / `pam project extend`.
+    # In-process invocation of PAM commands that need a live Commander session.
     # ------------------------------------------------------------------
 
     def _run_pam_list_in_process(self, args: list[str]) -> str:
@@ -1145,6 +1279,46 @@ class CommanderCliProvider(Provider):
         except Exception as exc:
             raise CapabilityError(
                 reason=f"in-process keeper pam project {subcmd} failed: {type(exc).__name__}: {exc}",
+                context={"stdout": stdout[-6000:], "stderr": stderr[-4000:]},
+                next_action="inspect the Commander output above and retry",
+            ) from exc
+
+    def _run_pam_rotation_edit_in_process(self, args: list[str]) -> str:
+        """Run ``pam rotation edit`` against the cached Commander session."""
+        stdout = ""
+        stderr = ""
+
+        def run_once() -> str:
+            nonlocal stdout, stderr
+            params = self._get_keeper_params()
+            buf_out = io.StringIO()
+            buf_err = io.StringIO()
+            err_log_handler = logging.StreamHandler(buf_err)
+            err_log_handler.setLevel(logging.WARNING)
+            root_logger = logging.getLogger()
+            root_logger.addHandler(err_log_handler)
+            try:
+                from keepercommander import api  # type: ignore[import-not-found]
+                from keepercommander.commands.discoveryrotation import (  # type: ignore[import-not-found]
+                    PAMCreateRecordRotationCommand,
+                )
+
+                cmd = PAMCreateRecordRotationCommand()
+                with contextlib.redirect_stdout(buf_out), contextlib.redirect_stderr(buf_err):
+                    parsed = vars(cmd.get_parser().parse_args(args[3:]))
+                    api.sync_down(params)
+                    cmd.execute(params, **parsed)
+            finally:
+                stdout = buf_out.getvalue()
+                stderr = buf_err.getvalue()
+                root_logger.removeHandler(err_log_handler)
+            return stdout
+
+        try:
+            return self._with_keeper_session_refresh(run_once)
+        except Exception as exc:
+            raise CapabilityError(
+                reason=f"in-process keeper pam rotation edit failed: {type(exc).__name__}: {exc}",
                 context={"stdout": stdout[-6000:], "stderr": stderr[-4000:]},
                 next_action="inspect the Commander output above and retry",
             ) from exc
@@ -1337,6 +1511,79 @@ def _preview_post_import_tuning_argvs(change: Change, manifest: Any) -> list[lis
         return []
 
 
+def _preview_rotation_argvs_by_ref(manifest: Any) -> dict[str, list[list[str]]]:
+    source = _manifest_source_dict(manifest)
+    if not source:
+        return {}
+    argvs_by_ref: dict[str, list[list[str]]] = {}
+    try:
+        _reject_top_level_user_rotation(source)
+    except ValueError:
+        return {}
+
+    for resource in source.get("resources") or []:
+        if not isinstance(resource, Mapping):
+            continue
+        parent_ref = _non_empty_str(resource.get("uid_ref"))
+        parent_title = _non_empty_str(resource.get("title"))
+        if not (parent_ref or parent_title):
+            continue
+        try:
+            config_ref, config_title = _rotation_config_ref(source, resource)
+        except ValueError:
+            continue
+        config_uid = _preview_ref(config_ref, config_title, role="config")
+        resource_uid = _preview_ref(parent_ref, parent_title, role="resource")
+
+        for user in resource.get("users") or []:
+            if (
+                not isinstance(user, Mapping)
+                or user.get("type") != "pamUser"
+                or user.get("rotation_settings") is None
+            ):
+                continue
+            user_ref = _non_empty_str(user.get("uid_ref"))
+            user_title = _non_empty_str(user.get("title"))
+            if not (user_ref or user_title):
+                continue
+            argv = _build_pam_rotation_edit_args(
+                record_uid=_preview_ref(user_ref, user_title, role="record"),
+                settings=user["rotation_settings"],
+                resource_uid=resource_uid,
+                config_uid=config_uid,
+                admin_uid=_preview_rotation_admin_uid(user["rotation_settings"]),
+            )
+            argvs_by_ref.setdefault(user_ref or user_title or "", []).append(argv)
+    return argvs_by_ref
+
+
+def _preview_ref(uid_ref: str | None, title: str | None, *, role: str) -> str:
+    if uid_ref:
+        if role == "record":
+            return f"<record:{uid_ref}>"
+        return f"<uid_ref:{uid_ref}>"
+    if title:
+        return f"<{role}:{title}>"
+    return f"<{role}:unresolved>"
+
+
+def _preview_rotation_admin_uid(settings: Any) -> str | None:
+    data = _model_dump_dict(settings)
+    admin_ref = next(
+        (
+            _non_empty_str(data.get(key))
+            for key in (
+                "admin_uid_ref",
+                "admin_user_uid_ref",
+                "administrative_credentials_uid_ref",
+            )
+            if _non_empty_str(data.get(key))
+        ),
+        None,
+    )
+    return f"<uid_ref:{admin_ref}>" if admin_ref else None
+
+
 def _manifest_source_dict(value: Any) -> dict[str, Any]:
     if hasattr(value, "model_dump"):
         dumped = value.model_dump(mode="python", exclude_none=True)
@@ -1517,12 +1764,13 @@ class _RotationRefResolver:
                 self._plan_by_title[(change.resource_type, change.title)] = change
 
         self._live_by_ref: dict[str, list[LiveRecord]] = {}
-        self._live_by_title: dict[tuple[str, str], list[LiveRecord]] = {}
+        self._live_by_title, self._live_by_any_title = _index_live_records_for_title_matching(
+            live_records
+        )
         for live in live_records:
             marker_ref = _non_empty_str((live.marker or {}).get("uid_ref"))
             if marker_ref:
                 self._live_by_ref.setdefault(marker_ref, []).append(live)
-            self._live_by_title.setdefault((live.resource_type, live.title), []).append(live)
 
     def resolve(
         self,
@@ -1564,13 +1812,43 @@ class _RotationRefResolver:
         return matches[0].keeper_uid if matches else None
 
     def _resolve_live_title(self, resource_type: str, title: str, role: str) -> str | None:
-        matches = self._live_by_title.get((resource_type, title), [])
+        matches = _live_matches_by_identity(
+            live_by_key=self._live_by_title,
+            live_by_title=self._live_by_any_title,
+            resource_type=resource_type,
+            title=title,
+        )
         if len(matches) > 1:
             raise ValueError(
                 f"duplicate live {role} match for title '{title}' ({resource_type}): "
                 f"{[item.keeper_uid for item in matches]}"
             )
         return matches[0].keeper_uid if matches else None
+
+
+def _index_live_records_for_title_matching(
+    live_records: list[LiveRecord],
+) -> tuple[dict[tuple[str, str], list[LiveRecord]], dict[str, list[LiveRecord]]]:
+    live_by_key: dict[tuple[str, str], list[LiveRecord]] = {}
+    live_by_title: dict[str, list[LiveRecord]] = {}
+    for live in live_records:
+        live_by_key.setdefault((live.resource_type, live.title), []).append(live)
+        if live.title:
+            live_by_title.setdefault(live.title, []).append(live)
+    return live_by_key, live_by_title
+
+
+def _live_matches_by_identity(
+    *,
+    live_by_key: dict[tuple[str, str], list[LiveRecord]],
+    live_by_title: dict[str, list[LiveRecord]],
+    resource_type: str,
+    title: str,
+) -> list[LiveRecord]:
+    exact = live_by_key.get((resource_type, title), [])
+    if exact:
+        return exact
+    return live_by_title.get(title, []) if title else []
 
 
 def _build_pam_connection_edit_argv(

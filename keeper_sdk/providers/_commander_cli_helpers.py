@@ -172,6 +172,59 @@ def _entry_uid_by_name(entries: Any, name: str) -> str | None:
     return None
 
 
+_TYPED_FIELD_SINGLE_OBJECT = frozenset({"pamRemoteBrowserSettings"})
+
+
+def _merge_pam_remote_browser_from_get_payload(payload: dict[str, Any]) -> None:
+    """Lift Commander typed ``pamRemoteBrowserSettings`` into manifest ``pam_settings`` shape."""
+    rbs = payload.pop("pamRemoteBrowserSettings", None)
+    if not isinstance(rbs, dict):
+        return
+    conn = rbs.get("connection")
+    if not isinstance(conn, dict) or not conn:
+        return
+    out: dict[str, Any] = {}
+    mapping = (
+        ("httpCredentialsUid", "autofill_credentials_uid_ref"),
+        ("protocol", "protocol"),
+        ("allowUrlManipulation", "allow_url_manipulation"),
+        ("ignoreInitialSslCert", "ignore_server_cert"),
+        ("allowedUrlPatterns", "allowed_url_patterns"),
+        ("allowedResourceUrlPatterns", "allowed_resource_url_patterns"),
+        ("recordingIncludeKeys", "recording_include_keys"),
+        ("disableCopy", "disable_copy"),
+        ("disablePaste", "disable_paste"),
+    )
+    for src, dst in mapping:
+        if src not in conn:
+            continue
+        val = conn[src]
+        if val is None or val == "":
+            continue
+        out[dst] = val
+    if out:
+        pam = payload.setdefault("pam_settings", {})
+        pam["connection"] = out
+
+
+def _merge_rbi_dag_options_into_pam_settings(
+    pam_settings: dict[str, Any],
+    *,
+    connections: str | None,
+    session_recording: str | None,
+) -> None:
+    """Map TunnelDAG ``allowedSettings`` tri-states onto manifest ``pam_settings.options``.
+
+    Commander persists RBI toggles on the DAG vertex; ``discover`` merges them
+    here so diff/plan see the same shape as the manifest after post-import tuning.
+    """
+    opts = pam_settings.setdefault("options", {})
+    if connections and connections != "default":
+        opts["remote_browser_isolation"] = connections
+    if session_recording and session_recording != "default":
+        opts["graphical_session_recording"] = session_recording
+
+
 def _record_from_get(item: dict[str, Any], *, listing_entry: dict[str, Any]) -> LiveRecord | None:
     keeper_uid = (
         item.get("record_uid")
@@ -192,6 +245,9 @@ def _record_from_get(item: dict[str, Any], *, listing_entry: dict[str, Any]) -> 
         return None
     if legacy_type_fallback:
         payload["_legacy_type_fallback"] = True
+
+    if resource_type == "pamRemoteBrowser":
+        _merge_pam_remote_browser_from_get_payload(payload)
 
     marker_raw = _extract_marker_field(item)
     marker = decode_marker(marker_raw)
@@ -240,6 +296,10 @@ def _canonical_payload_from_field(field: dict[str, Any]) -> dict[str, Any]:
         return {}
     value = values[0] if len(values) == 1 else values
     key = _FIELD_LABEL_ALIASES.get(label) or label or field_type
+    if field_type in _TYPED_FIELD_SINGLE_OBJECT:
+        if isinstance(value, dict):
+            return {str(field_type): value}
+        return {}
     if isinstance(value, (str, int, float, bool)):
         return {key: value}
     return {}
