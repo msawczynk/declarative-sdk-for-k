@@ -61,6 +61,8 @@ from keeper_sdk.providers._commander_cli_helpers import (
 _SILENT_FAIL_COMMANDS = {
     ("pam", "project", "import"),
     ("pam", "project", "extend"),
+    ("pam", "connection", "edit"),
+    ("pam", "rbi", "edit"),
     ("ls",),
     ("get",),
     ("record-update",),
@@ -366,12 +368,20 @@ class CommanderCliProvider(Provider):
                     keeper_uid = ""
                     if synthetic_config and change.resource_type == "pam_configuration":
                         keeper_uid = synthetic_config["config_uid"]
+                    details: dict[str, Any] = {"dry_run": dry_run}
+                    if dry_run:
+                        preview_argvs = _preview_post_import_tuning_argvs(
+                            change, self._manifest_source
+                        )
+                        if preview_argvs:
+                            details["post_import_tuning_argvs"] = preview_argvs
+                            details["post_import_tuning_dry_run"] = True
                     outcomes.append(
                         ApplyOutcome(
                             uid_ref=change.uid_ref or "",
                             keeper_uid=keeper_uid or change.keeper_uid or "",
                             action=change.kind.value,
-                            details={"dry_run": dry_run},
+                            details=details,
                         )
                     )
             finally:
@@ -421,6 +431,14 @@ class CommanderCliProvider(Provider):
                         continue
 
                     live = matches[0]
+                    post_import_argvs = _resolve_post_import_tuning_argvs(
+                        self._manifest_source,
+                        plan=plan,
+                        live_records=live_records,
+                        changes=[change],
+                    ).get(change.uid_ref or "", [])
+                    for argv in post_import_argvs:
+                        self._run_cmd(argv)
                     marker = encode_marker(
                         uid_ref=change.uid_ref or change.title,
                         manifest=plan.manifest_name,
@@ -434,6 +452,9 @@ class CommanderCliProvider(Provider):
                             "keeper_uid": live.keeper_uid,
                         }
                     )
+                    if post_import_argvs:
+                        outcome.details["post_import_tuning_argvs"] = post_import_argvs
+                        outcome.details["post_import_tuning_executed"] = True
                     drift = _field_drift(change.after or {}, live.payload)
                     if drift:
                         outcome.details["field_drift"] = drift
@@ -1174,6 +1195,186 @@ def build_post_import_tuning_argvs(
     else:
         argv = _build_pam_connection_edit_argv(record, resource, refs)
     return [argv] if argv is not None else []
+
+
+def _resolve_post_import_tuning_argvs(
+    manifest: Any,
+    *,
+    plan: Plan,
+    live_records: list[LiveRecord],
+    changes: list[Change],
+) -> dict[str, list[list[str]]]:
+    """Resolve and build post-import tuning argv for changed resources.
+
+    Pure resolver: no Commander calls. It requires live rediscovery because
+    create rows do not carry Keeper UIDs until after import / extend runs.
+    """
+    source = _manifest_source_dict(manifest)
+    if not source:
+        return {}
+    resources = _manifest_resources_by_ref(source)
+    refs = _RotationRefResolver(plan=plan, live_records=live_records)
+    argvs_by_ref: dict[str, list[list[str]]] = {}
+
+    for change in changes:
+        if not change.uid_ref:
+            continue
+        resource = resources.get(change.uid_ref)
+        if resource is None or not _has_post_import_tuning_fields(resource):
+            continue
+        try:
+            record_uid = refs.resolve(
+                uid_ref=change.uid_ref,
+                title=change.title,
+                resource_type=change.resource_type,
+                role="post-import tuning record",
+            )
+            resolved_refs = _resolve_post_import_tuning_refs(source, resource, refs)
+            argvs = build_post_import_tuning_argvs(
+                record_uid,
+                resource,
+                resolved_refs=resolved_refs,
+            )
+        except ValueError as exc:
+            raise CapabilityError(
+                reason=f"post-import tuning could not resolve refs: {exc}",
+                uid_ref=change.uid_ref,
+                resource_type=change.resource_type,
+                next_action=(
+                    "ensure every *_uid_ref used by pam_settings is declared in the "
+                    "manifest and visible after import, then re-run apply"
+                ),
+            ) from exc
+        if argvs:
+            argvs_by_ref[change.uid_ref] = argvs
+    return argvs_by_ref
+
+
+def _resolve_post_import_tuning_refs(
+    source: Mapping[str, Any],
+    resource: Mapping[str, Any],
+    refs: _RotationRefResolver,
+) -> dict[str, str]:
+    resolved: dict[str, str] = {}
+    for uid_ref in _post_import_tuning_uid_refs(resource):
+        resource_type, title = _desired_identity(source, uid_ref)
+        resolved[uid_ref] = refs.resolve(
+            uid_ref=uid_ref,
+            title=title,
+            resource_type=resource_type or "resource",
+            role="post-import tuning reference",
+        )
+    return resolved
+
+
+def _preview_post_import_tuning_argvs(change: Change, manifest: Any) -> list[list[str]]:
+    if not change.uid_ref:
+        return []
+    resource = _manifest_resources_by_ref(_manifest_source_dict(manifest)).get(change.uid_ref)
+    if resource is None or not _has_post_import_tuning_fields(resource):
+        return []
+    resolved_refs = {
+        uid_ref: f"<uid_ref:{uid_ref}>" for uid_ref in _post_import_tuning_uid_refs(resource)
+    }
+    try:
+        return build_post_import_tuning_argvs(
+            f"<record:{change.uid_ref}>",
+            resource,
+            resolved_refs=resolved_refs,
+        )
+    except ValueError:
+        return []
+
+
+def _manifest_source_dict(value: Any) -> dict[str, Any]:
+    if hasattr(value, "model_dump"):
+        dumped = value.model_dump(mode="python", exclude_none=True)
+        return dumped if isinstance(dumped, dict) else {}
+    return value if isinstance(value, dict) else {}
+
+
+def _manifest_resources_by_ref(source: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
+    resources: dict[str, Mapping[str, Any]] = {}
+    for resource in source.get("resources") or []:
+        if not isinstance(resource, Mapping):
+            continue
+        uid_ref = _non_empty_str(resource.get("uid_ref"))
+        if uid_ref:
+            resources[uid_ref] = resource
+    return resources
+
+
+_CONNECTION_TUNING_OPTION_KEYS = frozenset(
+    {
+        "connections",
+        "graphical_session_recording",
+        "text_session_recording",
+    }
+)
+_CONNECTION_TUNING_CONNECTION_KEYS = frozenset(
+    {
+        "administrative_credentials_uid_ref",
+        "launch_credentials_uid_ref",
+        "protocol",
+        "port",
+        "recording_include_keys",
+    }
+)
+_RBI_TUNING_OPTION_KEYS = frozenset(
+    {
+        "remote_browser_isolation",
+        "graphical_session_recording",
+    }
+)
+_RBI_TUNING_CONNECTION_KEYS = frozenset(
+    {
+        "autofill_credentials_uid_ref",
+        "autofill_targets",
+        "allow_url_manipulation",
+        "allowed_url_patterns",
+        "allowed_resource_url_patterns",
+        "recording_include_keys",
+        "disable_copy",
+        "disable_paste",
+        "ignore_server_cert",
+    }
+)
+
+
+def _has_post_import_tuning_fields(resource: Mapping[str, Any]) -> bool:
+    pam_settings = _as_mapping(resource.get("pam_settings"))
+    options = _as_mapping(pam_settings.get("options"))
+    connection = _as_mapping(pam_settings.get("connection"))
+    if resource.get("type") == "pamRemoteBrowser":
+        option_keys = _RBI_TUNING_OPTION_KEYS
+        connection_keys = _RBI_TUNING_CONNECTION_KEYS
+    else:
+        option_keys = _CONNECTION_TUNING_OPTION_KEYS
+        connection_keys = _CONNECTION_TUNING_CONNECTION_KEYS
+    return any(key in options for key in option_keys) or any(
+        key in connection for key in connection_keys
+    )
+
+
+def _post_import_tuning_uid_refs(resource: Mapping[str, Any]) -> list[str]:
+    refs: list[str] = []
+    config_ref = _non_empty_str(resource.get("pam_configuration_uid_ref"))
+    if config_ref:
+        refs.append(config_ref)
+    pam_settings = _as_mapping(resource.get("pam_settings"))
+    connection = _as_mapping(pam_settings.get("connection"))
+    if resource.get("type") == "pamRemoteBrowser":
+        keys = ("autofill_credentials_uid_ref",)
+    else:
+        keys = (
+            "administrative_credentials_uid_ref",
+            "launch_credentials_uid_ref",
+        )
+    for key in keys:
+        uid_ref = _non_empty_str(connection.get(key))
+        if uid_ref and uid_ref not in refs:
+            refs.append(uid_ref)
+    return refs
 
 
 def build_pam_rotation_edit_argvs(

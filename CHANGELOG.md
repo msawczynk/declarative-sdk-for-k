@@ -13,9 +13,11 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 - Offline `pam rotation edit` argv mapping helper and stricter preview
   detection for rotation keys. Rotation remains preview/unsupported
   until live apply is proven.
-- Offline post-import tuning argv helper for a safe subset of
-  `pam connection edit` and `pam rbi edit` fields. Not wired into live
-  apply yet.
+- Offline post-import tuning apply wiring for a safe subset of
+  `pam connection edit` and `pam rbi edit` fields. `apply_plan()` now
+  resolves changed records after rediscovery, executes the mapped edit
+  argv via `_run_cmd()`, and exposes dry-run preview argv without running
+  tuning commands. Live tenant proof is still pending.
 - Bounded in-process Commander session refresh for `session_token_expired`
   during `pam project import` / `extend` and ownership-marker writes.
   This is unit-tested with synthetic exceptions and live-proven through
