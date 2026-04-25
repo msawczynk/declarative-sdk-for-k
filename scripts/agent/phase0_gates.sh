@@ -21,6 +21,7 @@ bash -n scripts/agent/codex_offline_slice.sh
 bash -n scripts/agent/_codex_resolve.sh
 bash -n scripts/agent/phase0_gates.sh
 bash -n scripts/agent/run_parallel_codex.sh
+bash -n scripts/agent/run_smoke_matrix.sh
 
 if python3 -c "import yaml" 2>/dev/null; then
   for wf in .github/workflows/*.yml .github/workflows/*.yaml; do

@@ -84,6 +84,8 @@ Agent-first Python SDK + CLI (`dsk`) for deterministic `validate -> plan -> appl
 ├── scripts/                                # Maintenance and live-smoke tooling.
 │   ├── agent/                              # Codex CLI orchestration wrappers; see docs/CODEX_CLI.md.
 │   │   ├── README.md                       # When to use offline vs live-smoke scripts.
+│   │   ├── phase0_gates.sh                 # Scripted quick/full merge gates (pytest, ruff, mypy, build).
+│   │   ├── run_smoke_matrix.sh             # Optional: all live smoke scenarios; logs `.smoke-runs/`.
 │   │   ├── codex_offline_slice.sh          # Default offline `codex exec` (no network, workspace-write).
 │   │   └── codex_live_smoke.sh             # Whitelisted Codex live-smoke runner with network/redaction rules.
 │   ├── smoke/                              # Live-smoke harness and scenario registry.

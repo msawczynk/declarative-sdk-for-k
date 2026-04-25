@@ -9,8 +9,10 @@ Parent orchestration should prefer **Codex CLI** for scoped offline edits. See [
 | [`_codex_resolve.sh`](./_codex_resolve.sh) | Print resolved Codex path (`CODEX_BIN` → `PATH` → newest Cursor extension bundle). Used by the offline/live wrappers. |
 | [`codex_offline_slice.sh`](./codex_offline_slice.sh) | Run `codex exec` with workspace-write sandbox and **no network**; pass a prompt file that includes task, scope, allowed commands, and the DONE contract from `.github/codex/prompts/scoped-task.md`. |
 | [`codex_live_smoke.sh`](./codex_live_smoke.sh) | Run **one** whitelisted `scripts/smoke/smoke.py` scenario via Codex with network enabled for the harness only. |
+| [`run_smoke_matrix.sh`](./run_smoke_matrix.sh) | **Parent / CI optional:** run all smoke scenarios sequentially with `python3 -u` and per-scenario logs under `.smoke-runs/` (gitignored). Not part of default `phase0_gates` pytest; requires live tenant + lab configs. |
 
 Environment:
 
 - `CODEX_BIN` — path to `codex` if not on `PATH`.
 - `CODEX_MODEL` — e.g. `gpt-5.5` (set explicitly in scripts and in parent docs).
+- `SMOKE_LOGIN_HELPER` — default `deploy_watcher` for `run_smoke_matrix.sh` (override with `--login-helper`).

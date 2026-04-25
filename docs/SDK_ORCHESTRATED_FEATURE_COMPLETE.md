@@ -15,6 +15,7 @@ destroy** for every **supported** mutating path. See SDK_DA “Definition Of Don
 |------|----------------------|-------|
 | Fast loop | `scripts/agent/phase0_gates.sh quick` | Parent or CI |
 | Pre-merge | `scripts/agent/phase0_gates.sh full` | Parent |
+| Live matrix (optional) | `scripts/agent/run_smoke_matrix.sh` → `.smoke-runs/<ts>/*.log` | Parent |
 | Scoped code | `scripts/agent/codex_offline_slice.sh` + prompt from [`.github/codex/prompts/scoped-task.md`](../.github/codex/prompts/scoped-task.md) | Codex CLI (child) |
 | Parallel offline slices | `scripts/agent/run_parallel_codex.sh` (disjoint prompts; logs under `.codex-runs/`) | Parent launches, reviews patches |
 | Live tenant (whitelisted) | `scripts/agent/codex_live_smoke.sh …` or one explicit `python3 scripts/smoke/smoke.py …` line | Parent approves harness; no secret dumps |

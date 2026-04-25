@@ -41,7 +41,7 @@ Source checklist: [`docs/SDK_DA_COMPLETION_PLAN.md`](./SDK_DA_COMPLETION_PLAN.md
 
 - `python3 ~/.cursor-daybook-sync/scripts/audit_efficiency.py rules-verify` — symlinks + canonical rules.
 - Prepend `AGENT_PREAMBLE.md` to every Codex prompt; save long worker stdout to a file; optional `audit_efficiency.py text FILE` on Codex logs.
-- **Live smoke:** never background without capturing exit code; use `scripts/agent/codex_live_smoke.sh` or foreground `scripts/smoke/smoke.py` with `tee` if needed.
+- **Live smoke:** never background without capturing exit code; use `scripts/agent/codex_live_smoke.sh` or foreground `scripts/smoke/smoke.py` with `tee` if needed. Full sequential matrix: `scripts/agent/run_smoke_matrix.sh` (logs under `.smoke-runs/`).
 
 ## Related paths
 

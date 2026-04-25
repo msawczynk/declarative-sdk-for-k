@@ -7,11 +7,21 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- `scripts/agent/run_smoke_matrix.sh` — sequential live run of every smoke
+  scenario with `python3 -u` and per-scenario logs under `.smoke-runs/`
+  (gitignored); optional `SMOKE_LOGIN_HELPER` / `--login-helper`.
 - `docs/SDK_ORCHESTRATED_FEATURE_COMPLETE.md` — orchestration index: SDK_DA
   phases mapped to `phase0_gates.sh`, Codex scripts, live smoke commands, and
   gate-lift stop conditions.
 
 ### Changed
+- `AGENTS.md` — maintainer grant for autonomous gates + live smoke when lab
+  configs exist (no per-step approval); still no secret echo.
+- Commander: after reference-existing scaffold, invalidate cached in-process
+  `KeeperParams` before `pam project extend` to avoid `session_token_expired`
+  on graph APIs; walk `__cause__` when detecting retryable session errors.
+- Smoke: fail KSM `share add` when stdout reports folder is not a record/shared
+  folder even if rc=0; include stderr/stdout tail on non-zero share failures.
 - `docs/COMMANDER.md` — SDK_DA §P3.1 readback bucket vocabulary aligned with Issue #5 RBI dirty-readback status.
 - Autonomous orchestration pass: parallel `run_parallel_codex.sh` (slices 01–03)
   aligned GitHub issue template + `CODEX_GITHUB`, smoke README scenario matrix,

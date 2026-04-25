@@ -25,6 +25,15 @@ The `pamRemoteBrowser` and `pamUserNestedRotation` scenarios are proof harnesses
 
 ## One-command run
 
+Full matrix (all scenarios, logs under `.smoke-runs/`, gitignored):
+
+```bash
+scripts/agent/run_smoke_matrix.sh
+scripts/agent/run_smoke_matrix.sh --login-helper env
+```
+
+Single scenario:
+
 ```bash
 python3 scripts/smoke/smoke.py                          # pamMachine (default)
 python3 scripts/smoke/smoke.py --scenario pamDatabase   # Postgres cycle

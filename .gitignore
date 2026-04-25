@@ -22,6 +22,9 @@ venv/
 # Codex parallel runner logs (parent-reviewed only; never commit)
 .codex-runs/
 
+# Live smoke matrix logs (scripts/agent/run_smoke_matrix.sh)
+.smoke-runs/
+
 # Testing
 .pytest_cache/
 .coverage
