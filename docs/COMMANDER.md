@@ -63,6 +63,57 @@ Three concrete deltas that the SDK has to work around:
 | `keepercommander.vault.KeeperRecord.load` | hydrate typed record for the marker write |
 | `keepercommander.vault.TypedField.new_field` | build the custom-field entry |
 
+### Post-import connection / RBI tuning field map
+
+This is a docs-only audit for Issue #5 / Job D. It maps manifest fields to
+Commander import support vs. post-import edit hooks. It does **not** claim live
+support: `apply_plan()` currently imports or extends the project, discovers
+records, writes ownership markers, and reports drift; it does not run
+`pam connection edit` or `pam rbi edit` after import. Any
+`build_post_import_tuning_argvs()` helper is helper-only until `apply` calls it
+and the flow has offline plus live proof.
+
+Status vocabulary:
+
+- **Import-supported** means the field is rendered into `pam_data` for
+  `pam project import` / `pam project extend`, and the generated capability
+  mirror shows Commander import surface for that record family.
+- **Tuning-supported (helper-only)** means Commander exposes an edit flag and
+  the SDK can map a manifest field to argv, but `apply` does not execute that
+  argv today.
+- **Unsupported / unknown** means the SDK has no first-class model field, no
+  confirmed import key, no edit hook, or no verification path yet.
+
+| Field | Manifest path | Current status | Commander command / hook | Caveat |
+|-------|---------------|----------------|---------------------------|--------|
+| PAM config binding | `resources[].pam_configuration_uid_ref` | Tuning-supported (helper-only) | `pam connection edit --configuration`; `pam rbi edit --configuration` | SDK rewrites uid refs by title for import; edit hooks need live Keeper UID resolution first. |
+| Connections toggle | `resources[].pam_settings.options.connections` | Import-supported + tuning-supported (helper-only) | `pam project import/extend`; `pam connection edit --connections` | No post-import apply wiring yet. |
+| Graphical recording | `resources[].pam_settings.options.graphical_session_recording` | Import-supported + tuning-supported (helper-only) | `pam project import/extend`; `pam connection edit --connections-recording` | Commander flag name says connection recording; manifest name says graphical recording. |
+| Text/key recording | `resources[].pam_settings.options.text_session_recording` | Import-supported + tuning-supported (helper-only) | `pam project import/extend`; `pam connection edit --typescript-recording` | Commander flag spelling is `--typescript-recording`; no live proof in SDK. |
+| Connection protocol | `resources[].pam_settings.connection.protocol` | Import-supported + tuning-supported (helper-only) | `pam project import/extend`; `pam connection edit --protocol` | Applies to resource connection settings, not `pamRemoteBrowser` URL creation. |
+| Connection override port | `resources[].pam_settings.connection.port` | Import-supported + tuning-supported (helper-only) | `pam project import/extend`; `pam connection edit --connections-override-port` | Helper should stringify ints before argv. |
+| Admin credential | `resources[].pam_settings.connection.administrative_credentials_uid_ref` | Import-supported + tuning-supported (helper-only) | `pam project import/extend`; `pam connection edit --admin-user` | Import rewrites to a title; edit needs resolved UID/path. |
+| Launch credential | `resources[].pam_settings.connection.launch_credentials_uid_ref` | Import-supported + tuning-supported (helper-only) | `pam project import/extend`; `pam connection edit --launch-user` | Import rewrites to a title; edit needs resolved UID/path. |
+| Key-event recording | `resources[].pam_settings.connection.recording_include_keys` | Import-supported + tuning-supported (helper-only) | `pam project import/extend`; `pam connection edit --key-events` | Boolean maps to `on` / `off`. |
+| Supply user | `resources[].pam_settings.connection.allow_supply_user` | Import-supported only | `pam project import/extend` | No `pam connection edit` flag in the pinned Commander matrix. |
+| Copy / paste controls | `resources[].pam_settings.connection.disable_copy`, `disable_paste` | Import-supported only for non-RBI resources | `pam project import/extend` | `pam connection edit` has no copy/paste flags; RBI uses separate inverse flags below. |
+| SFTP block | `resources[].pam_settings.connection.sftp.*` | Import-supported only | `pam project import/extend` | No post-import edit flag in the pinned Commander matrix. |
+| Port forward | `resources[].pam_settings.port_forward.port`, `reuse_port` | Import-supported only | `pam project import/extend` | No post-import edit flag in the pinned Commander matrix. |
+| RBI URL | `resources[type=pamRemoteBrowser].url` | Import-supported by current model/examples; tuning unsupported | `pam project import/extend` | `pam rbi edit` has no URL flag in the pinned matrix. |
+| RBI enablement | `resources[type=pamRemoteBrowser].pam_settings.options.remote_browser_isolation` | Tuning-supported (helper-only); import support unknown | `pam rbi edit --remote-browser-isolation` | Capability matrix does not expose detailed `pamRemoteBrowser` import keys. |
+| RBI recording | `resources[type=pamRemoteBrowser].pam_settings.options.graphical_session_recording` | Tuning-supported (helper-only); import support unknown | `pam rbi edit --connections-recording` | Same flag text as connection recording. |
+| RBI autofill credential | `resources[type=pamRemoteBrowser].pam_settings.connection.autofill_credentials_uid_ref` | Tuning-supported (helper-only); import support unknown | `pam rbi edit --autofill-credentials` | Requires resolved UID/path before argv execution. |
+| RBI autofill targets | `resources[type=pamRemoteBrowser].pam_settings.connection.autofill_targets` | Tuning-supported (helper-only); import support unknown | `pam rbi edit --autofill-targets` | Commander supports repeated flags; current model is scalar, so list support needs a model/schema change before claiming contract support. |
+| RBI URL navigation | `resources[type=pamRemoteBrowser].pam_settings.connection.allow_url_manipulation` | Tuning-supported (helper-only); import support unknown | `pam rbi edit --allow-url-navigation` | Boolean maps to `on` / `off`. |
+| RBI allowed URLs | `resources[type=pamRemoteBrowser].pam_settings.connection.allowed_url_patterns` | Tuning-supported (helper-only); import support unknown | `pam rbi edit --allowed-urls` | Commander supports repeated flags; current model is scalar. |
+| RBI allowed resource URLs | `resources[type=pamRemoteBrowser].pam_settings.connection.allowed_resource_url_patterns` | Tuning-supported (helper-only); import support unknown | `pam rbi edit --allowed-resource-urls` | Commander supports repeated flags; current model is scalar. |
+| RBI key-event recording | `resources[type=pamRemoteBrowser].pam_settings.connection.recording_include_keys` | Tuning-supported (helper-only); import support unknown | `pam rbi edit --key-events` | Boolean maps to `on` / `off`. |
+| RBI copy control | `resources[type=pamRemoteBrowser].pam_settings.connection.disable_copy` | Tuning-supported (helper-only); import support unknown | `pam rbi edit --allow-copy` | Polarity is inverted: `disable_copy: true` -> `--allow-copy off`. |
+| RBI paste control | `resources[type=pamRemoteBrowser].pam_settings.connection.disable_paste` | Tuning-supported (helper-only); import support unknown | `pam rbi edit --allow-paste` | Polarity is inverted: `disable_paste: true` -> `--allow-paste off`. |
+| RBI certificate ignore | `resources[type=pamRemoteBrowser].pam_settings.connection.ignore_server_cert` | Tuning-supported (helper-only); import support unknown | `pam rbi edit --ignore-server-cert` | Boolean maps to `on` / `off`. |
+| RBI protocol | `resources[type=pamRemoteBrowser].pam_settings.connection.protocol` | Unsupported / unknown | None in pinned `pam rbi edit` flags | Model fixes this to `http`; do not claim tunability. |
+| RBI audio controls | no first-class manifest path today | Unsupported / unknown in SDK manifest | `pam rbi edit --disable-audio`, `--audio-bit-depth`, `--audio-channels`, `--audio-sample-rate` | Commander exposes flags, but the SDK model/schema does not expose typed fields yet. |
+
 ### Capabilities we explicitly DO NOT use
 
 | command | reason |

@@ -11,12 +11,14 @@ import pytest
 
 from keeper_sdk.core.diff import Change, ChangeKind
 from keeper_sdk.core.errors import CapabilityError
+from keeper_sdk.core.interfaces import LiveRecord
 from keeper_sdk.core.metadata import encode_marker, serialize_marker
 from keeper_sdk.core.models import RotationScheduleOnDemand, RotationSettings
 from keeper_sdk.core.planner import Plan
 from keeper_sdk.providers.commander_cli import (
     CommanderCliProvider,
     _build_pam_rotation_edit_args,
+    build_pam_rotation_edit_argvs,
     build_post_import_tuning_argvs,
 )
 
@@ -155,6 +157,215 @@ def test_build_pam_rotation_edit_args_for_typed_on_demand_schedule() -> None:
     ]
 
 
+def _rotation_manifest() -> dict:
+    return {
+        "version": "1",
+        "name": "customer-prod",
+        "pam_configurations": [
+            {"uid_ref": "cfg.local", "title": "Lab Config", "environment": "local"}
+        ],
+        "resources": [
+            {
+                "uid_ref": "res.db",
+                "type": "pamDatabase",
+                "title": "db-prod",
+                "pam_configuration_uid_ref": "cfg.local",
+                "users": [
+                    {
+                        "uid_ref": "usr.db",
+                        "type": "pamUser",
+                        "title": "db-user",
+                        "rotation_settings": {
+                            "rotation": "general",
+                            "enabled": "on",
+                            "schedule": {"type": "CRON", "cron": "30 18 * * *"},
+                            "password_complexity": "32,5,5,5,5",
+                            "admin_uid_ref": "usr.admin",
+                        },
+                    },
+                    {"uid_ref": "usr.admin", "type": "pamUser", "title": "admin-user"},
+                ],
+            }
+        ],
+    }
+
+
+def _rotation_live_records() -> list[LiveRecord]:
+    return [
+        LiveRecord(
+            keeper_uid="CFG_UID",
+            title="Lab Config",
+            resource_type="pam_configuration",
+            marker={"uid_ref": "cfg.local"},
+        ),
+        LiveRecord(
+            keeper_uid="RES_UID",
+            title="db-prod",
+            resource_type="pamDatabase",
+            marker={"uid_ref": "res.db"},
+        ),
+        LiveRecord(
+            keeper_uid="USER_UID",
+            title="db-user",
+            resource_type="pamUser",
+            marker={"uid_ref": "usr.db"},
+        ),
+        LiveRecord(
+            keeper_uid="ADMIN_UID",
+            title="admin-user",
+            resource_type="pamUser",
+            marker={"uid_ref": "usr.admin"},
+        ),
+    ]
+
+
+def test_build_pam_rotation_edit_argvs_for_nested_resource_user() -> None:
+    argvs = build_pam_rotation_edit_argvs(
+        _rotation_manifest(),
+        live_records=_rotation_live_records(),
+    )
+
+    assert argvs == [
+        [
+            "pam",
+            "rotation",
+            "edit",
+            "--record",
+            "USER_UID",
+            "--config",
+            "CFG_UID",
+            "--resource",
+            "RES_UID",
+            "--admin-user",
+            "ADMIN_UID",
+            "--rotation-profile",
+            "general",
+            "--schedulecron",
+            "30 18 * * *",
+            "--complexity",
+            "32,5,5,5,5",
+            "--enable",
+            "--force",
+        ]
+    ]
+
+
+def test_build_pam_rotation_edit_argvs_uses_plan_uids_when_live_omitted() -> None:
+    plan = Plan(
+        manifest_name="customer-prod",
+        changes=[
+            Change(
+                kind=ChangeKind.NOOP,
+                uid_ref="cfg.local",
+                resource_type="pam_configuration",
+                title="Lab Config",
+                keeper_uid="CFG_UID",
+            ),
+            Change(
+                kind=ChangeKind.NOOP,
+                uid_ref="res.db",
+                resource_type="pamDatabase",
+                title="db-prod",
+                keeper_uid="RES_UID",
+            ),
+            Change(
+                kind=ChangeKind.NOOP,
+                uid_ref="usr.db",
+                resource_type="pamUser",
+                title="db-user",
+                keeper_uid="USER_UID",
+            ),
+            Change(
+                kind=ChangeKind.NOOP,
+                uid_ref="usr.admin",
+                resource_type="pamUser",
+                title="admin-user",
+                keeper_uid="ADMIN_UID",
+            ),
+        ],
+        order=["cfg.local", "res.db", "usr.db", "usr.admin"],
+    )
+
+    argvs = build_pam_rotation_edit_argvs(_rotation_manifest(), plan=plan)
+
+    assert argvs[0][argvs[0].index("--record") + 1] == "USER_UID"
+    assert argvs[0][argvs[0].index("--resource") + 1] == "RES_UID"
+    assert argvs[0][argvs[0].index("--config") + 1] == "CFG_UID"
+    assert argvs[0][argvs[0].index("--admin-user") + 1] == "ADMIN_UID"
+
+
+def test_build_pam_rotation_edit_argvs_rejects_missing_parent_config_ref() -> None:
+    manifest = _rotation_manifest()
+    manifest["resources"][0].pop("pam_configuration_uid_ref")
+    manifest["pam_configurations"].append(
+        {"uid_ref": "cfg.other", "title": "Other Config", "environment": "local"}
+    )
+
+    with pytest.raises(ValueError, match="missing parent PAM configuration"):
+        build_pam_rotation_edit_argvs(manifest, live_records=_rotation_live_records())
+
+
+def test_build_pam_rotation_edit_argvs_requires_live_user() -> None:
+    live = [record for record in _rotation_live_records() if record.keeper_uid != "USER_UID"]
+
+    with pytest.raises(ValueError, match="missing live nested pamUser"):
+        build_pam_rotation_edit_argvs(_rotation_manifest(), live_records=live)
+
+
+def test_build_pam_rotation_edit_argvs_requires_live_resource() -> None:
+    live = [record for record in _rotation_live_records() if record.keeper_uid != "RES_UID"]
+
+    with pytest.raises(ValueError, match="missing live parent resource"):
+        build_pam_rotation_edit_argvs(_rotation_manifest(), live_records=live)
+
+
+def test_build_pam_rotation_edit_argvs_rejects_duplicate_live_match() -> None:
+    live = _rotation_live_records() + [
+        LiveRecord(
+            keeper_uid="USER_UID_2",
+            title="db-user-copy",
+            resource_type="pamUser",
+            marker={"uid_ref": "usr.db"},
+        )
+    ]
+
+    with pytest.raises(ValueError, match="duplicate live nested pamUser match"):
+        build_pam_rotation_edit_argvs(_rotation_manifest(), live_records=live)
+
+
+def test_build_pam_rotation_edit_argvs_requires_config() -> None:
+    live = [record for record in _rotation_live_records() if record.keeper_uid != "CFG_UID"]
+
+    with pytest.raises(ValueError, match="missing live PAM configuration"):
+        build_pam_rotation_edit_argvs(_rotation_manifest(), live_records=live)
+
+
+def test_build_pam_rotation_edit_argvs_rejects_top_level_user_rotation() -> None:
+    manifest = {
+        "version": "1",
+        "name": "customer-prod",
+        "users": [
+            {
+                "uid_ref": "usr.top",
+                "type": "pamUser",
+                "title": "top-user",
+                "rotation_settings": {"rotation": "general", "enabled": "on"},
+            }
+        ],
+    }
+
+    with pytest.raises(ValueError, match=r"top-level users\[\]\.rotation_settings is unsupported"):
+        build_pam_rotation_edit_argvs(manifest, live_records=[])
+
+
+def test_build_pam_rotation_edit_argvs_noops_without_rotation_settings() -> None:
+    manifest = _rotation_manifest()
+    for user in manifest["resources"][0]["users"]:
+        user.pop("rotation_settings", None)
+
+    assert build_pam_rotation_edit_argvs(manifest, live_records=[]) == []
+
+
 def test_unsupported_default_rotation_schedule_has_precise_hook(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -177,6 +388,18 @@ def test_unsupported_default_rotation_schedule_has_precise_hook(
     assert "default_rotation_schedule" in reasons[0]
     assert "no confirmed Commander CLI setter" in reasons[0]
     assert "--schedule-config only reads config default" in reasons[0]
+
+
+def test_unsupported_nested_rotation_settings_gate_stays_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = _provider(monkeypatch)
+
+    reasons = provider.unsupported_capabilities(_rotation_manifest())
+
+    assert len(reasons) == 1
+    assert "resources[].users[].rotation_settings" in reasons[0]
+    assert "pam rotation edit" in reasons[0]
 
 
 def test_build_post_import_tuning_argvs_for_connection_declared_subset() -> None:
@@ -1073,6 +1296,115 @@ def test_run_cmd_refreshes_session_once_on_keeper_api_expiry(
     assert output.strip() == "import ok"
     assert seen_params == params
     assert login_states == [(None, False), (None, False)]
+
+
+def test_run_cmd_retries_session_expiry_once_then_preserves_failure_context(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from keepercommander.error import KeeperApiError
+
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
+
+    params = [object(), object()]
+    login_states: list[tuple[object | None, bool]] = []
+    seen_params: list[object] = []
+
+    def fake_get_params(self: CommanderCliProvider) -> object:
+        login_states.append((self._keeper_params, self._keeper_login_attempted))
+        param = params[len(login_states) - 1]
+        self._keeper_params = param
+        self._keeper_login_attempted = True
+        return param
+
+    class _FakeCmd:
+        def execute(self, params, **kwargs):
+            seen_params.append(params)
+            attempt = len(seen_params)
+            print(f"stdout attempt {attempt}")
+            print(f"stderr attempt {attempt}", file=sys.stderr)
+            raise KeeperApiError("session_token_expired", "Session token expired")
+
+    monkeypatch.setattr(CommanderCliProvider, "_get_keeper_params", fake_get_params)
+    monkeypatch.setitem(
+        sys.modules,
+        "keepercommander.commands.pam_import.edit",
+        types.SimpleNamespace(PAMProjectImportCommand=_FakeCmd),
+    )
+
+    provider = CommanderCliProvider(folder_uid="folder-uid")
+
+    with pytest.raises(CapabilityError) as exc_info:
+        provider._run_cmd(
+            [
+                "pam",
+                "project",
+                "import",
+                "--file",
+                "/tmp/manifest.json",
+                "--name",
+                "customer-prod",
+            ]
+        )
+
+    assert "in-process keeper pam project import failed" in exc_info.value.reason
+    assert "KeeperApiError" in exc_info.value.reason
+    assert "session" in exc_info.value.reason.casefold()
+    assert seen_params == params
+    assert login_states == [(None, False), (None, False)]
+    assert "stdout attempt 2" in exc_info.value.context["stdout"]
+    assert "stderr attempt 2" in exc_info.value.context["stderr"]
+
+
+def test_run_cmd_does_not_retry_non_session_exception(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
+
+    params = [object()]
+    seen_params: list[object] = []
+
+    def fake_get_params(self: CommanderCliProvider) -> object:
+        self._keeper_params = params[0]
+        self._keeper_login_attempted = True
+        return params[0]
+
+    class _FakeCmd:
+        def execute(self, params, **kwargs):
+            seen_params.append(params)
+            print("stdout before non-session failure")
+            print("stderr before non-session failure", file=sys.stderr)
+            raise RuntimeError("non-session failure")
+
+    monkeypatch.setattr(CommanderCliProvider, "_get_keeper_params", fake_get_params)
+    monkeypatch.setitem(
+        sys.modules,
+        "keepercommander.commands.pam_import.edit",
+        types.SimpleNamespace(PAMProjectImportCommand=_FakeCmd),
+    )
+
+    provider = CommanderCliProvider(folder_uid="folder-uid")
+
+    with pytest.raises(CapabilityError) as exc_info:
+        provider._run_cmd(
+            [
+                "pam",
+                "project",
+                "import",
+                "--file",
+                "/tmp/manifest.json",
+                "--name",
+                "customer-prod",
+            ]
+        )
+
+    assert "RuntimeError: non-session failure" in exc_info.value.reason
+    assert seen_params == params
+    assert "stdout before non-session failure" in exc_info.value.context["stdout"]
+    assert "stderr before non-session failure" in exc_info.value.context["stderr"]
 
 
 def test_write_marker_refreshes_session_once_on_message_fallback(

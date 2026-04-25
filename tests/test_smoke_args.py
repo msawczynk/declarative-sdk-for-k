@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import subprocess
 import sys
 from pathlib import Path
+
+import pytest
 
 _SMOKE_DIR = Path(__file__).resolve().parents[1] / "scripts" / "smoke"
 sys.path.insert(0, str(_SMOKE_DIR))
@@ -17,3 +20,80 @@ def test_parse_args_login_helper_default() -> None:
 def test_parse_args_login_helper_env() -> None:
     args = smoke._parse_args(["--login-helper", "env"])
     assert args.login_helper == "env"
+
+
+def test_auth_path_message_names_public_env_helper() -> None:
+    message = smoke._auth_path_message("env")
+
+    assert "public EnvLoginHelper env path" in message
+    assert "KEEPER_SDK_LOGIN_HELPER unset" in message
+    assert "KEEPER_EMAIL" in message
+    assert "KEEPER_TOTP_SECRET" in message
+
+
+def test_auth_path_message_names_deploy_watcher_helper() -> None:
+    message = smoke._auth_path_message("deploy_watcher", helper_path="/tmp/deploy_watcher.py")
+
+    assert "deploy_watcher helper path" in message
+    assert "KEEPER_SDK_LOGIN_HELPER" in message
+    assert "/tmp/deploy_watcher.py" in message
+
+
+def test_sdk_error_preserves_command_exit_and_output_tails(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[list[str], dict[str, object]]] = []
+
+    def fake_run(cmd: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls.append((cmd, kwargs))
+        stdout = "\n".join(f"stdout line {idx}" for idx in range(45))
+        stderr = "\n".join(f"stderr line {idx}" for idx in range(43))
+        return subprocess.CompletedProcess(cmd, 7, stdout=stdout, stderr=stderr)
+
+    monkeypatch.setattr(smoke.subprocess, "run", fake_run)
+
+    with pytest.raises(smoke.SdkCommandError) as raised:
+        smoke._sdk_allow([0], ["plan", "manifest.yaml"], env={"KEEPER_CONFIG": "cfg.json"})
+
+    error = raised.value
+    message = str(error)
+    assert error.returncode == 7
+    assert error.args_list == ["plan", "manifest.yaml"]
+    assert error.command[-2:] == ["plan", "manifest.yaml"]
+    assert "sdk command failed: exit_code=7" in message
+    assert "command:" in message
+    assert "keeper_sdk.cli" in message
+    assert "stdout_tail:" in message
+    assert "stderr_tail:" in message
+    assert "stdout line 44" in message
+    assert "stderr line 42" in message
+    assert "stdout line 0" not in error.stdout_tail
+    assert "stderr line 0" not in error.stderr_tail
+    assert "... (5 line(s) omitted)" in error.stdout_tail
+    assert "... (3 line(s) omitted)" in error.stderr_tail
+
+    _, kwargs = calls[0]
+    assert kwargs["capture_output"] is True
+    assert kwargs["text"] is True
+    assert kwargs["stdin"] is subprocess.DEVNULL
+
+
+def test_sdk_constraint_error_preserves_failure_details(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_run(cmd: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(
+            cmd,
+            5,
+            stdout="provider stdout",
+            stderr="next_action: fix tenant role",
+        )
+
+    monkeypatch.setattr(smoke.subprocess, "run", fake_run)
+
+    with pytest.raises(smoke.TenantConstraintError) as raised:
+        smoke._sdk_allow([0], ["apply", "--auto-approve", "manifest.yaml"], env={})
+
+    message = str(raised.value)
+    assert "sdk command reported tenant/provider constraint: exit_code=5" in message
+    assert "command:" in message
+    assert "provider stdout" in message
+    assert "next_action: fix tenant role" in message

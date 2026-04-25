@@ -35,7 +35,7 @@ from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
-from keeper_sdk.core.diff import ChangeKind
+from keeper_sdk.core.diff import Change, ChangeKind
 from keeper_sdk.core.errors import CapabilityError, CollisionError
 from keeper_sdk.core.interfaces import ApplyOutcome, LiveRecord, Provider
 from keeper_sdk.core.metadata import (
@@ -1112,6 +1112,149 @@ def build_post_import_tuning_argvs(
     return [argv] if argv is not None else []
 
 
+def build_pam_rotation_edit_argvs(
+    manifest: Any,
+    *,
+    plan: Plan | None = None,
+    live_records: list[LiveRecord] | None = None,
+) -> list[list[str]]:
+    """Build Commander argv for nested ``pamUser`` rotation settings.
+
+    Pure resolver only: it never calls Keeper and is intentionally not wired
+    into ``apply_plan`` while the provider-capability and preview gates remain
+    in place. Nested users need three proven live UIDs before a rotation edit is
+    safe: the user record, the parent resource record, and the PAM config.
+    """
+    source = _manifest_dict(manifest)
+    _reject_top_level_user_rotation(source)
+
+    refs = _RotationRefResolver(plan=plan, live_records=live_records or [])
+    argvs: list[list[str]] = []
+    for resource in source.get("resources") or []:
+        if not isinstance(resource, Mapping):
+            continue
+        rotating_users = [
+            user
+            for user in resource.get("users") or []
+            if isinstance(user, Mapping)
+            and user.get("type") == "pamUser"
+            and user.get("rotation_settings") is not None
+        ]
+        if not rotating_users:
+            continue
+
+        parent_ref = _non_empty_str(resource.get("uid_ref"))
+        parent_title = _non_empty_str(resource.get("title"))
+        parent_type = _non_empty_str(resource.get("type")) or "resource"
+        if not parent_ref or not parent_title:
+            raise ValueError(
+                "resources[].users[].rotation_settings requires a parent resource with uid_ref and title"
+            )
+
+        config_ref, config_title = _rotation_config_ref(source, resource)
+        config_uid = refs.resolve(
+            uid_ref=config_ref,
+            title=config_title,
+            resource_type="pam_configuration",
+            role="PAM configuration",
+        )
+        resource_uid = refs.resolve(
+            uid_ref=parent_ref,
+            title=parent_title,
+            resource_type=parent_type,
+            role="parent resource",
+        )
+
+        for user in rotating_users:
+            settings = user["rotation_settings"]
+            user_ref = _non_empty_str(user.get("uid_ref"))
+            user_title = _non_empty_str(user.get("title"))
+            user_uid = refs.resolve(
+                uid_ref=user_ref,
+                title=user_title,
+                resource_type="pamUser",
+                role="nested pamUser",
+            )
+            admin_uid = _rotation_admin_uid(settings, refs, source)
+            argvs.append(
+                _build_pam_rotation_edit_args(
+                    record_uid=user_uid,
+                    settings=settings,
+                    resource_uid=resource_uid,
+                    config_uid=config_uid,
+                    admin_uid=admin_uid,
+                )
+            )
+    return argvs
+
+
+class _RotationRefResolver:
+    def __init__(self, *, plan: Plan | None, live_records: list[LiveRecord]) -> None:
+        self._plan_by_ref: dict[str, Change] = {}
+        self._plan_by_title: dict[tuple[str, str], Change] = {}
+        if plan is not None:
+            for change in plan.changes:
+                if change.uid_ref:
+                    self._plan_by_ref[change.uid_ref] = change
+                self._plan_by_title[(change.resource_type, change.title)] = change
+
+        self._live_by_ref: dict[str, list[LiveRecord]] = {}
+        self._live_by_title: dict[tuple[str, str], list[LiveRecord]] = {}
+        for live in live_records:
+            marker_ref = _non_empty_str((live.marker or {}).get("uid_ref"))
+            if marker_ref:
+                self._live_by_ref.setdefault(marker_ref, []).append(live)
+            self._live_by_title.setdefault((live.resource_type, live.title), []).append(live)
+
+    def resolve(
+        self,
+        *,
+        uid_ref: str | None,
+        title: str | None,
+        resource_type: str,
+        role: str,
+    ) -> str:
+        if uid_ref:
+            uid = self._resolve_live_ref(uid_ref, role)
+            if uid:
+                return uid
+            change = self._plan_by_ref.get(uid_ref)
+            if change and change.keeper_uid:
+                return change.keeper_uid
+
+        if title:
+            uid = self._resolve_live_title(resource_type, title, role)
+            if uid:
+                return uid
+            change = self._plan_by_title.get((resource_type, title))
+            if change and change.keeper_uid:
+                return change.keeper_uid
+
+        ident = f"uid_ref='{uid_ref}'" if uid_ref else f"title='{title}'"
+        raise ValueError(
+            f"missing live {role} ({ident}, type={resource_type}); "
+            "run import/apply first, then pass discovered live records with Keeper UIDs"
+        )
+
+    def _resolve_live_ref(self, uid_ref: str, role: str) -> str | None:
+        matches = self._live_by_ref.get(uid_ref, [])
+        if len(matches) > 1:
+            raise ValueError(
+                f"duplicate live {role} match for uid_ref '{uid_ref}': "
+                f"{[item.keeper_uid for item in matches]}"
+            )
+        return matches[0].keeper_uid if matches else None
+
+    def _resolve_live_title(self, resource_type: str, title: str, role: str) -> str | None:
+        matches = self._live_by_title.get((resource_type, title), [])
+        if len(matches) > 1:
+            raise ValueError(
+                f"duplicate live {role} match for title '{title}' ({resource_type}): "
+                f"{[item.keeper_uid for item in matches]}"
+            )
+        return matches[0].keeper_uid if matches else None
+
+
 def _build_pam_connection_edit_argv(
     record: str, resource: Mapping[str, Any], refs: Mapping[str, str]
 ) -> list[str] | None:
@@ -1281,6 +1424,101 @@ def _model_dump_dict(value: Any) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
+def _manifest_dict(value: Any) -> dict[str, Any]:
+    data = _model_dump_dict(value)
+    if not data:
+        raise ValueError("manifest data is required to build pam rotation edit argv")
+    return data
+
+
+def _non_empty_str(value: Any) -> str | None:
+    if isinstance(value, str) and value.strip():
+        return value
+    return None
+
+
+def _reject_top_level_user_rotation(source: Mapping[str, Any]) -> None:
+    for user in source.get("users") or []:
+        if (
+            isinstance(user, Mapping)
+            and user.get("type") == "pamUser"
+            and user.get("rotation_settings")
+        ):
+            ident = user.get("uid_ref") or user.get("title") or "<unknown>"
+            raise ValueError(
+                f"top-level users[].rotation_settings is unsupported for pamUser '{ident}'; "
+                "nest the pamUser under resources[].users[] so the parent resource UID can be resolved"
+            )
+
+
+def _rotation_config_ref(
+    source: Mapping[str, Any],
+    resource: Mapping[str, Any],
+) -> tuple[str | None, str | None]:
+    config_ref = _non_empty_str(resource.get("pam_configuration_uid_ref"))
+    configs = [cfg for cfg in source.get("pam_configurations") or [] if isinstance(cfg, Mapping)]
+    if config_ref:
+        config = next((cfg for cfg in configs if cfg.get("uid_ref") == config_ref), None)
+        config_title = _non_empty_str(config.get("title")) if config is not None else None
+        return config_ref, config_title
+    if len(configs) == 1:
+        config = configs[0]
+        return _non_empty_str(config.get("uid_ref")), _non_empty_str(config.get("title"))
+    raise ValueError(
+        f"missing parent PAM configuration for resource '{resource.get('uid_ref') or resource.get('title')}'; "
+        "set resources[].pam_configuration_uid_ref or declare exactly one pam_configurations[] entry"
+    )
+
+
+def _rotation_admin_uid(
+    settings: Any,
+    refs: _RotationRefResolver,
+    source: Mapping[str, Any],
+) -> str | None:
+    data = _model_dump_dict(settings)
+    admin_ref = next(
+        (
+            _non_empty_str(data.get(key))
+            for key in (
+                "admin_uid_ref",
+                "admin_user_uid_ref",
+                "administrative_credentials_uid_ref",
+            )
+            if _non_empty_str(data.get(key))
+        ),
+        None,
+    )
+    if not admin_ref:
+        return None
+    admin_type, admin_title = _desired_identity(source, admin_ref)
+    return refs.resolve(
+        uid_ref=admin_ref,
+        title=admin_title,
+        resource_type=admin_type or "pamUser",
+        role="rotation admin user",
+    )
+
+
+def _desired_identity(source: Mapping[str, Any], uid_ref: str) -> tuple[str | None, str | None]:
+    for cfg in source.get("pam_configurations") or []:
+        if isinstance(cfg, Mapping) and cfg.get("uid_ref") == uid_ref:
+            return "pam_configuration", _non_empty_str(cfg.get("title"))
+    for resource in source.get("resources") or []:
+        if not isinstance(resource, Mapping):
+            continue
+        if resource.get("uid_ref") == uid_ref:
+            return _non_empty_str(resource.get("type")), _non_empty_str(resource.get("title"))
+        for user in resource.get("users") or []:
+            if isinstance(user, Mapping) and user.get("uid_ref") == uid_ref:
+                return _non_empty_str(user.get("type")) or "pamUser", _non_empty_str(
+                    user.get("title")
+                )
+    for user in source.get("users") or []:
+        if isinstance(user, Mapping) and user.get("uid_ref") == uid_ref:
+            return _non_empty_str(user.get("type")) or "pamUser", _non_empty_str(user.get("title"))
+    return None, None
+
+
 def _contains_key(node: Any, key: str) -> bool:
     if isinstance(node, dict):
         return key in node or any(_contains_key(value, key) for value in node.values())
@@ -1377,4 +1615,8 @@ def _detect_unsupported_capabilities(manifest: Any) -> list[str]:
     return hits
 
 
-__all__ = ["CommanderCliProvider", "build_post_import_tuning_argvs"]
+__all__ = [
+    "CommanderCliProvider",
+    "build_pam_rotation_edit_argvs",
+    "build_post_import_tuning_argvs",
+]
