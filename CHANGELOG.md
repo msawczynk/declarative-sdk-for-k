@@ -18,8 +18,25 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   apply yet.
 - Bounded in-process Commander session refresh for `session_token_expired`
   during `pam project import` / `extend` and ownership-marker writes.
-  This is unit-tested with synthetic exceptions; live proof is still
-  pending.
+  This is unit-tested with synthetic exceptions and live-proven through
+  `scripts/smoke/smoke.py --login-helper env --scenario pamMachine`.
+- In-process PAM gateway/config JSON listing for the Commander provider,
+  with `sync_down` and bounded session refresh. This avoids stale
+  subprocess Commander sessions during reference-existing apply.
+- `docs/SDK_COMPLETION_PLAN.md` — devil's-advocate completion plan for
+  parent orchestration plus Codex worker slices.
+- Smoke-runner diagnostics now identify the active SDK auth path and
+  preserve command, exit code, stdout tail, and stderr tail on SDK
+  subprocess failures.
+- Pure `build_pam_rotation_edit_argvs()` resolver for nested `pamUser`
+  rotation settings. It resolves user/resource/config/admin refs but is
+  not wired into apply while rotation remains gated.
+- `docs/ISSUE_6_JIT_SUPPORT_BOUNDARY.md` — source-backed JIT decision:
+  keep `jit_settings` preview-gated because pinned Commander has import
+  and launch helpers, but no safe standalone edit surface.
+- `docs/COMMANDER.md` post-import tuning field map for connection/RBI
+  fields, marking import-supported, helper-only, and unsupported/unknown
+  cases.
 - `examples/`: minimal `pamMachine` / `pamDatabase` / `pamDirectory` /
   `pamRemoteBrowser` manifests; CI validates + mock-plans every file.
 - `SCAFFOLD.md`: LLM-readable repo map + design-vs-shipped reconcile.

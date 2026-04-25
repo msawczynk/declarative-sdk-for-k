@@ -5,6 +5,7 @@ import argparse
 import json
 import logging
 import os
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -42,6 +43,7 @@ PAM_CONFIG_TITLE = "Lab Rocky PAM Configuration"
 SMOKE_PROJECT_NAME = "sdk-smoke-testuser2"
 DEFAULT_SCENARIO_NAME = "pamMachine"
 TITLE_PREFIX = "sdk-smoke"
+SDK_OUTPUT_TAIL_LINES = 40
 
 # Set by ``main`` based on ``--scenario``; default is pamMachine so the
 # legacy one-command invocation (``python3 scripts/smoke/smoke.py``)
@@ -74,10 +76,29 @@ class TenantConstraintError(Exception):
 
 
 class SdkCommandError(Exception):
-    def __init__(self, *, args: list[str], returncode: int) -> None:
+    def __init__(
+        self,
+        *,
+        args: list[str],
+        command: list[str],
+        returncode: int,
+        stdout: str = "",
+        stderr: str = "",
+    ) -> None:
         self.args_list = list(args)
+        self.command = list(command)
         self.returncode = returncode
-        super().__init__(f"sdk command failed rc={returncode}: {' '.join(args)}")
+        self.stdout_tail = _tail_text(stdout)
+        self.stderr_tail = _tail_text(stderr)
+        super().__init__(
+            _format_sdk_failure(
+                "sdk command failed",
+                command=self.command,
+                returncode=returncode,
+                stdout_tail=self.stdout_tail,
+                stderr_tail=self.stderr_tail,
+            )
+        )
 
 
 def run_smoke(
@@ -96,6 +117,11 @@ def run_smoke(
         _mark(state, "admin auth OK")
         ident = identity.ensure_sdktest_identity()
         _mark(state, f"test identity OK ({ident['email']})")
+        # `ensure_sdktest_identity()` performs its own admin login. On some
+        # tenants that invalidates the earlier in-process session, so refresh
+        # before sandbox provisioning uses `admin_params`.
+        admin_params = identity.admin_login()
+        _mark(state, "admin auth refreshed after identity bootstrap")
     except Exception as exc:  # pragma: no cover - live-only path
         raise PreflightError(f"auth bootstrap failed: {exc}") from exc
 
@@ -154,19 +180,24 @@ def run_smoke(
     # local key on each subprocess invocation; KEEPER_PASSWORD short-circuits
     # the prompt without hitting stdin.
     env["KEEPER_PASSWORD"] = admin_password
-    log.info("sdk login helper mode: %s", login_helper)
     if login_helper == "env":
         email, _password, totp_secret = _load_admin_creds()
         env["KEEPER_EMAIL"] = email
         env["KEEPER_TOTP_SECRET"] = totp_secret
         env.pop("KEEPER_SDK_LOGIN_HELPER", None)
         os.environ.pop("KEEPER_SDK_LOGIN_HELPER", None)
+        auth_path = _auth_path_message("env")
     else:
         # The SDK routes pam project import/extend + marker writes through the
         # in-process Commander API; point it at the lab's deploy_watcher.py so
         # _get_keeper_params() can bootstrap a KeeperParams session.
-        env["KEEPER_SDK_LOGIN_HELPER"] = str(identity.LAB_ROOT / "scripts" / "deploy_watcher.py")
-        os.environ["KEEPER_SDK_LOGIN_HELPER"] = env["KEEPER_SDK_LOGIN_HELPER"]
+        helper_path = str(identity.LAB_ROOT / "scripts" / "deploy_watcher.py")
+        env["KEEPER_SDK_LOGIN_HELPER"] = helper_path
+        os.environ["KEEPER_SDK_LOGIN_HELPER"] = helper_path
+        auth_path = _auth_path_message("deploy_watcher", helper_path=helper_path)
+    log.info(auth_path)
+    state["sdk_auth_path"] = auth_path
+    _mark(state, auth_path)
     state["keeper_args"] = argv_prefix
     state["admin_config_path"] = admin_config_path
     _remove_project_tree(argv_prefix, env=env, project_name=SMOKE_PROJECT_NAME)
@@ -329,22 +360,94 @@ def _write_temp_manifest(document: dict[str, Any], *, suffix: str) -> Path:
 
 
 def _sdk(args: list[str], *, env: dict[str, str]) -> None:
-    rc = _sdk_allow([0], args, env=env)
-    if rc != 0:
-        raise SdkCommandError(args=args, returncode=rc)
+    _sdk_allow([0], args, env=env)
 
 
 def _sdk_allow(ok_codes: list[int], args: list[str], *, env: dict[str, str]) -> int:
     cmd = [sys.executable, "-m", "keeper_sdk.cli", "--provider", "commander", *args]
     log.info("SDK: %s", " ".join(cmd))
-    result = subprocess.run(cmd, cwd=ROOT, env=env, check=False)
+    result = subprocess.run(
+        cmd,
+        cwd=ROOT,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+        stdin=subprocess.DEVNULL,
+    )
     if result.returncode not in ok_codes:
+        stdout_tail = _tail_text(result.stdout)
+        stderr_tail = _tail_text(result.stderr)
         if result.returncode == 5:
             raise TenantConstraintError(
-                f"sdk command reported tenant/provider constraint: {' '.join(args)}"
+                _format_sdk_failure(
+                    "sdk command reported tenant/provider constraint",
+                    command=cmd,
+                    returncode=result.returncode,
+                    stdout_tail=stdout_tail,
+                    stderr_tail=stderr_tail,
+                )
             )
-        raise SdkCommandError(args=args, returncode=result.returncode)
+        raise SdkCommandError(
+            args=args,
+            command=cmd,
+            returncode=result.returncode,
+            stdout=result.stdout,
+            stderr=result.stderr,
+        )
+    if result.stdout:
+        log.debug("SDK stdout tail:\n%s", _tail_text(result.stdout))
+    if result.stderr:
+        log.debug("SDK stderr tail:\n%s", _tail_text(result.stderr))
     return result.returncode
+
+
+def _auth_path_message(login_helper: str, *, helper_path: str | None = None) -> str:
+    if login_helper == "env":
+        return (
+            "sdk auth path: public EnvLoginHelper env path "
+            "(KEEPER_EMAIL/KEEPER_PASSWORD/KEEPER_TOTP_SECRET; "
+            "KEEPER_SDK_LOGIN_HELPER unset)"
+        )
+    if login_helper == "deploy_watcher":
+        suffix = f" ({helper_path})" if helper_path else ""
+        return f"sdk auth path: deploy_watcher helper path via KEEPER_SDK_LOGIN_HELPER{suffix}"
+    raise ValueError(f"unknown login helper: {login_helper}")
+
+
+def _tail_text(text: str | None, *, max_lines: int = SDK_OUTPUT_TAIL_LINES) -> str:
+    if not text:
+        return "<empty>"
+    lines = text.splitlines()
+    omitted = max(0, len(lines) - max_lines)
+    tail = "\n".join(lines[-max_lines:])
+    if omitted:
+        return f"... ({omitted} line(s) omitted)\n{tail}"
+    return tail
+
+
+def _format_sdk_failure(
+    prefix: str,
+    *,
+    command: list[str],
+    returncode: int,
+    stdout_tail: str,
+    stderr_tail: str,
+) -> str:
+    return "\n".join(
+        [
+            f"{prefix}: exit_code={returncode}",
+            f"command: {_quote_cmd(command)}",
+            "stdout_tail:",
+            stdout_tail,
+            "stderr_tail:",
+            stderr_tail,
+        ]
+    )
+
+
+def _quote_cmd(command: list[str]) -> str:
+    return " ".join(shlex.quote(part) for part in command)
 
 
 def _load_admin_creds() -> tuple[str, str, str]:

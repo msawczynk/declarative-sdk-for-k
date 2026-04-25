@@ -44,9 +44,9 @@ top-level live-smoke resource.
 lab-helper path. `--login-helper env` unsets `KEEPER_SDK_LOGIN_HELPER`
 for SDK subprocesses and instead exports `KEEPER_EMAIL`,
 `KEEPER_PASSWORD`, and `KEEPER_TOTP_SECRET` so the provider falls back
-to the public `EnvLoginHelper` contract for the pre-apply gates. Treat
-`--login-helper env` as a login-contract smoke until the deferred
-Commander session-refresh gap is closed for full apply.
+to the public `EnvLoginHelper` contract. The smoke log and failure
+post-mortem explicitly name which auth path ran: `deploy_watcher`
+helper vs public `EnvLoginHelper` env path.
 
 Exit codes come from `smoke.py::main()`:
 
@@ -86,6 +86,7 @@ Exit codes come from `smoke.py::main()`:
 | `Required gateway 'Lab GW Rocky' is not visible` | The admin session cannot see the gateway; ensure the admin `commander-config.json` belongs to a user with access, then re-run |
 | `Commander returned non-JSON` from `ls` on an empty folder | Already handled internally in `sandbox._loads_json()`: empty output is treated as `[]` |
 | Keeper subprocess commands hang | They should not hang after `--batch-mode` plus `KEEPER_PASSWORD`; if they do, check that the `testuser2` Commander config still has a valid `device_token` and `clone_code` |
+| SDK command failure | The post-mortem includes the full SDK command, exit code, stdout tail, and stderr tail so the parent/live runner can see Commander/provider details without rerunning blind |
 
 ## Non-negotiable constraints
 
