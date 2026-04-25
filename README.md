@@ -43,11 +43,12 @@ keeper_sdk/                          # import path stable through 1.x
   providers/                         # MockProvider, CommanderCliProvider
   auth/                              # LoginHelper protocol + EnvLoginHelper reference impl
   cli/                               # `dsk` (validate / export / plan / diff / apply / import)
-tests/                               # 106 tests; reuses examples/ fixtures
+tests/                               # 169 passing tests + 2 expected v1.1 deferrals
 docs/
-  AGENTS.md                          # agent-first operating manual
   COMMANDER.md                       # pinned Commander version + capability matrix
   LOGIN.md                           # login helper contract + 30-line skeleton
+  VALIDATION_STAGES.md               # validate/plan/apply exit-code contract
+AGENTS.md                            # agent-first operating manual
 ```
 
 ## Install
@@ -65,9 +66,9 @@ the mock provider works standalone.
 ## Quick start (offline, mock provider)
 
 ```bash
-dsk validate examples/minimal/environment.yaml
-dsk plan examples/minimal/environment.yaml
-dsk apply examples/minimal/environment.yaml --auto-approve
+dsk validate examples/pamMachine.yaml
+dsk --provider mock plan examples/pamMachine.yaml --json
+dsk --provider mock apply examples/pamMachine.yaml --auto-approve
 ```
 
 ## Quick start (live tenant)
@@ -78,18 +79,21 @@ export KEEPER_PASSWORD='...'
 export KEEPER_TOTP_SECRET='JBSWY3DPEHPK3PXP'      # base32 secret, NOT a 6-digit code
 export KEEPER_DECLARATIVE_FOLDER='<shared-folder-uid>'
 
-dsk --provider commander validate examples/minimal/environment.yaml --online
-dsk --provider commander plan     examples/minimal/environment.yaml
-dsk --provider commander apply    examples/minimal/environment.yaml --auto-approve
+dsk --provider commander validate examples/pamMachine.yaml --online
+dsk --provider commander plan     examples/pamMachine.yaml
 ```
 
 See [`docs/LOGIN.md`](docs/LOGIN.md) for custom login flows (KSM pull,
 HSM-backed TOTP, device-approval queues, …).
+The built-in `EnvLoginHelper` live proof currently covers validate, plan,
+and sandbox provisioning; full live apply has a deferred Commander
+session-refresh gap tracked for v1.1. Use a custom helper for apply only
+after validating that refresh path in your tenant.
 
 The legacy `pamform` and `keeper-sdk` CLI names remain installed as
 aliases for one major version so existing pipelines do not break.
 
-## Status (main, 2026-04-24)
+## Status (main, 2026-04-25)
 
 Core + mock: complete. Commander provider: discover, plan, apply
 (create / update / delete via `keeper rm`, gated behind
@@ -97,8 +101,10 @@ Core + mock: complete. Commander provider: discover, plan, apply
 capability check. Capability gaps (rotation, JIT, gateway `mode: create`)
 surface as plan-time CONFLICT rows rather than silent drops, so
 `plan == apply --dry-run == apply` for every manifest + provider pair.
-106/106 tests green. Live-smoke GREEN end-to-end against a real
-tenant (create → verify → destroy).
+Current local suite: 169 passing tests + 2 expected v1.1 deferrals.
+Live `EnvLoginHelper` smoke proved the login contract (validate, plan,
+and sandbox provisioning); full apply is deferred behind a Commander
+session-refresh gap tracked for v1.1.
 
 ## Exit codes
 
@@ -145,17 +151,15 @@ ownership markers over them.
 pytest
 ```
 
-58 tests now cover manifest load/dump, canonicalisation, pam_import
-round-trip, and schema validation across 7 parametrised invalid fixtures,
-including cyclic refs. They also cover semantic rules (gateway-create, RBI
-rotation/JIT, rotation on non-rotatable resources, and the
-`pam_configuration` requirement), graph build across shared folders and
-projects with topological order and cycle detection, diff taxonomy
-(create/update/delete/noop/conflict/collision plus adoption opt-in),
-MockProvider two-phase apply, Renderer protocol conformance, and a 500-resource
-performance smoke.
+Tests cover manifest load/dump, canonicalisation, Commander payload
+normalisation, schema + semantic validation, preview gates, graph order,
+diff taxonomy, provider contracts, CLI JSON/exit-code surfaces, stage-5
+tenant binding checks, renderer snapshots, DOR scenario regressions, and
+a 500-resource performance/memory smoke.
 
 CLI smokes exercise `validate`, `export`, `plan` exit codes (`0`/`2`/`4`),
-`apply --dry-run` equivalence to `plan`, and JSON output.
+`apply --dry-run` equivalence to `plan`, and JSON output. Live-smoke
+variants live under `scripts/smoke/` and can be selected with
+`--scenario` plus `--login-helper deploy_watcher|env`.
 
 

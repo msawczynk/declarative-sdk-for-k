@@ -1,0 +1,9 @@
+                                  Plan: acme-lab-minimal                                  
+┏━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━┳━━━━━━┓
+┃ Action ┃ Type        ┃ uid_ref              ┃ Title            ┃ Keeper UID     ┃ Note ┃
+┡━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━╇━━━━━━┩
+│ update │ pamUser     │ acme-lab-linux1-root │ lab-linux-1-root │ UID-USER-001   │      │
+│ create │ pamMachine  │ acme-lab-linux2      │ lab-linux-2      │ -              │      │
+│ delete │ pamDatabase │ old-db               │ old-db           │ UID-DELETE-001 │      │
+└────────┴─────────────┴──────────────────────┴──────────────────┴────────────────┴──────┘
++1 create, ~1 update, -1 delete, !1 conflict, ·2 noop

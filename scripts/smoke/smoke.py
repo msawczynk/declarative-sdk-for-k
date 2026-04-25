@@ -81,6 +81,7 @@ def run_smoke(
     keep_sf: bool = True,
     teardown_only: bool = False,
     keep_records: bool = False,
+    login_helper: str = "deploy_watcher",
     state: dict[str, Any] | None = None,
 ) -> int:
     del keep_sf  # Shared-folder removal is intentionally not part of this runner.
@@ -149,11 +150,19 @@ def run_smoke(
     # local key on each subprocess invocation; KEEPER_PASSWORD short-circuits
     # the prompt without hitting stdin.
     env["KEEPER_PASSWORD"] = admin_password
-    # The SDK routes pam project import/extend + marker writes through the
-    # in-process Commander API; point it at the lab's deploy_watcher.py so
-    # _get_keeper_params() can bootstrap a KeeperParams session.
-    env["KEEPER_SDK_LOGIN_HELPER"] = str(identity.LAB_ROOT / "scripts" / "deploy_watcher.py")
-    os.environ["KEEPER_SDK_LOGIN_HELPER"] = env["KEEPER_SDK_LOGIN_HELPER"]
+    log.info("sdk login helper mode: %s", login_helper)
+    if login_helper == "env":
+        email, _password, totp_secret = _load_admin_creds()
+        env["KEEPER_EMAIL"] = email
+        env["KEEPER_TOTP_SECRET"] = totp_secret
+        env.pop("KEEPER_SDK_LOGIN_HELPER", None)
+        os.environ.pop("KEEPER_SDK_LOGIN_HELPER", None)
+    else:
+        # The SDK routes pam project import/extend + marker writes through the
+        # in-process Commander API; point it at the lab's deploy_watcher.py so
+        # _get_keeper_params() can bootstrap a KeeperParams session.
+        env["KEEPER_SDK_LOGIN_HELPER"] = str(identity.LAB_ROOT / "scripts" / "deploy_watcher.py")
+        os.environ["KEEPER_SDK_LOGIN_HELPER"] = env["KEEPER_SDK_LOGIN_HELPER"]
     state["keeper_args"] = argv_prefix
     state["admin_config_path"] = admin_config_path
     _remove_project_tree(argv_prefix, env=env, project_name=SMOKE_PROJECT_NAME)
@@ -333,17 +342,22 @@ def _sdk_allow(ok_codes: list[int], args: list[str], *, env: dict[str, str]) -> 
     return result.returncode
 
 
-def _load_admin_password() -> str:
-    """Re-fetch admin master password via deploy_watcher.load_keeper_creds().
+def _load_admin_creds() -> tuple[str, str, str]:
+    """Re-fetch admin creds via deploy_watcher.load_keeper_creds().
 
     KeeperParams zeroes .password after successful login, so we can't pull
-    it off admin_params. Re-reading from KSM is cheap (~1s) and avoids
-    plumbing the raw password through identity.admin_login()'s return.
+    the password off admin_params. Re-reading from KSM is cheap (~1s) and
+    lets the smoke runner exercise either login-helper path without
+    plumbing secrets through identity.admin_login()'s return.
     """
     module_path = identity.LAB_ROOT / "scripts" / "deploy_watcher.py"
     deploy_watcher = identity._load_lab_module("sdk_smoke_admin_creds", module_path)
-    _email, password, _totp = deploy_watcher.load_keeper_creds()
-    return password
+    email, password, totp_secret = deploy_watcher.load_keeper_creds()
+    return email, password, totp_secret
+
+
+def _load_admin_password() -> str:
+    return _load_admin_creds()[1]
 
 
 def _share_ksm_app_folder(admin_params: Any, *, app_uid: str, folder_uid: str) -> None:
@@ -504,6 +518,17 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "scripts/smoke/scenarios.py for the registry."
         ),
     )
+    parser.add_argument(
+        "--login-helper",
+        default="deploy_watcher",
+        choices=["deploy_watcher", "env"],
+        help=(
+            "How SDK subprocesses authenticate. 'deploy_watcher' exports "
+            "KEEPER_SDK_LOGIN_HELPER; 'env' clears that variable and relies on "
+            "KEEPER_EMAIL/KEEPER_PASSWORD/KEEPER_TOTP_SECRET for the "
+            "EnvLoginHelper fallback."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -523,6 +548,7 @@ def main(argv: list[str] | None = None) -> int:
             keep_sf=True,
             teardown_only=args.teardown,
             keep_records=args.keep_records,
+            login_helper=args.login_helper,
             state=state,
         )
         return exit_code

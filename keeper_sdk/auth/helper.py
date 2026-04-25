@@ -91,21 +91,42 @@ class EnvLoginHelper:
                     "KEEPER_SDK_LOGIN_HELPER at a custom helper"
                 ),
             )
-        return {
+        creds = {
             "email": os.environ["KEEPER_EMAIL"],
             "password": os.environ["KEEPER_PASSWORD"],
             "totp_secret": os.environ["KEEPER_TOTP_SECRET"],
-            "server": os.environ.get("KEEPER_SERVER", "keepersecurity.com"),
             "config_path": os.environ.get("KEEPER_CONFIG", ""),
         }
+        if os.environ.get("KEEPER_SERVER"):
+            creds["server"] = os.environ["KEEPER_SERVER"]
+        return creds
 
     def keeper_login(self, email: str, password: str, totp_secret: str, **kwargs: Any) -> Any:
         """Perform a Commander login. Imports ``keepercommander`` lazily
         so the SDK can be imported and used against ``MockProvider``
-        without Commander installed."""
+        without Commander installed.
+
+        When ``config_path`` is supplied (``KEEPER_CONFIG`` env), the
+        on-disk Commander config is loaded via ``load_config_properties``
+        so persistent-login state (``device_token``, ``clone_code``) is
+        reused. Without this load, every invocation triggers a fresh
+        device registration that blocks on the tenant's device-approval
+        queue — see LESSONS.md 2026-04-25 ``[keeper] EnvLoginHelper
+        persistent-login``.
+        """
         try:
+            import json
+
             import pyotp  # type: ignore[import-not-found]
             from keepercommander import api  # type: ignore[import-not-found]
+            from keepercommander.auth.login_steps import (  # type: ignore[import-not-found]
+                DeviceApprovalChannel,
+                LoginUi,
+                TwoFactorDuration,
+            )
+            from keepercommander.config_storage.loader import (  # type: ignore[import-not-found]
+                load_config_properties,
+            )
             from keepercommander.params import KeeperParams  # type: ignore[import-not-found]
         except ImportError as exc:
             raise CapabilityError(
@@ -115,15 +136,39 @@ class EnvLoginHelper:
 
         self._sleep_past_totp_edge(totp_secret, pyotp)
 
-        params = KeeperParams()
-        params.server = kwargs.get("server") or "keepersecurity.com"
-        if kwargs.get("config_path"):
-            params.config_filename = kwargs["config_path"]
+        config_path = kwargs.get("config_path") or ""
+        config_dict: dict[str, Any] = {}
+        if config_path:
+            try:
+                config_dict = json.loads(Path(config_path).read_text(encoding="utf-8"))
+            except FileNotFoundError:
+                config_dict = {}
+            except Exception as exc:
+                raise CapabilityError(
+                    reason=f"EnvLoginHelper: cannot parse KEEPER_CONFIG at {config_path}: {exc}",
+                    next_action=(
+                        "ensure KEEPER_CONFIG points at a valid Commander JSON config "
+                        "(or unset it to register a fresh device)"
+                    ),
+                ) from exc
+
+        explicit_server = kwargs.get("server") or ""
+        params = KeeperParams(config_filename=config_path, config=config_dict)
+        if config_path:
+            load_config_properties(params)
+        config_server = getattr(params, "server", None) or config_dict.get("server") or ""
         params.user = email
         params.password = password
+        params.server = explicit_server or config_server or "keepersecurity.com"
 
         try:
-            ui = _AutoLoginUi(totp_secret=totp_secret)
+            ui = _AutoLoginUi(
+                password=password,
+                totp_secret=totp_secret,
+                login_ui_base=LoginUi,
+                device_approval_channel=DeviceApprovalChannel.TwoFactor,
+                two_factor_duration=TwoFactorDuration.Forever,
+            )
             api.login(params, login_ui=ui)
         except Exception as exc:
             raise CapabilityError(
@@ -155,24 +200,68 @@ class EnvLoginHelper:
 
 
 class _AutoLoginUi:
-    """Answers Commander's two-factor + device-approval prompts headlessly.
+    """Answers Commander's full ``LoginUi`` protocol headlessly.
 
-    Extracted as a nested helper so operators who want different
-    prompt behaviour (e.g. fail on device-approval instead of
-    auto-accepting) can subclass ``EnvLoginHelper`` and override
-    ``_make_ui``.
+    Commander's ``api.login`` invokes step-based callbacks
+    (``on_password``, ``on_two_factor``, ``on_device_approval``,
+    ``on_sso_redirect``, ``on_sso_data_key``). Earlier versions of this
+    helper only stubbed two of them and returned strings/bools, which
+    matched no real protocol method and caused ``api.login`` to hang
+    waiting for a step that never completed. The current implementation
+    mirrors the lab's ``deploy_watcher.AutoUI`` (proven against this
+    tenant) — see LESSONS.md 2026-04-25 ``[keeper] EnvLoginHelper UI
+    contract``.
+
+    The class is constructed dynamically so the SDK doesn't import
+    ``keepercommander.auth.login_steps`` at module load time
+    (Commander is an optional extra).
     """
 
-    def __init__(self, totp_secret: str) -> None:
+    def __init__(
+        self,
+        *,
+        password: str,
+        totp_secret: str,
+        login_ui_base: type,
+        device_approval_channel: Any,
+        two_factor_duration: Any,
+    ) -> None:
+        self._password = password
         self._totp_secret = totp_secret
+        self._device_approval_channel = device_approval_channel
+        self._two_factor_duration = two_factor_duration
+        # Re-parent at construction so isinstance(self, LoginUi) holds
+        # for Commander's runtime checks.
+        self.__class__ = type(  # type: ignore[assignment]
+            "_AutoLoginUiBound", (_AutoLoginUi, login_ui_base), {}
+        )
 
-    def on_two_factor(self, *_args: Any, **_kwargs: Any) -> str:
+    def _fresh_totp(self) -> str:
         import pyotp  # type: ignore[import-not-found]
 
+        remaining = 30 - int(time.time()) % 30
+        if remaining < 8:
+            time.sleep(remaining + 1)
         return pyotp.TOTP(self._totp_secret).now()
 
-    def on_device_approval(self, *_args: Any, **_kwargs: Any) -> bool:
-        return True
+    def on_password(self, step: Any) -> None:
+        step.verify_password(self._password)
+
+    def on_two_factor(self, step: Any) -> None:
+        channels = step.get_channels()
+        if not channels:
+            return
+        step.duration = self._two_factor_duration
+        step.send_code(channels[0].channel_uid, self._fresh_totp())
+
+    def on_device_approval(self, step: Any) -> None:
+        step.send_code(self._device_approval_channel, self._fresh_totp())
+
+    def on_sso_redirect(self, step: Any) -> None:
+        step.login_with_password()
+
+    def on_sso_data_key(self, step: Any) -> None:
+        step.cancel()
 
 
 def load_helper_from_path(path: str | Path) -> LoginHelper:

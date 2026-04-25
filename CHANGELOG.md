@@ -49,6 +49,17 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   `pam_remote_browser.options`. Non-breaking.
 - `docs/COMMANDER.md`: new "Automated capability mirror" section
   linking to the pinned matrix and the DOR drift policy.
+- `scripts/smoke/smoke.py --login-helper env` — live-smoke mode that
+  exercises the public `EnvLoginHelper` fallback instead of the lab's
+  `deploy_watcher.py` helper. `tests/test_smoke_args.py` pins the CLI
+  switch.
+- `tests/test_auth_helper.py` — unit coverage for env-var credential
+  loading, Commander config warm-up, step-based `LoginUi` construction,
+  and invalid config errors.
+- `tests/test_renderer_snapshots.py` + `tests/fixtures/renderer_snapshots/`
+  — snapshot coverage for Rich plan/diff/outcome layouts.
+- `tests/test_dor_scenarios.py` — offline mapping for DOR `TEST_PLAN`
+  cases, with v1.1-only gaps marked `xfail`.
 
 ### Changed
 - Sibling `keeper-pam-declarative` repo reframed as a capability
@@ -63,11 +74,23 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   machine-readable command table, JSON contracts).
 - `keeper_sdk.auth` reference login helper (`EnvLoginHelper`) so
   `KEEPER_SDK_LOGIN_HELPER` is now optional for the common case.
+- `EnvLoginHelper` now implements Commander's full step-based
+  `LoginUi`, loads `KEEPER_CONFIG` through Commander's config loader
+  before env credentials are applied, and reuses persistent-login state
+  without letting stale config credentials override env credentials.
 - `docs/LOGIN.md` — helper contract + 30-line skeleton for custom flows.
 - `V1_GA_CHECKLIST.md` — roadmap toward v1.0.0; now tracks full-K
   scope (vault records, shared folders, teams, roles, enterprise
   config, KSM apps, PAM, compliance, rotation, migration) rather
   than PAM-only.
+- `tests/test_perf.py` now asserts peak RSS under the 500-resource
+  lifecycle smoke to catch memory regressions.
+- Packaging metadata now uses the SPDX `license = "MIT"` form and drops
+  the deprecated license classifier.
+- Retained `DeleteUnsupportedError` as a public compat shim subclassing
+  `CapabilityError`; provider failures now use `CapabilityError` directly.
+- Added `pyotp` as an unpinned runtime dependency because the built-in
+  `EnvLoginHelper` imports it lazily during Commander login.
 
 ### Changed
 - **Project renamed** across two hops:

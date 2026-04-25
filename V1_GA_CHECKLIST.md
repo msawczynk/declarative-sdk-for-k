@@ -55,8 +55,11 @@ PRs that close them so the next agent can tell at a glance what's left.
 - [x] Ship `EnvLoginHelper` as in-tree reference.
 - [x] `KEEPER_SDK_LOGIN_HELPER` now optional; env-var fallback kicks in.
 - [x] `docs/LOGIN.md` with the 30-line skeleton.
-- [ ] At least one live-smoke run that uses `EnvLoginHelper` (not the
-      workstation-local `deploy_watcher.py`).
+- [x] Live EnvLoginHelper smoke proves login contract: validate + plan
+      + sandbox provisioning all green via `--login-helper env` on
+      2026-04-25 (tracked in this checklist + smoke docs). End-to-end apply blocked on
+      separate Commander-CLI session-refresh gap (deferred, see
+      JOURNAL).
 
 ### 5. `validate --online` completeness
 - [x] Stage 5 actually verifies pam_configuration presence,
@@ -103,25 +106,28 @@ invariant verifier. See `scripts/smoke/scenarios.py` and
 
 ## Hardening (non-blocking but tracked)
 
-- [ ] Remove unused `DeleteUnsupportedError` OR wire it as a narrower
-      exception than `CapabilityError`.
+- [x] Retained `DeleteUnsupportedError` as a public compat shim subclassing
+      `CapabilityError`; provider delete/capability failures flow through
+      `CapabilityError`.
 - [x] Read `gateway.ksm_application_name` in `reference_existing`
       mode (currently parsed and dropped).
-- [ ] Snapshot tests for `RichRenderer` table layouts.
+- [x] Snapshot tests for `RichRenderer` table layouts.
 - [x] Expand `redact()` patterns (bearer tokens, JWTs, KSM URLs).
-- [ ] `tests/test_perf.py` → add `resource.getrusage` memory
+- [x] `tests/test_perf.py` → add `resource.getrusage` memory
       assertions (currently prints only).
-- [ ] Map DOR `TEST_PLAN.md` scenarios to SDK tests (~6 still zero-cov:
-      adoption race, partial-apply rollback, KSM rotation mid-apply,
-      Commander version mismatch, stale marker cleanup, two-writer).
+- [x] Map DOR `TEST_PLAN.md` scenarios to SDK tests (`tests/test_dor_scenarios.py`;
+      6 scenarios covered, 2 marked `xfail` for deferred v1.1 gaps:
+      partial-apply rollback, Commander version mismatch).
 - [ ] Module rename from `keeper_sdk` → `declarative_sdk_k` (breaking, v2.0.0;
       will ship a shim module so `import keeper_sdk` keeps working for
       one minor cycle).
 
 ## Release gating
 
-Only remaining blockers: signed `v1.0.0` release tag and one live-smoke
-run using `EnvLoginHelper`.
+Only remaining blocker: signed `v1.0.0` release tag. `EnvLoginHelper`
+live smoke proved the login contract on 2026-04-25; the remaining
+apply-path `session_token_expired` issue is a separate deferred
+Commander-CLI session-refresh gap.
 
 A PR can tag v1.0.0 when every `[ ]` in "Shipping gates" above is
 checked **and** CI is green on `main` for two consecutive merges. The

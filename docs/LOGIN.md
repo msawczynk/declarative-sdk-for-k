@@ -23,17 +23,28 @@ No code required. Set:
 export KEEPER_EMAIL='you@example.com'
 export KEEPER_PASSWORD='...'
 export KEEPER_TOTP_SECRET='JBSWY3DPEHPK3PXP'
-dsk --provider commander apply env.yaml
+dsk --provider commander validate env.yaml --online
+dsk --provider commander plan env.yaml
 ```
+
+The built-in helper is release-candidate proven for validate, plan, and
+sandbox provisioning. Full live apply currently has a deferred Commander
+session-refresh gap; use a custom helper for apply only after proving that
+refresh path in your tenant.
 
 Under the hood `EnvLoginHelper`:
 
 - imports `keepercommander` + `pyotp` lazily (so `dsk` still
   imports cleanly on machines without them),
+- loads `KEEPER_CONFIG` with Commander's own config loader when present,
+  so persistent-login state such as `device_token` and `clone_code` is
+  reused instead of forcing a fresh device-registration flow,
 - handles the TOTP edge-of-window race (sleeps into the next window
   when within 5 s of the boundary — see `LESSONS.md` 2026-04-23),
-- auto-accepts device-approval prompts and answers two-factor
-  challenges via TOTP.
+- implements Commander's step-based `LoginUi` protocol
+  (`on_password`, `on_two_factor`, `on_device_approval`,
+  `on_sso_redirect`, `on_sso_data_key`) and answers two-factor /
+  device-approval challenges via TOTP.
 
 If any of those behaviours are wrong for your environment, move to
 option 2.
@@ -69,19 +80,42 @@ def load_keeper_creds() -> dict[str, str]:
 
 def keeper_login(email: str, password: str, totp_secret: str, **kwargs: Any) -> Any:
     from keepercommander import api
+    from keepercommander.auth.login_steps import (
+        DeviceApprovalChannel,
+        LoginUi,
+        TwoFactorDuration,
+    )
+    from keepercommander.config_storage.loader import load_config_properties
     from keepercommander.params import KeeperParams
     import pyotp
 
-    params = KeeperParams()
+    params = KeeperParams(
+        config_filename=kwargs.get("config_path", ""),
+    )
+    if params.config_filename:
+        load_config_properties(params)
     params.user = email
     params.password = password
-    params.server = kwargs.get("server", "keepersecurity.com")
+    params.server = kwargs.get("server") or getattr(params, "server", None) or "keepersecurity.com"
 
-    class Ui:
-        def on_two_factor(self, *_a, **_kw):
-            return pyotp.TOTP(totp_secret).now()
-        def on_device_approval(self, *_a, **_kw):
-            return True   # or raise if your policy forbids auto-approval
+    class Ui(LoginUi):
+        def on_password(self, step):
+            step.verify_password(password)
+
+        def on_two_factor(self, step):
+            channels = step.get_channels()
+            if channels:
+                step.duration = TwoFactorDuration.Forever
+                step.send_code(channels[0].channel_uid, pyotp.TOTP(totp_secret).now())
+
+        def on_device_approval(self, step):
+            step.send_code(DeviceApprovalChannel.TwoFactor, pyotp.TOTP(totp_secret).now())
+
+        def on_sso_redirect(self, step):
+            step.login_with_password()
+
+        def on_sso_data_key(self, step):
+            step.cancel()
 
     api.login(params, login_ui=Ui())
     if not getattr(params, "session_token", None):

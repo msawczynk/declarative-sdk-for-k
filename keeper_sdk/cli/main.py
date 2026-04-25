@@ -30,7 +30,6 @@ from keeper_sdk.cli.renderer import RichRenderer
 from keeper_sdk.core import (
     CapabilityError,
     ChangeKind,
-    DeleteUnsupportedError,
     ManifestError,
     OwnershipError,
     RefError,
@@ -277,9 +276,6 @@ def import_(
     provider = _make_provider(ctx, manifest_path, manifest=manifest)
     try:
         outcomes = provider.apply_plan(plan_obj, dry_run=False)
-    except DeleteUnsupportedError as exc:
-        click.echo(f"delete unsupported: {exc}", err=True)
-        sys.exit(EXIT_CAPABILITY)
     except CapabilityError as exc:
         click.echo(f"provider error: {exc}", err=True)
         sys.exit(EXIT_CAPABILITY)
@@ -335,9 +331,6 @@ def apply(
     provider = _make_provider(ctx, manifest_path, manifest=manifest)
     try:
         outcomes = provider.apply_plan(plan_obj, dry_run=dry_run)
-    except DeleteUnsupportedError as exc:
-        click.echo(f"delete unsupported: {exc}", err=True)
-        sys.exit(EXIT_CAPABILITY)
     except CapabilityError as exc:
         click.echo(f"provider error: {exc}", err=True)
         if exc.context:

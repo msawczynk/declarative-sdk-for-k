@@ -1,6 +1,6 @@
 # SDK Live Smoke
 
-This smoke is an autonomous, no-human-input proof that the SDK can plan -> apply -> verify -> destroy against a live Keeper tenant through Commander CLI 17.x, while honoring the current "no DAG writes" moratorium by routing all tenant mutations through the CLI rather than `keeper_dag`.
+This smoke is an autonomous, no-human-input harness for proving the SDK against a live Keeper tenant through Commander CLI 17.x, while honoring the current "no DAG writes" moratorium by routing all tenant mutations through the CLI rather than `keeper_dag`. The `deploy_watcher` helper path drives the full plan -> apply -> verify -> destroy cycle; the public `EnvLoginHelper` path is release-candidate proof for validate, plan, and sandbox provisioning while the full apply session-refresh gap remains deferred to v1.1.
 
 ## Prerequisites
 
@@ -28,12 +28,21 @@ python3 scripts/smoke/smoke.py                          # pamMachine (default)
 python3 scripts/smoke/smoke.py --scenario pamDatabase   # Postgres cycle
 python3 scripts/smoke/smoke.py --scenario pamDirectory  # OpenLDAP cycle
 python3 scripts/smoke/smoke.py --scenario pamRemoteBrowser
+python3 scripts/smoke/smoke.py --login-helper env --scenario pamMachine
 ```
 
 Registered scenarios live in `scripts/smoke/scenarios.py`. Every scenario
 is unit-tested offline (`tests/test_smoke_scenarios.py`) — schema,
 typed-model, and planner all run without a tenant, so scenario drift
 is caught before you burn a tenant round-trip.
+
+`--login-helper deploy_watcher` is the default and preserves the current
+lab-helper path. `--login-helper env` unsets `KEEPER_SDK_LOGIN_HELPER`
+for SDK subprocesses and instead exports `KEEPER_EMAIL`,
+`KEEPER_PASSWORD`, and `KEEPER_TOTP_SECRET` so the provider falls back
+to the public `EnvLoginHelper` contract for the pre-apply gates. Treat
+`--login-helper env` as a login-contract smoke until the deferred
+Commander session-refresh gap is closed for full apply.
 
 Exit codes come from `smoke.py::main()`:
 

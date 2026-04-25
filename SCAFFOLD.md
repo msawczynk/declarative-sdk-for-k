@@ -13,7 +13,8 @@ Agent-first Python SDK + CLI (`dsk`) for deterministic `validate -> plan -> appl
 ├── .cursorrules                            # Local editor/agent rule entrypoint.
 ├── .github/                                # GitHub automation root.
 │   └── workflows/
-│       └── ci.yml                          # CI: lint, mypy, pytest, examples, drift-check, build.
+│       ├── ci.yml                          # CI: lint, mypy, pytest, examples, drift-check, build.
+│       └── publish.yml                     # PyPI trusted-publisher workflow, release-triggered.
 ├── .gitignore                              # Git ignore rules.
 ├── AGENTS.md                               # Machine-readable operating manual for agents.
 ├── AUDIT.md                                # Milestone/audit history and design reconciliation log.
@@ -27,6 +28,7 @@ Agent-first Python SDK + CLI (`dsk`) for deterministic `validate -> plan -> appl
 │   ├── CAPABILITY_MATRIX.md                # Generated Commander capability mirror.
 │   ├── COMMANDER.md                        # Version pin, CLI/API usage, drift policy.
 │   ├── LOGIN.md                            # `EnvLoginHelper` + custom login-helper contract.
+│   ├── RELEASING.md                        # Maintainer release ritual + PyPI OIDC setup.
 │   ├── VALIDATION_STAGES.md                # Stage-by-stage `validate --online` contract.
 │   └── capability-snapshot.json            # Machine-readable mirror consumed by drift-check CI.
 ├── examples/                               # Canonical minimal manifests for common PAM resource shapes.
@@ -81,11 +83,14 @@ Agent-first Python SDK + CLI (`dsk`) for deterministic `validate -> plan -> appl
     ├── __init__.py                         # Tests package marker.
     ├── conftest.py                         # Shared fixtures and test helpers.
     ├── fixtures/                           # Vendored fixture data for clean CI runs.
-    │   └── examples/                       # Copied example corpus used by tests.
+    │   ├── examples/                       # Copied example corpus used by tests.
+    │   └── renderer_snapshots/              # Rich table snapshots.
+    ├── test_auth_helper.py                  # EnvLoginHelper and Commander LoginUi contract tests.
     ├── test_cli.py                         # CLI command/output/exit-code tests.
     ├── test_commander_cli.py               # Commander provider behavior under mocks.
     ├── test_coverage_followups.py          # Regression coverage for prior review gaps.
     ├── test_diff.py                        # Diff taxonomy tests.
+    ├── test_dor_scenarios.py               # Offline DOR TEST_PLAN scenario mapping.
     ├── test_graph.py                       # Graph/order/cycle tests.
     ├── test_h_series_gaps.py               # H-series audit gap regressions.
     ├── test_interfaces.py                  # Protocol/interface conformance tests.
@@ -97,11 +102,14 @@ Agent-first Python SDK + CLI (`dsk`) for deterministic `validate -> plan -> appl
     ├── test_preview_gate.py                # Preview-key guard tests.
     ├── test_providers.py                   # Provider protocol/common-provider tests.
     ├── test_redact.py                      # Redaction contract tests.
+    ├── test_renderer_snapshots.py          # RichRenderer snapshot tests.
     ├── test_rules.py                       # Semantic rule tests.
     ├── test_schema.py                      # Schema and invalid-fixture validation tests.
+    ├── test_smoke_args.py                  # Smoke-runner CLI args.
     ├── test_smoke_scenarios.py             # Offline validation of live-smoke scenario shapes.
     ├── test_stage_5_bindings.py            # `validate --online` stage-5 binding checks.
-    └── test_sync_upstream.py               # Capability-mirror generator + `--check` tests.
+    ├── test_sync_upstream.py               # Capability-mirror generator + `--check` tests.
+    └── test_uid_ref_gate.py                # `pam_configuration_uid_ref` gate tests.
 ```
 
 ## Where to land new work
@@ -123,27 +131,26 @@ Agent-first Python SDK + CLI (`dsk`) for deterministic `validate -> plan -> appl
 |---|---|---|---|
 | 1. Capability parity | Preview/decision guard for unsupported schema surface exists | SHIPPED | `keeper_sdk/core/preview.py`, `tests/test_preview_gate.py`, `V1_GA_CHECKLIST.md` |
 | 1. Capability parity | Examples exist and CI validates them offline + mock-plans them | SHIPPED | `examples/*.yaml`, `.github/workflows/ci.yml`, `tests/test_smoke_scenarios.py` |
-| 1. Capability parity | `pam_configuration_uid_ref` linking still unresolved/stub-needed | GAP | `V1_GA_CHECKLIST.md`; no dedicated implementation doc/test/file in `keeper_sdk/` |
+| 1. Capability parity | `pam_configuration_uid_ref` in-manifest linking shipped; cross-manifest/live-tenant config linking fails at stage 3 | SHIPPED | `tests/test_uid_ref_gate.py`, `V1_GA_CHECKLIST.md` |
 | 1. Capability parity | Upstream DOR mismatch handled by capability mirror, not the old merge note flow | SHIPPED | `docs/CAPABILITY_MATRIX.md`, `docs/capability-snapshot.json`, `scripts/sync_upstream.py`, `docs/COMMANDER.md` |
-| 2. DOR reconciliation | Old “merge NOTES_FROM_SDK upstream” checklist is superseded by shipped mirror/drift model | PARTIAL | `AUDIT.md`, `REVIEW.md`, `docs/COMMANDER.md`, `docs/CAPABILITY_MATRIX.md` |
+| 2. DOR reconciliation | Old “merge NOTES_FROM_SDK upstream” checklist is superseded by shipped mirror/drift model | SHIPPED | `AUDIT.md`, `REVIEW.md`, `docs/COMMANDER.md`, `docs/CAPABILITY_MATRIX.md` |
 | 3. CI + release | CI matrix, examples job, drift-check, build wiring are live | SHIPPED | `.github/workflows/ci.yml`, `pyproject.toml` |
 | 3. CI + release | First green `main` CI run recorded | SHIPPED | `V1_GA_CHECKLIST.md`, `CHANGELOG.md`, commit `fb6fb8b` in `git log` |
-| 3. CI + release | PyPI publish workflow absent | GAP | `.github/workflows/ci.yml` present; no `.github/workflows/publish.yml` in tree |
-| 3. CI + release | Signed `v1.0.0` release tag absent | GAP | `git tag -l v1.0.0` returns empty; no release doc/workflow file in tree |
+| 3. CI + release | PyPI publish workflow exists; maintainer-side trusted-publisher + protected env setup remains external | SHIPPED | `.github/workflows/publish.yml`, `docs/RELEASING.md` |
+| 3. CI + release | Signed `v1.0.0` release tag absent | GAP | `git tag -l v1.0.0` returns empty; `docs/RELEASING.md` documents the release command |
 | 4. Login | Built-in env helper + helper contract docs shipped | SHIPPED | `keeper_sdk/auth/helper.py`, `docs/LOGIN.md`, `README.md` |
-| 4. Login | Live-smoke explicitly using `EnvLoginHelper` is still missing | GAP | `V1_GA_CHECKLIST.md`; smoke harness lives in `scripts/smoke/` but no committed proof artifact/doc for env-helper path |
+| 4. Login | Live-smoke explicitly using `EnvLoginHelper` proved validate + plan + sandbox provisioning; apply-path session refresh deferred | SHIPPED | `scripts/smoke/smoke.py --login-helper env`, `scripts/smoke/README.md`, `V1_GA_CHECKLIST.md` |
 | 5. Validate stages | Stage-5 tenant-binding checks implemented + documented | SHIPPED | `keeper_sdk/core/interfaces.py`, `keeper_sdk/providers/commander_cli.py`, `tests/test_stage_5_bindings.py`, `docs/VALIDATION_STAGES.md` |
 | 6. Live-smoke coverage | `pamMachine` / `pamDatabase` / `pamDirectory` / `pamRemoteBrowser` scenario registry shipped | SHIPPED | `scripts/smoke/scenarios.py`, `scripts/smoke/smoke.py`, `tests/test_smoke_scenarios.py` |
 | 6. Live-smoke coverage | `pamUser` standalone runner not shipped yet | DEFERRED-1.1 | `V1_GA_CHECKLIST.md`, `scripts/smoke/scenarios.py` |
 | 6. Live-smoke coverage | Adoption / field-drift / two-writer smokes not shipped yet | DEFERRED-1.1 | `V1_GA_CHECKLIST.md`, `scripts/smoke/scenarios.py` |
-| Hardening | DeleteUnsupportedError cleanup already done | SHIPPED | `REVIEW.md`, `keeper_sdk/providers/commander_cli.py` |
-| Hardening | `gateway.ksm_application_name` in `reference_existing` still incomplete | GAP | `V1_GA_CHECKLIST.md`, `keeper_sdk/providers/commander_cli.py` |
-| Hardening | Renderer snapshots, redact expansion, perf memory assertions still open | GAP | `V1_GA_CHECKLIST.md`, `keeper_sdk/cli/renderer.py`, `keeper_sdk/core/redact.py`, `tests/test_perf.py` |
-| Hardening | DOR `TEST_PLAN` scenario mapping + `keeper_sdk` rename are explicitly deferred | DEFERRED-1.1 | `V1_GA_CHECKLIST.md`, `pyproject.toml`, `keeper_sdk/__init__.py` |
+| Hardening | `DeleteUnsupportedError` retained as a public compat shim; provider failures use `CapabilityError` | SHIPPED | `V1_GA_CHECKLIST.md`, `keeper_sdk/cli/main.py`, `keeper_sdk/core/errors.py` |
+| Hardening | `gateway.ksm_application_name` in `reference_existing` enforced in tenant validation | SHIPPED | `V1_GA_CHECKLIST.md`, `keeper_sdk/providers/commander_cli.py`, `tests/test_stage_5_bindings.py` |
+| Hardening | Renderer snapshots, redact expansion, perf memory assertions shipped | SHIPPED | `tests/test_renderer_snapshots.py`, `tests/test_redact.py`, `tests/test_perf.py` |
+| Hardening | DOR `TEST_PLAN` scenario mapping shipped with two expected v1.1 deferrals; `keeper_sdk` rename remains v2 | MIXED | `tests/test_dor_scenarios.py`, `V1_GA_CHECKLIST.md`, `pyproject.toml`, `keeper_sdk/__init__.py` |
 
 ## Open questions for next session
 
 - `keeper-pam-declarative` — push to a GitHub remote as the public mirror, or keep local-only? Public makes the drift-check debuggable by third parties; local keeps the marker-wire-format surface unpublished.
 - `sdk-live-smoke` branch still carries old `pamform`-era history — rename / delete / leave as snapshot?
-- Signed-tag pin for Commander vs the current branch-HEAD pin — does the operator want reproducibility over upstream-tracking?
 - `DSK_PREVIEW=1` discoverability — is a one-line check-list in the `validate` error enough, or does it deserve a dedicated doc page?

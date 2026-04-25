@@ -54,5 +54,9 @@ class CapabilityError(ManifestError):
     """Missing role enforcement, license, KSM app, or environment support."""
 
 
-class DeleteUnsupportedError(ManifestError):
-    """Delete rejected because provider cannot prove safe ownership or has dependents."""
+class DeleteUnsupportedError(CapabilityError):
+    """Backward-compatible alias for delete capability failures.
+
+    v1 provider code now raises :class:`CapabilityError` directly, but
+    pre-GA callers may still import this public symbol.
+    """
