@@ -73,6 +73,19 @@ project, rediscovers records, resolves live Keeper UIDs, and runs mapped
 is still pending, so treat this as offline apply wiring until a smoke run proves
 the Commander edit path end-to-end.
 
+### SDK_DA §P3.1 readback buckets (design vocabulary)
+
+Map each manifest field to one bucket (see `docs/SDK_DA_COMPLETION_PLAN.md` §P3.1):
+
+| Bucket | Meaning |
+|--------|---------|
+| **import-supported** | `pam project import` / `extend` owns the value; `discover()` returns manifest-shaped fields for diff. |
+| **edit-supported-clean** | Post-import `pam connection edit` / `pam rbi edit` persists it **and** `discover()` round-trips into the same manifest path used in `compute_diff` (live proof still required before any gate lift). |
+| **edit-supported-dirty** | Edit persists on tenant/DAG surfaces Commander uses, but current `get`/`discover()` does **not** populate the manifest field the planner compares — clean re-plan may stay red until readback is extended (RBI isolation/recording rows below, Issue #5). |
+| **upstream-gap** | No safe Commander writer in the pinned matrix, or no typed manifest path — schema may exist; apply stays preview-gated or conflicted. |
+
+Rows in the table below mix **offline apply-wired** (argv exists) with readback truth: treat “tuning-supported (offline apply-wired)” **without** live clean re-plan as **at best** `edit-supported-dirty` until smoke proves `edit-supported-clean`.
+
 2026-04-25 live smoke status for Issue #5: `pamRemoteBrowser` with
 `--login-helper env` created records and teardown-only cleanup passed, but
 verification failed before clean re-plan. Pinned Commander

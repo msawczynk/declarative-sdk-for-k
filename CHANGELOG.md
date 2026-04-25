@@ -7,6 +7,7 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Changed
+- `docs/COMMANDER.md` — SDK_DA §P3.1 readback bucket vocabulary aligned with Issue #5 RBI dirty-readback status.
 - Autonomous orchestration pass: parallel `run_parallel_codex.sh` (slices 01–03)
   aligned GitHub issue template + `CODEX_GITHUB`, smoke README scenario matrix,
   root docs with `ORCHESTRATION_PHASE0_PARALLEL`; parent ran `phase0_gates.sh full`
