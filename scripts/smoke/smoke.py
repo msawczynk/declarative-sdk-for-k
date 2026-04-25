@@ -57,6 +57,10 @@ def _active_titles() -> list[str]:
     return [str(res["title"]) for res in _active_resources()]
 
 
+def _active_expected_records() -> set[tuple[str, str]]:
+    return set(_ACTIVE_SCENARIO.expected_records(PAM_CONFIG_UID_REF, TITLE_PREFIX))
+
+
 class SmokeError(Exception):
     pass
 
@@ -197,20 +201,21 @@ def run_smoke(
         raise SmokeError("provider did not cache the resolved Resources shared-folder UID")
 
     live = prov.discover()
-    expected_titles = set(_active_titles())
-    expected_count = len(expected_titles)
+    expected_records = _active_expected_records()
+    expected_count = len(expected_records)
     owned = [
         record
         for record in live
-        if record.resource_type == _ACTIVE_SCENARIO.resource_type
-        and record.title in expected_titles
+        if (record.resource_type, record.title) in expected_records
         and record.marker
         and record.marker.get("manager") == MANAGER_NAME
     ]
     if len(owned) != expected_count:
+        found = {(record.resource_type, record.title) for record in owned}
+        missing = sorted(expected_records - found)
         raise SmokeError(
-            f"expected {expected_count} SDK-managed {_ACTIVE_SCENARIO.resource_type} records, "
-            f"found {len(owned)}; live={_live_summary(live)}"
+            f"expected {expected_count} SDK-managed scenario records, found {len(owned)}; "
+            f"missing={missing}; live={_live_summary(live)}"
         )
     try:
         _ACTIVE_SCENARIO.verify(owned)

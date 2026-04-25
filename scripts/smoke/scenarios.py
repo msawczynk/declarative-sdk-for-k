@@ -9,7 +9,7 @@ A scenario provides:
 
 1. A canonical name (``pamMachine``, ``pamDatabase``, …) used on the
    ``--scenario`` CLI flag and for title namespacing.
-2. The Keeper-side ``resource_type`` — must match the
+2. The Keeper-side primary ``resource_type`` — must match the
    ``keepercommander.commands.pam_import`` accepted strings verbatim
    (see ``docs/CAPABILITY_MATRIX.md``).
 3. A ``build_resources(pam_config_uid_ref)`` callable that returns the
@@ -33,6 +33,8 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
+ExpectedRecord = tuple[str, str]
+
 
 @dataclass(frozen=True)
 class ScenarioSpec:
@@ -44,9 +46,25 @@ class ScenarioSpec:
     verify: Callable[[Sequence[Any]], None] = field(default_factory=lambda: _verify_noop)
     description: str = ""
 
+    def expected_records(self, pam_config_uid_ref: str, title_prefix: str) -> list[ExpectedRecord]:
+        """Return ``(resource_type, title)`` pairs this scenario should create."""
+        return expected_records_from_resources(
+            self.build_resources(pam_config_uid_ref, title_prefix)
+        )
+
 
 def _verify_noop(_records: Sequence[Any]) -> None:
     """Default verifier — no type-specific post-apply checks."""
+
+
+def expected_records_from_resources(resources: Sequence[dict[str, Any]]) -> list[ExpectedRecord]:
+    """Flatten top-level resources plus nested ``users[]`` into expected records."""
+    expected: list[ExpectedRecord] = []
+    for resource in resources:
+        expected.append((str(resource["type"]), str(resource["title"])))
+        for user in resource.get("users") or []:
+            expected.append((str(user["type"]), str(user["title"])))
+    return expected
 
 
 # ---------------------------------------------------------------------------
@@ -139,6 +157,32 @@ def _remote_browser_resources(pam_config_uid_ref: str, title_prefix: str) -> lis
     ]
 
 
+def _pam_user_nested_resources(pam_config_uid_ref: str, title_prefix: str) -> list[dict[str, Any]]:
+    return [
+        {
+            "uid_ref": f"{title_prefix}-host-with-user",
+            "type": "pamMachine",
+            "title": f"{title_prefix}-host-with-user",
+            "pam_configuration_uid_ref": pam_config_uid_ref,
+            "shared_folder": "resources",
+            "host": "10.0.0.230",
+            "port": "22",
+            "ssl_verification": True,
+            "operating_system": "Linux",
+            "users": [
+                {
+                    "uid_ref": f"{title_prefix}-pam-user-1",
+                    "type": "pamUser",
+                    "title": f"{title_prefix}-pam-user-1",
+                    "login": "sdk-smoke-user",
+                    "password": "offline-smoke-password",
+                    "managed": False,
+                }
+            ],
+        },
+    ]
+
+
 # ---------------------------------------------------------------------------
 # Post-apply verifiers. Called with discovered LiveRecord list; raise
 # AssertionError on type-specific invariant violation.
@@ -178,6 +222,19 @@ def _verify_remote_browser(records: Sequence[Any]) -> None:
             )
 
 
+def _verify_pam_user_nested(records: Sequence[Any]) -> None:
+    seen_pam_user = False
+    for record in records:
+        if getattr(record, "resource_type", None) != "pamUser":
+            continue
+        seen_pam_user = True
+        payload = getattr(record, "payload", {}) or {}
+        if not payload.get("login"):
+            raise AssertionError(f"pamUser {record.title} has no login in discovered payload")
+    if not seen_pam_user:
+        raise AssertionError("nested pamUser record was not discovered")
+
+
 # ---------------------------------------------------------------------------
 # Registry — canonical source of what lives in the live-smoke matrix.
 
@@ -214,6 +271,17 @@ _SCENARIOS: dict[str, ScenarioSpec] = {
         description=(
             "HTTP RBI cycle with session recording + isolation toggled on. "
             "Exercises the pam_settings.options/connection sub-schemas."
+        ),
+    ),
+    "pamUserNested": ScenarioSpec(
+        name="pamUserNested",
+        resource_type="pamMachine",
+        build_resources=_pam_user_nested_resources,
+        verify=_verify_pam_user_nested,
+        description=(
+            "Nested pamUser shape: a Linux machine with resources[].users[]. "
+            "Offline gate proves schema/model/planner/normalize support without "
+            "claiming standalone top-level pamUser live support."
         ),
     ),
 }

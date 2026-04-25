@@ -49,3 +49,36 @@ def test_to_pam_import_preserves_top_metadata(minimal_manifest_path: Path) -> No
     assert "name" not in converted
     assert "pam_configuration" in converted
     assert "pam_data" in converted
+
+
+def test_to_pam_import_preserves_nested_pam_users() -> None:
+    doc = {
+        "version": "1",
+        "name": "nested-user-smoke",
+        "resources": [
+            {
+                "uid_ref": "res.host",
+                "type": "pamMachine",
+                "title": "linux-host",
+                "users": [
+                    {
+                        "uid_ref": "usr.local",
+                        "type": "pamUser",
+                        "title": "linux-local-user",
+                        "login": "local-user",
+                    }
+                ],
+            }
+        ],
+    }
+    converted = to_pam_import_json(doc)
+
+    resource = converted["pam_data"]["resources"][0]
+    user = resource["users"][0]
+    assert "uid_ref" not in resource
+    assert "uid_ref" not in user
+    assert user == {
+        "type": "pamUser",
+        "title": "linux-local-user",
+        "login": "local-user",
+    }
