@@ -275,7 +275,44 @@ def run_smoke(
     _sdk(["apply", "--allow-delete", "--auto-approve", str(empty_manifest_path)], env=env)
     _mark(state, "destroy apply OK")
 
-    live_after = prov.discover()
+    # Empty-manifest plans omit ``gateways`` / ``pam_configurations``; combined
+    # with ``reference_existing`` scaffolds, Commander can leave SDK-marked
+    # ``pam_configuration`` rows under the project Resources/Users folders that
+    # never appear as DELETE rows. Sweep those folders the same way as
+    # pre-clean, then re-discover with an empty ``manifest_source`` so
+    # :meth:`discover` does not inject the synthetic reference-configuration
+    # :class:`~keeper_sdk.core.interfaces.LiveRecord` (which always carries a
+    # marker and would false-positive this check).
+    for folder_uid in (resolved_sf_uid, prov.last_resolved_users_folder_uid or ""):
+        if not folder_uid:
+            continue
+        try:
+            extra = sandbox.teardown_records(admin_params, folder_uid, manager=MANAGER_NAME)
+        except Exception as exc:
+            # Destroy may remove the Users/Resources tree; UIDs cached before
+            # apply are then stale. Missing-folder errors are non-fatal here.
+            if "No such folder" in str(exc) or "No such folder or record" in str(exc):
+                log.warning(
+                    "post-destroy folder sweep skipped %s (%s)", folder_uid, exc.__class__.__name__
+                )
+                continue
+            raise
+        if extra:
+            log.info(
+                "post-destroy folder sweep removed %d SDK-managed record(s) under %s",
+                len(extra),
+                folder_uid,
+            )
+
+    empty_src = yaml.safe_load(empty_manifest_path.read_text())
+    if not isinstance(empty_src, dict):
+        empty_src = {}
+    prov_verify = CommanderCliProvider(
+        config_file=admin_config_path,
+        keeper_password=admin_password,
+        manifest_source=empty_src,
+    )
+    live_after = prov_verify.discover()
     still_ours = [
         record
         for record in live_after
