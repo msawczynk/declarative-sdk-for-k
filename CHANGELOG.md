@@ -19,6 +19,7 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   consistent `get` readback metadata.
 
 ### Added
+- Offline P2.1 diff anchor: `test_diff_nested_pam_user_rotation_drift_surfaces_rotation_settings_key` — proves nested `pamUser` rotation readback drift keys `rotation_settings` in plan tails.
 - `scripts/agent/_codex_resolve.sh` — auto-pick Codex from `CODEX_BIN`, `PATH`, or newest Cursor `openai.chatgpt-*` extension bundle.
 - `scripts/agent/run_parallel_codex.sh` + `scripts/agent/prompts/*.prompt.md` — disjoint Codex CLI slices with logs under `.codex-runs/` (gitignored).
 - `docs/ORCHESTRATION_PHASE0_PARALLEL.md` + `scripts/agent/phase0_gates.sh` — parent vs Codex split, Phase 0 / merge gates scripted (referenced from global Cursor rules + daybook drift-guard).

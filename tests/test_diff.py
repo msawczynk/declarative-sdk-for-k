@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from pathlib import Path
 
 import pytest
@@ -11,6 +12,7 @@ from keeper_sdk.core.diff import ChangeKind
 from keeper_sdk.core.errors import CollisionError
 from keeper_sdk.core.interfaces import LiveRecord
 from keeper_sdk.core.metadata import encode_marker
+from keeper_sdk.core.models import Manifest
 
 
 def test_diff_all_create(minimal_manifest_path: Path) -> None:
@@ -227,3 +229,59 @@ def test_no_collision_single_marker_pair(minimal_manifest_path: Path) -> None:
     machine_changes = [c for c in changes if c.uid_ref == "acme-lab-linux1"]
     assert len(machine_changes) == 1
     assert machine_changes[0].kind in (ChangeKind.UPDATE, ChangeKind.NOOP)
+
+
+def test_diff_nested_pam_user_rotation_drift_surfaces_rotation_settings_key(
+    minimal_manifest_path: Path,
+) -> None:
+    """P2.1 offline anchor: nested ``pamUser`` rotation readback shape drift keys ``rotation_settings``.
+
+    Live Commander payloads can disagree with manifest schedule shape while still
+    representing the same applied intent; ``compute_diff`` must name
+    ``rotation_settings`` in UPDATE ``before``/``after`` so smoke/parent tails
+    stay diagnosable (SDK_DA §P2.1 task 2).
+    """
+    manifest = load_manifest(minimal_manifest_path)
+    assert isinstance(manifest, Manifest)
+    data = manifest.model_dump(mode="python", exclude_none=True)
+    machine = next(r for r in data["resources"] if r["uid_ref"] == "acme-lab-linux1")
+    user_desired = next(u for u in machine["users"] if u["uid_ref"] == "acme-lab-linux1-root")
+    live_user = {k: v for k, v in user_desired.items() if k not in {"rotation_settings"}} | {
+        "rotation_settings": {
+            "rotation": "general",
+            "enabled": "on",
+            "schedule": {"type": "CRON", "cron": "0 0 * * *"},
+            "password_complexity": user_desired["rotation_settings"]["password_complexity"],
+        }
+    }
+    live = [
+        LiveRecord(
+            keeper_uid="LIVE_MACHINE",
+            title="lab-linux-1",
+            resource_type="pamMachine",
+            payload=deepcopy(machine),
+            marker=encode_marker(
+                uid_ref="acme-lab-linux1",
+                manifest=manifest.name,
+                resource_type="pamMachine",
+            ),
+        ),
+        LiveRecord(
+            keeper_uid="LIVE_USER",
+            title="lab-linux-1-root",
+            resource_type="pamUser",
+            payload=live_user,
+            marker=encode_marker(
+                uid_ref="acme-lab-linux1-root",
+                manifest=manifest.name,
+                resource_type="pamUser",
+            ),
+        ),
+    ]
+    changes = compute_diff(manifest, live_records=live)
+    user_change = next(c for c in changes if c.uid_ref == "acme-lab-linux1-root")
+    assert user_change.kind is ChangeKind.UPDATE
+    assert user_change.before is not None
+    assert user_change.after is not None
+    assert "rotation_settings" in user_change.before
+    assert "rotation_settings" in user_change.after

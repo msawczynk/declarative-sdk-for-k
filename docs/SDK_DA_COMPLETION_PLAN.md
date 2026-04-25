@@ -136,7 +136,9 @@ Tasks:
 1. Add an offline fixture reproducing post-apply live payload shape for nested
    `pamUser` + parent `pamMachine`.
 2. Make drift output structured enough to identify exact field names in live
-   smoke failure tails.
+   smoke failure tails. Offline anchor:
+   `tests/test_diff.py::test_diff_nested_pam_user_rotation_drift_surfaces_rotation_settings_key`
+   (nested ``pamUser`` ``rotation_settings`` shows up on ``compute_diff`` UPDATE rows).
 3. If fields are SDK-only linkage metadata, add them to the ignored drift set
    with a focused regression test.
 4. If fields are real rotation settings, design readback before any gate lift.
