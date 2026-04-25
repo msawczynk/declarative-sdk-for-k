@@ -28,13 +28,17 @@ python3 scripts/smoke/smoke.py                          # pamMachine (default)
 python3 scripts/smoke/smoke.py --scenario pamDatabase   # Postgres cycle
 python3 scripts/smoke/smoke.py --scenario pamDirectory  # OpenLDAP cycle
 python3 scripts/smoke/smoke.py --scenario pamRemoteBrowser
+python3 scripts/smoke/smoke.py --scenario pamUserNested # machine + nested users[]
 python3 scripts/smoke/smoke.py --login-helper env --scenario pamMachine
 ```
 
 Registered scenarios live in `scripts/smoke/scenarios.py`. Every scenario
 is unit-tested offline (`tests/test_smoke_scenarios.py`) — schema,
-typed-model, and planner all run without a tenant, so scenario drift
-is caught before you burn a tenant round-trip.
+typed-model, planner, and Commander JSON normalization all run without
+a tenant, so scenario drift is caught before you burn a tenant
+round-trip. `pamUserNested` is intentionally a nested `resources[].users[]`
+shape, not a claim that `pamUser` is supported as a standalone
+top-level live-smoke resource.
 
 `--login-helper deploy_watcher` is the default and preserves the current
 lab-helper path. `--login-helper env` unsets `KEEPER_SDK_LOGIN_HELPER`
@@ -59,11 +63,11 @@ Exit codes come from `smoke.py::main()`:
 - Ensures the `testuser2` smoke identity exists and is usable with `identity.ensure_sdktest_identity()`
 - Ensures the reusable sandbox exists with `sandbox.ensure_sandbox()`: shared folder `SDK Test (ephemeral)`, KSM app `SDK Test KSM`, gateway visibility, app binding, and share to `testuser2`
 - Pre-cleans the sandbox with `sandbox.teardown_records(..., manager=MANAGER_NAME)` to remove orphaned SDK-managed records from prior runs
-- Writes a two-resource smoke manifest and an empty destroy manifest
+- Writes a scenario-specific smoke manifest and an empty destroy manifest
 - Runs SDK `validate` against the generated manifest
 - Runs SDK `plan` and expects exit `2` because the initial plan should contain creates
-- Runs SDK `apply --auto-approve` to create the two `pamMachine` records
-- Discovers live state through `CommanderCliProvider.discover()` and verifies exactly two SDK-managed `pamMachine` records with titles `sdk-smoke-host-1` and `sdk-smoke-host-2`
+- Runs SDK `apply --auto-approve` to create the scenario records
+- Discovers live state through `CommanderCliProvider.discover()` and verifies every expected SDK-managed scenario record, including nested `pamUser` records for `pamUserNested`
 - Runs SDK `plan` again and expects exit `0` for a clean re-plan
 - Runs SDK `plan --allow-delete` against the empty manifest and expects exit `2` because deletes should be present
 - Runs SDK `apply --allow-delete --auto-approve` against the empty manifest
