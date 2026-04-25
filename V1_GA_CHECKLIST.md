@@ -80,18 +80,20 @@ PRs that close them so the next agent can tell at a glance what's left.
       run = `--scenario pamDirectory`).
 - [x] `pamRemoteBrowser` cycle (scenario registered + offline-tested;
       live run = `--scenario pamRemoteBrowser`).
-- [x] `pamUser` cycle deferred to v1.1 (standalone `pamUser` lives
-      under `users[]` on a PAM configuration, not as a top-level
-      resource, so it needs a dedicated runner shape; see JOURNAL
-      "Deferred to v1.1").
+- [x] `pamUser` nested shape covered offline by `pamUserNested`: the
+      scenario builds `resources[].users[]` and proves it through
+      schema, typed model, planner, and Commander JSON normalization.
+      Standalone/top-level `pamUser` live-smoke support remains deferred
+      to v1.1.
 - [x] Adoption path against unmanaged records deferred to v1.1.
 - [x] Field-drift → UPDATE path deferred to v1.1.
 - [x] Two-writer conflict (ownership-marker race) deferred to v1.1.
 
-The four registered scenarios share the identity / sandbox / destroy
-flow; each scenario only diverges at `resources[]` and the post-apply
-invariant verifier. See `scripts/smoke/scenarios.py` and
-`tests/test_smoke_scenarios.py`.
+The registered scenarios share the identity / sandbox / destroy flow;
+each scenario only diverges at `resources[]` and the post-apply
+invariant verifier. `pamUserNested` is the dedicated nested-user shape,
+not a top-level `pamUser` scenario. See `scripts/smoke/scenarios.py`
+and `tests/test_smoke_scenarios.py`.
 
 ## Recently closed (this session)
 

@@ -24,6 +24,7 @@ import scenarios as smoke_scenarios  # noqa: E402
 from keeper_sdk.core.diff import compute_diff  # noqa: E402
 from keeper_sdk.core.graph import build_graph, execution_order  # noqa: E402
 from keeper_sdk.core.manifest import load_manifest  # noqa: E402
+from keeper_sdk.core.normalize import to_pam_import_json  # noqa: E402
 from keeper_sdk.core.planner import build_plan  # noqa: E402
 from keeper_sdk.core.schema import validate_manifest  # noqa: E402
 
@@ -64,6 +65,7 @@ def test_registry_lists_expected_scenarios() -> None:
     assert "pamDatabase" in names
     assert "pamDirectory" in names
     assert "pamRemoteBrowser" in names
+    assert "pamUserNested" in names
 
 
 def test_unknown_scenario_raises() -> None:
@@ -114,13 +116,42 @@ def test_scenario_manifest_is_schema_valid_and_plans_cleanly(
     order = execution_order(build_graph(manifest))
     changes = compute_diff(manifest, [], allow_delete=True)
     plan = build_plan(manifest.name, changes, order)
-    resource_creates = [
-        change for change in plan.creates if change.resource_type == spec.resource_type
-    ]
-    assert len(resource_creates) == len(resources), (
-        f"scenario {spec.name}: expected {len(resources)} {spec.resource_type} creates, "
-        f"got {len(resource_creates)}"
-    )
+    expected_records = spec.expected_records(PAM_CONFIG_UID_REF, TITLE_PREFIX)
+    plan_records = [(change.resource_type, change.title) for change in plan.creates]
+    for expected in expected_records:
+        assert expected in plan_records, f"scenario {spec.name}: missing create {expected}"
+
+
+def test_pamuser_nested_scenario_exercises_full_offline_path(tmp_path: Path) -> None:
+    """Pin pamUser as nested under resources[].users[], not top-level resources[]."""
+    spec = smoke_scenarios.get("pamUserNested")
+    resources = spec.build_resources(PAM_CONFIG_UID_REF, TITLE_PREFIX)
+    document = _wrap_manifest(resources)
+    validate_manifest(document)
+
+    import yaml
+
+    path = tmp_path / "pamUserNested.yaml"
+    path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
+
+    manifest = load_manifest(path)
+    assert manifest.resources[0].users[0].type == "pamUser"
+    assert manifest.iter_all_users()[0].title == "sdk-smoke-pam-user-1"
+
+    order = execution_order(build_graph(manifest))
+    changes = compute_diff(manifest, [], allow_delete=True)
+    plan = build_plan(manifest.name, changes, order)
+    plan_records = {(change.resource_type, change.title) for change in plan.creates}
+    assert ("pamMachine", "sdk-smoke-host-with-user") in plan_records
+    assert ("pamUser", "sdk-smoke-pam-user-1") in plan_records
+
+    converted = to_pam_import_json(manifest.model_dump(mode="python", exclude_none=True))
+    converted_resource = converted["pam_data"]["resources"][0]
+    converted_user = converted_resource["users"][0]
+    assert "uid_ref" not in converted_user
+    assert converted_user["type"] == "pamUser"
+    assert converted_user["title"] == "sdk-smoke-pam-user-1"
+    assert converted_user["login"] == "sdk-smoke-user"
 
 
 def test_noop_verifier_accepts_empty_records() -> None:
@@ -163,4 +194,16 @@ def test_remote_browser_verifier_rejects_missing_isolation_flag() -> None:
         payload: dict[str, Any] = {"pam_settings": {"options": {}}}
 
     with pytest.raises(AssertionError, match="remote_browser_isolation"):
+        spec.verify([_Record()])
+
+
+def test_pamuser_nested_verifier_rejects_missing_login() -> None:
+    spec = smoke_scenarios.get("pamUserNested")
+
+    class _Record:
+        resource_type = "pamUser"
+        title = "smoke-user"
+        payload: dict[str, Any] = {}
+
+    with pytest.raises(AssertionError, match="login"):
         spec.verify([_Record()])
