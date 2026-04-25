@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
@@ -186,6 +187,74 @@ def _pam_remote_browser_settings_equivalent(live_ps: Any, desired_ps: Any) -> bo
     return True
 
 
+def _normalize_rotation_enabled(val: Any) -> str | None:
+    if val is None:
+        return None
+    if isinstance(val, bool):
+        return "on" if val else "off"
+    s = str(val).strip().lower()
+    if s in ("true", "1", "yes", "on"):
+        return "on"
+    if s in ("false", "0", "no", "off"):
+        return "off"
+    return s
+
+
+def _normalize_rotation_schedule_tuple(sched: Any) -> tuple[Any, ...]:
+    if sched is None:
+        return ("",)
+    if not isinstance(sched, dict):
+        return ("raw", str(sched))
+    st = sched.get("type")
+    st_s = str(st).strip() if st is not None else ""
+    slug = st_s.casefold().replace("_", "-").replace(" ", "")
+    if slug == "cron":
+        cron = sched.get("cron")
+        if cron is None:
+            cron = sched.get("expression")
+        return ("CRON", str(cron or "").strip())
+    rest = {k: v for k, v in sched.items() if k != "type"}
+    return (slug or st_s, json.dumps(rest, sort_keys=True) if rest else "")
+
+
+def _rotation_settings_equivalent(live: Any, desired: Any) -> bool:
+    """Semantic equality for Commander vs manifest ``rotation_settings`` shape drift."""
+    if live == desired:
+        return True
+    if not isinstance(desired, dict):
+        return live == desired
+    live_d = live if isinstance(live, dict) else {}
+
+    def norm(rs: dict[str, Any]) -> tuple[Any, ...]:
+        rot = rs.get("rotation")
+        en = _normalize_rotation_enabled(rs.get("enabled"))
+        sched_t = _normalize_rotation_schedule_tuple(rs.get("schedule"))
+        pc = rs.get("password_complexity")
+        if isinstance(pc, (dict, list)):
+            pc = json.dumps(pc, sort_keys=True)
+        else:
+            pc = str(pc) if pc is not None else None
+        return (rot, en, sched_t, pc)
+
+    return norm(live_d) == norm(desired)
+
+
+def _field_diff_pam_user(live: dict[str, Any], desired: dict[str, Any]) -> list[str]:
+    keys: set[str] = set(live) | set(desired)
+    changed: list[str] = []
+    for key in keys:
+        if key in _DIFF_IGNORED_FIELDS:
+            continue
+        if key not in desired:
+            continue
+        if key == "rotation_settings":
+            if not _rotation_settings_equivalent(live.get(key), desired.get(key)):
+                changed.append(key)
+        elif live.get(key) != desired.get(key):
+            changed.append(key)
+    return sorted(changed)
+
+
 def _field_diff_pam_remote_browser(live: dict[str, Any], desired: dict[str, Any]) -> list[str]:
     """Like :func:`_field_diff` but treats ``pam_settings`` as a partial overlay for RBI."""
     keys: set[str] = set(live) | set(desired)
@@ -274,6 +343,8 @@ def _classify_desired(
 
     if resource_type == "pamRemoteBrowser":
         diff_fields = _field_diff_pam_remote_browser(live.payload, payload)
+    elif resource_type == "pamUser":
+        diff_fields = _field_diff_pam_user(live.payload, payload)
     else:
         diff_fields = _field_diff(live.payload, payload)
     if not diff_fields:

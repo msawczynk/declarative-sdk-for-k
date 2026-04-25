@@ -34,9 +34,11 @@ Shipped and proven:
 
 Not yet supported:
 
-- Nested `resources[].users[].rotation_settings`: apply now reaches marker
-  verification in live smoke, but post-apply re-plan still reports update drift
-  for the nested `pamUser` and parent `pamMachine`.
+- Nested `resources[].users[].rotation_settings`: apply reaches marker
+  verification; ``compute_diff`` now treats common Commander readback shape drift
+  on ``pamUser.rotation_settings`` (e.g. ``enabled`` bool vs tri-state string,
+  extra ``schedule`` keys with the same CRON) as NOOP. **Parent live re-plan**
+  for ``pamUserNestedRotation`` still required before narrowing preview gates.
 - Post-import RBI tuning: Commander still persists RBI tri-state primarily on
   the TunnelDAG vertex; the provider **merges** `allowedSettings` into
   manifest-shaped `pam_settings.options` when `discover()` has an in-process

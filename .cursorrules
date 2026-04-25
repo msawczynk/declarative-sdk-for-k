@@ -22,6 +22,8 @@ Current architecture:
 
 Hard rules:
 
+- Prefer long autonomous completion passes over step-by-step status narration;
+  only surface outcomes when blocked, scope shifts, or the user asks.
 - Preserve preview/provider gates until parent-reviewed live proof passes.
 - Do not write direct Keeper DAG state from SDK or lab scripts; route live mutation through Commander surfaces.
 - Prefer Codex/cheap workers for scoped offline edits; parent owns live proof, gate lifts, release, GitHub safety, and final review.

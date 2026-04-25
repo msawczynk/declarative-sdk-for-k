@@ -15,6 +15,10 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   gate-lift stop conditions.
 
 ### Changed
+- `compute_diff` — ``pamUser`` field drift uses semantic equality for
+  ``rotation_settings`` (CRON normalization, ``enabled`` bool vs ``on``/``off``,
+  extra schedule keys) so live re-plan is not blocked by readback-only shape
+  noise; true schedule changes still surface as UPDATE.
 - `AGENTS.md` — maintainer grant for autonomous gates + live smoke when lab
   configs exist (no per-step approval); still no secret echo.
 - Commander: after reference-existing scaffold, invalidate cached in-process

@@ -285,3 +285,66 @@ def test_diff_nested_pam_user_rotation_drift_surfaces_rotation_settings_key(
     assert user_change.after is not None
     assert "rotation_settings" in user_change.before
     assert "rotation_settings" in user_change.after
+
+
+def test_diff_pam_user_rotation_same_cron_extra_schedule_keys_is_noop(
+    minimal_manifest_path: Path,
+) -> None:
+    manifest = load_manifest(minimal_manifest_path)
+    data = manifest.model_dump(mode="python", exclude_none=True)
+    machine = next(r for r in data["resources"] if r["uid_ref"] == "acme-lab-linux1")
+    user_desired = next(u for u in machine["users"] if u["uid_ref"] == "acme-lab-linux1-root")
+    live_user = dict(user_desired)
+    live_user["rotation_settings"] = {
+        "rotation": "general",
+        "enabled": True,
+        "schedule": {
+            "type": "CRON",
+            "cron": "0 0 * * *",
+            "timezone": "UTC",
+        },
+        "password_complexity": user_desired["rotation_settings"]["password_complexity"],
+    }
+    desired_user = dict(user_desired)
+    desired_user["rotation_settings"] = {
+        "rotation": "general",
+        "enabled": "on",
+        "schedule": {"type": "CRON", "cron": "0 0 * * *"},
+        "password_complexity": user_desired["rotation_settings"]["password_complexity"],
+    }
+    machine_live = deepcopy(machine)
+    machine_live["users"] = [live_user]
+    new_resources: list[dict[str, Any]] = []
+    for r in data["resources"]:
+        if r["uid_ref"] == "acme-lab-linux1":
+            new_resources.append({**deepcopy(machine), "users": [desired_user]})
+        else:
+            new_resources.append(deepcopy(r))
+    manifest2 = Manifest.model_validate({**data, "resources": new_resources})
+    live = [
+        LiveRecord(
+            keeper_uid="LIVE_MACHINE",
+            title="lab-linux-1",
+            resource_type="pamMachine",
+            payload=machine_live,
+            marker=encode_marker(
+                uid_ref="acme-lab-linux1",
+                manifest=manifest.name,
+                resource_type="pamMachine",
+            ),
+        ),
+        LiveRecord(
+            keeper_uid="LIVE_USER",
+            title="lab-linux-1-root",
+            resource_type="pamUser",
+            payload=live_user,
+            marker=encode_marker(
+                uid_ref="acme-lab-linux1-root",
+                manifest=manifest.name,
+                resource_type="pamUser",
+            ),
+        ),
+    ]
+    changes = compute_diff(manifest2, live_records=live)
+    user_change = next(c for c in changes if c.uid_ref == "acme-lab-linux1-root")
+    assert user_change.kind is ChangeKind.NOOP
