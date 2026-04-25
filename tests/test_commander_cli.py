@@ -1020,6 +1020,143 @@ def test_run_cmd_wraps_in_process_pam_import_exception(monkeypatch: pytest.Monke
     assert "about to fail" in exc_info.value.context["stdout"]
 
 
+def test_run_cmd_refreshes_session_once_on_keeper_api_expiry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from keepercommander.error import KeeperApiError
+
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
+
+    params = [object(), object()]
+    login_states: list[tuple[object | None, bool]] = []
+    seen_params: list[object] = []
+
+    def fake_get_params(self: CommanderCliProvider) -> object:
+        login_states.append((self._keeper_params, self._keeper_login_attempted))
+        param = params[len(login_states) - 1]
+        self._keeper_params = param
+        self._keeper_login_attempted = True
+        return param
+
+    class _FakeCmd:
+        def execute(self, params, **kwargs):
+            seen_params.append(params)
+            assert kwargs["project_name"] == "customer-prod"
+            assert kwargs["file_name"] == "/tmp/manifest.json"
+            if len(seen_params) == 1:
+                raise KeeperApiError("session_token_expired", "Session token expired")
+            print("import ok")
+
+    monkeypatch.setattr(CommanderCliProvider, "_get_keeper_params", fake_get_params)
+    monkeypatch.setitem(
+        sys.modules,
+        "keepercommander.commands.pam_import.edit",
+        types.SimpleNamespace(PAMProjectImportCommand=_FakeCmd),
+    )
+
+    provider = CommanderCliProvider(folder_uid="folder-uid")
+
+    output = provider._run_cmd(
+        [
+            "pam",
+            "project",
+            "import",
+            "--file",
+            "/tmp/manifest.json",
+            "--name",
+            "customer-prod",
+        ]
+    )
+
+    assert output.strip() == "import ok"
+    assert seen_params == params
+    assert login_states == [(None, False), (None, False)]
+
+
+def test_write_marker_refreshes_session_once_on_message_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import keepercommander
+
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
+
+    params = [object(), object()]
+    login_states: list[tuple[object | None, bool]] = []
+
+    def fake_get_params(self: CommanderCliProvider) -> object:
+        login_states.append((self._keeper_params, self._keeper_login_attempted))
+        param = params[len(login_states) - 1]
+        self._keeper_params = param
+        self._keeper_login_attempted = True
+        return param
+
+    class _FakeTypedRecord:
+        def __init__(self) -> None:
+            self.custom: list[object] = []
+
+    class _FakeKeeperRecord:
+        @staticmethod
+        def load(params, keeper_uid):
+            loads.append((params, keeper_uid))
+            return _FakeTypedRecord()
+
+    class _FakeTypedField:
+        @staticmethod
+        def new_field(field_type, value, label):
+            return types.SimpleNamespace(type=field_type, value=[value], label=label)
+
+    syncs: list[object] = []
+    loads: list[tuple[object, str]] = []
+    updates: list[tuple[object, _FakeTypedRecord]] = []
+
+    fake_api = types.SimpleNamespace()
+
+    def fake_sync_down(params) -> None:
+        syncs.append(params)
+        if len(syncs) == 1:
+            raise RuntimeError("session token expired")
+
+    fake_api.sync_down = fake_sync_down
+    fake_record_management = types.SimpleNamespace(
+        update_record=lambda params, record: updates.append((params, record))
+    )
+    fake_vault = types.SimpleNamespace(
+        KeeperRecord=_FakeKeeperRecord,
+        TypedField=_FakeTypedField,
+        TypedRecord=_FakeTypedRecord,
+    )
+
+    monkeypatch.setattr(CommanderCliProvider, "_get_keeper_params", fake_get_params)
+    monkeypatch.setattr(keepercommander, "api", fake_api, raising=False)
+    monkeypatch.setattr(keepercommander, "record_management", fake_record_management, raising=False)
+    monkeypatch.setattr(keepercommander, "vault", fake_vault, raising=False)
+    monkeypatch.setitem(sys.modules, "keepercommander.api", fake_api)
+    monkeypatch.setitem(sys.modules, "keepercommander.record_management", fake_record_management)
+    monkeypatch.setitem(sys.modules, "keepercommander.vault", fake_vault)
+
+    provider = CommanderCliProvider(folder_uid="folder-uid")
+    marker = encode_marker(
+        uid_ref="prod-db",
+        manifest="customer-prod",
+        resource_type="pamDatabase",
+        last_applied_at="2026-04-24T12:34:56Z",
+    )
+
+    provider._write_marker("keeper-created-uid", marker)
+
+    assert login_states == [(None, False), (None, False)]
+    assert syncs == [params[0], params[1], params[1]]
+    assert loads == [(params[1], "keeper-created-uid")]
+    assert len(updates) == 1
+    assert updates[0][0] is params[1]
+    assert updates[0][1].custom[0].label == "keeper_declarative_manager"
+    assert updates[0][1].custom[0].value == [serialize_marker(marker)]
+
+
 def test_apply_reference_existing_splits_to_extend(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"

@@ -16,6 +16,10 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 - Offline post-import tuning argv helper for a safe subset of
   `pam connection edit` and `pam rbi edit` fields. Not wired into live
   apply yet.
+- Bounded in-process Commander session refresh for `session_token_expired`
+  during `pam project import` / `extend` and ownership-marker writes.
+  This is unit-tested with synthetic exceptions; live proof is still
+  pending.
 - `examples/`: minimal `pamMachine` / `pamDatabase` / `pamDirectory` /
   `pamRemoteBrowser` manifests; CI validates + mock-plans every file.
 - `SCAFFOLD.md`: LLM-readable repo map + design-vs-shipped reconcile.

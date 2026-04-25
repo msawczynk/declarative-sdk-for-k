@@ -28,9 +28,11 @@ dsk --provider commander plan env.yaml
 ```
 
 The built-in helper is release-candidate proven for validate, plan, and
-sandbox provisioning. Full live apply currently has a deferred Commander
-session-refresh gap; use a custom helper for apply only after proving that
-refresh path in your tenant.
+sandbox provisioning. Apply has a bounded in-process retry for Commander
+`session_token_expired`: the provider discards cached `KeeperParams`,
+logs in once, then retries the current `pam project import` / `extend`
+or marker write. Full live apply still needs tenant proof before this is
+claimed as GA-proven.
 
 Under the hood `EnvLoginHelper`:
 
