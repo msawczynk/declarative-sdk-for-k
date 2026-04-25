@@ -31,6 +31,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -1042,6 +1043,170 @@ class CommanderCliProvider(Provider):
         return params
 
 
+def build_post_import_tuning_argvs(
+    record: str,
+    resource: Mapping[str, Any],
+    *,
+    resolved_refs: Mapping[str, str] | None = None,
+) -> list[list[str]]:
+    """Build Commander argv for safe post-import tuning fields.
+
+    Pure helper only: it does not resolve refs, inspect live records, or execute
+    Commander. ``resolved_refs`` must map manifest ``*_uid_ref`` values to the
+    UID/path strings accepted by the target Commander edit command.
+    """
+    if not record:
+        raise ValueError("record is required to build post-import tuning argv")
+
+    refs = resolved_refs or {}
+    resource_type = resource.get("type")
+    if resource_type == "pamRemoteBrowser":
+        argv = _build_pam_rbi_edit_argv(record, resource, refs)
+    else:
+        argv = _build_pam_connection_edit_argv(record, resource, refs)
+    return [argv] if argv is not None else []
+
+
+def _build_pam_connection_edit_argv(
+    record: str, resource: Mapping[str, Any], refs: Mapping[str, str]
+) -> list[str] | None:
+    pam_settings = _as_mapping(resource.get("pam_settings"))
+    options = _as_mapping(pam_settings.get("options"))
+    connection = _as_mapping(pam_settings.get("connection"))
+
+    argv = ["pam", "connection", "edit"]
+    _append_ref(argv, "--configuration", resource.get("pam_configuration_uid_ref"), refs)
+    _append_option(argv, "--connections", options.get("connections"))
+    _append_option(
+        argv,
+        "--connections-recording",
+        options.get("graphical_session_recording"),
+    )
+    _append_option(argv, "--typescript-recording", options.get("text_session_recording"))
+    _append_ref(
+        argv,
+        "--admin-user",
+        connection.get("administrative_credentials_uid_ref"),
+        refs,
+    )
+    _append_ref(argv, "--launch-user", connection.get("launch_credentials_uid_ref"), refs)
+    _append_option(argv, "--protocol", connection.get("protocol"))
+    _append_option(argv, "--connections-override-port", connection.get("port"))
+    _append_option(argv, "--key-events", _on_off(connection.get("recording_include_keys")))
+
+    if len(argv) == 3:
+        return None
+    argv.append(record)
+    return argv
+
+
+def _build_pam_rbi_edit_argv(
+    record: str, resource: Mapping[str, Any], refs: Mapping[str, str]
+) -> list[str] | None:
+    pam_settings = _as_mapping(resource.get("pam_settings"))
+    options = _as_mapping(pam_settings.get("options"))
+    connection = _as_mapping(pam_settings.get("connection"))
+
+    argv = ["pam", "rbi", "edit", "--record", record]
+    _append_ref(argv, "--configuration", resource.get("pam_configuration_uid_ref"), refs)
+    _append_option(
+        argv,
+        "--remote-browser-isolation",
+        options.get("remote_browser_isolation"),
+    )
+    _append_option(
+        argv,
+        "--connections-recording",
+        options.get("graphical_session_recording"),
+    )
+    _append_ref(
+        argv,
+        "--autofill-credentials",
+        connection.get("autofill_credentials_uid_ref"),
+        refs,
+    )
+    _append_repeated(argv, "--autofill-targets", connection.get("autofill_targets"))
+    _append_option(
+        argv,
+        "--allow-url-navigation",
+        _on_off(connection.get("allow_url_manipulation")),
+    )
+    _append_repeated(argv, "--allowed-urls", connection.get("allowed_url_patterns"))
+    _append_repeated(
+        argv,
+        "--allowed-resource-urls",
+        connection.get("allowed_resource_url_patterns"),
+    )
+    _append_option(argv, "--key-events", _on_off(connection.get("recording_include_keys")))
+    _append_option(argv, "--allow-copy", _inverse_on_off(connection.get("disable_copy")))
+    _append_option(argv, "--allow-paste", _inverse_on_off(connection.get("disable_paste")))
+    _append_option(argv, "--ignore-server-cert", _on_off(connection.get("ignore_server_cert")))
+
+    if len(argv) == 5:
+        return None
+    return argv
+
+
+def _as_mapping(value: Any) -> Mapping[str, Any]:
+    return value if isinstance(value, Mapping) else {}
+
+
+def _on_off(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return "on" if value else "off"
+    return str(value)
+
+
+def _inverse_on_off(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return "off" if value else "on"
+    if value == "on":
+        return "off"
+    if value == "off":
+        return "on"
+    return str(value)
+
+
+def _append_option(argv: list[str], flag: str, value: Any) -> None:
+    if value is None:
+        return
+    rendered = str(value)
+    if rendered:
+        argv.extend([flag, rendered])
+
+
+def _append_ref(
+    argv: list[str],
+    flag: str,
+    uid_ref: Any,
+    refs: Mapping[str, str],
+) -> None:
+    if uid_ref is None:
+        return
+    if not isinstance(uid_ref, str) or not uid_ref:
+        return
+    resolved = refs.get(uid_ref)
+    if not resolved:
+        raise ValueError(f"unresolved uid_ref '{uid_ref}' for {flag}")
+    argv.extend([flag, resolved])
+
+
+def _append_repeated(argv: list[str], flag: str, value: Any) -> None:
+    if value is None:
+        return
+    values = [value] if isinstance(value, str) else value
+    if not isinstance(values, list | tuple):
+        values = [values]
+    for item in values:
+        rendered = str(item)
+        if rendered:
+            argv.extend([flag, rendered])
+
+
 _UNSUPPORTED_CAPABILITY_HINTS: tuple[tuple[str, str, str], ...] = (
     # (dotted manifest path fragment, human name, Commander hook the SDK
     # should eventually drive to fulfil this capability)
@@ -1103,4 +1268,4 @@ def _detect_unsupported_capabilities(manifest: Any) -> list[str]:
     return hits
 
 
-__all__ = ["CommanderCliProvider"]
+__all__ = ["CommanderCliProvider", "build_post_import_tuning_argvs"]
