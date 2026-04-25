@@ -14,7 +14,7 @@ Main branch as of 2026-04-25:
 
 - `v1.0.0` GitHub release exists.
 - PyPI publish workflow exists but is blocked by PyPI trusted-publisher config.
-- Local/core checks: `202 passed / 2 xfailed`, ruff, format, mypy, build/twine clean.
+- Local/core checks: `216 passed / 2 xfailed`, ruff, format, mypy, build/twine clean.
 - Commander provider supports current GA PAM lifecycle for manifests without preview keys.
 - `EnvLoginHelper` supports Commander's step-based `LoginUi`, loads `KEEPER_CONFIG`, and retries in-process `session_token_expired` once.
 - First v1.1 slices landed:

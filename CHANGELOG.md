@@ -31,8 +31,8 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   preserve command, exit code, stdout tail, and stderr tail on SDK
   subprocess failures.
 - Pure `build_pam_rotation_edit_argvs()` resolver for nested `pamUser`
-  rotation settings. It resolves user/resource/config/admin refs but is
-  not wired into apply while rotation remains gated.
+  rotation settings. It resolves user/resource/config/admin refs and is
+  used only by the experimental apply path while rotation remains gated.
 - Experimental Commander apply wiring for nested
   `resources[].users[].rotation_settings`, guarded by
   `DSK_EXPERIMENTAL_ROTATION_APPLY=1`. The public provider conflict

@@ -1414,6 +1414,7 @@ def _post_import_tuning_uid_refs(resource: Mapping[str, Any]) -> list[str]:
         refs.append(config_ref)
     pam_settings = _as_mapping(resource.get("pam_settings"))
     connection = _as_mapping(pam_settings.get("connection"))
+    keys: tuple[str, ...]
     if resource.get("type") == "pamRemoteBrowser":
         keys = ("autofill_credentials_uid_ref",)
     else:
@@ -1854,6 +1855,13 @@ def _desired_identity(source: Mapping[str, Any], uid_ref: str) -> tuple[str | No
     return None, None
 
 
+def _has_resource_rotation(source: Mapping[str, Any]) -> bool:
+    for resource in source.get("resources") or []:
+        if isinstance(resource, Mapping) and resource.get("rotation_settings") is not None:
+            return True
+    return False
+
+
 def _contains_key(node: Any, key: str) -> bool:
     if isinstance(node, dict):
         return key in node or any(_contains_key(value, key) for value in node.values())
@@ -1951,6 +1959,11 @@ def _detect_unsupported_capabilities(
         hits.append(
             "top-level users[].rotation_settings is not implemented for pamUser "
             "(Commander hook needs a parent resource; nest the pamUser under resources[].users[])"
+        )
+    if _has_resource_rotation(source):
+        hits.append(
+            "resources[].rotation_settings is not implemented "
+            "(Commander hook for resource rotation requires a proven mapping)"
         )
     if _has_nested_user_rotation(source) and not allow_nested_rotation:
         hits.append(
