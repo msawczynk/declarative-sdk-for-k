@@ -7,6 +7,15 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- `pamUserNested` smoke scenario — proves nested `resources[].users[]`
+  through schema, typed model, planner, and Commander normalization
+  without claiming standalone top-level `pamUser` live support.
+- Offline `pam rotation edit` argv mapping helper and stricter preview
+  detection for rotation keys. Rotation remains preview/unsupported
+  until live apply is proven.
+- Offline post-import tuning argv helper for a safe subset of
+  `pam connection edit` and `pam rbi edit` fields. Not wired into live
+  apply yet.
 - `examples/`: minimal `pamMachine` / `pamDatabase` / `pamDirectory` /
   `pamRemoteBrowser` manifests; CI validates + mock-plans every file.
 - `SCAFFOLD.md`: LLM-readable repo map + design-vs-shipped reconcile.
