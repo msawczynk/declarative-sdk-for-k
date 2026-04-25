@@ -4,8 +4,9 @@ Pins three invariants:
 
 1. With ``DSK_PREVIEW`` unset, a manifest carrying a preview key
    (``rotation_settings``, ``jit_settings``, gateway ``mode: create``,
-   ``default_rotation_schedule``) is rejected at load time with
-   :class:`SchemaError` and a remediation that names the env var.
+   ``default_rotation_schedule``, top-level ``projects[]``) is rejected
+   at load time with :class:`SchemaError` and a remediation that names
+   the env var.
 2. With ``DSK_PREVIEW=1``, the same manifest loads cleanly.
 3. The detector is pure and does not consult the env var.
 
@@ -74,6 +75,24 @@ resources:
     host: db.example.com
 """
 
+_MANIFEST_WITH_GATEWAY_CREATE = """\
+version: "1"
+name: gateway-create
+gateways:
+  - uid_ref: gw-new
+    name: gw-new
+    mode: create
+    ksm_application_name: sdk-test-ksm
+"""
+
+_MANIFEST_WITH_PROJECTS = """\
+version: "1"
+name: project-shape
+projects:
+  - uid_ref: proj.lab
+    project: project-shape
+"""
+
 
 @pytest.fixture
 def preview_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -85,18 +104,39 @@ def preview_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(PREVIEW_ENV_VAR, "1")
 
 
-def test_gate_rejects_preview_key_without_opt_in(preview_disabled: None) -> None:
+@pytest.mark.parametrize(
+    ("raw", "needle"),
+    [
+        (_MANIFEST_WITH_ROTATION, "rotation_settings"),
+        (_MANIFEST_WITH_GATEWAY_CREATE, "mode: create"),
+        (_MANIFEST_WITH_PROJECTS, "top-level projects[]"),
+    ],
+)
+def test_gate_rejects_preview_key_without_opt_in(
+    preview_disabled: None, raw: str, needle: str
+) -> None:
     with pytest.raises(SchemaError) as exc:
-        load_manifest_string(_MANIFEST_WITH_ROTATION, suffix=".yaml")
+        load_manifest_string(raw, suffix=".yaml")
     message = str(exc.value)
     assert "preview" in message.lower()
-    assert "rotation_settings" in message
+    assert needle in message
     assert PREVIEW_ENV_VAR in message
 
 
-def test_gate_accepts_preview_key_with_opt_in(preview_enabled: None) -> None:
-    manifest = load_manifest_string(_MANIFEST_WITH_ROTATION, suffix=".yaml")
-    assert manifest.resources[0].uid_ref == "res-db"
+@pytest.mark.parametrize(
+    ("raw", "expected_ref"),
+    [
+        (_MANIFEST_WITH_ROTATION, "res-db"),
+        (_MANIFEST_WITH_GATEWAY_CREATE, "gw-new"),
+        (_MANIFEST_WITH_PROJECTS, "proj.lab"),
+    ],
+)
+def test_gate_accepts_preview_key_with_opt_in(
+    preview_enabled: None, raw: str, expected_ref: str
+) -> None:
+    manifest = load_manifest_string(raw, suffix=".yaml")
+    refs = {uid_ref for uid_ref, _kind in manifest.iter_uid_refs()}
+    assert expected_ref in refs
 
 
 def test_gate_is_noop_for_clean_manifest(preview_disabled: None) -> None:
@@ -108,11 +148,13 @@ def test_detector_is_pure_and_ignores_env(preview_enabled: None) -> None:
     hits = detect_preview_keys(
         {
             "gateways": [{"uid_ref": "gw.new", "mode": "create"}],
+            "projects": [{"uid_ref": "proj.lab", "project": "lab"}],
             "resources": [{"users": [{"rotation_settings": {}}]}],
         }
     )
     joined = " ".join(hits)
     assert "mode: create" in joined
+    assert "top-level projects[]" in joined
     assert "rotation_settings" in joined
 
 

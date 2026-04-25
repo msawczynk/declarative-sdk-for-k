@@ -34,6 +34,9 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 - `docs/ISSUE_6_JIT_SUPPORT_BOUNDARY.md` — source-backed JIT decision:
   keep `jit_settings` preview-gated because pinned Commander has import
   and launch helpers, but no safe standalone edit surface.
+- `docs/ISSUE_7_GATEWAY_CREATE_PROJECTS_DESIGN.md` — docs-only design
+  for gateway `mode: create` and top-level `projects[]`; preview gates
+  remain closed until Commander hooks and live proof are available.
 - `docs/COMMANDER.md` post-import tuning field map for connection/RBI
   fields, marking import-supported, helper-only, and unsupported/unknown
   cases.

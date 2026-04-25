@@ -28,6 +28,7 @@ Agent-first Python SDK + CLI (`dsk`) for deterministic `validate -> plan -> appl
 │   ├── CAPABILITY_MATRIX.md                # Generated Commander capability mirror.
 │   ├── COMMANDER.md                        # Version pin, CLI/API usage, drift policy, post-import tuning field map.
 │   ├── ISSUE_6_JIT_SUPPORT_BOUNDARY.md     # JIT apply boundary decision against pinned Commander.
+│   ├── ISSUE_7_GATEWAY_CREATE_PROJECTS_DESIGN.md # Gateway create / projects[] design boundary.
 │   ├── LOGIN.md                            # `EnvLoginHelper` + custom login-helper contract.
 │   ├── RELEASING.md                        # Maintainer release ritual + PyPI OIDC setup.
 │   ├── SDK_COMPLETION_PLAN.md              # Parent/Codex orchestration plan for completing SDK support.
@@ -136,6 +137,7 @@ Agent-first Python SDK + CLI (`dsk`) for deterministic `validate -> plan -> appl
 | 1. Capability parity | `pam_configuration_uid_ref` in-manifest linking shipped; cross-manifest/live-tenant config linking fails at stage 3 | SHIPPED | `tests/test_uid_ref_gate.py`, `V1_GA_CHECKLIST.md` |
 | 1. Capability parity | Upstream DOR mismatch handled by capability mirror, not the old merge note flow | SHIPPED | `docs/CAPABILITY_MATRIX.md`, `docs/capability-snapshot.json`, `scripts/sync_upstream.py`, `docs/COMMANDER.md` |
 | 1. Capability parity | JIT settings support boundary investigated against pinned Commander; no safe post-import writer path confirmed | DEFERRED-1.2 | `docs/ISSUE_6_JIT_SUPPORT_BOUNDARY.md`, `keeper_sdk/core/preview.py`, `keeper_sdk/providers/commander_cli.py` |
+| 1. Capability parity | Gateway `mode: create` and top-level `projects[]` design captured; no support gate removed | DESIGN-ONLY | `docs/ISSUE_7_GATEWAY_CREATE_PROJECTS_DESIGN.md`, `keeper_sdk/core/preview.py`, `tests/test_preview_gate.py` |
 | 2. DOR reconciliation | Old “merge NOTES_FROM_SDK upstream” checklist is superseded by shipped mirror/drift model | SHIPPED | `AUDIT.md`, `REVIEW.md`, `docs/COMMANDER.md`, `docs/CAPABILITY_MATRIX.md` |
 | 3. CI + release | CI matrix, examples job, drift-check, build wiring are live | SHIPPED | `.github/workflows/ci.yml`, `pyproject.toml` |
 | 3. CI + release | First green `main` CI run recorded | SHIPPED | `V1_GA_CHECKLIST.md`, `CHANGELOG.md`, commit `fb6fb8b` in `git log` |
@@ -158,4 +160,5 @@ Agent-first Python SDK + CLI (`dsk`) for deterministic `validate -> plan -> appl
 - `keeper-pam-declarative` — push to a GitHub remote as the public mirror, or keep local-only? Public makes the drift-check debuggable by third parties; local keeps the marker-wire-format surface unpublished.
 - `sdk-live-smoke` branch still carries old `pamform`-era history — rename / delete / leave as snapshot?
 - `DSK_PREVIEW=1` discoverability — is a one-line check-list in the `validate` error enough, or does it deserve a dedicated doc page?
+- Gateway `mode: create` and `projects[]` — design exists; implementation still needs Commander source audit, provider conflict hardening for `projects[]`, and live proof before any gate lift.
 - Post-import connection/RBI tuning — wire helper argv into `apply`, add offline assertions, then run a live smoke before upgrading the docs-only audit to shipped support.
