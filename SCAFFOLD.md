@@ -40,6 +40,7 @@ Agent-first Python SDK + CLI (`dsk`) for deterministic `validate -> plan -> appl
 │   ├── ORCHESTRATION_PHASE0_PARALLEL.md     # Phase 0 clean-tree + parallel Codex workflow; daybook sync is private/global.
 │   ├── RELEASING.md                        # Maintainer release ritual (GitHub-only; no PyPI).
 │   ├── SDK_DA_COMPLETION_PLAN.md           # Devil's-advocate completion gates, phases, and stop conditions.
+│   ├── SDK_ORCHESTRATED_FEATURE_COMPLETE.md # Phases × phase0_gates × Codex × live smoke (master index).
 │   ├── SDK_COMPLETION_PLAN.md              # Parent/Codex orchestration plan for completing SDK support.
 │   ├── VALIDATION_STAGES.md                # Stage-by-stage `validate --online` contract.
 │   └── capability-snapshot.json            # Machine-readable mirror consumed by drift-check CI.

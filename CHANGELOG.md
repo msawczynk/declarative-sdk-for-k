@@ -6,6 +6,11 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- `docs/SDK_ORCHESTRATED_FEATURE_COMPLETE.md` — orchestration index: SDK_DA
+  phases mapped to `phase0_gates.sh`, Codex scripts, live smoke commands, and
+  gate-lift stop conditions.
+
 ### Changed
 - `docs/COMMANDER.md` — SDK_DA §P3.1 readback bucket vocabulary aligned with Issue #5 RBI dirty-readback status.
 - Autonomous orchestration pass: parallel `run_parallel_codex.sh` (slices 01–03)
@@ -16,7 +21,9 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   delegates to `_merge_rbi_dag_options_into_pam_settings` in
   `_commander_cli_helpers.py`, with unit tests for tri-state / default
   handling. Discover passes `folder_uid` on each `ls` listing row for
-  consistent `get` readback metadata.
+  consistent `get` readback metadata. Post-apply smoke passes `manifest_source`
+  and `discover()` may bootstrap in-process login when RBI + resources list are
+  present so verify can see DAG-backed toggles.
 
 ### Added
 - Offline P2.1 diff anchor: `test_diff_nested_pam_user_rotation_drift_surfaces_rotation_settings_key` — proves nested `pamUser` rotation readback drift keys `rotation_settings` in plan tails.

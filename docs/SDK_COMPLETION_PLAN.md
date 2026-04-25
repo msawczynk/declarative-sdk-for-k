@@ -28,7 +28,8 @@ Main branch as of 2026-04-25:
 - `v1.0.0` GitHub release exists.
 - **Distribution is GitHub only** (no PyPI): `publish.yml` attaches `dist/*` to
   each GitHub Release; install via git URL or downloaded wheel per `docs/RELEASING.md`.
-- Local/core checks: **231 passed / 2 xfailed** (re-verify on current `main`),
+- Local/core checks: **236 passed / 2 xfailed** (re-verify with
+  `scripts/agent/phase0_gates.sh full` on current `main`),
   ruff, format, mypy, build/twine clean. CI is green across lint, mypy,
   py3.11/3.12/3.13 tests, examples, drift-check, and build.
 - Commander provider supports current GA PAM lifecycle for manifests without preview keys.
@@ -50,11 +51,11 @@ Closed / classified:
 - #6 JIT support boundary: `upstream-gap`.
 - #7 Gateway create and `projects[]`: design-only / `preview-gated`.
 
-Latest #5 live proof:
+Latest #5 live proof (updated):
 
-- `python3 scripts/smoke/smoke.py --login-helper env --scenario pamRemoteBrowser` created records and teardown-only cleanup passed, but verify failed before re-plan: discovered `pamRemoteBrowser` payload did not expose `remote_browser_isolation=on`.
-- Pinned Commander evidence: `pam rbi edit --remote-browser-isolation` writes DAG `allowedSettings.connections`, not a manifest-shaped field returned by current `discover()`.
-- Classification remains `preview-gated` until readback/re-plan semantics are designed and proven.
+- Code: post-apply smoke builds `CommanderCliProvider(..., manifest_source=<temp yaml>)`; `discover()` best-effort bootstraps in-process params when RBI records exist so TunnelDAG merge can populate `pam_settings.options` (`remote_browser_isolation` / session recording tri-states). Offline partial overlay diff remains in `tests/test_rbi_readback.py`.
+- **Still required for gate lift:** parent-run `python3 scripts/smoke/smoke.py … --scenario pamRemoteBrowser` (or `codex_live_smoke.sh`) showing **verify + re-plan exit 0** on a tenant where TunnelDAG is available; if verify fails, capture whether `CapabilityError` masked login or DAG had no graph.
+- Classification: **`preview-gated`** until that live matrix row is green end-to-end.
 
 ## Definition Of Complete
 

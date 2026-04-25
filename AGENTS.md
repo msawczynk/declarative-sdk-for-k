@@ -229,6 +229,8 @@ GitHub Codex (issues, Actions) is optional for async work — [`docs/CODEX_GITHU
 - `docs/COMMANDER.md` — pinned Commander version + capability matrix.
 - `docs/SDK_DA_COMPLETION_PLAN.md` — current devil's-advocate completion
   gates, phases, and stop conditions.
+- `docs/SDK_ORCHESTRATED_FEATURE_COMPLETE.md` — master table: phases × gates ×
+  Codex/live proofs (orchestration index).
 - `docs/SDK_COMPLETION_PLAN.md` — parent/Codex orchestration roadmap.
 - `docs/CODEX_CLI.md` — local `codex exec` as default worker; scripts under `scripts/agent/`.
 - `docs/ORCHESTRATION_PHASE0_PARALLEL.md` — Phase 0 clean tree, parallel Codex slices, scripted gates.

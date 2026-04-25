@@ -4,7 +4,9 @@ Date: 2026-04-25
 
 Purpose: finish `declarative-sdk-for-k` without turning unproven Keeper behavior
 into support claims. This plan supersedes optimistic feature-count roadmaps when
-there is a conflict. The SDK is "complete" only when every modeled capability is
+there is a conflict. **Orchestrated execution index (phases × scripts × live
+proofs):** [`docs/SDK_ORCHESTRATED_FEATURE_COMPLETE.md`](./SDK_ORCHESTRATED_FEATURE_COMPLETE.md).
+The SDK is "complete" only when every modeled capability is
 one of:
 
 - `supported`: unit tests + docs + live proof + clean re-plan.
@@ -35,9 +37,12 @@ Not yet supported:
 - Nested `resources[].users[].rotation_settings`: apply now reaches marker
   verification in live smoke, but post-apply re-plan still reports update drift
   for the nested `pamUser` and parent `pamMachine`.
-- Post-import RBI tuning: live `pamRemoteBrowser` shows Commander writes RBI
-  state to DAG `allowedSettings.connections`, while `discover()` does not read
-  that state back into manifest-shaped fields.
+- Post-import RBI tuning: Commander still persists RBI tri-state primarily on
+  the TunnelDAG vertex; the provider **merges** `allowedSettings` into
+  manifest-shaped `pam_settings.options` when `discover()` has an in-process
+  session **and** `manifest_source` lists `resources` (smoke passes the temp
+  manifest). **Clean re-plan for RBI remains parent live-verified** before any
+  gate lift from `preview-gated` to `supported`.
 - Standalone top-level `pamUser`.
 - JIT writes.
 - Gateway `mode: create` and top-level `projects[]`.

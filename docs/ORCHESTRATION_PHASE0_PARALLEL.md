@@ -48,6 +48,7 @@ Source checklist: [`docs/SDK_DA_COMPLETION_PLAN.md`](./SDK_DA_COMPLETION_PLAN.md
 | Path | Role |
 |------|------|
 | [`docs/SDK_DA_COMPLETION_PLAN.md`](./SDK_DA_COMPLETION_PLAN.md) | Devil's-advocate completion contract |
+| [`docs/SDK_ORCHESTRATED_FEATURE_COMPLETE.md`](./SDK_ORCHESTRATED_FEATURE_COMPLETE.md) | Phases × scripts × live proofs (feature-complete index) |
 | [`docs/SDK_COMPLETION_PLAN.md`](./SDK_COMPLETION_PLAN.md) | Roadmap + parent loop |
 | [`docs/CODEX_CLI.md`](./CODEX_CLI.md) | Codex CLI defaults |
 | [`scripts/agent/README.md`](../scripts/agent/README.md) | Wrapper scripts |
