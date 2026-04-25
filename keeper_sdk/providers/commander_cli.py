@@ -117,6 +117,14 @@ class CommanderCliProvider(Provider):
                 next_action="install Keeper Commander or set KEEPER_BIN",
             )
 
+    def _manifest_has_resource_entries(self) -> bool:
+        """True when ``manifest_source`` includes a non-empty ``resources`` list."""
+        ms = self._manifest_source
+        if not isinstance(ms, dict):
+            return False
+        resources = ms.get("resources")
+        return isinstance(resources, list) and bool(resources)
+
     # ------------------------------------------------------------------
 
     def discover(self) -> list[LiveRecord]:
@@ -164,6 +172,13 @@ class CommanderCliProvider(Provider):
         config_record = self._synthetic_reference_configuration_record()
         if config_record is not None:
             records.append(config_record)
+        if any(r.resource_type == "pamRemoteBrowser" for r in records):
+            if self._keeper_params is None and self._manifest_has_resource_entries():
+                try:
+                    self._get_keeper_params()
+                except CapabilityError:
+                    # Subprocess-only discover remains valid; TunnelDAG merge is best-effort.
+                    pass
         if self._keeper_params is not None:
             self._enrich_pam_remote_browser_dag_options(records)
         return records
@@ -205,7 +220,9 @@ class CommanderCliProvider(Provider):
         ``KeeperParams`` session exists (for example after apply), map those
         tri-states back onto manifest-shaped ``pam_settings.options`` so smoke
         verify and re-plan can see post-tuning state without direct DAG writes
-        from the SDK.
+        from the SDK. :meth:`discover` may call :meth:`_get_keeper_params` once
+        when RBI records are present and ``manifest_source`` lists resources so
+        ``pam_configuration_uid_ref`` can resolve for TunnelDAG.
         """
         try:
             from keepercommander.commands.tunnel.port_forward.tunnel_helpers import (  # type: ignore

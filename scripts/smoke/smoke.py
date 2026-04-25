@@ -214,9 +214,13 @@ def run_smoke(
     _sdk(["apply", "--auto-approve", str(manifest_path)], env=env)
     _mark(state, "apply OK")
 
+    manifest_source = yaml.safe_load(manifest_path.read_text())
+    if not isinstance(manifest_source, dict):
+        manifest_source = {}
     prov = CommanderCliProvider(
         config_file=admin_config_path,
         keeper_password=admin_password,
+        manifest_source=manifest_source,
     )
     resolved_sf_uid = prov._resolve_project_resources_folder(SMOKE_PROJECT_NAME)
     state["managed_folder_uid"] = resolved_sf_uid
