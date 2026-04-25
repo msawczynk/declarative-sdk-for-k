@@ -14,7 +14,11 @@ from keeper_sdk.core.errors import CapabilityError
 from keeper_sdk.core.metadata import encode_marker, serialize_marker
 from keeper_sdk.core.models import RotationScheduleOnDemand, RotationSettings
 from keeper_sdk.core.planner import Plan
-from keeper_sdk.providers.commander_cli import CommanderCliProvider, _build_pam_rotation_edit_args
+from keeper_sdk.providers.commander_cli import (
+    CommanderCliProvider,
+    _build_pam_rotation_edit_args,
+    build_post_import_tuning_argvs,
+)
 
 
 def _provider(monkeypatch: pytest.MonkeyPatch, stdout: str = "") -> CommanderCliProvider:
@@ -173,6 +177,142 @@ def test_unsupported_default_rotation_schedule_has_precise_hook(
     assert "default_rotation_schedule" in reasons[0]
     assert "no confirmed Commander CLI setter" in reasons[0]
     assert "--schedule-config only reads config default" in reasons[0]
+
+
+def test_build_post_import_tuning_argvs_for_connection_declared_subset() -> None:
+    resource = {
+        "type": "pamMachine",
+        "pam_configuration_uid_ref": "cfg.local",
+        "pam_settings": {
+            "options": {
+                "connections": "on",
+                "graphical_session_recording": "off",
+                "text_session_recording": "on",
+            },
+            "connection": {
+                "administrative_credentials_uid_ref": "usr.admin",
+                "launch_credentials_uid_ref": "usr.launch",
+                "protocol": "rdp",
+                "port": 3389,
+                "recording_include_keys": False,
+            },
+        },
+    }
+
+    argvs = build_post_import_tuning_argvs(
+        "RES_UID",
+        resource,
+        resolved_refs={
+            "cfg.local": "CFG_UID",
+            "usr.admin": "ADMIN_UID",
+            "usr.launch": "LAUNCH_UID",
+        },
+    )
+
+    assert argvs == [
+        [
+            "pam",
+            "connection",
+            "edit",
+            "--configuration",
+            "CFG_UID",
+            "--connections",
+            "on",
+            "--connections-recording",
+            "off",
+            "--typescript-recording",
+            "on",
+            "--admin-user",
+            "ADMIN_UID",
+            "--launch-user",
+            "LAUNCH_UID",
+            "--protocol",
+            "rdp",
+            "--connections-override-port",
+            "3389",
+            "--key-events",
+            "off",
+            "RES_UID",
+        ]
+    ]
+
+
+def test_build_post_import_tuning_argvs_for_rbi_declared_subset() -> None:
+    resource = {
+        "type": "pamRemoteBrowser",
+        "pam_configuration_uid_ref": "cfg.local",
+        "pam_settings": {
+            "options": {
+                "remote_browser_isolation": "on",
+                "graphical_session_recording": "on",
+            },
+            "connection": {
+                "autofill_credentials_uid_ref": "login.portal",
+                "autofill_targets": ["#username", "#password"],
+                "allow_url_manipulation": False,
+                "allowed_url_patterns": "https://portal.example/*",
+                "allowed_resource_url_patterns": ["https://cdn.example/*"],
+                "recording_include_keys": True,
+                "disable_copy": True,
+                "disable_paste": False,
+                "ignore_server_cert": True,
+            },
+        },
+    }
+
+    argvs = build_post_import_tuning_argvs(
+        "RBI_UID",
+        resource,
+        resolved_refs={"cfg.local": "CFG_UID", "login.portal": "LOGIN_UID"},
+    )
+
+    assert argvs == [
+        [
+            "pam",
+            "rbi",
+            "edit",
+            "--record",
+            "RBI_UID",
+            "--configuration",
+            "CFG_UID",
+            "--remote-browser-isolation",
+            "on",
+            "--connections-recording",
+            "on",
+            "--autofill-credentials",
+            "LOGIN_UID",
+            "--autofill-targets",
+            "#username",
+            "--autofill-targets",
+            "#password",
+            "--allow-url-navigation",
+            "off",
+            "--allowed-urls",
+            "https://portal.example/*",
+            "--allowed-resource-urls",
+            "https://cdn.example/*",
+            "--key-events",
+            "on",
+            "--allow-copy",
+            "off",
+            "--allow-paste",
+            "on",
+            "--ignore-server-cert",
+            "on",
+        ]
+    ]
+
+
+def test_build_post_import_tuning_argvs_requires_resolved_refs() -> None:
+    resource = {
+        "type": "pamMachine",
+        "pam_settings": {
+            "connection": {"administrative_credentials_uid_ref": "usr.admin"},
+        },
+    }
+
+    with pytest.raises(ValueError, match="unresolved uid_ref 'usr.admin'"):
+        build_post_import_tuning_argvs("RES_UID", resource)
 
 
 def _apply_recorder(
