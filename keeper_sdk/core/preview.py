@@ -32,19 +32,21 @@ without schema change.
 
 from __future__ import annotations
 
-import json
 import os
 from typing import Any
 
 from keeper_sdk.core.errors import SchemaError
 
-#: ``(needle, human_name, removal_version)`` — ``needle`` is a substring
-#: matched against the JSON-serialised manifest. Coarse but cheap and
-#: works for nested keys. Add entries here when the schema grows a key
-#: before any provider drives it; remove entries once the first
-#: provider implements the feature.
+#: ``(needle, human_name, removal_version)`` — ``needle`` is matched as
+#: an exact nested key. Add entries here when the schema grows a key before
+#: any provider drives it; remove entries once the first provider implements
+#: the feature.
 PREVIEW_KEYS: tuple[tuple[str, str, str], ...] = (
-    ("rotation_settings", "resources[].rotation_settings", "planned for 1.1"),
+    (
+        "rotation_settings",
+        "users[].rotation_settings / resources[].users[].rotation_settings",
+        "planned for 1.1",
+    ),
     (
         "default_rotation_schedule",
         "pam_configurations[].default_rotation_schedule",
@@ -68,6 +70,14 @@ def preview_is_enabled() -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _contains_key(node: Any, key: str) -> bool:
+    if isinstance(node, dict):
+        return key in node or any(_contains_key(value, key) for value in node.values())
+    if isinstance(node, list):
+        return any(_contains_key(item, key) for item in node)
+    return False
+
+
 def detect_preview_keys(manifest: dict[str, Any]) -> list[str]:
     """Return human-readable descriptions of preview keys present.
 
@@ -88,9 +98,8 @@ def detect_preview_keys(manifest: dict[str, Any]) -> list[str]:
     if manifest.get("projects"):
         hits.append("top-level projects[] (planned for 1.2)")
 
-    serialized = json.dumps(manifest, default=str)
     for needle, human, removal_version in PREVIEW_KEYS:
-        if needle in serialized:
+        if _contains_key(manifest, needle):
             hits.append(f"{human} ({removal_version})")
 
     return hits
