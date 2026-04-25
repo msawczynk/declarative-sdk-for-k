@@ -4,8 +4,8 @@ Goal: make `declarative-sdk-for-k` feature-complete against current Keeper funct
 
 This plan is written for a parent orchestrator plus cheap Codex workers:
 
-- Parent owns live credentials, tenant smoke tests, GitHub release/publish, roadmap decisions, merge safety, and final review.
-- Codex owns scoped offline implementation slices with tests, docs, and no live Keeper calls.
+- Parent owns live-test design, credential boundaries, GitHub release/publish, roadmap decisions, merge safety, and final review.
+- Codex owns scoped implementation slices and can run live smoke only when explicitly delegated through a whitelisted harness command.
 - Every Codex task returns a branch/patch, test output, caveats, and next steps. Parent verifies before merge.
 
 ## Current Baseline
@@ -75,6 +75,30 @@ Risk gates before merge:
 
 ## Operating Model
 
+### Cost-Optimized Orchestration And Checks
+
+Cost target: spend cheap worker tokens on exploration/execution, spend parent tokens on review, gates, and decisions.
+
+Worker tiers:
+
+1. **Offline Codex implementation worker** — default for code/docs/tests. Runs focused tests only, no network, no live Keeper calls.
+2. **Live Codex smoke worker** — allowed for cloud-code proof when parent gives one exact smoke command, enables network, and forbids secret/env printing. It may use existing lab credentials only through the smoke harness; it must not inspect or modify credential files except through the harness.
+3. **Parent** — runs final diff review, full local checks once per integrated branch, classifies live results, updates issues/daybook, and merges/releases.
+
+Check budget:
+
+- Per worker: focused tests for touched area plus `ruff` on touched Python files.
+- Per integration branch: one full `pytest`, `ruff`, `format --check`, `mypy`, build/twine, and drift-check only if capability mirror touched.
+- Per PR: rely on GitHub matrix for py3.11/3.12/3.13 and build duplication; do not rerun full local suite after docs-only amendments unless risk changes.
+- Per live feature: one clean live smoke create -> verify -> clean re-plan -> destroy before claiming `supported`.
+
+Live smoke command rules:
+
+- Use `python3 scripts/smoke/smoke.py ...` or another committed harness, never ad hoc Keeper mutations.
+- Add `DSK_PREVIEW=1` / experimental env vars only when the issue says so.
+- Redact stdout/stderr if a failure includes tokens, passwords, config JSON, or one-time codes.
+- Parent reviews the transcript and closes the issue as `supported`, `preview-gated`, or `upstream-gap`.
+
 ### Parent Loop
 
 For each work package:
@@ -82,7 +106,7 @@ For each work package:
 1. Read issue, code, `JOURNAL.md`, and latest CI state.
 2. Create/refresh a GitHub issue with acceptance criteria.
 3. Spawn 1-3 Codex workers in isolated branches/worktrees.
-4. Give each worker one narrow slice and no live secrets.
+4. Give each worker one narrow slice; if live proof is needed, give one whitelisted harness command, not credentials.
 5. Review returned diff like a PR: correctness first, then tests/docs.
 6. Run parent checks:
    - `python3 -m pytest -q`
@@ -92,7 +116,7 @@ For each work package:
    - `python3 -m build && python3 -m twine check dist/*`
    - `python3 scripts/sync_upstream.py --check` when capability mirror touched.
 7. Open PR, wait CI, merge only green.
-8. Parent runs live smoke for tenant-sensitive items.
+8. Parent delegates or runs live smoke for tenant-sensitive items, then reviews the transcript.
 9. Update `CHANGELOG.md`, `SCAFFOLD.md`, issues, daybook.
 
 ### Codex Rules
@@ -100,7 +124,7 @@ For each work package:
 Codex must:
 
 - Work on one branch/worktree.
-- Avoid live Keeper calls.
+- Avoid live Keeper calls unless the parent explicitly delegates one whitelisted smoke harness command.
 - Avoid secrets and credential files.
 - Prefer offline unit tests and fixtures.
 - Preserve public API/backward compatibility unless task says otherwise.
@@ -114,6 +138,7 @@ Codex must not:
 - Modify GitHub repo settings.
 - Create PyPI releases.
 - Touch customer/lab private data unless parent supplies a sanitized fixture.
+- Print env vars, credential JSON, TOTP seeds, passwords, KSM config contents, or raw secret-bearing logs.
 - Convert plan-only helpers into live apply without explicit acceptance tests.
 
 ## Phase 0: Release / Publish Hygiene
