@@ -57,7 +57,7 @@ packaged schema alone as GA.
 | Manifest family (`schema:` key) | Schema in repo | Clears PAM bar today |
 |----------------------------------|----------------|----------------------|
 | `pam-environment.v1` | yes | **Yes** (PAM scope; preview-gated sub-features called out in AGENTS / checklist) |
-| `keeper-vault.v1` | yes | **No** — `scaffold-only` live proof + matrix bar; **yes** L1 Commander slice (`login` discover/apply), `validate --online`, and semantic `plan`/`diff` for flattened vs `fields[]` login payloads |
+| `keeper-vault.v1` | yes | **No** — `scaffold-only` live proof + matrix bar; **yes** L1 Commander slice (`login` discover/apply **UPDATE** on **record version 3** JSON), `validate --online`, and semantic `plan`/`diff` for scalar `login` `fields[]` vs Commander-flattened payloads (see **Honest limits** below) |
 | `keeper-vault-sharing.v1` | yes | **No** — scaffold-only |
 | `keeper-enterprise.v1` | yes | **No** — scaffold / partial design only |
 | `keeper-integrations-identity.v1` | yes | **No** — scaffold-only |
@@ -69,6 +69,29 @@ packaged schema alone as GA.
 
 Separate runtime: **`dsk report`** verbs (password / compliance / security-audit)
 are production read paths; they are not manifest families.
+
+### Honest limits — vault L1 (devil’s-advocate bar)
+
+Treat the vault row above as **“wired + tested,” not “proven like PAM”**
+until **G6** (sanitized live transcript + matrix) and **§7** sign-off on
+[`docs/VAULT_L1_DESIGN.md`](docs/VAULT_L1_DESIGN.md) land.
+
+- **Semantic diff:** compares flattened **scalar** login values; duplicate
+  labels, non-scalar typed fields, or Commander shape drift across versions can
+  still produce false “clean” or surprise **UPDATE** — extend tests when you
+  hit real records.
+- **Apply:** Commander **vault UPDATE** uses the **version 3** JSON edit path;
+  older record shapes are out of scope until explicitly supported. Confirm
+  failures are not silent (stderr / return contract) in your environment
+  before unattended automation.
+- **`validate --online`:** bundles discover, binding gates, and diff; network
+  or Commander flakes fail a check that offline `validate` would pass — use
+  offline CI for schema-only gates and reserve `--online` for integration
+  slots.
+- **Secrets in JSON:** `--json` can echo titles, UIDs, and folder scope; pipe
+  and log discipline still matter (`docs/live-proof/README.md`).
+
+Orchestration checklist: [`docs/ORCHESTRATION_UNTIL_COMPLETE.md`](docs/ORCHESTRATION_UNTIL_COMPLETE.md).
 
 ## Keeper Security Platform: what DSK does not cover (by design)
 
@@ -106,7 +129,7 @@ keeper_sdk/                          # import path stable through 1.x
                                      # provisioning), ksm.py (KsmSecretStore + load_keeper_login_from_ksm),
                                      # bus.py (Phase B inter-agent bus directory — sealed skeleton)
   cli/                               # `dsk` (validate / export / plan / diff / apply / import / bootstrap-ksm)
-tests/                               # run `pytest` — on the order of 470+ tests; CI ratchets coverage
+tests/                               # run `pytest` — ~518 tests collected; CI ratchets coverage
 docs/
   ORCHESTRATION_PAM_PARITY.md        # merge train, workers, CI ladder (vault L1 + gates)
   EXECUTION_PLAN_HEAVY_ORCHESTRATION.md  # phased checklist A–E + metrics + sprint close
@@ -145,10 +168,15 @@ dsk --provider mock apply examples/pamMachine.yaml --auto-approve
 ```
 
 Any packaged manifest family (`schema: keeper-vault.v1`, …) can run
-`dsk validate` for **JSON Schema + dropped-design guard**; uid_ref graph and
-`--online` stay **PAM-only** until per-family providers ship (`docs/PAM_PARITY_PROGRAM.md`).
-Use **`dsk validate PATH --json`** for a single JSON object (`mode`: `schema_only`
-vs `pam_full`) for agents and CI parsers.
+`dsk validate` for **JSON Schema + dropped-design guard**. **`--online`** is
+**PAM** for full tenant binding + diff smoke, and **`keeper-vault.v1`** when you
+use **`--provider commander`** with a scoped folder (`--folder-uid` or
+`KEEPER_DECLARATIVE_FOLDER`) — see [`AGENTS.md`](AGENTS.md) and
+[`docs/VALIDATION_STAGES.md`](docs/VALIDATION_STAGES.md). Other families stay
+offline until their provider slice ships (`docs/PAM_PARITY_PROGRAM.md`).
+Use **`dsk validate PATH --json`** for a single JSON object (`mode` varies by
+family — e.g. `schema_only`, `pam_full`, `vault_offline`, `vault_online`) for
+agents and CI parsers.
 
 ## Quick start (live tenant)
 
@@ -192,19 +220,24 @@ dsk --provider commander --login-helper ksm validate examples/pamMachine.yaml --
 The legacy `pamform` and `keeper-sdk` CLI names remain installed as
 aliases for one major version so existing pipelines do not break.
 
-## Status (main, 2026-04-26)
+## Status (main, 2026-04-27)
 
 Core + mock: complete. Commander provider: discover, plan, apply
 (create / update / delete via `keeper rm`, gated behind
 `--allow-delete`), ownership-marker read/write, provider-level
-capability check. Capability gaps (rotation, JIT, gateway `mode: create`)
+capability check. **`keeper-vault.v1` L1** adds Commander discover/apply
+(including **login UPDATE** on v3 JSON), **`dsk validate --online`** for
+vault, and semantic vault diff for scalar logins — still **not** “PAM-bar
+GA” until live proof + design §7 close the ledger
+([`docs/ORCHESTRATION_UNTIL_COMPLETE.md`](docs/ORCHESTRATION_UNTIL_COMPLETE.md)).
+Capability gaps (rotation, JIT, gateway `mode: create`)
 surface as plan-time CONFLICT rows rather than silent drops, so the CLI's
 `plan` and `apply --dry-run` agree before any mutation runs.
 KSM is now a first-class SDK feature: `dsk bootstrap-ksm` provisions an
 app + share + client token + `ksm-config.json` end-to-end, and
 `KsmLoginHelper` reads Commander credentials back out of that vault — so
 the SDK can authenticate without any plaintext env vars on the host.
-Current local suite: on the order of **470+ tests** collected; line coverage
+Current local suite: **~518 tests** collected; line coverage
 is CI-ratcheted (see `pyproject.toml` / workflows); core modules
 `redact`, `schema`, `normalize` at 100%.
 Live `EnvLoginHelper` smoke proved full apply for `pamMachine`; Issue #5

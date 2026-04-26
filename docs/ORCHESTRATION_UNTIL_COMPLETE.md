@@ -129,6 +129,12 @@ capping tier (archive reason in JOURNAL).
 - [x] **`dsk validate --online`** for vault (Commander `discover` + `compute_vault_diff` smoke;
   requires `--provider commander` + folder scope)
 - [ ] **L1** live proof transcript + **V8** schema + matrix + README
+- [ ] **Publish:** `main` ahead of `origin/main` → `git push` + confirm CI on pushed SHA
+- [ ] **Hardening (post-UPDATE):** assert Commander **vault UPDATE** success (no silent
+  `RecordEditCommand` no-op); document semantic **login** diff limits (duplicate labels,
+  non-scalar typed fields, Commander version skew)
+- [ ] **Concurrency:** call out in §7 / `VAULT_L1_DESIGN` — `validate --online` is a point-in-time
+  snapshot; concurrent mobile/admin edits can invalidate assumptions before `apply`
 
 ### Program infrastructure
 
@@ -178,6 +184,7 @@ full pytest before handoff; update JOURNAL snapshot not repo daybook.
 | 2026-04-27 | §2 ledger: `keeper-vault.v1` G3–G5 → ✓; `docs/live-proof` V8 template JSON + README; CI validates `docs/live-proof/*.json`. |
 | 2026-04-27 | `docs/SCAFFOLD.md` live-proof row; `tests/test_live_proof_artifacts.py`; `PAM_PARITY_PROGRAM` vault inventory line. |
 | 2026-04-27 | `examples/scaffold_only/vaultOneLogin.yaml` L1 sample; live-proof + PAM parity V8 cross-links; `test_validate_json_scaffold_vault_one_login`. |
+| 2026-04-27 | Plan + README: §7 checklist adds publish, post-UPDATE hardening, concurrency; §10 wave table retargets hardening + devil’s-advocate block; README fixes `--online` scope, adds honest vault limits, bumps status + test count. |
 
 ---
 
@@ -185,11 +192,17 @@ full pytest before handoff; update JOURNAL snapshot not repo daybook.
 
 **Binding tier until product says otherwise:** **Tier A** (vault + vault-sharing slice-1).
 
+**Devil’s-advocate reminder (integrator reads before ticking G6):** semantic vault
+login diff matches **scalar** flattening — not a proof of unique field slots or
+cross-Commander-version payload stability; **UPDATE** is **record v3** JSON only;
+`validate --online` bundles I/O + diff and can flake independently of schema-only
+CI; JSON modes need redaction discipline. README § “Honest limits” mirrors this.
+
 | Lane | Owner | Next deliverable | Parallel OK? |
 |------|-------|------------------|--------------|
 | **Vault G6 / V8** | Integrator + one live slot | Sanitized transcript per `docs/live-proof/README.md`; bump `x-keeper-live-proof` on `keeper-vault.v1`; matrix + README row | **No** parallel tenant writers |
 | **§7 sign-off** | Integrator + reviewer | Close **G2** ledger row (removes `DRAFT` on `VAULT_L1_DESIGN.md`) | Readonly review only |
-| **Vault hardening** | Foreground dev | Commander **vault UPDATE** body sync via `RecordEditCommand` + `custom` merge (marker-preserving); live L1 proof still **V8** | **No** second PR touching same `commander_cli.py` region |
+| **Vault hardening** | Foreground dev | **After** shipped UPDATE: verify `RecordEditCommand` outcomes (no silent no-op); doc semantic diff limits + concurrent-edit caveat (`VAULT_L1_DESIGN` / `VALIDATION_STAGES`) | **No** second PR touching same `commander_cli.py` region without queue |
 | **P18c F1** | Worker / Codex | R1 memo + extractor allowlist (does **not** gate vault) | **Yes** |
 | **P11 F2** | Worker | Memos first; schema edits after integrator merge | **Yes** if disjoint `$defs` |
 | **Wave close** | Integrator | W.5 merge + full pytest + **NEXT_SPRINT §16** skim; JOURNAL 5-line snapshot | — |

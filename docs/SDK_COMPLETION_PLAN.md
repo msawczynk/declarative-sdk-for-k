@@ -40,6 +40,7 @@ Main branch as of 2026-04-25:
   - `pam rotation edit` argv helper plus experimental apply wiring, still preview/experimental gated pending live proof.
   - `pam connection edit` / `pam rbi edit` apply wiring, still preview-gated pending live proof.
   - JIT and gateway-create / `projects[]` decisions captured as boundary/design docs; no gate removed.
+- **`keeper-vault.v1` L1 (2026-04-27):** Commander discover/apply includes login **UPDATE** (record **version 3** JSON), `dsk validate --online`, and semantic scalar-login diff vs flattened live — still **preview / not PAM-bar GA** until **G6** live proof + `VAULT_L1_DESIGN` §7; see [README](../README.md) (Readiness table + **Honest limits — vault L1**) and [`docs/ORCHESTRATION_UNTIL_COMPLETE.md`](./ORCHESTRATION_UNTIL_COMPLETE.md) §7/§10.
 
 Open GitHub issues:
 
