@@ -13,6 +13,9 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   `record_uid` (and related) key values stay as returned by Commander
   unless **`--quiet`** is also set (which fingerprints those UID
   fields). See `AGENTS.md` command table.
+- **Orchestration** — `docs/NEXT_SPRINT_PARALLEL_ORCHESTRATION.md` adds
+  **§12 large-sprint mode** (WIP limits, program board, trains, roles) and
+  **§13** sprint-size cheat sheet.
 - **Live-proof runbook** — `docs/live-proof/README.md` (L1 checklist,
   committed-artifact naming, sanitization expectations). `keeper-vault.v1`
   and `keeper-vault-sharing.v1` now cite it from

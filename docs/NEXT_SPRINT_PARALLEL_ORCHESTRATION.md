@@ -234,3 +234,79 @@ At least **three** of:
 - [ ] Daybook rollup line updated  
 
 This plan is safe to attach to Codex / Cursor worker prompts as the **orchestration index**; slice-specific bodies stay in per-task prompts.
+
+---
+
+## 12. Large sprint mode (more scope, more orchestration)
+
+**Yes — larger sprints work** if you treat them as a **program** (many small packages) rather than one big blob. What scales is **parallel readonly + serialized integration + explicit WIP limits**. What does *not* scale is “everyone edits `main` blind” or “many live tenants at once.”
+
+### When to use large-sprint mode
+
+- **Multi-track goals** in one calendar window (e.g. live-proof + P18 + two P11 slices + one report verb).
+- **Enough parent bandwidth** for triage: expect **~2×** the triage time of §3–§4 for each extra parallel *implementation* track, not for readonly memos.
+- **SDK_DA still holds:** no widening “supported” without gates; large sprint = more **packages**, not looser proof.
+
+### WIP limits (recommended defaults)
+
+| Lane | Max parallel |
+|------|----------------|
+| Readonly memos (R\*) | **6** (cheap; conflict-free if outputs are external) |
+| Foreground impl touching **different** path prefixes | **3** |
+| Workers touching the **same** hot file (`main.py`, one `.schema.json`) | **1** |
+| Open integration branches / merge trains | **2** (second only if first is green and idle) |
+| Live lab sessions (**L1**) | **1** |
+
+Exceed these only if you add a second **integration owner** who owns merge order.
+
+### Program structure (add to small sprint)
+
+1. **Program board** (one table): columns *Backlog → Memo done → Impl in flight → CI green → Merged*. Each row = one work package ID from §3 (or split F2 into F2a1, F2a2).
+2. **Weekly (or mid-sprint) checkpoint**: collapse scope — what ships this train vs slips to next train; update JOURNAL “next queue” once.
+3. **Trains**: e.g. **Train A** = schemas + tests only; **Train B** = CLI + report; **Train C** = `sync_upstream` + snapshots. Merge **A → B → C** order when B depends on A; A and C can be parallel **only if** C does not regenerate files A touches.
+
+### Extra waves (typical 2-week shape)
+
+| Day band | Focus |
+|----------|--------|
+| **D1** | Wave 0 + Wave 1 (all R\* in parallel) + start long-running R1 if heavy |
+| **D2–D3** | Wave 2 triage; lock hot-file map; spawn F2a/F2b/F1 as unlocked |
+| **D5** | Mid-sprint checkpoint; kill or defer lowest-priority row |
+| **D8–D10** | L1 live window; F3 evidence; no new F\* starts unless train is green |
+| **D12–D14** | Final integration train; distillation pass on JOURNAL if tail > 2 screens |
+
+Adjust proportionally for 1-week vs 3-week; the **invariant** is **readonly burst first**, **impl second**, **live gate last**.
+
+### Roles (lightweight — can all be one person)
+
+| Role | Responsibility |
+|------|----------------|
+| **Parent / integrator** | Merge train, hot-file exclusivity, final CI, SDK_DA wording |
+| **Memo triage** | Resolve contradictions between R2a/R2b/R1; can be same as parent |
+| **Live runner** | L1 only; never parallel with another tenant writer |
+
+### Large-sprint success bar (stricter than §10)
+
+Pick **four** of:
+
+1. Two or more **F\*** packages merged with green full CI.
+2. **R1** accepted and **F1** merged or honestly blocked with issue link.
+3. **L1** executed **or** time-boxed deferral with exact next date in JOURNAL.
+4. **Zero** undeclared hot-file merge conflicts (if any → LESSON entry).
+5. Daybook rollup + board table match `pytest` count after merge.
+
+### Failure mode to avoid
+
+**“Orchestration theatre”** — many workers, no merge train, parent drowning in partial diffs. Fix: **lower WIP**, freeze new F\* until current train merges, prefer another **readonly** wave instead.
+
+---
+
+## 13. Choosing sprint size (cheat sheet)
+
+| Situation | Prefer |
+|-----------|--------|
+| Single slice, clear owner | Small sprint (§1–§11 only) |
+| 2–3 disjoint path prefixes + memos ready | Medium = §11 + **half** of §12 (WIP table + one train) |
+| Multi-track + calendar pressure | Large = full §12 + program board + mid-sprint checkpoint |
+
+Larger sprints **increase orchestration overhead**; they do not replace proof, CI, or SDK_DA gates.
