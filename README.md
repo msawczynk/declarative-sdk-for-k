@@ -25,7 +25,7 @@ in the maintainer's private daybook, not this repo.
 | PAM resources        | machines, databases, directories, nested users, remote-browsers (GA lifecycle; preview-gated tuning gaps called out below) | rotation settings, standalone users, JIT, gateway `mode: create` (behind `DSK_PREVIEW=1`) |
 | Gateways             | `reference_existing` mode            | `create` mode                |
 | Shared folders       | scope + membership refs              | permissions matrix           |
-| KSM applications     | reference_existing + share-bindings  | app create + client rotation |
+| KSM applications     | reference_existing + share-bindings; **`dsk bootstrap-ksm` provisions an app + admin-record share + one-time client token + redeemed `ksm-config.json`**; `KsmLoginHelper` pulls Commander credentials *from* KSM (close the loop). Phase B inter-agent bus directory is provisioned but the client is sealed (`secrets/bus.py` raises `NotImplementedError`). | client-token rotation; bus client implementation |
 | Ownership markers    | read + write + adopt                 | multi-manager arbitration    |
 | Vault records (non-PAM) | typed-model read/write via `login` resource | generic records, file records |
 | Teams / roles        | discover surface only                | full declarative lifecycle   |
@@ -45,12 +45,17 @@ keeper_sdk/                          # import path stable through 1.x
   core/                              # pure models, schema, graph, diff, planner, metadata, redact
     schemas/                         # packaged pam-environment.v1.schema.json
   providers/                         # MockProvider, CommanderCliProvider
-  auth/                              # LoginHelper protocol + EnvLoginHelper reference impl
-  cli/                               # `dsk` (validate / export / plan / diff / apply / import)
-tests/                               # ~231 passing tests + 2 expected v1.1 deferrals (run pytest)
+  auth/                              # LoginHelper protocol + EnvLoginHelper / KsmLoginHelper reference impls
+  secrets/                           # KSM as first-class SDK feature: bootstrap.py (Commander-driven
+                                     # provisioning), ksm.py (KsmSecretStore + load_keeper_login_from_ksm),
+                                     # bus.py (Phase B inter-agent bus directory — sealed skeleton)
+  cli/                               # `dsk` (validate / export / plan / diff / apply / import / bootstrap-ksm)
+tests/                               # 315 passing tests + 2 expected v1.1 deferrals (run pytest); coverage 86% (CI floor 84)
 docs/
   COMMANDER.md                       # pinned Commander version + capability matrix
   LOGIN.md                           # login helper contract + 30-line skeleton
+  KSM_BOOTSTRAP.md                   # `dsk bootstrap-ksm` operator runbook
+  KSM_INTEGRATION.md                 # end-to-end bootstrap → KsmLoginHelper → SDK story
   VALIDATION_STAGES.md               # validate/plan/apply exit-code contract
 AGENTS.md                            # agent-first operating manual
 ```
@@ -88,16 +93,36 @@ dsk --provider commander plan     examples/pamMachine.yaml
 ```
 
 See [`docs/LOGIN.md`](docs/LOGIN.md) for custom login flows (KSM pull,
-HSM-backed TOTP, device-approval queues, …).
+HSM-backed TOTP, device-approval queues, …),
+[`docs/KSM_BOOTSTRAP.md`](docs/KSM_BOOTSTRAP.md) for the
+Commander-driven KSM-app provisioning flow exposed as `dsk bootstrap-ksm`,
+and [`docs/KSM_INTEGRATION.md`](docs/KSM_INTEGRATION.md) for the
+end-to-end story (bootstrap → `ksm-config.json` → `KsmLoginHelper` →
+fully credential-free SDK runs).
 The built-in `EnvLoginHelper` is live-proven for a full `pamMachine`
-validate -> plan -> apply -> verify -> destroy cycle. Preview-gated
-surfaces such as RBI tuning and nested `pamUser` rotation still need their
-own live proof before they become support claims.
+validate -> plan -> apply -> verify -> destroy cycle. `KsmLoginHelper` is
+green offline (264 unit tests in the KSM stack) and is the recommended
+production helper once `dsk bootstrap-ksm` has produced a config.
+Preview-gated surfaces such as RBI tuning and nested `pamUser` rotation
+still need their own live proof before they become support claims.
+
+### Quick start (KSM bootstrap)
+
+```bash
+# 1. Provision a KSM app + admin-record share + client token + ksm-config.json
+#    (uses your already-logged-in Commander session by default; `--login-helper ksm`
+#    or a custom path lets you bootstrap one KSM app from another).
+dsk bootstrap-ksm --app-name my-sdk-app
+
+# 2. Use the resulting config for credential-free SDK runs:
+export KEEPER_SDK_KSM_CONFIG=~/.keeper/my-sdk-app-ksm-config.json
+dsk --provider commander --login-helper ksm validate examples/pamMachine.yaml --online
+```
 
 The legacy `pamform` and `keeper-sdk` CLI names remain installed as
 aliases for one major version so existing pipelines do not break.
 
-## Status (main, 2026-04-25)
+## Status (main, 2026-04-26)
 
 Core + mock: complete. Commander provider: discover, plan, apply
 (create / update / delete via `keeper rm`, gated behind
@@ -105,10 +130,18 @@ Core + mock: complete. Commander provider: discover, plan, apply
 capability check. Capability gaps (rotation, JIT, gateway `mode: create`)
 surface as plan-time CONFLICT rows rather than silent drops, so the CLI's
 `plan` and `apply --dry-run` agree before any mutation runs.
-Current local suite: 216 passing tests + 2 expected v1.1 deferrals.
+KSM is now a first-class SDK feature: `dsk bootstrap-ksm` provisions an
+app + share + client token + `ksm-config.json` end-to-end, and
+`KsmLoginHelper` reads Commander credentials back out of that vault — so
+the SDK can authenticate without any plaintext env vars on the host.
+Current local suite: **315 passing tests** + 2 expected v1.1 deferrals;
+total line coverage **86.32%** (CI ratchet floor `84`); core modules
+`redact`, `schema`, `normalize` at 100%.
 Live `EnvLoginHelper` smoke proved full apply for `pamMachine`; Issue #5
 RBI readback and Issue #4 nested-user rotation remain preview-gated until
 their live create -> verify -> clean re-plan -> destroy loops pass.
+`KsmLoginHelper` + `dsk bootstrap-ksm` are green offline; the live
+end-to-end bootstrap → login → apply loop is the next gate.
 
 ## Exit codes
 
