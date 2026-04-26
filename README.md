@@ -131,6 +131,8 @@ keeper_sdk/                          # import path stable through 1.x
                                      # bus.py (Phase B inter-agent bus directory — sealed skeleton)
   cli/                               # `dsk` (validate / export / plan / diff / apply / import / bootstrap-ksm)
 tests/                               # run `pytest` — ~518 tests collected; CI ratchets coverage
+examples/
+  SCAFFOLD.md                        # PAM root YAMLs + scaffold_only; CI validate vs mock-plan split
 docs/
   ORCHESTRATION_PAM_PARITY.md        # merge train, workers, CI ladder (vault L1 + gates)
   EXECUTION_PLAN_HEAVY_ORCHESTRATION.md  # phased checklist A–E + metrics + sprint close

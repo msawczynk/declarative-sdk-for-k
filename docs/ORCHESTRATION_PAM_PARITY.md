@@ -154,16 +154,14 @@ Run: targeted pytest with mocks; live run is integrator/parent only unless grant
 
 ---
 
-## 7. CI ladder (when to extend workflows)
+## 7. CI ladder (workflows vs pytest)
 
-| Step | Trigger |
-|------|---------|
-| Now | `dsk validate` on `examples/*.yaml` + `examples/scaffold_only/*.yaml` |
-| After **V3** | Add `dsk --provider mock plan` for **one** `examples/scaffold_only/vault*.yaml` **only if** plan supports vault without breaking PAM-only jobs |
-| After **V6** | Optional live-smoke job (separate workflow, credentialed) per `AGENTS.md` |
-
-Do **not** add vault to the **mock plan loop** for all `examples/*.yaml` until
-**V4** explicitly unifies plan entry — today root examples remain PAM-only.
+| Where | What runs today |
+|------|-----------------|
+| **`examples` job** (`.github/workflows/ci.yml`) | `dsk validate` on **`examples/*.yaml`** and **`examples/scaffold_only/*.yaml`**. Mock **`dsk --provider mock plan`** on **`examples/*.yaml`** only (PAM manifests). |
+| **pytest** | `keeper-vault.v1` **plan / diff / apply** (mock + fakes), `validate --json`, `compute_vault_diff`, etc. — see `tests/test_vault_mock_provider.py`, `tests/test_cli.py`, `tests/test_vault_diff.py`, … |
+| **Optional CI hardening** | Add **one** `examples/scaffold_only/vault*.yaml` to the **`examples` job plan loop** if you want CI duplicate guardrails beyond pytest (not required on current `main`). |
+| **Live** | Credentialed smoke / L1 runs stay in **separate** workflows or harnesses per `AGENTS.md` — not in default public CI. |
 
 ---
 
