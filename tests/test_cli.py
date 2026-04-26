@@ -57,8 +57,68 @@ def test_validate_json_scaffold_vault() -> None:
     assert data["ok"] is True
     assert data["family"] == "keeper-vault.v1"
     assert data["mode"] == "vault_offline"
+    assert data["online"] is False
     assert data["uid_ref_count"] == 0
     assert "uid_ref_graph" in data["stages_completed"]
+
+
+def test_validate_json_scaffold_vault_one_login() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    path = repo_root / "examples" / "scaffold_only" / "vaultOneLogin.yaml"
+    result = _run(["validate", str(path), "--json"])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output.strip())
+    assert data["ok"] is True
+    assert data["family"] == "keeper-vault.v1"
+    assert data["uid_ref_count"] == 1
+
+
+def _vault_minimal_path() -> Path:
+    return Path(__file__).resolve().parents[1] / "examples" / "scaffold_only" / "vaultMinimal.yaml"
+
+
+def test_validate_vault_online_requires_commander() -> None:
+    result = _run(["validate", str(_vault_minimal_path()), "--online"])
+    assert result.exit_code == EXIT_CAPABILITY, result.output
+    assert "commander" in result.output.lower()
+
+
+def test_validate_vault_online_requires_folder_uid() -> None:
+    result = _run(
+        ["--provider", "commander", "validate", str(_vault_minimal_path()), "--online"]
+    )
+    assert result.exit_code == EXIT_CAPABILITY, result.output
+    assert "folder" in result.output.lower()
+
+
+def test_validate_vault_online_json_smoke(monkeypatch: pytest.MonkeyPatch) -> None:
+    from unittest.mock import MagicMock
+
+    fake = MagicMock()
+    fake.discover.return_value = []
+    fake.unsupported_capabilities.return_value = []
+    fake.check_tenant_bindings.return_value = []
+    monkeypatch.setattr(cli_main_module, "CommanderCliProvider", lambda **kw: fake)
+
+    result = _run(
+        [
+            "--provider",
+            "commander",
+            "--folder-uid",
+            "FOLDER_UID",
+            "validate",
+            str(_vault_minimal_path()),
+            "--online",
+            "--json",
+        ]
+    )
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output.strip())
+    assert data["mode"] == "vault_online"
+    assert data["online"] is True
+    assert "diff_smoke" in data["stages_completed"]
+    assert data["live_record_count"] == 0
+    assert data["stage5_summary"]["create"] == 0
 
 
 def test_plan_vault_mock_creates(tmp_path: Path) -> None:

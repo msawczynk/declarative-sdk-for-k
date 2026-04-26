@@ -57,7 +57,7 @@ packaged schema alone as GA.
 | Manifest family (`schema:` key) | Schema in repo | Clears PAM bar today |
 |----------------------------------|----------------|----------------------|
 | `pam-environment.v1` | yes | **Yes** (PAM scope; preview-gated sub-features called out in AGENTS / checklist) |
-| `keeper-vault.v1` | yes | **No** — scaffold-only; no `CommanderCliProvider` slice |
+| `keeper-vault.v1` | yes | **No** — `scaffold-only` live proof + matrix bar; **yes** L1 Commander slice (`login` discover/apply), `validate --online`, and semantic `plan`/`diff` for flattened vs `fields[]` login payloads |
 | `keeper-vault-sharing.v1` | yes | **No** — scaffold-only |
 | `keeper-enterprise.v1` | yes | **No** — scaffold / partial design only |
 | `keeper-integrations-identity.v1` | yes | **No** — scaffold-only |

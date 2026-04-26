@@ -1,0 +1,34 @@
+{
+  "family": "keeper-vault.v1",
+  "template": true,
+  "purpose": "Shape-only placeholder for V8 L1. After a lab run, copy to keeper-vault.v1.<pin-abbrev>.sanitized.json with real redacted content; remove template and purpose keys. See docs/live-proof/README.md checklist.",
+  "suggested_commands": [
+    "dsk --provider commander --folder-uid <FOLDER_UID> validate examples/scaffold_only/vaultOneLogin.yaml --online --json",
+    "dsk --provider commander --folder-uid <FOLDER_UID> plan examples/scaffold_only/vaultOneLogin.yaml --json"
+  ],
+  "placeholder_validate_online": {
+    "ok": true,
+    "family": "keeper-vault.v1",
+    "mode": "vault_online",
+    "online": true,
+    "stages_completed": [
+      "json_schema",
+      "semantic_rules",
+      "typed_model",
+      "uid_ref_graph",
+      "tenant_capability",
+      "tenant_bindings",
+      "diff_smoke"
+    ],
+    "stage5_summary": {
+      "create": 0,
+      "update": 0,
+      "delete": 0,
+      "conflict": 0
+    }
+  },
+  "placeholder_plan_json": {
+    "ok": true,
+    "changes": []
+  }
+}

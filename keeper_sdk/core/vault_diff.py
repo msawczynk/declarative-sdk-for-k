@@ -9,6 +9,10 @@ private helpers in :mod:`keeper_sdk.core.diff`. Desired rows are built from
 ``MockProvider`` can apply vault plans: it writes the ownership marker into
 ``payload["custom_fields"]``, which :func:`keeper_sdk.core.diff._field_diff`
 ignores, so re-plans stay clean when manifest records omit that key.
+
+:func:`compute_vault_diff` uses a **vault login** diff: manifest ``fields[]`` is
+compared to Commander-flattened top-level login scalars so benign shape drift
+does not surface as ``UPDATE``.
 """
 
 from __future__ import annotations
@@ -67,6 +71,7 @@ def compute_vault_diff(
             live=live,
             by_title=by_title,
             adopt=adopt,
+            vault_login_diff=True,
         )
         changes.append(change)
         if change.kind in (ChangeKind.UPDATE, ChangeKind.NOOP) and live is not None:

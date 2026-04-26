@@ -9,7 +9,7 @@ from typing import Any
 
 from keeper_sdk.core.errors import CollisionError, OwnershipError
 from keeper_sdk.core.interfaces import LiveRecord
-from keeper_sdk.core.metadata import MANAGER_NAME, MARKER_VERSION
+from keeper_sdk.core.metadata import MANAGER_NAME, MARKER_FIELD_LABEL, MARKER_VERSION
 from keeper_sdk.core.models import Manifest
 
 
@@ -313,6 +313,101 @@ def _field_diff_pam_remote_browser(live: dict[str, Any], desired: dict[str, Any]
     return sorted(changed)
 
 
+def _vault_flatten_login_field_entries(entries: Any) -> dict[str, Any]:
+    """Map typed ``fields[]`` entries to a flat ``label -> scalar`` dict (L1 login)."""
+    out: dict[str, Any] = {}
+    if not isinstance(entries, list):
+        return out
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        field_type = entry.get("type")
+        values = entry.get("value")
+        label = str(entry.get("label") or "")
+        if not field_type or not isinstance(values, list) or not values:
+            continue
+        value = values[0] if len(values) == 1 else values
+        if isinstance(value, dict):
+            continue
+        if isinstance(value, (str, int, float, bool)):
+            key = label or str(field_type)
+            out[key] = value
+    return out
+
+
+def _vault_norm_login_field_map(m: dict[str, Any]) -> dict[str, Any]:
+    return {str(k).casefold(): v for k, v in m.items()}
+
+
+def _vault_flatten_live_login_scalar_map(
+    live: dict[str, Any],
+    flat_desired: dict[str, Any],
+) -> dict[str, Any]:
+    """When live has no ``fields[]`` (Commander ``get`` flattening), read scalars by label."""
+    out: dict[str, Any] = {}
+    for label in flat_desired:
+        got = live.get(label)
+        if got is None:
+            for lk, lv in live.items():
+                if lk in _DIFF_IGNORED_FIELDS:
+                    continue
+                if str(lk).casefold() == str(label).casefold():
+                    got = lv
+                    break
+        out[label] = got
+    return out
+
+
+def _vault_sorted_custom_json(entries: list[dict[str, Any]]) -> str:
+    norm = sorted(entries, key=lambda e: str(e.get("label") or e.get("name") or ""))
+    return json.dumps(norm, sort_keys=True)
+
+
+def _field_diff_vault_login(live: dict[str, Any], desired: dict[str, Any]) -> list[str]:
+    """Diff ``login`` rows for ``keeper-vault.v1`` vs Commander-shaped live payloads.
+
+    Commander ``get`` merges typed ``fields`` into top-level scalar keys; manifests
+    keep ``fields[]``. Compare semantically so matching logins do not churn UPDATE.
+    """
+    changed: list[str] = []
+    for k in ("title", "notes"):
+        if k not in desired:
+            continue
+        if live.get(k) != desired.get(k):
+            changed.append(k)
+
+    if "fields" in desired and desired.get("fields") is not None:
+        flat_d = _vault_flatten_login_field_entries(desired["fields"])
+        live_fields = live.get("fields")
+        if isinstance(live_fields, list) and live_fields:
+            flat_l = _vault_flatten_login_field_entries(live_fields)
+        else:
+            flat_l = _vault_flatten_live_login_scalar_map(live, flat_d)
+        if _vault_norm_login_field_map(flat_l) != _vault_norm_login_field_map(flat_d):
+            changed.append("fields")
+
+    if "custom" in desired and desired.get("custom") is not None:
+        d_list = [
+            e
+            for e in desired.get("custom") or []
+            if isinstance(e, dict)
+            and str(e.get("label") or e.get("name") or "").casefold()
+            != MARKER_FIELD_LABEL.casefold()
+        ]
+        l_raw = live.get("custom") if isinstance(live.get("custom"), list) else []
+        l_list = [
+            e
+            for e in l_raw
+            if isinstance(e, dict)
+            and str(e.get("label") or e.get("name") or "").casefold()
+            != MARKER_FIELD_LABEL.casefold()
+        ]
+        if _vault_sorted_custom_json(l_list) != _vault_sorted_custom_json(d_list):
+            changed.append("custom")
+
+    return sorted(changed)
+
+
 def _classify_desired(
     *,
     uid_ref: str,
@@ -322,6 +417,7 @@ def _classify_desired(
     live: LiveRecord | None,
     by_title: dict[tuple[str, str], LiveRecord],
     adopt: bool,
+    vault_login_diff: bool = False,
 ) -> Change:
     """Classify ONE desired resource against its best live match.
 
@@ -382,7 +478,9 @@ def _classify_desired(
             reason="adoption: write ownership marker",
         )
 
-    if resource_type == "pamRemoteBrowser":
+    if vault_login_diff and resource_type == "login":
+        diff_fields = _field_diff_vault_login(live.payload, payload)
+    elif resource_type == "pamRemoteBrowser":
         diff_fields = _field_diff_pam_remote_browser(live.payload, payload)
     elif resource_type == "pamUser":
         diff_fields = _field_diff_pam_user(

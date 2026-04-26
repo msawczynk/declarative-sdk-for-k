@@ -185,8 +185,13 @@ This design **recommends Option A** long-term; Option B is acceptable only as a
   `compute_vault_diff`; :class:`~keeper_sdk.providers.mock.MockProvider` for
   apply; tests `tests/test_vault_mock_provider.py`.
 - **Loader + CLI (PR-V4):** :func:`keeper_sdk.core.manifest.load_declarative_manifest`;
-  ``dsk plan`` / ``diff`` / ``apply``; ``dsk validate --json`` mode
-  ``vault_offline`` for vault manifests.
+  ``dsk plan`` / ``diff`` / ``apply``; ``dsk validate --json`` modes
+  ``vault_offline`` / ``vault_online`` (``--online`` requires Commander + folder
+  scope; discover + diff smoke — see ``docs/VALIDATION_STAGES.md``).
+- **Commander (PR-V5/V6):** :class:`~keeper_sdk.providers.commander_cli.CommanderCliProvider`
+  — vault ``discover()`` keeps ``login`` rows; ``apply_plan()`` record-add, **UPDATE**
+  merges planner field drift (Commander ``RecordEditCommand`` JSON path — **record
+  version 3** in cache only) then marker refresh, ``rm`` for deletes.
 
 ## 9. Revision history
 
@@ -194,3 +199,4 @@ This design **recommends Option A** long-term; Option B is acceptable only as a
 |------|--------|
 | 2026-04-26 | Initial slice-1 technical body for PR-V0 / Phase A. |
 | 2026-04-26 | PR-V1: `vault_models.py` + tests (sign-off still pending on §7). |
+| 2026-04-27 | §8: `validate --online` / `vault_online` JSON mode (PR-V4+); no §7 sign-off. |

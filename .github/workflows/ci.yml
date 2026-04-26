@@ -120,8 +120,16 @@ jobs:
               fail=1
             fi
           done
+          if [ -d docs/live-proof ]; then
+            for f in $(find docs/live-proof -name '*.json' -type f); do
+              if ! python -m json.tool < "$f" > /dev/null 2>&1; then
+                echo "::error file=$f::not RFC 8259-compliant JSON (trailing comma? comment? unquoted key?)"
+                fail=1
+              fi
+            done
+          fi
           [ "$fail" -eq 0 ] || exit 1
-          echo "All schema files clean."
+          echo "All schema + docs/live-proof JSON files clean."
 
   drift-check:
     name: drift-check (upstream capability mirror)

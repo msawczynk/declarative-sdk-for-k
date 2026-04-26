@@ -47,9 +47,9 @@ agents.
 
 | Command             | Input                | Output                 | Machine flag          |
 |---------------------|----------------------|------------------------|-----------------------|
-| `dsk validate PATH` | manifest YAML/JSON   | PAM: `ok: <name> (<n>refs)`; other `schema:` families: `ok: schema-valid (<family>)` (graph/`--online` PAM-only) | `--emit-canonical`, `--json` |
-| `dsk plan PATH`     | manifest             | plan summary + table   | `--json`              |
-| `dsk diff PATH`     | manifest             | field-level diff       | —                     |
+| `dsk validate PATH` | manifest YAML/JSON   | PAM: `ok: <name> (<n>refs)`; `keeper-vault.v1`: typed graph offline, optional `--online` (Commander); other packaged families: schema stages only unless extended | `--emit-canonical`, `--json`, `--online` |
+| `dsk plan PATH`     | manifest             | plan summary + table (`pam-environment.v1` + `keeper-vault.v1`; vault `login` diff matches manifest `fields[]` to Commander-flattened scalars) | `--json`              |
+| `dsk diff PATH`     | manifest             | field-level diff (same vault `login` semantics as `plan`) | —                     |
 | `dsk apply PATH`    | manifest             | outcomes table         | `--dry-run`           |
 | `dsk import PATH`   | manifest             | adoption plan          | `--dry-run`           |
 | `dsk export JSON`   | `pam project export` | manifest YAML          | `-o FILE`             |

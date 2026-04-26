@@ -12,12 +12,17 @@ Commands used:
     keeper ls <folder_uid> --format json
     keeper get <uid> --format json
     keeper rm <uid>
+    keeper-vault.v1 (slice 1): in-process ``RecordAddCommand`` (record-add) for
+    ``login`` creates; ``RecordEditCommand`` merges manifest drift into existing
+    v3 JSON then :meth:`_write_marker` refreshes ownership metadata; same ``ls`` /
+    ``get`` discover path filtered to ``login`` rows.
 
 The provider:
     1. Lists the target folder (if configured) and fetches each record.
     2. Decodes ownership markers from the custom field.
-    3. Applies plans by writing a temp ``pam_import`` JSON document and
-       invoking ``keeper pam project import`` or ``extend``.
+    3. Applies PAM plans by writing a temp ``pam_import`` JSON document and
+       invoking ``keeper pam project import`` or ``extend``. Applies vault
+       slice-1 plans via record-add + marker writes (see :meth:`_apply_vault_plan`).
     4. Deletes records via ``keeper rm <uid>``; ``compute_diff`` restricts
        deletes to records whose ownership marker matches ``MANAGER_NAME``.
 """
@@ -25,6 +30,7 @@ The provider:
 from __future__ import annotations
 
 import contextlib
+import copy
 import io
 import json
 import logging
@@ -36,7 +42,7 @@ from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
-from keeper_sdk.core.diff import Change, ChangeKind
+from keeper_sdk.core.diff import _DIFF_IGNORED_FIELDS, Change, ChangeKind
 from keeper_sdk.core.errors import CapabilityError, CollisionError
 from keeper_sdk.core.interfaces import ApplyOutcome, LiveRecord, Provider
 from keeper_sdk.core.metadata import (
@@ -138,6 +144,19 @@ def _ensure_keepercommander_version_for_apply() -> None:
         )
 
 
+def _manifest_source_is_vault(source: Any) -> bool:
+    """True when the provider was constructed with a ``keeper-vault.v1`` document."""
+    if source is None:
+        return False
+    if hasattr(source, "model_dump"):
+        data = source.model_dump(mode="python", exclude_none=True, by_alias=True)
+    elif isinstance(source, dict):
+        data = source
+    else:
+        return False
+    return data.get("schema") == "keeper-vault.v1"
+
+
 class CommanderCliProvider(Provider):
     """Delegates to the ``keeper`` Commander CLI via subprocess."""
 
@@ -227,8 +246,9 @@ class CommanderCliProvider(Provider):
                 record = _record_from_get(item, listing_entry=listing_entry)
                 if record is not None:
                     records.append(record)
-        config_record = self._synthetic_reference_configuration_record()
-        if config_record is not None:
+        if _manifest_source_is_vault(self._manifest_source):
+            records = [r for r in records if r.resource_type == "login"]
+        elif (config_record := self._synthetic_reference_configuration_record()) is not None:
             records.append(config_record)
         if any(r.resource_type == "pamRemoteBrowser" for r in records):
             if self._keeper_params is None and self._manifest_has_resource_entries():
@@ -469,6 +489,8 @@ class CommanderCliProvider(Provider):
         return issues
 
     def apply_plan(self, plan: Plan, *, dry_run: bool = False) -> list[ApplyOutcome]:
+        if _manifest_source_is_vault(self._manifest_source):
+            return self._apply_vault_plan(plan, dry_run=dry_run)
         # Last-line defence — CLI should have surfaced these as conflicts
         # already (see unsupported_capabilities above). If an SDK caller
         # bypasses the CLI and hands us a plan directly, we still refuse.
@@ -760,6 +782,353 @@ class CommanderCliProvider(Provider):
                 )
             )
         return outcomes
+
+    def _apply_vault_plan(self, plan: Plan, *, dry_run: bool = False) -> list[ApplyOutcome]:
+        """Apply ``keeper-vault.v1`` slice-1 (``login``) via record-add + marker + ``rm``."""
+        hits = _detect_unsupported_capabilities(
+            self._manifest_source,
+            allow_nested_rotation=_rotation_apply_is_enabled(),
+        )
+        if hits:
+            raise CapabilityError(
+                reason="manifest declares capabilities the CommanderCliProvider does not implement yet: "
+                + "; ".join(hits),
+                next_action=(
+                    "remove the declarations, or drive the Commander hook manually before "
+                    "re-running apply. See REVIEW.md D-4."
+                ),
+            )
+        _ensure_keepercommander_version_for_apply()
+        if not self._folder_uid:
+            raise CapabilityError(
+                reason="keeper-vault apply requires a shared folder uid (discover scope)",
+                next_action="pass --folder-uid or set KEEPER_DECLARATIVE_FOLDER",
+            )
+
+        outcomes: list[ApplyOutcome] = []
+        now = utc_timestamp()
+        for change in plan.ordered():
+            if change.kind is ChangeKind.CREATE:
+                if dry_run:
+                    outcomes.append(
+                        ApplyOutcome(
+                            uid_ref=change.uid_ref or "",
+                            keeper_uid="",
+                            action="create",
+                            details={"dry_run": True},
+                        )
+                    )
+                    continue
+                keeper_uid = self._vault_add_login_record(change.after or {})
+                marker = encode_marker(
+                    uid_ref=change.uid_ref or change.title,
+                    manifest=plan.manifest_name,
+                    resource_type=change.resource_type,
+                    last_applied_at=now,
+                )
+                self._write_marker(keeper_uid, marker)
+                outcomes.append(
+                    ApplyOutcome(
+                        uid_ref=change.uid_ref or "",
+                        keeper_uid=keeper_uid,
+                        action="create",
+                        details={"marker_written": True},
+                    )
+                )
+            elif change.kind is ChangeKind.UPDATE:
+                keeper_uid = change.keeper_uid or ""
+                if not keeper_uid:
+                    outcomes.append(
+                        ApplyOutcome(
+                            uid_ref=change.uid_ref or "",
+                            keeper_uid="",
+                            action="update",
+                            details={"skipped": True, "reason": "no keeper_uid on update change"},
+                        )
+                    )
+                    continue
+                if dry_run:
+                    outcomes.append(
+                        ApplyOutcome(
+                            uid_ref=change.uid_ref or "",
+                            keeper_uid=keeper_uid,
+                            action="update",
+                            details={"dry_run": True},
+                        )
+                    )
+                    continue
+                patch = dict(change.after or {})
+                if patch:
+                    self._vault_apply_login_body_update(keeper_uid, patch)
+                marker = encode_marker(
+                    uid_ref=change.uid_ref or change.title,
+                    manifest=plan.manifest_name,
+                    resource_type=change.resource_type,
+                    last_applied_at=now,
+                )
+                self._write_marker(keeper_uid, marker)
+                outcomes.append(
+                    ApplyOutcome(
+                        uid_ref=change.uid_ref or "",
+                        keeper_uid=keeper_uid,
+                        action="update",
+                        details={"marker_written": True, "record_updated": bool(patch)},
+                    )
+                )
+
+        for change in plan.deletes:
+            if not change.keeper_uid:
+                outcomes.append(
+                    ApplyOutcome(
+                        uid_ref=change.uid_ref or "",
+                        keeper_uid="",
+                        action="delete",
+                        details={
+                            "skipped": True,
+                            "reason": "no keeper_uid on delete change",
+                            "warning": "dependency checks are enforced by Keeper CLI/server, not client-side",
+                        },
+                    )
+                )
+                continue
+            if dry_run:
+                outcomes.append(
+                    ApplyOutcome(
+                        uid_ref=change.uid_ref or "",
+                        keeper_uid=change.keeper_uid,
+                        action="delete",
+                        details={
+                            "dry_run": True,
+                            "keeper_uid": change.keeper_uid,
+                            "warning": "dependency checks are enforced by Keeper CLI/server, not client-side",
+                        },
+                    )
+                )
+                continue
+            outcome = ApplyOutcome(
+                uid_ref=change.uid_ref or "",
+                keeper_uid=change.keeper_uid,
+                action="delete",
+                details={
+                    "keeper_uid": change.keeper_uid,
+                    "removed": False,
+                    "warning": "dependency checks are enforced by Keeper CLI/server, not client-side",
+                },
+            )
+            outcomes.append(outcome)
+            try:
+                self._run_cmd(["rm", "--force", change.keeper_uid])
+            except CapabilityError:
+                raise
+            outcome.details["removed"] = True
+
+        for change in plan.conflicts:
+            outcomes.append(
+                ApplyOutcome(
+                    uid_ref=change.uid_ref or "",
+                    keeper_uid=change.keeper_uid or "",
+                    action="conflict",
+                    details={"reason": change.reason or ""},
+                )
+            )
+        for change in plan.noops:
+            outcomes.append(
+                ApplyOutcome(
+                    uid_ref=change.uid_ref or "",
+                    keeper_uid=change.keeper_uid or "",
+                    action="noop",
+                )
+            )
+        return outcomes
+
+    @staticmethod
+    def _vault_custom_field_label(entry: dict[str, Any]) -> str:
+        return str(entry.get("label") or entry.get("name") or "").casefold()
+
+    @classmethod
+    def _vault_merge_custom_for_update(
+        cls,
+        existing_list: list[Any],
+        patch_list: list[Any],
+    ) -> list[dict[str, Any]]:
+        """Overlay ``patch_list`` entries onto ``existing_list`` by field label.
+
+        Preserves the SDK ownership marker entry if the manifest ``custom`` patch
+        omits it (declarative manifests normally do not carry the live marker).
+        """
+        marker_key = MARKER_FIELD_LABEL.casefold()
+        patch_by = {
+            cls._vault_custom_field_label(e): copy.deepcopy(e)
+            for e in patch_list
+            if isinstance(e, dict) and cls._vault_custom_field_label(e)
+        }
+        out: list[dict[str, Any]] = []
+        used_patch: set[str] = set()
+        for e in existing_list:
+            if not isinstance(e, dict):
+                continue
+            lab = cls._vault_custom_field_label(e)
+            if lab in patch_by:
+                out.append(copy.deepcopy(patch_by[lab]))
+                used_patch.add(lab)
+            else:
+                out.append(copy.deepcopy(e))
+        for lab, ent in patch_by.items():
+            if lab not in used_patch:
+                out.append(ent)
+        labels_present = {cls._vault_custom_field_label(x) for x in out}
+        if marker_key not in labels_present:
+            marker_keep = next(
+                (
+                    copy.deepcopy(x)
+                    for x in existing_list
+                    if isinstance(x, dict) and cls._vault_custom_field_label(x) == marker_key
+                ),
+                None,
+            )
+            if marker_keep is not None:
+                out.append(marker_keep)
+        return out
+
+    @staticmethod
+    def _vault_patch_login_record_data(
+        existing: dict[str, Any],
+        patch: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Merge planner ``patch`` (subset of manifest record) into v3 ``data`` JSON."""
+        out = copy.deepcopy(existing)
+        for key, val in patch.items():
+            if key in _DIFF_IGNORED_FIELDS:
+                continue
+            if key == "custom":
+                if not isinstance(val, list):
+                    continue
+                out["custom"] = CommanderCliProvider._vault_merge_custom_for_update(
+                    out.get("custom") or [],
+                    val,
+                )
+            else:
+                out[key] = copy.deepcopy(val)
+        return out
+
+    def _vault_apply_login_body_update(self, keeper_uid: str, patch: dict[str, Any]) -> None:
+        """Push manifest field drift onto an existing v3 ``login`` via RecordEditCommand."""
+        if not patch:
+            return
+        try:
+            from keepercommander import api  # type: ignore
+            from keepercommander.commands.recordv3 import RecordEditCommand  # type: ignore
+        except ImportError as exc:
+            raise CapabilityError(
+                reason=f"cannot update vault record body: keepercommander unavailable: {exc}",
+                next_action="install Commander Python package in the same interpreter as the SDK",
+            ) from exc
+
+        def run_edit() -> None:
+            params = self._get_keeper_params()
+            api.sync_down(params)
+            cache = getattr(params, "record_cache", None) or {}
+            if keeper_uid not in cache:
+                raise CapabilityError(
+                    reason=f"vault update: record {keeper_uid} not found in Commander cache after sync",
+                    next_action="confirm the record uid and folder scope, then retry",
+                )
+            rec = cache[keeper_uid]
+            version = int(rec.get("version") or 0)
+            # Commander ``RecordEditCommand`` only accepts ``rv == 3`` for the
+            # ``--data`` JSON path we use (see keepercommander ``recordv3.py``).
+            if version != 3:
+                raise CapabilityError(
+                    reason=(
+                        f"vault update: record {keeper_uid} must be record version 3 for JSON edit "
+                        f"(got version={version})"
+                    ),
+                    next_action="use v3 typed login records in the scoped folder for keeper-vault L1",
+                )
+            raw = rec.get("data_unencrypted")
+            if raw is None:
+                raise CapabilityError(
+                    reason=f"vault update: record {keeper_uid} has no decrypted data in cache",
+                    next_action="retry after a successful Commander sync_down",
+                )
+            raw_str = raw.decode("utf-8", errors="replace") if isinstance(raw, bytes) else str(raw)
+            existing = json.loads(raw_str or "{}")
+            merged = self._vault_patch_login_record_data(existing, patch)
+            buf_out = io.StringIO()
+            buf_err = io.StringIO()
+            with contextlib.redirect_stdout(buf_out), contextlib.redirect_stderr(buf_err):
+                RecordEditCommand().execute(
+                    params,
+                    record=keeper_uid,
+                    data=json.dumps(merged),
+                )
+
+        try:
+            self._with_keeper_session_refresh(run_edit)
+        except CapabilityError:
+            raise
+        except Exception as exc:
+            raise CapabilityError(
+                reason=f"vault record body update failed: {type(exc).__name__}: {exc}",
+                next_action="inspect Commander stderr/stdout and the manifest patch fields, then retry",
+            ) from exc
+
+    def _vault_add_login_record(self, after: dict[str, Any]) -> str:
+        """Create a vault ``login`` record in the configured shared folder (in-process)."""
+        try:
+            from keepercommander.commands.recordv3 import RecordAddCommand  # type: ignore
+        except ImportError as exc:
+            raise CapabilityError(
+                reason=f"cannot create vault record: keepercommander unavailable: {exc}",
+                next_action="install Commander Python package in the same interpreter as the SDK",
+            ) from exc
+
+        record_data: dict[str, Any] = {
+            "type": str(after.get("type") or "login"),
+            "title": str(after.get("title") or ""),
+            "fields": list(after.get("fields") or []),
+            "custom": list(after.get("custom") or []),
+        }
+        notes = after.get("notes")
+        if isinstance(notes, str) and notes.strip():
+            record_data["notes"] = notes
+
+        def _run_add() -> Any:
+            params = self._get_keeper_params()
+            buf_out = io.StringIO()
+            buf_err = io.StringIO()
+            with contextlib.redirect_stdout(buf_out), contextlib.redirect_stderr(buf_err):
+                return RecordAddCommand().execute(
+                    params,
+                    data=json.dumps(record_data),
+                    force=False,
+                    folder=self._folder_uid,
+                    attach=[],
+                )
+
+        try:
+            uid = self._with_keeper_session_refresh(_run_add)
+        except CapabilityError:
+            raise
+        except Exception as exc:
+            raise CapabilityError(
+                reason=f"vault record-add failed: {type(exc).__name__}: {exc}",
+                next_action="verify folder permissions and login session, then retry",
+            ) from exc
+
+        uid_str = ""
+        if isinstance(uid, str):
+            uid_str = uid.strip()
+        elif isinstance(uid, bytes):
+            uid_str = uid.decode("utf-8", errors="replace").strip()
+        elif uid is not None:
+            uid_str = str(uid).strip()
+        if not uid_str:
+            raise CapabilityError(
+                reason="Commander record-add did not return a record UID",
+                next_action="verify keepercommander record-add for login records in shared folders",
+            )
+        return uid_str
 
     # ------------------------------------------------------------------
 
@@ -2485,6 +2854,9 @@ def _detect_unsupported_capabilities(
     elif isinstance(manifest, dict):
         source = manifest
     else:
+        return []
+
+    if source.get("schema") == "keeper-vault.v1" or source.get("vault_schema") == "keeper-vault.v1":
         return []
 
     hits: list[str] = []

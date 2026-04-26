@@ -1,16 +1,30 @@
 # Validation stages and exit codes
 
-`dsk validate` runs a layered check. **Family dispatch:** manifests with
-`schema: keeper-*` (or any packaged non-PAM family) complete **stages 1–2
-only** today — JSON Schema plus semantic rules that still apply — then exit
-success without typed `Manifest` load, uid_ref graph, or tenant probes (see
-`docs/PAM_PARITY_PROGRAM.md`). Legacy PAM manifests (`version` + `name`, or
-`schema: pam-environment.v1`) run the full stack below. Use `dsk validate
---json` for a machine-readable summary (`mode`: `schema_only` vs `pam_full`).
+`dsk validate` runs a layered check. **Family dispatch:**
 
-The layers are cumulative for **PAM** — stage N only executes if stages 1
-through N-1 all passed. `--online` enables stages 4 and 5 for PAM only; without
-it, PAM validation stops after stage 3.
+- **`schema: pam-environment.v1`** (and legacy PAM manifests with `version` +
+  `name`) run the full PAM stack below.
+- **`schema: keeper-vault.v1`** runs JSON Schema, typed
+  ``VaultManifestV1`` load, and
+  ``build_vault_graph`` (stages 1–3 analogue to PAM). With ``--online`` and
+  ``--provider commander`` plus folder scope, it runs **tenant** stages 4–5
+  (``discover``, ``unsupported_capabilities``, ``check_tenant_bindings``,
+  ``compute_vault_diff``) — same exit codes as PAM; there is **no** PAM gateway
+  ``reference_existing`` probe on vault paths. Offline ``plan`` / ``diff`` use the
+  same ``compute_vault_diff`` rules: manifest ``login`` ``fields[]`` is compared
+  to flattened Commander-style live payloads so benign shape drift does not look
+  like drift when values agree (see ``tests/test_vault_diff.py``).
+- **Other packaged non-PAM families** complete stages 1–2 (JSON Schema + rules
+  that apply) then exit success without typed PAM ``Manifest`` load, uid_ref
+  graph, or tenant probes (see ``docs/PAM_PARITY_PROGRAM.md``).
+
+Use ``dsk validate --json`` for a machine-readable summary (``mode``:
+``schema_only``, ``pam_full``, ``vault_offline``, or ``vault_online``).
+
+The layers are cumulative per family — stage N only executes if stages 1
+through N-1 all passed for that family. ``--online`` enables stages 4 and 5 for
+**PAM** and **keeper-vault.v1**; without it, those families stop after offline
+stage 3.
 
 Every stage has a deterministic exit code so CI pipelines can branch on
 the specific failure class without parsing stderr.
@@ -20,10 +34,10 @@ the specific failure class without parsing stderr.
 | Stage | Name | Failure exit code | What it checks | Requires `--online` |
 |------:|------|:-----------------:|----------------|:-------------------:|
 | 1 | JSON Schema (structural) | `EXIT_SCHEMA` (`2`) | Manifest parses; family resolved from `schema:` or legacy PAM keys; packaged JSON Schema for that family passes `jsonschema.validate`. `dropped-design` families fail here. | no |
-| 2 | Typed model | `EXIT_SCHEMA` (`2`) | **PAM only:** Pydantic v2 validation, enum coercion, canonical field-name rule (aliases fold to canonical). Non-PAM families skip this stage. | no |
-| 3 | Manifest-internal references | `EXIT_REF` (`3`) | **PAM only:** every `*_uid_ref` targets a declared `uid_ref`; no cycles; ownership-marker shape is sane. | no |
-| 4 | Tenant-side capabilities | `EXIT_CAPABILITY` (`5`) | Session active, `discover()` works, gateways declared as `reference_existing` exist on the tenant, provider `unsupported_capabilities()` returns `[]`. | **yes** |
-| 5 | Tenant-side bindings | `EXIT_CAPABILITY` (`5`) | Provider `check_tenant_bindings()` returns `[]`. For commander: pam_configuration titles resolve, shared_folder bindings exist on each config, `gateway_uid_ref` pairings match the live gateway UID, declared `ksm_application_name` matches the tenant's. | **yes** |
+| 2 | Typed model | `EXIT_SCHEMA` (`2`) | **PAM:** Pydantic v2 validation, enum coercion, canonical field-name rule (aliases fold to canonical). **Vault:** ``VaultManifestV1`` + L1 ``login``-only rule. Other non-PAM families skip this stage. | no |
+| 3 | Manifest-internal references | `EXIT_REF` (`3`) | **PAM:** every `*_uid_ref` targets a declared `uid_ref`; no cycles; ownership-marker shape is sane. **Vault:** ``build_vault_graph`` (``uid_ref`` / ``folder_ref``). | no |
+| 4 | Tenant-side capabilities | `EXIT_CAPABILITY` (`5`) | Session active, ``discover()`` works, provider ``unsupported_capabilities()`` returns ``[]``. **PAM adds:** gateways declared as ``reference_existing`` exist on the tenant. | **yes** |
+| 5 | Tenant diff smoke + bindings | `EXIT_CAPABILITY` (`5`) | After stage 4, **PAM** runs ``compute_diff`` and **vault** runs ``compute_vault_diff`` (``OwnershipError`` → exit **5**). Stdout labels the create/update/delete/conflict counts **stage 5**. Then ``check_tenant_bindings()`` must return ``[]`` (**PAM** Commander: pam_configuration titles, shared folders, ``gateway_uid_ref``, ``ksm_application_name``; **vault** Commander: hook is a no-op today). | **yes** |
 
 Success path (all stages pass) exits `0`.
 
@@ -61,6 +75,19 @@ The numeric values are part of the **binding CLI contract**: CI
 pipelines depend on them. Do not reorder without a major version bump.
 
 ## Examples
+
+### Passing run (vault, online)
+
+```bash
+$ dsk --provider commander --folder-uid "$KEEPER_DECLARATIVE_FOLDER" \
+    validate examples/scaffold_only/vaultMinimal.yaml --online --json
+{"ok": true, "family": "keeper-vault.v1", "mode": "vault_online", ...}
+$ echo $?
+0
+```
+
+Requires an authenticated Commander session and a folder UID scoped to the
+vault under test.
 
 ### Passing run (online)
 
@@ -121,6 +148,10 @@ exists — it just verifies every declared binding inside that reachable
 surface lines up. If Commander CLI output cannot prove a gateway's
 `ksm_application_name` binding, stage 5 fails closed and points the
 operator at a manual Keeper UI check rather than silently passing.
+
+**Vault:** there is no PAM gateway pre-check; stage 4 is ``discover`` +
+capability gaps, stage 5 is diff smoke plus vault-specific binding checks
+(today a no-op for L1).
 
 Both map to the same exit code (`5`) because both are "tenant side
 can't execute this manifest today." Operators get the specific cause

@@ -75,11 +75,17 @@ transcript helpers (`keeper_sdk.cli._live.transcript`). When in doubt, keep
 7. **Open PR** with a one-line “clean re-plan” or equivalent proof statement in
    the description (SDK_DA completion gates).
 
+## V8 prep (not live evidence)
+
+**Template JSON (shape only):** [`keeper-vault.v1.sanitized.template.json`](./keeper-vault.v1.sanitized.template.json) — `template: true`; safe to commit. After a tenant run, produce a real `*.sanitized.json` per the naming rule above, redact, then point `x-keeper-live-proof.evidence` at that file.
+
+**Sample manifest (one `login`):** [`../examples/scaffold_only/vaultOneLogin.yaml`](../examples/scaffold_only/vaultOneLogin.yaml) — edit `uid_ref` / title / field values for your lab folder; keep non-production credentials only.
+
 ## Current placeholders
 
 | Family | Schema status | Evidence pointer |
 |--------|---------------|------------------|
-| `keeper-vault.v1` | `scaffold-only` | This README until a transcript lands |
+| `keeper-vault.v1` | `scaffold-only` | Commander L1 + `validate --online` in code; commit a **sanitized** transcript (see template + checklist §6) before `supported` |
 | `keeper-vault-sharing.v1` | `scaffold-only` | This README until a transcript lands |
 | `keeper-enterprise.v1` | `scaffold-only` | This README until a transcript lands |
 

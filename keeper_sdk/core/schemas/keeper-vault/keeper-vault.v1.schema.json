@@ -2,12 +2,12 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/msawczynk/declarative-sdk-for-k/schemas/keeper-vault/v1.json",
   "title": "keeper-vault.v1",
-  "description": "Offline schema body for Keeper Vault records, custom record types, attachments, and KeeperFill settings. Live tenant proof is still pending.",
+  "description": "Offline schema body for Keeper Vault records, custom record types, attachments, and KeeperFill settings. Live tenant proof (sanitized transcript + matrix) is still pending.",
   "x-keeper-live-proof": {
     "status": "scaffold-only",
     "evidence": "docs/live-proof/README.md",
     "since_pin": "89047920a0df857e01fb59adcb0bfb9fa6db70bf",
-    "notes": "P9 schema body offline-green. Operator runbook + naming convention in evidence path; replace with sanitized transcript JSON when L1 gate passes (CONVENTIONS.md)."
+    "notes": "P9 schema body offline-green. Expected L1 smoke before transcript: dsk validate --online (Commander + folder) on a tiny keeper-vault.v1 manifest; then plan/apply dry-runs per docs/VAULT_L1_DESIGN.md. Commit sanitized JSON per naming convention here; bump status to supported (CONVENTIONS.md)."
   },
   "type": "object",
   "additionalProperties": false,

@@ -12,6 +12,7 @@ contract.
 | `capability-snapshot.json` | machine | Machine-readable mirror; `scripts/sync_upstream.py --check` diff-checks against upstream. |
 | `LOGIN.md` | operator | `EnvLoginHelper` contract + 30-line custom-helper skeleton. |
 | `VALIDATION_STAGES.md` | agent / CI | Per-stage `validate --online` contract; which exit code fires for which failure. Disambiguates exit-2 overload. |
+| `live-proof/README.md` | operator / integrator | Sanitized transcript naming, redaction bar, L1 checklist, **V8 prep** template pointer; `keeper-vault.v1.sanitized.template.json` (shape-only, `template: true`). CI `schema-validate` runs `json.tool` on `docs/live-proof/*.json`. |
 | `SDK_DA_COMPLETION_PLAN.md` | parent | **Devil's-advocate** completion gates. `supported`/`preview-gated`/`upstream-gap`. Wins over wish-list roadmaps. |
 | `SDK_COMPLETION_PLAN.md` | parent | Long-form roadmap + risk gates (companion to DA plan). |
 | `SDK_ORCHESTRATED_FEATURE_COMPLETE.md` | parent | Master index — phases × gates × live smoke. |
@@ -29,6 +30,7 @@ contract.
 | New design boundary doc | `ISSUE_<n>_<topic>.md` | `ISSUE_6_JIT_SUPPORT_BOUNDARY.md` |
 | New login flow | `LOGIN.md` | helper-skeleton block |
 | New release knob | `RELEASING.md` | publish-workflow row |
+| Live-proof / `x-keeper-live-proof` | `live-proof/README.md` + family schema block | `CONVENTIONS.md` + `_meta/x-keeper-live-proof.schema.json` |
 
 ## Hard rules
 

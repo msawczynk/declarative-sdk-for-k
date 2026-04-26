@@ -14,7 +14,7 @@ import pytest
 from keeper_sdk.core.diff import Change, ChangeKind
 from keeper_sdk.core.errors import CapabilityError, CollisionError
 from keeper_sdk.core.interfaces import LiveRecord
-from keeper_sdk.core.metadata import encode_marker, serialize_marker
+from keeper_sdk.core.metadata import MARKER_FIELD_LABEL, encode_marker, serialize_marker
 from keeper_sdk.core.models import RotationScheduleOnDemand, RotationSettings
 from keeper_sdk.core.planner import Plan
 from keeper_sdk.providers.commander_cli import (
@@ -3534,3 +3534,150 @@ def test_apply_partial_failure_records_outcomes_then_raises(
     assert partial[1].details["apply_failed"] is True
     assert "simulated marker write failure" in partial[1].details["apply_failure_reason"]
     assert marker_calls["count"] == 2
+
+
+def test_vault_discover_keeps_login_records_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    ls_payload = [
+        {"type": "record", "uid": "u-login", "details": "Type: login"},
+        {"type": "record", "uid": "u-host", "details": "Type: pamMachine"},
+    ]
+    get_payloads = {
+        "u-login": {"type": "login", "title": "L", "record_uid": "u-login", "fields": []},
+        "u-host": {"type": "pamMachine", "title": "H", "record_uid": "u-host", "fields": []},
+    }
+    provider = _discover_provider(monkeypatch, ls_payload=ls_payload, get_payloads=get_payloads)
+    provider._manifest_source = {"schema": "keeper-vault.v1", "records": []}
+    rows = provider.discover()
+    assert [r.keeper_uid for r in rows] == ["u-login"]
+
+
+def test_vault_apply_plan_create_writes_marker(monkeypatch: pytest.MonkeyPatch) -> None:
+    from keeper_sdk.providers import commander_cli as commander_cli_mod
+
+    monkeypatch.setattr(
+        commander_cli_mod, "_ensure_keepercommander_version_for_apply", lambda: None
+    )
+    monkeypatch.setattr(
+        commander_cli_mod.CommanderCliProvider,
+        "_vault_add_login_record",
+        lambda self, after: "NEWUID",
+    )
+    marker_calls: list[dict[str, str | None]] = []
+
+    def fake_write_marker(self, keeper_uid: str, marker: dict) -> None:
+        marker_calls.append({"keeper_uid": keeper_uid, "uid_ref": marker.get("uid_ref")})
+
+    monkeypatch.setattr(
+        commander_cli_mod.CommanderCliProvider, "_write_marker", fake_write_marker
+    )
+    monkeypatch.setattr(
+        commander_cli_mod.CommanderCliProvider, "_run_cmd", lambda self, args: ""
+    )
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
+
+    provider = commander_cli_mod.CommanderCliProvider(
+        folder_uid="fld",
+        manifest_source={"schema": "keeper-vault.v1", "records": []},
+    )
+    plan = Plan(
+        manifest_name="demo",
+        changes=[
+            Change(
+                kind=ChangeKind.CREATE,
+                uid_ref="r1",
+                resource_type="login",
+                title="T1",
+                after={"type": "login", "title": "T1", "fields": []},
+            )
+        ],
+        order=["r1"],
+    )
+    outcomes = provider.apply_plan(plan)
+    assert outcomes[0].keeper_uid == "NEWUID"
+    assert marker_calls == [{"keeper_uid": "NEWUID", "uid_ref": "r1"}]
+
+
+def test_vault_patch_login_record_data_skips_ignored_and_sets_title() -> None:
+    existing = {"type": "login", "title": "Old", "fields": [], "custom": []}
+    patch = {"uid_ref": "x", "title": "New", "notes": "n1"}
+    out = CommanderCliProvider._vault_patch_login_record_data(existing, patch)
+    assert out["title"] == "New"
+    assert out["notes"] == "n1"
+    assert out["type"] == "login"
+
+
+def test_vault_patch_login_record_data_replaces_fields_array() -> None:
+    existing = {
+        "type": "login",
+        "title": "T",
+        "fields": [{"type": "login", "label": "login", "value": ["u1"]}],
+        "custom": [],
+    }
+    patch = {"fields": [{"type": "login", "label": "login", "value": ["u2"]}]}
+    out = CommanderCliProvider._vault_patch_login_record_data(existing, patch)
+    assert out["fields"][0]["value"] == ["u2"]
+
+
+def test_vault_merge_custom_preserves_marker() -> None:
+    existing = [{"label": MARKER_FIELD_LABEL, "type": "text", "value": ["{}"]}]
+    patch = [{"label": "other", "type": "text", "value": ["x"]}]
+    out = CommanderCliProvider._vault_merge_custom_for_update(existing, patch)
+    labels = {e.get("label") for e in out}
+    assert MARKER_FIELD_LABEL in labels
+    assert "other" in labels
+
+
+def test_vault_apply_plan_update_body_then_marker(monkeypatch: pytest.MonkeyPatch) -> None:
+    from keeper_sdk.providers import commander_cli as commander_cli_mod
+
+    monkeypatch.setattr(
+        commander_cli_mod, "_ensure_keepercommander_version_for_apply", lambda: None
+    )
+    body_calls: list[tuple[str, dict[str, str]]] = []
+
+    def fake_body(self, keeper_uid: str, patch: dict[str, str]) -> None:
+        body_calls.append((keeper_uid, dict(patch)))
+
+    monkeypatch.setattr(
+        commander_cli_mod.CommanderCliProvider, "_vault_apply_login_body_update", fake_body
+    )
+    marker_calls: list[dict[str, str | None]] = []
+
+    def fake_write_marker(self, keeper_uid: str, marker: dict) -> None:
+        marker_calls.append({"keeper_uid": keeper_uid, "uid_ref": marker.get("uid_ref")})
+
+    monkeypatch.setattr(
+        commander_cli_mod.CommanderCliProvider, "_write_marker", fake_write_marker
+    )
+    monkeypatch.setattr(
+        commander_cli_mod.CommanderCliProvider, "_run_cmd", lambda self, args: ""
+    )
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
+
+    provider = commander_cli_mod.CommanderCliProvider(
+        folder_uid="fld",
+        manifest_source={"schema": "keeper-vault.v1", "records": []},
+    )
+    plan = Plan(
+        manifest_name="demo",
+        changes=[
+            Change(
+                kind=ChangeKind.UPDATE,
+                uid_ref="r1",
+                resource_type="login",
+                title="T1",
+                keeper_uid="UID1",
+                after={"title": "T1-renamed"},
+            )
+        ],
+        order=["r1"],
+    )
+    outcomes = provider.apply_plan(plan)
+    assert body_calls == [("UID1", {"title": "T1-renamed"})]
+    assert marker_calls == [{"keeper_uid": "UID1", "uid_ref": "r1"}]
+    assert outcomes[0].details.get("record_updated") is True
+    assert outcomes[0].details.get("marker_written") is True

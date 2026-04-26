@@ -7,6 +7,15 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- **V8 prep** — [`docs/live-proof/keeper-vault.v1.sanitized.template.json`](docs/live-proof/keeper-vault.v1.sanitized.template.json)
+  (`template: true`, shape-only) plus README section; **§2 ledger** in
+  [`docs/ORCHESTRATION_UNTIL_COMPLETE.md`](docs/ORCHESTRATION_UNTIL_COMPLETE.md)
+  marks `keeper-vault.v1` **G3–G5** complete (G2 still **◐** until §7 sign-off;
+  **G6** open). CI `schema-validate` also runs `python -m json.tool` on
+  `docs/live-proof/*.json`. `docs/SCAFFOLD.md` indexes `live-proof/`; regression
+  tests in `tests/test_live_proof_artifacts.py`. Sample L1 manifest
+  [`examples/scaffold_only/vaultOneLogin.yaml`](examples/scaffold_only/vaultOneLogin.yaml)
+  linked from `docs/live-proof/README.md` and **V8** row in `ORCHESTRATION_PAM_PARITY.md`.
 - **Master orchestration** — [`docs/ORCHESTRATION_UNTIL_COMPLETE.md`](docs/ORCHESTRATION_UNTIL_COMPLETE.md):
   exit **tiers A/B/C**, per-family **completion ledger** (G0–G6), repeating
   **waves** W.1–W.6, parallelism do/don’t, metrics dashboard, §7 vault +
@@ -19,12 +28,18 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   `vault_record_apply_order` (duplicate `uid_ref`, `folder_ref` prerequisite
   nodes, invalid `folder_ref` pattern → `RefError`); tests in
   `tests/test_vault_graph.py`.
+- **Vault PR-V5/V6 (Commander)** — :class:`~keeper_sdk.providers.commander_cli.CommanderCliProvider`
+  ``discover()`` filters to ``login`` when ``manifest_source`` is ``keeper-vault.v1``;
+  ``apply_plan()`` uses :meth:`~keeper_sdk.providers.commander_cli.CommanderCliProvider._apply_vault_plan`
+  (``RecordAddCommand`` create; ``RecordEditCommand`` + marker for **UPDATE**;
+  ``rm`` delete). ``_detect_unsupported_capabilities`` returns ``[]`` for vault manifests.
+  Tests in ``tests/test_commander_cli.py``.
 - **Vault PR-V4** — **`load_declarative_manifest`** / **`load_declarative_manifest_string`**
   in `keeper_sdk/core/manifest.py` (PAM :class:`~keeper_sdk.core.models.Manifest` or
   :class:`~keeper_sdk.core.vault_models.VaultManifestV1`). CLI **plan** / **diff** /
-  **apply** dispatch on family; **validate --json** uses ``vault_offline`` for
-  ``keeper-vault.v1`` (typed model + ``build_vault_graph``). **import** stays
-  PAM-only. Tests: `tests/test_cli.py`.
+  **apply** dispatch on family; **validate --json** uses ``vault_offline`` /
+  ``vault_online`` for ``keeper-vault.v1`` (``--online`` = Commander discover +
+  ``compute_vault_diff`` smoke). **import** stays PAM-only. Tests: `tests/test_cli.py`.
 - **Vault PR-V3** — **`keeper_sdk/core/vault_diff.py`**: `compute_vault_diff`
   (reuses PAM diff classification for vault ``records[]``); integration tests with
   existing :class:`~keeper_sdk.providers.mock.MockProvider` in
@@ -133,6 +148,10 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   refactors don't gate CI while still catching ~70 LOC regressions.
 
 ### Changed
+- **Vault Commander `apply_plan` UPDATE** — `_apply_vault_plan` now merges
+  planner ``change.after`` into existing v3 record JSON (in-process
+  ``RecordEditCommand``) before refreshing the ownership marker; ``custom[]``
+  merges preserve the SDK marker when the manifest patch omits it.
 - **Report row preprocessing** always applies **secret-key-only**
   redaction to row-shaped data before the existing `redact` pass, so
   Commander fields whose names match known secret keys (for example
@@ -142,6 +161,15 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   `keeper_sdk/cli/_report/common.py`.
 
 ### Fixed
+- **Vault diff false positives** — ``compute_vault_diff`` compares manifest
+  ``login`` ``fields[]`` to Commander-flattened scalar keys (and strips the SDK
+  marker from ``custom[]`` compare) so matching tenants do not churn ``UPDATE``;
+  tests in ``tests/test_vault_diff.py`` (includes case-insensitive typed-field
+  labels vs flattened live keys). ``AGENTS`` / ``VALIDATION_STAGES`` / README
+  readiness row + ``examples/scaffold_only/vaultMinimal.yaml`` comment updated.
+- **Vault Commander UPDATE** — body sync now requires **record cache
+  version 3** only; v6 was incorrectly admitted but Commander's
+  ``RecordEditCommand`` ``--data`` path accepts ``rv == 3`` only.
 - **Rotation drift resume** — `keeper_sdk/providers/commander_cli.py`
   no longer loops on `session_token_expired` during rotation re-plan
   after a session refresh. The bounded in-process refresh helper now

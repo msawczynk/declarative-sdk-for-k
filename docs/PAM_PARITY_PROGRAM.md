@@ -45,7 +45,7 @@ complete the JSON file looks.
 | Family | Packaged schema | Wired into `dsk` core + Commander provider | Typical `x-keeper-live-proof` |
 |--------|-----------------|------------------------------------------|--------------------------------|
 | `pam-environment.v1` | yes (`pam-environment.v1.schema.json`) | **yes** | `supported` on proven paths |
-| `keeper-vault.v1` | yes | **no** (schema validate via `dsk validate` only) | `scaffold-only` |
+| `keeper-vault.v1` | yes | **partial** — `dsk validate` (offline + `--online` Commander), `plan` / `diff` / `apply` on mock + Commander L1 **`login`** slice; `compute_vault_diff` semantic **login** compare (manifest `fields[]` vs flattened live); matrix “F” + `supported` live proof still open | `scaffold-only` |
 | `keeper-vault-sharing.v1` | yes | **no** | `scaffold-only` |
 | `keeper-enterprise.v1` | yes | **no** | scaffold / partial slices in design memos only |
 | `keeper-integrations-identity.v1` | yes | **no** | scaffold-only |

@@ -1,7 +1,7 @@
 """Keeper PAM Declarative CLI.
 
 Subcommands:
-    validate   - JSON Schema (all families); vault offline graph; PAM graph + online
+    validate   - JSON Schema (all families); vault graph + optional online; PAM graph + online
     export     - Commander JSON export -> declarative YAML manifest
     plan       - compute and render a plan (pam-environment.v1 or keeper-vault.v1 + mock)
     import     - adopt unmanaged matching records and write ownership markers
@@ -115,7 +115,11 @@ def main(ctx: click.Context, provider: str, folder_uid: str | None) -> None:
 @click.argument("manifest_path", type=click.Path(exists=True, path_type=Path))
 @click.option("--emit-canonical", is_flag=True, help="Print the canonicalised document")
 @click.option("--json", "as_json", is_flag=True, help="Emit validation summary as JSON on stdout")
-@click.option("--online", is_flag=True, help="Run tenant-connectivity checks (stage 4-5)")
+@click.option(
+    "--online",
+    is_flag=True,
+    help="Tenant checks: PAM discover+diff; keeper-vault.v1 discover+diff (Commander only)",
+)
 @click.pass_context
 def validate(
     ctx: click.Context,
@@ -124,7 +128,7 @@ def validate(
     as_json: bool,
     online: bool,
 ) -> None:
-    """Validate JSON Schema for any packaged family; vault offline graph; PAM graph + online."""
+    """Validate JSON Schema for any packaged family; vault graph (+ optional online); PAM graph + online."""
     try:
         document = read_manifest_document(manifest_path)
         family = validate_manifest(document)
@@ -142,9 +146,9 @@ def validate(
         sys.exit(EXIT_GENERIC)
 
     if family != PAM_FAMILY:
-        if online:
+        if online and family != VAULT_MANIFEST_FAMILY:
             click.echo(
-                "`--online` applies to pam-environment.v1 only (discover + diff smoke).",
+                "`--online` is supported for pam-environment.v1 and keeper-vault.v1 only.",
                 err=True,
             )
             sys.exit(EXIT_CAPABILITY)
@@ -155,6 +159,88 @@ def validate(
             vm = load_vault_manifest(document)
             build_vault_graph(vm)
             uid_n = len(vm.iter_uid_refs())
+
+            live: list[LiveRecord] | None = None
+            online_suffix = ""
+            create_count = update_count = delete_count = conflict_count = 0
+            stage4_failed = False
+            stage5_failed = False
+
+            if online:
+                if ctx.obj.get("provider") != "commander":
+                    click.echo(
+                        "`keeper-vault.v1` --online requires --provider commander "
+                        "(tenant discover + diff smoke).",
+                        err=True,
+                    )
+                    sys.exit(EXIT_CAPABILITY)
+                folder_uid = ctx.obj.get("folder_uid") or os.environ.get(
+                    "KEEPER_DECLARATIVE_FOLDER"
+                )
+                if not folder_uid:
+                    click.echo(
+                        "vault --online requires --folder-uid or KEEPER_DECLARATIVE_FOLDER.",
+                        err=True,
+                    )
+                    sys.exit(EXIT_CAPABILITY)
+                manifest_source = vm.model_dump(
+                    mode="python", exclude_none=True, by_alias=True
+                )
+                provider = CommanderCliProvider(
+                    folder_uid=folder_uid, manifest_source=manifest_source
+                )
+                try:
+                    live = provider.discover()
+                except CapabilityError as exc:
+                    click.echo(f"discovery failed: {exc}", err=True)
+                    sys.exit(EXIT_CAPABILITY)
+
+                gaps: list[str] = getattr(provider, "unsupported_capabilities", lambda _m: [])(
+                    vm
+                )
+                if gaps:
+                    stage4_failed = True
+                    if not as_json:
+                        click.echo("capability gaps (will appear as plan conflicts):", err=True)
+                        for reason in gaps:
+                            click.echo(f"  - {reason}", err=True)
+
+                try:
+                    assert live is not None
+                    changes = compute_vault_diff(
+                        vm, live, manifest_name=manifest_path.stem, adopt=False
+                    )
+                except OwnershipError as exc:
+                    click.echo(f"ownership error: {exc}", err=True)
+                    sys.exit(EXIT_CAPABILITY)
+
+                create_count = sum(1 for c in changes if c.kind.value == "create")
+                update_count = sum(1 for c in changes if c.kind.value == "update")
+                delete_count = sum(1 for c in changes if c.kind.value == "delete")
+                conflict_count = sum(1 for c in changes if c.kind.value == "conflict")
+                if not as_json:
+                    click.echo(
+                        "stage 5: "
+                        f"{create_count} create, "
+                        f"{update_count} update, "
+                        f"{delete_count} delete-candidates, "
+                        f"{conflict_count} conflicts"
+                    )
+
+                binding_issues: list[str] = getattr(
+                    provider, "check_tenant_bindings", lambda _m: []
+                )(vm)
+                if binding_issues:
+                    stage5_failed = True
+                    if not as_json:
+                        click.echo("stage 5: tenant binding failures:", err=True)
+                        for issue in binding_issues:
+                            click.echo(f"  - {issue}", err=True)
+
+                online_suffix = f"; online: {len(live)} live records"
+                if stage4_failed or stage5_failed:
+                    sys.exit(EXIT_CAPABILITY)
+
             if emit_canonical and not as_json:
                 import yaml
 
@@ -163,7 +249,7 @@ def validate(
                 vpayload: dict[str, Any] = {
                     "ok": True,
                     "family": family,
-                    "mode": "vault_offline",
+                    "mode": "vault_online" if online else "vault_offline",
                     "manifest_path": str(manifest_path.resolve()),
                     "stages_completed": [
                         "json_schema",
@@ -172,7 +258,19 @@ def validate(
                         "uid_ref_graph",
                     ],
                     "uid_ref_count": uid_n,
+                    "online": online,
                 }
+                if online and live is not None:
+                    vpayload["stages_completed"].extend(
+                        ["tenant_capability", "tenant_bindings", "diff_smoke"]
+                    )
+                    vpayload["live_record_count"] = len(live)
+                    vpayload["stage5_summary"] = {
+                        "create": create_count,
+                        "update": update_count,
+                        "delete": delete_count,
+                        "conflict": conflict_count,
+                    }
                 if emit_canonical:
                     import yaml
 
@@ -181,7 +279,10 @@ def validate(
                     )
                 click.echo(json.dumps(vpayload, indent=2))
             else:
-                click.echo(f"ok: vault ({uid_n} uid_refs)")
+                msg = f"ok: vault ({uid_n} uid_refs)"
+                if online_suffix:
+                    msg += online_suffix
+                click.echo(msg)
             return
 
         if emit_canonical and not as_json:

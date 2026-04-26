@@ -41,7 +41,7 @@ Legend: **✓** done · **◐** in flight · **○** open · **—** N/A (droppe
 | Family | G0 schema | G1 validate | G2 typed | G3 graph | G4 mock | G5 Commander | G6 proof+matrix |
 |--------|:---------:|:-----------:|:--------:|:--------:|:-------:|:--------------:|:---------------:|
 | `pam-environment.v1` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ (proven paths) |
-| `keeper-vault.v1` | ✓ | ✓ | ◐ | ◐ | ◐ | ◐ | ○ |
+| `keeper-vault.v1` | ✓ | ✓ | ◐ | ✓ | ✓ | ✓ | ○ |
 | `keeper-vault-sharing.v1` | ✓ | ✓ | ○ | ○ | ○ | ○ | ○ |
 | `keeper-enterprise.v1` | ✓ | ✓ | ○ | ○ | ○ | ○ | ○ |
 | `keeper-integrations-identity.v1` | ✓ | ✓ | ○ | ○ | ○ | ○ | ○ |
@@ -123,8 +123,11 @@ capping tier (archive reason in JOURNAL).
 - [x] **V2** graph for vault `uid_ref` / `folder_ref` (+ tests) — `vault_graph.py`
 - [x] **V3** mock discover / diff / plan — `compute_vault_diff` + `MockProvider`;
   `tests/test_vault_mock_provider.py`
-- [ ] **V4** CLI / loader dispatch decision implemented
-- [ ] **V5–V6** Commander discover + apply (+ contract tests)
+- [x] **V4** CLI / loader dispatch — `load_declarative_manifest` + plan/diff/apply
+- [x] **V5–V6** Commander discover + apply (slice-1 **login**; mocked + unit tests;
+  live L1 proof still **V8**)
+- [x] **`dsk validate --online`** for vault (Commander `discover` + `compute_vault_diff` smoke;
+  requires `--provider commander` + folder scope)
 - [ ] **L1** live proof transcript + **V8** schema + matrix + README
 
 ### Program infrastructure
@@ -143,7 +146,7 @@ un-drop triggers and stop editing that family until triggers fire.
 
 - [ ] [NEXT_SPRINT §16](./NEXT_SPRINT_PARALLEL_ORCHESTRATION.md) full sprint review
 - [ ] README hero update **only** if Tier B achieved for chosen scope
-- [ ] Archive / freeze this doc with final date in **§9** (below)
+- [ ] Archive / freeze this doc with final date in **revision log** (§9 below)
 
 ---
 
@@ -165,3 +168,30 @@ full pytest before handoff; update JOURNAL snapshot not repo daybook.
 | 2026-04-26 | Vault G3 partial: `build_vault_graph` + `vault_record_apply_order` (`vault_graph.py`). |
 | 2026-04-26 | Vault G4 partial: `compute_vault_diff` + mock round-trip (`vault_diff.py`, `test_vault_mock_provider.py`). |
 | 2026-04-26 | Vault G5 partial: `load_declarative_manifest` + CLI plan/diff/apply + validate JSON (`manifest.py`, `cli/main.py`). |
+| 2026-04-26 | Vault Commander slice: `CommanderCliProvider` discover filter + `_apply_vault_plan` / `RecordAddCommand` (`commander_cli.py`). |
+| 2026-04-27 | §10 next-wave table + vault `validate --online` (`cli/main.py`); §7 checklist tick. |
+| 2026-04-27 | Doc reconcile: `VALIDATION_STAGES`, `PAM_PARITY_PROGRAM`, `README`, `AGENTS`, `VAULT_L1_DESIGN` §8, `live-proof/README`, vault schema `x-keeper-live-proof.notes` (no status bump). |
+| 2026-04-27 | Vault Commander **UPDATE** applies manifest drift (`RecordEditCommand`) before marker refresh; `_vault_merge_custom_for_update` preserves SDK marker in `custom[]`. |
+| 2026-04-27 | Vault UPDATE: restrict body sync to **record version 3** (Commander `RecordEditCommand`); unit tests for `_vault_patch_login_record_data`. |
+| 2026-04-27 | `compute_vault_diff` semantic **login** compare (manifest `fields[]` vs flattened live); `tests/test_vault_diff.py`. |
+| 2026-04-27 | Vault diff: case-label regression test; `AGENTS` / `VALIDATION_STAGES` / README / `vaultMinimal.yaml` note semantic `plan`/`diff`. |
+| 2026-04-27 | §2 ledger: `keeper-vault.v1` G3–G5 → ✓; `docs/live-proof` V8 template JSON + README; CI validates `docs/live-proof/*.json`. |
+| 2026-04-27 | `docs/SCAFFOLD.md` live-proof row; `tests/test_live_proof_artifacts.py`; `PAM_PARITY_PROGRAM` vault inventory line. |
+| 2026-04-27 | `examples/scaffold_only/vaultOneLogin.yaml` L1 sample; live-proof + PAM parity V8 cross-links; `test_validate_json_scaffold_vault_one_login`. |
+
+---
+
+## 10. Next orchestration wave (post V5–V6 land)
+
+**Binding tier until product says otherwise:** **Tier A** (vault + vault-sharing slice-1).
+
+| Lane | Owner | Next deliverable | Parallel OK? |
+|------|-------|------------------|--------------|
+| **Vault G6 / V8** | Integrator + one live slot | Sanitized transcript per `docs/live-proof/README.md`; bump `x-keeper-live-proof` on `keeper-vault.v1`; matrix + README row | **No** parallel tenant writers |
+| **§7 sign-off** | Integrator + reviewer | Close **G2** ledger row (removes `DRAFT` on `VAULT_L1_DESIGN.md`) | Readonly review only |
+| **Vault hardening** | Foreground dev | Commander **vault UPDATE** body sync via `RecordEditCommand` + `custom` merge (marker-preserving); live L1 proof still **V8** | **No** second PR touching same `commander_cli.py` region |
+| **P18c F1** | Worker / Codex | R1 memo + extractor allowlist (does **not** gate vault) | **Yes** |
+| **P11 F2** | Worker | Memos first; schema edits after integrator merge | **Yes** if disjoint `$defs` |
+| **Wave close** | Integrator | W.5 merge + full pytest + **NEXT_SPRINT §16** skim; JOURNAL 5-line snapshot | — |
+
+**W.6 this week:** avoid new top-level `docs/*.md` unless consolidating; prefer edits to this file + `ORCHESTRATION_PAM_PARITY.md`.
