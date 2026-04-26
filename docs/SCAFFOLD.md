@@ -11,7 +11,9 @@ contract.
 | `CAPABILITY_MATRIX.md` | parent / agent | Generated mirror of upstream Commander capabilities. Consumed by CI `drift-check`. |
 | `capability-snapshot.json` | machine | Machine-readable mirror; `scripts/sync_upstream.py --check` diff-checks against upstream. |
 | `LOGIN.md` | operator | `EnvLoginHelper` contract + 30-line custom-helper skeleton. |
-| `VALIDATION_STAGES.md` | agent / CI | Per-stage `validate --online` contract; which exit code fires for which failure. Disambiguates exit-2 overload. |
+| `VALIDATION_STAGES.md` | agent / CI | Per-stage `validate --online` contract; which exit code fires for which failure. Disambiguates exit-2 overload. **`keeper-vault.v1` L1:** operator caveats (semantic diff limits, races, offline vs `vault_online` CI) in section *Vault — operator caveats*. |
+| `VAULT_L1_DESIGN.md` | integrator / agent | Vault slice-1 scope, markers, discover mapping; **§4** semantic `login` diff limits, concurrent edits, Commander UPDATE notes. **§7** sign-off clears ledger G2. |
+| `ORCHESTRATION_UNTIL_COMPLETE.md` | integrator | Tier A/B/C exit, G0–G6 ledger, §7 checklist, next-wave table — not a second source of vault semantics (link `VAULT_L1_DESIGN` + `VALIDATION_STAGES`). |
 | `live-proof/README.md` | operator / integrator | Sanitized transcript naming, redaction bar, L1 checklist, **V8 prep** template pointer; `keeper-vault.v1.sanitized.template.json` (shape-only, `template: true`). CI `schema-validate` runs `json.tool` on `docs/live-proof/*.json`. |
 | `SDK_DA_COMPLETION_PLAN.md` | parent | **Devil's-advocate** completion gates. `supported`/`preview-gated`/`upstream-gap`. Wins over wish-list roadmaps. |
 | `SDK_COMPLETION_PLAN.md` | parent | Long-form roadmap + risk gates (companion to DA plan). |
@@ -25,6 +27,7 @@ contract.
 | Change | File | Sibling to copy |
 |---|---|---|
 | New CLI exit code / stage | `VALIDATION_STAGES.md` + `AGENTS.md` exit-code table | existing stage row |
+| Vault L1 semantics / caveats | `VAULT_L1_DESIGN.md` §4 + `VALIDATION_STAGES.md` (vault section) + `AGENTS.md` vault paragraph | §4 revision row |
 | New Commander surface used | `COMMANDER.md` capability table | existing row |
 | New phase or gate | `SDK_DA_COMPLETION_PLAN.md` + `SDK_ORCHESTRATED_FEATURE_COMPLETE.md` | P3 row |
 | New design boundary doc | `ISSUE_<n>_<topic>.md` | `ISSUE_6_JIT_SUPPORT_BOUNDARY.md` |

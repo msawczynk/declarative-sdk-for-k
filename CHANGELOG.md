@@ -16,6 +16,7 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   concurrent-edit caveat, Commander UPDATE / `CapabilityError` note.
   [`docs/VALIDATION_STAGES.md`](docs/VALIDATION_STAGES.md): vault operator caveats, remediation rows.
   [`AGENTS.md`](AGENTS.md): vault L1 caveats + links after the `validate` stage pointer.
+  [`docs/SCAFFOLD.md`](docs/SCAFFOLD.md): index `VAULT_L1_DESIGN`, `ORCHESTRATION_UNTIL_COMPLETE`, vault rows; [`keeper_sdk/providers/SCAFFOLD.md`](keeper_sdk/providers/SCAFFOLD.md): Commander vault UPDATE + caveat links.
 
 ### Added
 - **V8 prep** — [`docs/live-proof/keeper-vault.v1.sanitized.template.json`](docs/live-proof/keeper-vault.v1.sanitized.template.json)
