@@ -1236,6 +1236,32 @@ class CommanderCliProvider(Provider):
             ["pam", "config", "list", "--format", "json"],
         ):
             return self._run_pam_list_in_process(args)
+        # ``ls <FOLDER_UID> --format json`` / ``get <UID> --format json`` are
+        # the read-side of every discover() round-trip. Subprocess execution
+        # against ``/usr/local/bin/keeper`` uses ``~/.keeper/commander-config.json``
+        # which can hold a stale device_token (e.g. on dev workstations) and
+        # then fails to resync just-applied records on a post-apply re-plan
+        # — even though the in-process Commander 17.2.13 session that ran
+        # the apply itself is fresh. Route through the same in-process
+        # session when login config is detectable so discover() shares the
+        # apply-time auth context. Falls through to subprocess when no
+        # in-process login is configured (plain installs).
+        if (
+            len(args) >= 2
+            and args[0] == "ls"
+            and "--format" in args
+            and args[args.index("--format") + 1 : args.index("--format") + 2] == ["json"]
+            and self._can_attempt_in_process_login()
+        ):
+            return self._run_ls_in_process(args)
+        if (
+            len(args) >= 2
+            and args[0] == "get"
+            and "--format" in args
+            and args[args.index("--format") + 1 : args.index("--format") + 2] == ["json"]
+            and self._can_attempt_in_process_login()
+        ):
+            return self._run_record_get_in_process(args)
 
         # --batch-mode suppresses interactive prompts (password, 2FA,
         # confirmations). stdin=DEVNULL is belt-and-braces — if Commander ever
@@ -1437,6 +1463,110 @@ class CommanderCliProvider(Provider):
                 context={"stdout": stdout[-6000:], "stderr": stderr[-4000:]},
                 next_action="inspect the Commander output above and retry",
             ) from exc
+
+    def _run_ls_in_process(self, args: list[str]) -> str:
+        """Run ``ls <pattern> --format json`` in-process so discover() shares apply auth.
+
+        Mirrors :meth:`_run_pam_rotation_edit_in_process`: parse argv via the
+        Commander command's own argparse, sync_down once, capture stdout.
+        Output shape is identical to subprocess ``keeper ls --format json``
+        because the same command class produces it.
+        """
+        stdout = ""
+        stderr = ""
+
+        def run_once() -> str:
+            nonlocal stdout, stderr
+            params = self._get_keeper_params()
+            buf_out = io.StringIO()
+            buf_err = io.StringIO()
+            err_log_handler = logging.StreamHandler(buf_err)
+            err_log_handler.setLevel(logging.WARNING)
+            root_logger = logging.getLogger()
+            root_logger.addHandler(err_log_handler)
+            try:
+                from keepercommander import api  # type: ignore[import-not-found]
+                from keepercommander.commands.folder import (  # type: ignore[import-not-found]
+                    FolderListCommand,
+                )
+
+                cmd = FolderListCommand()
+                with contextlib.redirect_stdout(buf_out), contextlib.redirect_stderr(buf_err):
+                    parsed = vars(cmd.get_parser().parse_args(args[1:]))
+                    api.sync_down(params)
+                    cmd.execute(params, **parsed)
+            finally:
+                stdout = buf_out.getvalue()
+                stderr = buf_err.getvalue()
+                root_logger.removeHandler(err_log_handler)
+            return stdout
+
+        try:
+            return self._with_keeper_session_refresh(run_once)
+        except Exception as exc:
+            raise CapabilityError(
+                reason=f"in-process keeper ls failed: {type(exc).__name__}: {exc}",
+                context={"stdout": stdout[-6000:], "stderr": stderr[-4000:]},
+                next_action="inspect the Commander output above and retry",
+            ) from exc
+
+    def _run_record_get_in_process(self, args: list[str]) -> str:
+        """Run ``get <uid> --format json`` in-process; same auth context as apply."""
+        stdout = ""
+        stderr = ""
+
+        def run_once() -> str:
+            nonlocal stdout, stderr
+            params = self._get_keeper_params()
+            buf_out = io.StringIO()
+            buf_err = io.StringIO()
+            err_log_handler = logging.StreamHandler(buf_err)
+            err_log_handler.setLevel(logging.WARNING)
+            root_logger = logging.getLogger()
+            root_logger.addHandler(err_log_handler)
+            try:
+                from keepercommander import api  # type: ignore[import-not-found]
+                from keepercommander.commands.record import (  # type: ignore[import-not-found]
+                    RecordGetUidCommand,
+                )
+
+                cmd = RecordGetUidCommand()
+                with contextlib.redirect_stdout(buf_out), contextlib.redirect_stderr(buf_err):
+                    parsed = vars(cmd.get_parser().parse_args(args[1:]))
+                    api.sync_down(params)
+                    cmd.execute(params, **parsed)
+            finally:
+                stdout = buf_out.getvalue()
+                stderr = buf_err.getvalue()
+                root_logger.removeHandler(err_log_handler)
+            return stdout
+
+        try:
+            return self._with_keeper_session_refresh(run_once)
+        except Exception as exc:
+            raise CapabilityError(
+                reason=f"in-process keeper get failed: {type(exc).__name__}: {exc}",
+                context={"stdout": stdout[-6000:], "stderr": stderr[-4000:]},
+                next_action="inspect the Commander output above and retry",
+            ) from exc
+
+    def _can_attempt_in_process_login(self) -> bool:
+        """True when in-process Commander login is plausibly available.
+
+        Checked before routing read-side commands (``ls``/``get``) through
+        the in-process path. When False the dispatcher falls through to
+        subprocess so plain installs (no helper, no env creds) keep working.
+        """
+        if self._keeper_params is not None:
+            return True
+        if self._keeper_login_attempted:
+            return False
+        if os.environ.get("KEEPER_SDK_LOGIN_HELPER"):
+            return True
+        env_creds = ("KEEPER_EMAIL", "KEEPER_PASSWORD", "KEEPER_TOTP_SECRET")
+        if all(os.environ.get(v) for v in env_creds):
+            return True
+        return False
 
     def _with_keeper_session_refresh(self, operation: Callable[[], Any]) -> Any:
         """Run an in-process Commander operation, re-login once on session expiry."""

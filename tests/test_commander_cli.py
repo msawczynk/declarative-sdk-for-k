@@ -354,6 +354,203 @@ def test_run_cmd_wraps_in_process_pam_rotation_edit_exception(
     assert "stderr before rotation failure" in exc_info.value.context["stderr"]
 
 
+def test_run_cmd_routes_ls_in_process_when_login_helper_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``ls <FOLDER> --format json`` runs in-process when login config detectable.
+
+    Subprocess ``keeper`` against a dev workstation can hold a stale
+    device_token and fail to resync just-applied records on a post-apply
+    re-plan. Rerouting ``ls``/``get`` through the in-process Commander
+    session shares the apply-time auth context so discover() always sees
+    fresh state.
+    """
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
+    monkeypatch.setenv("KEEPER_SDK_LOGIN_HELPER", "/dev/null")
+    monkeypatch.delenv("KEEPER_EMAIL", raising=False)
+    monkeypatch.delenv("KEEPER_PASSWORD", raising=False)
+    monkeypatch.delenv("KEEPER_TOTP_SECRET", raising=False)
+
+    params = object()
+    sync_calls: list[object] = []
+    seen: list[tuple[object, dict[str, object]]] = []
+
+    def fail_subprocess(*_args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        raise AssertionError("ls --format json must not call subprocess")
+
+    def fake_get_params(self: CommanderCliProvider) -> object:
+        self._keeper_params = params
+        self._keeper_login_attempted = True
+        return params
+
+    class _FakeFolderList:
+        def get_parser(self) -> argparse.ArgumentParser:
+            parser = argparse.ArgumentParser(prog="ls")
+            parser.add_argument("pattern", nargs="?")
+            parser.add_argument("--format", dest="format")
+            return parser
+
+        def execute(self, params_arg: object, **kwargs: object) -> None:
+            seen.append((params_arg, kwargs))
+            print('[{"type": "record", "uid": "REC1", "title": "lab-linux-1"}]')
+
+    monkeypatch.setattr("keeper_sdk.providers.commander_cli.subprocess.run", fail_subprocess)
+    monkeypatch.setattr(CommanderCliProvider, "_get_keeper_params", fake_get_params)
+    import keepercommander.api as keeper_api
+
+    monkeypatch.setattr(keeper_api, "sync_down", lambda call_params: sync_calls.append(call_params))
+    monkeypatch.setitem(
+        sys.modules,
+        "keepercommander.commands.folder",
+        types.SimpleNamespace(FolderListCommand=_FakeFolderList),
+    )
+
+    provider = CommanderCliProvider(folder_uid="folder-uid")
+    output = provider._run_cmd(["ls", "FOLDER_UID", "--format", "json"])
+
+    assert '"REC1"' in output
+    assert sync_calls == [params]
+    assert seen == [(params, {"pattern": "FOLDER_UID", "format": "json"})]
+
+
+def test_run_cmd_routes_get_in_process_when_login_helper_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Mirror of the ``ls`` route for ``get <UID> --format json``."""
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
+    monkeypatch.setenv("KEEPER_SDK_LOGIN_HELPER", "/dev/null")
+    monkeypatch.delenv("KEEPER_EMAIL", raising=False)
+    monkeypatch.delenv("KEEPER_PASSWORD", raising=False)
+    monkeypatch.delenv("KEEPER_TOTP_SECRET", raising=False)
+
+    params = object()
+    sync_calls: list[object] = []
+    seen: list[tuple[object, dict[str, object]]] = []
+
+    def fail_subprocess(*_args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        raise AssertionError("get --format json must not call subprocess")
+
+    def fake_get_params(self: CommanderCliProvider) -> object:
+        self._keeper_params = params
+        self._keeper_login_attempted = True
+        return params
+
+    class _FakeRecordGet:
+        def get_parser(self) -> argparse.ArgumentParser:
+            parser = argparse.ArgumentParser(prog="get")
+            parser.add_argument("uid")
+            parser.add_argument("--format", dest="format")
+            parser.add_argument("--unmask", dest="unmask", action="store_true")
+            parser.add_argument("--legacy", dest="legacy", action="store_true")
+            parser.add_argument("--include-dag", dest="include_dag", action="store_true")
+            return parser
+
+        def execute(self, params_arg: object, **kwargs: object) -> None:
+            seen.append((params_arg, kwargs))
+            print('{"record_uid":"REC1","title":"lab-linux-1","type":"pamMachine"}')
+
+    monkeypatch.setattr("keeper_sdk.providers.commander_cli.subprocess.run", fail_subprocess)
+    monkeypatch.setattr(CommanderCliProvider, "_get_keeper_params", fake_get_params)
+    import keepercommander.api as keeper_api
+
+    monkeypatch.setattr(keeper_api, "sync_down", lambda call_params: sync_calls.append(call_params))
+    monkeypatch.setitem(
+        sys.modules,
+        "keepercommander.commands.record",
+        types.SimpleNamespace(RecordGetUidCommand=_FakeRecordGet),
+    )
+
+    provider = CommanderCliProvider(folder_uid="folder-uid")
+    output = provider._run_cmd(["get", "REC1", "--format", "json"])
+
+    assert '"REC1"' in output
+    assert sync_calls == [params]
+    assert seen == [
+        (
+            params,
+            {
+                "uid": "REC1",
+                "format": "json",
+                "unmask": False,
+                "legacy": False,
+                "include_dag": False,
+            },
+        )
+    ]
+
+
+def test_run_cmd_falls_back_to_subprocess_for_ls_get_without_login_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """No helper + no env creds + no cached params ⇒ ls/get use subprocess.
+
+    Plain installs (no ``KEEPER_SDK_LOGIN_HELPER``, no env creds, no
+    apply-time login yet) must keep working through subprocess so we don't
+    regress users who only have ``~/.keeper/commander-config.json``.
+    """
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
+    monkeypatch.delenv("KEEPER_SDK_LOGIN_HELPER", raising=False)
+    monkeypatch.delenv("KEEPER_EMAIL", raising=False)
+    monkeypatch.delenv("KEEPER_PASSWORD", raising=False)
+    monkeypatch.delenv("KEEPER_TOTP_SECRET", raising=False)
+
+    seen_argv: list[list[str]] = []
+
+    def fake_run(*args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        argv = list(args[0]) if args else []
+        seen_argv.append(argv)
+        return subprocess.CompletedProcess(argv, 0, stdout="[]", stderr="")
+
+    monkeypatch.setattr("keeper_sdk.providers.commander_cli.subprocess.run", fake_run)
+
+    provider = CommanderCliProvider(folder_uid="folder-uid")
+    assert provider._run_cmd(["ls", "FOLDER_UID", "--format", "json"]) == "[]"
+    assert provider._run_cmd(["get", "REC1", "--format", "json"]) == "[]"
+    assert any(argv[-4:] == ["ls", "FOLDER_UID", "--format", "json"] for argv in seen_argv)
+    assert any(argv[-4:] == ["get", "REC1", "--format", "json"] for argv in seen_argv)
+
+
+def test_can_attempt_in_process_login_truth_table(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``_can_attempt_in_process_login`` honours the four signal sources."""
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
+    for var in ("KEEPER_SDK_LOGIN_HELPER", "KEEPER_EMAIL", "KEEPER_PASSWORD", "KEEPER_TOTP_SECRET"):
+        monkeypatch.delenv(var, raising=False)
+
+    provider = CommanderCliProvider(folder_uid="folder-uid")
+    assert provider._can_attempt_in_process_login() is False
+
+    monkeypatch.setenv("KEEPER_SDK_LOGIN_HELPER", "/dev/null")
+    assert provider._can_attempt_in_process_login() is True
+    monkeypatch.delenv("KEEPER_SDK_LOGIN_HELPER")
+
+    for var, value in (
+        ("KEEPER_EMAIL", "user@example.com"),
+        ("KEEPER_PASSWORD", "secret"),
+        ("KEEPER_TOTP_SECRET", "ABC123"),
+    ):
+        monkeypatch.setenv(var, value)
+    assert provider._can_attempt_in_process_login() is True
+    monkeypatch.delenv("KEEPER_TOTP_SECRET")
+    assert provider._can_attempt_in_process_login() is False
+
+    provider._keeper_params = object()
+    assert provider._can_attempt_in_process_login() is True
+
+    provider._keeper_params = None
+    provider._keeper_login_attempted = True
+    assert provider._can_attempt_in_process_login() is False
+
+
 def test_build_pam_rotation_edit_args_for_cron_settings() -> None:
     args = _build_pam_rotation_edit_args(
         record_uid="user-uid",
