@@ -288,6 +288,82 @@ def test_diff_nested_pam_user_rotation_drift_surfaces_rotation_settings_key(
     assert "rotation_settings" in user_change.after
 
 
+def test_diff_pam_user_rotation_missing_readback_is_noop_with_sdk_marker(
+    minimal_manifest_path: Path,
+) -> None:
+    manifest = load_manifest(minimal_manifest_path)
+    data = manifest.model_dump(mode="python", exclude_none=True)
+    machine = next(r for r in data["resources"] if r["uid_ref"] == "acme-lab-linux1")
+    user_desired = next(u for u in machine["users"] if u["uid_ref"] == "acme-lab-linux1-root")
+    live_user = {k: v for k, v in user_desired.items() if k != "rotation_settings"}
+    live = [
+        LiveRecord(
+            keeper_uid="LIVE_MACHINE",
+            title="lab-linux-1",
+            resource_type="pamMachine",
+            payload=deepcopy(machine),
+            marker=encode_marker(
+                uid_ref="acme-lab-linux1",
+                manifest=manifest.name,
+                resource_type="pamMachine",
+            ),
+        ),
+        LiveRecord(
+            keeper_uid="LIVE_USER",
+            title="lab-linux-1-root",
+            resource_type="pamUser",
+            payload=live_user,
+            marker=encode_marker(
+                uid_ref="acme-lab-linux1-root",
+                manifest=manifest.name,
+                resource_type="pamUser",
+            ),
+        ),
+    ]
+    changes = compute_diff(manifest, live_records=live)
+    user_change = next(c for c in changes if c.uid_ref == "acme-lab-linux1-root")
+    assert user_change.kind is ChangeKind.NOOP
+
+
+def test_diff_pam_user_rotation_missing_readback_updates_without_matching_sdk_marker(
+    minimal_manifest_path: Path,
+) -> None:
+    manifest = load_manifest(minimal_manifest_path)
+    data = manifest.model_dump(mode="python", exclude_none=True)
+    machine = next(r for r in data["resources"] if r["uid_ref"] == "acme-lab-linux1")
+    user_desired = next(u for u in machine["users"] if u["uid_ref"] == "acme-lab-linux1-root")
+    live_user = {k: v for k, v in user_desired.items() if k != "rotation_settings"}
+    live = [
+        LiveRecord(
+            keeper_uid="LIVE_MACHINE",
+            title="lab-linux-1",
+            resource_type="pamMachine",
+            payload=deepcopy(machine),
+            marker=encode_marker(
+                uid_ref="acme-lab-linux1",
+                manifest=manifest.name,
+                resource_type="pamMachine",
+            ),
+        ),
+        LiveRecord(
+            keeper_uid="LIVE_USER",
+            title="lab-linux-1-root",
+            resource_type="pamUser",
+            payload=live_user,
+            marker=encode_marker(
+                uid_ref="other-user",
+                manifest=manifest.name,
+                resource_type="pamUser",
+            ),
+        ),
+    ]
+    changes = compute_diff(manifest, live_records=live)
+    user_change = next(c for c in changes if c.uid_ref == "acme-lab-linux1-root")
+    assert user_change.kind is ChangeKind.UPDATE
+    assert user_change.before == {"rotation_settings": None}
+    assert "rotation_settings" in user_change.after
+
+
 def test_diff_pam_user_rotation_same_cron_extra_schedule_keys_is_noop(
     minimal_manifest_path: Path,
 ) -> None:
