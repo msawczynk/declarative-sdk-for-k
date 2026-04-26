@@ -1593,19 +1593,27 @@ class CommanderCliProvider(Provider):
         self._keeper_login_attempted = True
 
         # Resolution order:
-        # 1. If KEEPER_SDK_LOGIN_HELPER points at a Python file, use it
-        #    (custom flows — KSM, HSM-backed TOTP, device-approval queue).
-        # 2. Otherwise fall back to the in-tree EnvLoginHelper reading
+        # 1. Setting KEEPER_SDK_LOGIN_HELPER=ksm triggers the in-tree KSM
+        #    helper, which reads KEEPER_SDK_KSM_CREDS_RECORD_UID and pulls
+        #    login/password/oneTimeCode from that KSM record.
+        # 2. If KEEPER_SDK_LOGIN_HELPER points at a Python file, use it
+        #    (custom flows — HSM-backed TOTP, device-approval queue).
+        # 3. Otherwise fall back to the in-tree EnvLoginHelper reading
         #    KEEPER_EMAIL / KEEPER_PASSWORD / KEEPER_TOTP_SECRET.
         # The KEEPER_SDK_LOGIN_HELPER path is validated but the env-var
         # fallback kicks in only when the var is unset — an operator
         # pointing at a missing file gets a loud error (the point of
         # setting the var is to say "do not use the default").
-        from keeper_sdk.auth import EnvLoginHelper, load_helper_from_path
+        from keeper_sdk.auth import EnvLoginHelper, KsmLoginHelper, load_helper_from_path
 
         helper_path = os.environ.get("KEEPER_SDK_LOGIN_HELPER")
         try:
-            helper = load_helper_from_path(helper_path) if helper_path else EnvLoginHelper()
+            if helper_path == "ksm":
+                helper = KsmLoginHelper()
+            elif helper_path:
+                helper = load_helper_from_path(helper_path)
+            else:
+                helper = EnvLoginHelper()
             creds = helper.load_keeper_creds()
             email = creds["email"] if isinstance(creds, dict) else creds[0]
             password = creds["password"] if isinstance(creds, dict) else creds[1]

@@ -58,6 +58,9 @@ dev = [
     "types-PyYAML",
     "types-jsonschema",
 ]
+ksm = [
+    "keeper-secrets-manager-core>=17.2.0,<18",
+]
 
 [project.scripts]
 # Short, tab-completable, agent-friendly. Primary CLI name.

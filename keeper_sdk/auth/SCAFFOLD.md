@@ -1,14 +1,15 @@
 # `keeper_sdk/auth/` — login helper contract
 
-Pluggable login. Default is `EnvLoginHelper` (env-var driven). Custom helpers
-opt in via `KEEPER_SDK_LOGIN_HELPER=/abs/path/helper.py`.
+Pluggable login. Default is `EnvLoginHelper` (env-var driven). KSM login opts
+in via `KEEPER_SDK_LOGIN_HELPER=ksm`; other custom helpers opt in via
+`KEEPER_SDK_LOGIN_HELPER=/abs/path/helper.py`.
 
 ## Modules
 
 | File | LOC | Role |
 |---|---:|---|
-| `__init__.py` | 43 | Exports `EnvLoginHelper`, helper-loader, helper-protocol. |
-| `helper.py` | 293 | `EnvLoginHelper` reads `KEEPER_EMAIL`/`KEEPER_PASSWORD`/`KEEPER_TOTP_SECRET` (+ optional `KEEPER_SERVER`/`KEEPER_CONFIG`). Implements Commander `LoginUi` contract: TOTP from base32 secret, device-approval prompts handled. Also: helper loader (`load_login_helper`) that imports a user-supplied helper file and wires its callable into `KeeperParams`. |
+| `__init__.py` | ~45 | Exports `EnvLoginHelper`, `KsmLoginHelper`, helper-loader, helper-protocol. |
+| `helper.py` | ~350 | `EnvLoginHelper` reads `KEEPER_EMAIL`/`KEEPER_PASSWORD`/`KEEPER_TOTP_SECRET`; `KsmLoginHelper` reads the same logical credentials from KSM. Shared Commander `LoginUi` contract: TOTP from base32 secret, device-approval prompts handled. Also: helper loader (`load_helper_from_path`) that imports a user-supplied helper file and wires its callable into `KeeperParams`. |
 
 ## Helper contract
 
@@ -27,14 +28,18 @@ Receives optional overrides; returns an authenticated `keepercommander.params.Ke
 |---|---|
 | New env-var fallback | `helper.py` `EnvLoginHelper.__init__` |
 | New helper-loader behaviour | `helper.py::load_login_helper` |
-| New auth backend (e.g. KSM-pull, OIDC) | new helper file referenced by `KEEPER_SDK_LOGIN_HELPER` (out-of-tree) — keep `auth/` minimal |
+| New auth backend (KSM) | shipped: `KsmLoginHelper` in `helper.py` |
+| New auth backend (other, e.g. OIDC) | new helper file referenced by `KEEPER_SDK_LOGIN_HELPER=/abs/path` |
 
 ## Hard rules
 
-- Never log password / TOTP secret / config path contents.
-- `KEEPER_TOTP_SECRET` is the **base32 secret**, NOT a 6-digit code (documented; common confusion).
-- Helper protocol: pure function returning `KeeperParams`. No side effects on import.
-- Tests use `tests/test_auth_helper.py` mocks; never network.
+| Rule | Status | Evidence |
+|---|---|---|
+| Never log password / TOTP secret / config path contents. | shipped | helper code avoids logging values |
+| `KEEPER_TOTP_SECRET` is the **base32 secret**, NOT a 6-digit code. | shipped | `EnvLoginHelper` docstring |
+| Helper protocol: pure function returning `KeeperParams`. No side effects on import. | shipped | `LoginHelper` protocol |
+| Tests use mocks; never network. | shipped | `tests/test_auth_helper.py`, `tests/test_auth_ksm.py` |
+| `KsmLoginHelper` works without `keeper_secrets_manager_core` import (lazy) | shipped | `tests/test_secrets_ksm.py::test_lazy_import_does_not_crash` |
 
 ## Reconciliation vs design
 
