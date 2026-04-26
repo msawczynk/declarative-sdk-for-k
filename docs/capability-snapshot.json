@@ -1,6 +1,6 @@
 {
-  "commander_branch": "release",
-  "commander_sha": "63150540",
+  "commander_branch": "clean-pam-tunnel",
+  "commander_sha": "89047920",
   "commands": [
     {
       "class": "PAMConnectionEditCommand",
@@ -447,7 +447,7 @@
       "type": "BOOLEAN"
     }
   ],
-  "generated_at": "2026-04-24T16:59:38+00:00",
+  "generated_at": "2026-04-26T18:26:31+00:00",
   "groups": [
     {
       "class": "PAMProjectCommand",

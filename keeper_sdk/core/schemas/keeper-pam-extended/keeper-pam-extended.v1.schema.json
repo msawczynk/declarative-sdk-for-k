@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/msawczynk/declarative-sdk-for-k/schemas/keeper-pam-extended/v1.json",
+  "title": "keeper-pam-extended.v1 (scaffold)",
+  "description": "Scaffold-only schema for the keeper-pam-extended family (P14 in docs/V2_DECISIONS.md). No body yet \u2014 landing as part of P14 work. Validators MUST reject any manifest that declares this schema with a non-empty body until x-keeper-live-proof.status leaves 'scaffold-only'.",
+  "x-keeper-live-proof": {
+    "status": "scaffold-only",
+    "evidence": "pending",
+    "since_pin": "89047920a0df857e01fb59adcb0bfb9fa6db70bf",
+    "notes": "Top-level keys planned: gateway_configs, rotation_schedules, discovery_rules, service_mappings, saas_mappings. See docs/V2_DECISIONS.md Q1."
+  },
+  "type": "object",
+  "required": [
+    "schema"
+  ],
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "keeper-pam-extended.v1"
+    }
+  },
+  "additionalProperties": false
+}

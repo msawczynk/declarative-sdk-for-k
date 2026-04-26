@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/msawczynk/declarative-sdk-for-k/schemas/_meta/x-keeper-live-proof.v1.json",
+  "title": "x-keeper-live-proof",
+  "description": "Annotation that every per-family schema document MUST carry as the top-level extension field `x-keeper-live-proof`. Records the live-tenant verification status of the schema's contract surface against a specific Commander pin. Decision basis: docs/V2_DECISIONS.md Q4.",
+  "type": "object",
+  "required": ["status", "since_pin"],
+  "additionalProperties": false,
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["supported", "preview-gated", "upstream-gap", "scaffold-only"],
+      "description": "supported = clean live re-plan exists. preview-gated = offline-green only, requires DSK_PREVIEW=1 to enable. upstream-gap = Commander itself blocks; cite issue. scaffold-only = directory exists, no schema body yet."
+    },
+    "evidence": {
+      "type": "string",
+      "description": "Path to live-proof transcript (e.g. docs/proof-transcripts/p9-vault.md) or the literal string 'pending'."
+    },
+    "since_pin": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{7,40}$",
+      "description": "Commander commit SHA at which this status was last verified."
+    },
+    "notes": {
+      "type": "string"
+    }
+  }
+}
