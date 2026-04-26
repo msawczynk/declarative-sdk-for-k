@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import re
-from typing import Any
+from collections.abc import Callable, Iterable, Iterator
+from typing import Any, TypeAlias
 
 # Field substrings that must never be rendered.
 _SECRET_TOKENS = (
@@ -19,20 +20,91 @@ _SECRET_TOKENS = (
 )
 
 REDACTED = "***redacted***"
+_INLINE_REDACTED = "***"
 
-_STRING_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
-    ("bearer_token", re.compile(r"Bearer [A-Za-z0-9._\-]+")),
+_Replacement: TypeAlias = str | Callable[[re.Match[str]], str]
+
+
+def _mask_token(token: str) -> str:
+    if token.startswith("eyJ") and "." in token:
+        return f"{token.split('.', 1)[0]}{_INLINE_REDACTED}"
+    return f"{token[:4]}{_INLINE_REDACTED}"
+
+
+def _mask_base32(secret: str) -> str:
+    if len(secret) <= 4:
+        return _INLINE_REDACTED
+    return f"{secret[:2]}{_INLINE_REDACTED}{secret[-2:]}"
+
+
+def _redact_auth(match: re.Match[str]) -> str:
+    return f"{match.group(1)}{_mask_token(match.group(2))}"
+
+
+def _redact_jwt(match: re.Match[str]) -> str:
+    return f"{match.group(1)[:6]}{_INLINE_REDACTED}"
+
+
+def _redact_ksm_url(match: re.Match[str]) -> str:
+    suffix = match.group("suffix")
+    if not suffix:
+        return match.group(0)
+    return f"{match.group('host')}/{_INLINE_REDACTED}"
+
+
+def _redact_otpauth_secret(match: re.Match[str]) -> str:
+    return f"{match.group(1)}{_mask_base32(match.group(2))}"
+
+
+def _redact_env_assignment(match: re.Match[str]) -> str:
+    return f"{match.group(1)}{_INLINE_REDACTED}"
+
+
+def _redact_base32(match: re.Match[str]) -> str:
+    return _mask_base32(match.group(0))
+
+
+_PATTERNS: tuple[tuple[re.Pattern[str], _Replacement], ...] = (
     (
-        "jwt_token",
-        re.compile(r"eyJ[A-Za-z0-9_\-]+\.eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+"),
+        re.compile(r"(?i)\b(otpauth://[^\s;]*?[?&]secret=)([A-Z2-7]+)(?=(&|[\s;]|$))"),
+        _redact_otpauth_secret,
     ),
-    ("ksm_one_time_token", re.compile(r"(US|EU|AU|JP|CA|GOV):[A-Za-z0-9_\-]{20,}")),
+    (
+        re.compile(r"(?i)\b(?P<host>ksm://[^/\s?#;]+)(?P<suffix>(?:/[^\s?;]*)?(?:\?[^\s;]*)?)"),
+        _redact_ksm_url,
+    ),
+    (
+        re.compile(r"\b(KEEPER_(?:PASSWORD|TOTP_SECRET|EMAIL)=)([^\s;]+)"),
+        _redact_env_assignment,
+    ),
+    (
+        re.compile(r"(?i)\b((?:Authorization:\s*)?(?:Bearer|Token)\s+)([A-Za-z0-9._~+/=-]{3,})"),
+        _redact_auth,
+    ),
+    (
+        re.compile(r"\b(eyJ[A-Za-z0-9_-]*)(?:\.[A-Za-z0-9_-]+){2}\b"),
+        _redact_jwt,
+    ),
+    (
+        re.compile(r"\b(?:US|EU|AU|JP|CA|GOV):[A-Za-z0-9_-]{20,}\b"),
+        REDACTED,
+    ),
+    (
+        re.compile(r"\b[A-Z2-7]{16,}\b"),
+        _redact_base32,
+    ),
 )
 
 
 def _is_secret(key: str) -> bool:
     lower = key.lower()
     return any(token in lower for token in _SECRET_TOKENS)
+
+
+def _redact_string(value: str) -> str:
+    for pattern, replacement in _PATTERNS:
+        value = pattern.sub(replacement, value)
+    return value
 
 
 def redact(value: Any) -> Any:
@@ -47,7 +119,11 @@ def redact(value: Any) -> Any:
     if isinstance(value, tuple):
         return tuple(redact(item) for item in value)
     if isinstance(value, str):
-        for _name, pattern in _STRING_PATTERNS:
-            value = pattern.sub(REDACTED, value)
-        return value
+        return _redact_string(value)
     return value
+
+
+def redact_lines(lines: Iterable[str]) -> Iterator[str]:
+    """Yield redacted text lines without materializing the full input."""
+    for line in lines:
+        yield _redact_string(line)
