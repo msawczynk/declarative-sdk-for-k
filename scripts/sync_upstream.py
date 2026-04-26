@@ -60,6 +60,12 @@ _RESOURCE_TYPE_HINTS = (
     "login",
 )
 
+# P18b — `keeper-vault` / `keeper-vault-sharing` / integrations-adjacent CLI
+# surfaces (explicit registry; see docs/P18_SYNC_UPSTREAM_EXTRACTOR_DECISION.md).
+_VAULT_FAMILY_COMMAND_LABELS: frozenset[str] = frozenset(
+    {"get", "search", "record-add", "record-update", "list-sf", "ls"}
+)
+
 
 # ---------------------------------------------------------------------------
 # Commander pin
@@ -349,6 +355,22 @@ _GROUPS: tuple[tuple[str, str, str], ...] = (
         "PAMRbiCommand",
         "pam rbi",
     ),
+    # P18b — integrations (`keeper-integrations-*`) + vault trash lifecycle.
+    (
+        "keepercommander.commands.scim",
+        "ScimCommand",
+        "scim",
+    ),
+    (
+        "keepercommander.commands.automator",
+        "AutomatorCommand",
+        "automator",
+    ),
+    (
+        "keepercommander.commands.record",
+        "TrashCommand",
+        "trash",
+    ),
 )
 
 _COMMAND_CLASSES: tuple[tuple[str, str, str], ...] = (
@@ -403,6 +425,37 @@ _COMMAND_CLASSES: tuple[tuple[str, str, str], ...] = (
         "keepercommander.commands.enterprise",
         "EnterpriseTeamCommand",
         "enterprise-team",
+    ),
+    # P18b — vault record + folder listing (keeper-vault / keeper-vault-sharing).
+    (
+        "keepercommander.commands.record",
+        "RecordGetUidCommand",
+        "get",
+    ),
+    (
+        "keepercommander.commands.record",
+        "SearchCommand",
+        "search",
+    ),
+    (
+        "keepercommander.commands.record_edit",
+        "RecordAddCommand",
+        "record-add",
+    ),
+    (
+        "keepercommander.commands.record_edit",
+        "RecordUpdateCommand",
+        "record-update",
+    ),
+    (
+        "keepercommander.commands.record",
+        "RecordListSfCommand",
+        "list-sf",
+    ),
+    (
+        "keepercommander.commands.folder",
+        "FolderListCommand",
+        "ls",
     ),
 )
 
@@ -514,25 +567,65 @@ def render_markdown(snapshot: dict[str, Any], warnings: Sequence[str]) -> str:
         "",
         f"_Generated at {snapshot['generated_at']}._",
         "",
-        "## Registered PAM commands",
+        "## Registered PAM command groups",
         "",
     ]
 
-    group_rows: list[list[str]] = []
+    pam_group_rows: list[list[str]] = []
+    integ_group_rows: list[list[str]] = []
+    vault_group_rows: list[list[str]] = []
     for group in snapshot["groups"]:
+        label = str(group["group"])
         for sub in group["subcommands"]:
-            group_rows.append([group["group"], sub["name"], sub["class"], sub["help"]])
-    if group_rows:
-        lines.append(_md_table(["Group", "Subcommand", "Class", "Help"], group_rows))
+            row = [group["group"], sub["name"], sub["class"], sub["help"]]
+            if label.startswith("pam"):
+                pam_group_rows.append(row)
+            elif label in ("scim", "automator"):
+                integ_group_rows.append(row)
+            elif label == "trash":
+                vault_group_rows.append(row)
+            else:
+                pam_group_rows.append(row)
+
+    if pam_group_rows:
+        lines.append(_md_table(["Group", "Subcommand", "Class", "Help"], pam_group_rows))
     else:
-        lines.append("_No groups extracted — see extraction warnings below._")
+        lines.append("_No PAM groups extracted — see extraction warnings below._")
     lines.append("")
 
-    pam_cmds = [
-        c for c in snapshot["commands"] if not str(c["group_command"]).startswith("enterprise")
-    ]
+    if integ_group_rows:
+        lines.append("## Integrations command groups (extracted, P18b)")
+        lines.append("")
+        lines.append(
+            "_SCIM + Automator roots for `keeper-integrations-identity.v1` / "
+            "`keeper-integrations-events.v1` — explicit registry only._"
+        )
+        lines.append("")
+        lines.append(_md_table(["Group", "Subcommand", "Class", "Help"], integ_group_rows))
+        lines.append("")
+
+    if vault_group_rows:
+        lines.append("## Vault / trash command groups (extracted, P18b)")
+        lines.append("")
+        lines.append(
+            "_`trash` group for deleted records / shared-folder trash flows "
+            "adjacent to `keeper-vault-sharing`._"
+        )
+        lines.append("")
+        lines.append(_md_table(["Group", "Subcommand", "Class", "Help"], vault_group_rows))
+        lines.append("")
+
     ent_cmds = [
         c for c in snapshot["commands"] if str(c["group_command"]).startswith("enterprise")
+    ]
+    vault_cmds = [
+        c for c in snapshot["commands"] if c["group_command"] in _VAULT_FAMILY_COMMAND_LABELS
+    ]
+    pam_cmds = [
+        c
+        for c in snapshot["commands"]
+        if not str(c["group_command"]).startswith("enterprise")
+        and c["group_command"] not in _VAULT_FAMILY_COMMAND_LABELS
     ]
 
     def _append_command_flag_section(cmd: dict[str, Any]) -> None:
@@ -559,6 +652,17 @@ def render_markdown(snapshot: dict[str, Any], warnings: Sequence[str]) -> str:
     lines.append("")
     for cmd in pam_cmds:
         _append_command_flag_section(cmd)
+
+    if vault_cmds:
+        lines.append("## Vault / folder CLI flags (extracted, P18b)")
+        lines.append("")
+        lines.append(
+            "_Record + shared-folder + folder listing commands for `keeper-vault.v1` / "
+            "`keeper-vault-sharing.v1` — see `docs/P18_SYNC_UPSTREAM_EXTRACTOR_DECISION.md`._"
+        )
+        lines.append("")
+        for cmd in sorted(vault_cmds, key=lambda c: c["group_command"]):
+            _append_command_flag_section(cmd)
 
     if ent_cmds:
         lines.append("## Enterprise commands (extracted, P18a)")

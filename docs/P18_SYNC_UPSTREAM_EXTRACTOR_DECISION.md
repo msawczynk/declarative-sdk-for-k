@@ -1,14 +1,16 @@
 # P18 — `sync_upstream.py` extractor expansion (decision memo, R1)
 
-**Status:** **P18a landed** in `scripts/sync_upstream.py` (enterprise command
-registry + matrix section). Later phases (P18b/c) remain open. **Authority:** `docs/V2_DECISIONS.md` (P18), `docs/NEXT_SPRINT_PARALLEL_ORCHESTRATION.md` §15.1–15.2.
+**Status:** **P18a + P18b landed** in `scripts/sync_upstream.py` (enterprise +
+vault/integrations registry + matrix sections). **P18c** (optional JSON
+allowlist helper) remains open. **Authority:** `docs/V2_DECISIONS.md` (P18), `docs/NEXT_SPRINT_PARALLEL_ORCHESTRATION.md` §15.1–15.2.
 
 ## 1. Current state (fact)
 
 `scripts/sync_upstream.py` today imports a **fixed** tuple of Commander
 classes:
 
-- **`_GROUPS`:** `PAMProjectCommand` (`pam project`), `PAMRbiCommand` (`pam rbi`)
+- **`_GROUPS`:** `PAMProjectCommand`, `PAMRbiCommand`, plus **P18b** `ScimCommand`,
+  `AutomatorCommand`, `TrashCommand`
 - **`_COMMAND_CLASSES`:** PAM import/extend/rbi-edit/connection-edit **plus**
   six enterprise commands (`GetEnterpriseDataCommand`, `EnterpriseInfoCommand`,
   …) — P18a
@@ -73,7 +75,7 @@ the PR, not production.
 | Phase | Scope | Exit |
 |-------|--------|------|
 | **P18a** | Add 3–5 **enterprise**-related `GroupCommand` / command classes that `keeper-enterprise.v1` references in memos | **Done:** six `Enterprise*` / `GetEnterpriseDataCommand` rows + `## Enterprise commands (extracted, P18a)` in matrix |
-| **P18b** | Vault / sharing / integrations command roots used by V2 families | Same pattern |
+| **P18b** | Vault / sharing / integrations command roots used by V2 families | **Done:** `scim` + `automator` + `trash` groups; flags for `get`, `search`, `record-add`, `record-update`, `list-sf`, `ls`; matrix sections **Integrations** + **Vault/trash** + **Vault/folder CLI flags** |
 | **P18c** | Optional generic helper that **reads** a static JSON allowlist file in-repo (`scripts/upstream_command_allowlist.json`) so non-Python owners can propose rows | Still explicit; no runtime crawl |
 
 Stop between phases if `--check` diff becomes unreviewable.

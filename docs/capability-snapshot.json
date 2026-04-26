@@ -749,6 +749,175 @@
       "module": "keepercommander.commands.enterprise"
     },
     {
+      "class": "RecordGetUidCommand",
+      "flags": [
+        {
+          "aliases": [],
+          "dest": "format",
+          "help": "output format",
+          "name": "--format",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "include_dag",
+          "help": "include DAG/GraphSync information in json output",
+          "name": "--include-dag",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "legacy",
+          "help": "json output: display typed records as legacy",
+          "name": "--legacy",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "unmask",
+          "help": "display hidden field content",
+          "name": "--unmask",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "uid",
+          "help": "UID or title to search for",
+          "name": "<uid>",
+          "required": true,
+          "type": "str"
+        }
+      ],
+      "group_command": "get",
+      "module": "keepercommander.commands.record"
+    },
+    {
+      "class": "RecordListSfCommand",
+      "flags": [
+        {
+          "aliases": [],
+          "dest": "format",
+          "help": "format of output",
+          "name": "--format",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "output",
+          "help": "path to resulting output file (ignored for \"table\" format)",
+          "name": "--output",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "pattern",
+          "help": "search pattern",
+          "name": "<pattern>",
+          "required": false,
+          "type": "str"
+        }
+      ],
+      "group_command": "list-sf",
+      "module": "keepercommander.commands.record"
+    },
+    {
+      "class": "FolderListCommand",
+      "flags": [
+        {
+          "aliases": [],
+          "dest": "format",
+          "help": "format of output",
+          "name": "--format",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "output",
+          "help": "path to resulting output file (ignored for \"table\" format)",
+          "name": "--output",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "--recursive"
+          ],
+          "dest": "recursive",
+          "help": "list all folders/records in subfolders",
+          "name": "-R",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "--folders"
+          ],
+          "dest": "folders_only",
+          "help": "display folders only",
+          "name": "-f",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "--list"
+          ],
+          "dest": "detail",
+          "help": "show detailed list",
+          "name": "-l",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "--records"
+          ],
+          "dest": "records_only",
+          "help": "display records only",
+          "name": "-r",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "--short"
+          ],
+          "dest": "short",
+          "help": "Do not display record details. (Not used)",
+          "name": "-s",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "--verbose"
+          ],
+          "dest": "verbose",
+          "help": "verbose output",
+          "name": "-v",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "pattern",
+          "help": "search pattern",
+          "name": "<pattern>",
+          "required": false,
+          "type": "str"
+        }
+      ],
+      "group_command": "ls",
+      "module": "keepercommander.commands.folder"
+    },
+    {
       "class": "PAMConnectionEditCommand",
       "flags": [
         {
@@ -1153,6 +1322,241 @@
       ],
       "group_command": "pam rbi edit",
       "module": "keepercommander.commands.tunnel_and_connections"
+    },
+    {
+      "class": "RecordAddCommand",
+      "flags": [
+        {
+          "aliases": [],
+          "dest": "email_config",
+          "help": "Email configuration name to use for sending (required with --send-email)",
+          "name": "--email-config",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "email_message",
+          "help": "Custom message to include in onboarding email",
+          "name": "--email-message",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "folder",
+          "help": "folder name or UID to store record",
+          "name": "--folder",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "pam_config",
+          "help": "PAM configuration UID or name to sync password to cloud provider (Azure AD, AWS IAM)",
+          "name": "--pam-config",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "self_destruct",
+          "help": "Time period record share URL is valid. The record will be deleted in your vault in 5 minutes since open",
+          "name": "--self-destruct",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "send_email",
+          "help": "Email address to send onboarding email with share URL (requires --self-destruct)",
+          "name": "--send-email",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "syntax_help",
+          "help": "Display help on field parameters.",
+          "name": "--syntax-help",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "--force"
+          ],
+          "dest": "force",
+          "help": "ignore warnings",
+          "name": "-f",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "--notes"
+          ],
+          "dest": "notes",
+          "help": "record notes",
+          "name": "-n",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "--record-type"
+          ],
+          "dest": "record_type",
+          "help": "record type",
+          "name": "-rt",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "--title"
+          ],
+          "dest": "title",
+          "help": "record title",
+          "name": "-t",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "fields",
+          "help": "load record type data from strings with dot notation",
+          "name": "<fields>",
+          "required": false,
+          "type": "str"
+        }
+      ],
+      "group_command": "record-add",
+      "module": "keepercommander.commands.record_edit"
+    },
+    {
+      "class": "RecordUpdateCommand",
+      "flags": [
+        {
+          "aliases": [],
+          "dest": "syntax_help",
+          "help": "Display help on field parameters.",
+          "name": "--syntax-help",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "--force"
+          ],
+          "dest": "force",
+          "help": "ignore warnings",
+          "name": "-f",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "--notes"
+          ],
+          "dest": "notes",
+          "help": "append/modify record notes",
+          "name": "-n",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "--record"
+          ],
+          "dest": "record",
+          "help": "record path or UID",
+          "name": "-r",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "--record-type"
+          ],
+          "dest": "record_type",
+          "help": "record type",
+          "name": "-rt",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "--title"
+          ],
+          "dest": "title",
+          "help": "modify record title",
+          "name": "-t",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "fields",
+          "help": "load record type data from strings with dot notation",
+          "name": "<fields>",
+          "required": false,
+          "type": "str"
+        }
+      ],
+      "group_command": "record-update",
+      "module": "keepercommander.commands.record_edit"
+    },
+    {
+      "class": "SearchCommand",
+      "flags": [
+        {
+          "aliases": [],
+          "dest": "format",
+          "help": "output format",
+          "name": "--format",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "regex",
+          "help": "treat pattern as a regular expression instead of space-separated search terms",
+          "name": "--regex",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "--categories"
+          ],
+          "dest": "categories",
+          "help": "One or more of these letters for categories to search: \"r\" = records, \"s\" = shared folders, \"t\" = teams",
+          "name": "-c",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "--verbose"
+          ],
+          "dest": "verbose",
+          "help": "verbose output",
+          "name": "-v",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "pattern",
+          "help": "search terms (space-separated, order independent)",
+          "name": "<pattern>",
+          "required": false,
+          "type": "str"
+        }
+      ],
+      "group_command": "search",
+      "module": "keepercommander.commands.record"
     }
   ],
   "enforcements": [
@@ -1193,8 +1597,92 @@
       "type": "BOOLEAN"
     }
   ],
-  "generated_at": "2026-04-26T21:54:21+00:00",
+  "generated_at": "2026-04-26T21:57:03+00:00",
   "groups": [
+    {
+      "class": "AutomatorCommand",
+      "group": "automator",
+      "subcommands": [
+        {
+          "class": "AutomatorCertificateCommand",
+          "help": "Display certificate information.",
+          "module": "keepercommander.commands.automator",
+          "name": "certificate"
+        },
+        {
+          "class": "AutomatorCreateCommand",
+          "help": "Creates automator endpoint.",
+          "module": "keepercommander.commands.automator",
+          "name": "create"
+        },
+        {
+          "class": "AutomatorDeleteCommand",
+          "help": "Deletes automator.",
+          "module": "keepercommander.commands.automator",
+          "name": "delete"
+        },
+        {
+          "class": "AutomatorActionCommand",
+          "help": "Disables automator.",
+          "module": "keepercommander.commands.automator",
+          "name": "disable"
+        },
+        {
+          "class": "AutomatorEditCommand",
+          "help": "Changes automator configuration.",
+          "module": "keepercommander.commands.automator",
+          "name": "edit"
+        },
+        {
+          "class": "AutomatorActionCommand",
+          "help": "Enables automator.",
+          "module": "keepercommander.commands.automator",
+          "name": "enable"
+        },
+        {
+          "class": "AutomatorActionCommand",
+          "help": "Initializes automator.",
+          "module": "keepercommander.commands.automator",
+          "name": "init"
+        },
+        {
+          "class": "AutomatorListCommand",
+          "help": "Displays a list of available automators.",
+          "module": "keepercommander.commands.automator",
+          "name": "list"
+        },
+        {
+          "class": "AutomatorLogCommand",
+          "help": "Retrieves automator logs.",
+          "module": "keepercommander.commands.automator",
+          "name": "log"
+        },
+        {
+          "class": "AutomatorLogCommand",
+          "help": "Clears automator logs.",
+          "module": "keepercommander.commands.automator",
+          "name": "log-clear"
+        },
+        {
+          "class": "AutomatorActionCommand",
+          "help": "Resets automator configuration to the default values.",
+          "module": "keepercommander.commands.automator",
+          "name": "reset"
+        },
+        {
+          "class": "AutomatorSetupCommand",
+          "help": "Sets up automator.",
+          "module": "keepercommander.commands.automator",
+          "name": "setup"
+        },
+        {
+          "class": "AutomatorViewCommand",
+          "help": "Prints automator details.",
+          "module": "keepercommander.commands.automator",
+          "name": "view"
+        }
+      ]
+    },
     {
       "class": "PAMProjectCommand",
       "group": "pam project",
@@ -1222,6 +1710,84 @@
           "help": "Edit Remote Browser Isolation settings",
           "module": "keepercommander.commands.tunnel_and_connections",
           "name": "edit"
+        }
+      ]
+    },
+    {
+      "class": "ScimCommand",
+      "group": "scim",
+      "subcommands": [
+        {
+          "class": "ScimCreateCommand",
+          "help": "Create SCIM endpoint.",
+          "module": "keepercommander.commands.scim",
+          "name": "create"
+        },
+        {
+          "class": "ScimDeleteCommand",
+          "help": "Delete SCIM endpoint.",
+          "module": "keepercommander.commands.scim",
+          "name": "delete"
+        },
+        {
+          "class": "ScimEditCommand",
+          "help": "Edit SCIM endpoint.",
+          "module": "keepercommander.commands.scim",
+          "name": "edit"
+        },
+        {
+          "class": "ScimListCommand",
+          "help": "Display a list of available SCIM endpoints.",
+          "module": "keepercommander.commands.scim",
+          "name": "list"
+        },
+        {
+          "class": "ScimPushCommand",
+          "help": "Push data to SCIM endpoint.",
+          "module": "keepercommander.commands.scim",
+          "name": "push"
+        },
+        {
+          "class": "ScimViewCommand",
+          "help": "Display a SCIM endpoint details.",
+          "module": "keepercommander.commands.scim",
+          "name": "view"
+        }
+      ]
+    },
+    {
+      "class": "TrashCommand",
+      "group": "trash",
+      "subcommands": [
+        {
+          "class": "TrashGetCommand",
+          "help": "Get the details of a deleted record",
+          "module": "keepercommander.commands.record",
+          "name": "get"
+        },
+        {
+          "class": "TrashListCommand",
+          "help": "Displays a list of deleted records",
+          "module": "keepercommander.commands.record",
+          "name": "list"
+        },
+        {
+          "class": "TrashPurgeCommand",
+          "help": "Removes all deleted records from the trash bin",
+          "module": "keepercommander.commands.record",
+          "name": "purge"
+        },
+        {
+          "class": "TrashRestoreCommand",
+          "help": "Restores deleted records",
+          "module": "keepercommander.commands.record",
+          "name": "restore"
+        },
+        {
+          "class": "TrashUnshareCommand",
+          "help": "Remove shares from deleted records",
+          "module": "keepercommander.commands.record",
+          "name": "unshare"
         }
       ]
     }

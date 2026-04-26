@@ -28,6 +28,10 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   daybook sync (`AGENTS.md`, `docs/live-proof/README.md`, orchestration header).
   **§0** autonomous cold start: new sessions use repo + daybook, not repeated
   chat prompts.
+- **P18b** — `sync_upstream` adds **integrations** groups (`ScimCommand`,
+  `AutomatorCommand`) + **trash** `GroupCommand`; vault-related **Command** rows
+  (`get`, `search`, `record-add`, `record-update`, `list-sf`, `ls`). Matrix
+  sections for P18b + split PAM group table header.
 - **P18a** — `scripts/sync_upstream.py` registers six enterprise CLI command
   classes (`enterprise-down` / `-info` / `-node` / `-user` / `-role` / `-team`);
   capability matrix gains **Enterprise commands (extracted, P18a)** section;
