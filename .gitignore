@@ -21,6 +21,11 @@ venv/
 
 # Live smoke logs (operator-side; never commit)
 .smoke-runs/
+.live-smoke/
+# Raw transcript artefacts before they are reviewed and promoted into
+# docs/live-proof/. Keep raw outputs out of git; only the sanitized,
+# pin-stamped copy under docs/live-proof/ is committed.
+evidence/
 
 # Codex CLI worker scratch dirs (operator-side; never commit)
 # Workers occasionally write run artefacts here; keep them out of the SDK delivery.
