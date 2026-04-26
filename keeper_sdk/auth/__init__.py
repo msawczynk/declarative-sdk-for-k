@@ -16,9 +16,11 @@ This module ships two things:
    must expose (``load_keeper_creds`` and ``keeper_login``).
 2. ``EnvLoginHelper`` — a working reference implementation that reads
    credentials from environment variables. Enough to get started.
-   Production operators still typically wire something smarter (KSM
-   pull, HSM-backed TOTP, device-approval queue, …) and point
-   ``KEEPER_SDK_LOGIN_HELPER`` at their own module.
+3. ``KsmLoginHelper`` — an in-tree KSM-backed helper selected with
+   ``KEEPER_SDK_LOGIN_HELPER=ksm`` for production credential pulls.
+   Operators with HSM-backed TOTP, device-approval queues, or other
+   custom flows can still point ``KEEPER_SDK_LOGIN_HELPER`` at their
+   own module.
 
 Design notes for agent authors
 ------------------------------
@@ -36,8 +38,9 @@ from __future__ import annotations
 
 from keeper_sdk.auth.helper import (
     EnvLoginHelper,
+    KsmLoginHelper,
     LoginHelper,
     load_helper_from_path,
 )
 
-__all__ = ["EnvLoginHelper", "LoginHelper", "load_helper_from_path"]
+__all__ = ["EnvLoginHelper", "KsmLoginHelper", "LoginHelper", "load_helper_from_path"]
