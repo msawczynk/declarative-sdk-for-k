@@ -86,11 +86,17 @@ binding), read [`docs/VALIDATION_STAGES.md`](./docs/VALIDATION_STAGES.md).
 
 Maintainers grant **standing permission** to run this repo's committed
 live-smoke harness (`scripts/smoke/smoke.py`) without asking for approval
-before each command—**when** the lab machine already has Commander + the
-expected `keeper-vault-rbi-pam-testenv` configs (see
-`scripts/smoke/README.md`). Agents still must not echo secrets, must use the
-smoke harness (not ad-hoc tenant edits), and must treat failures as evidence
-(fix, document, or stop per `docs/SDK_DA_COMPLETION_PLAN.md`).
+before each command. The **orchestrator** (Cursor lead agent in this
+workspace) **owns** keeping that path healthy: Commander + config layout per
+`scripts/smoke/README.md`, lab tenant reachability, and smoke/L1
+prerequisites. Successful runs are evidenced in the **daybook** (`JOURNAL` /
+sprint lines); if something regresses, the orchestrator **triages and fixes or
+documents a blocker in JOURNAL** before claiming live gates — not an operator
+todo list.
+
+Agents still must not echo secrets, must use the smoke harness (not ad-hoc
+tenant edits), and must treat failures as evidence (fix, document, or stop
+per `docs/SDK_DA_COMPLETION_PLAN.md`).
 
 The **same contract** applies when agents or CI produce **live-proof**
 evidence for schema graduation: whitelisted commands only (smoke harness,

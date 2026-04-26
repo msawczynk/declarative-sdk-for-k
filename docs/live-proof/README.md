@@ -9,6 +9,10 @@ before changing `x-keeper-live-proof.status` on a family schema.
 `since_pin` = full 40-char SHA from `.commander-pin`). Meta schema:
 `keeper_sdk/core/schemas/_meta/x-keeper-live-proof.schema.json`.
 
+**Prerequisite health:** the **orchestrator** keeps smoke/L1 prerequisites
+aligned with `scripts/smoke/README.md` and records pass/fail in the daybook —
+same ownership as `AGENTS.md` § Autonomous execution.
+
 ## Live access for code (agents, workers, CI, Codex)
 
 Live proof is **not** parent-only. The orchestrator, **Codex CLI**, workers, or

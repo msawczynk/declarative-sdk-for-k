@@ -8,6 +8,8 @@
 
 **Program exit:** §**15** sequences large sprints to **close capability gaps**, then **§15.3 maintenance mode** for Commander pin / upstream drift only. **§16** is mandatory **after every sprint**: review against daybook and **optimize** the next run. **Live tenant / L1:** orchestrator **and** Codex CLI are allowed (same harness + sanitization as `AGENTS.md`). **`.commander-pin`:** never left ambiguous — resolve candidates with **live testing** + drift-check, not guesswork. **Support wording** for Commander semantics lives in **upstream** Commander / Keeper repos; this SDK documents integration + gates only. **Daybook:** private GitHub repo + `sync_daybook.sh`; orchestrator has access (no separate “grant daybook” step).
 
+**Orchestrator duty (standing):** treat lab toolchain + daybook continuity as **this thread’s** responsibility — verify before L1/smoke, record outcomes in JOURNAL, run `sync_daybook.sh` after daybook edits. Do not punt prerequisite health to “the user will set it up”; daybook history is the ledger that it already worked and must keep working.
+
 ---
 
 ## 1. Sprint outcome (one sentence)
