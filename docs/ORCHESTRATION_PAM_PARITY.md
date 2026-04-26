@@ -66,6 +66,12 @@ path** only — one actor at a time per tenant ([NEXT_SPRINT §2](./NEXT_SPRINT_
 
 ## 3. Vault L1 merge train (recommended PR sequence)
 
+**Status pointer:** for **today’s** `keeper-vault.v1` G2–G6 ticks, use **§1**
+above and [`ORCHESTRATION_UNTIL_COMPLETE.md`](./ORCHESTRATION_UNTIL_COMPLETE.md) §2.
+The table below is a **historical merge-train** (pedagogical slice order): “Delivers”
+text reflects intent **at that PR’s era** (e.g. V1 before later PRs) and can read
+stale versus `main` — it is **not** a second source of truth.
+
 Each row is a **mergeable** unit; integrator runs **full** `pytest` + `ruff` +
 `mypy` + `sync_upstream.py --check` (if touched) before merge.
 

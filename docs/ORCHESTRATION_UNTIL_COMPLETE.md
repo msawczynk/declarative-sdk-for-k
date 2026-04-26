@@ -193,6 +193,7 @@ full pytest before handoff; update JOURNAL snapshot not repo daybook.
 | 2026-04-27 | `docs/SCAFFOLD.md` + `keeper_sdk/providers/SCAFFOLD.md`: vault doc index + Commander row / Vault L1 caveat links. |
 | 2026-04-27 | `ORCHESTRATION_PAM_PARITY` §1 gate table + V6 row reconciled; `live-proof/README` + README layout vault pointers. |
 | 2026-04-27 | `PAM_PARITY_PROGRAM` inventory + Phase 0/1a validate modes; `EXECUTION_PLAN` Phase D V6 + L1/V8 exit criteria. |
+| 2026-04-27 | `ORCHESTRATION_PAM_PARITY` §3: status pointer (§1 + ledger authoritative; train table historical). `CHANGELOG` Unreleased **Changed** split into bullets. |
 
 ---
 

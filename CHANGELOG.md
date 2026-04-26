@@ -12,14 +12,18 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   without raising); skip the call when patch yields no net change.
 
 ### Changed
-- **Docs** — [`docs/VAULT_L1_DESIGN.md`](docs/VAULT_L1_DESIGN.md) §4: semantic `login` diff limits,
-  concurrent-edit caveat, Commander UPDATE / `CapabilityError` note.
-  [`docs/VALIDATION_STAGES.md`](docs/VALIDATION_STAGES.md): vault operator caveats, remediation rows.
-  [`AGENTS.md`](AGENTS.md): vault L1 caveats + links after the `validate` stage pointer.
-  [`docs/SCAFFOLD.md`](docs/SCAFFOLD.md): index `VAULT_L1_DESIGN`, `ORCHESTRATION_UNTIL_COMPLETE`, vault rows; [`keeper_sdk/providers/SCAFFOLD.md`](keeper_sdk/providers/SCAFFOLD.md): Commander vault UPDATE + caveat links.
-  [`docs/ORCHESTRATION_PAM_PARITY.md`](docs/ORCHESTRATION_PAM_PARITY.md): G2–G6 state machine reconciled to vault vs PAM; V6 train row (UPDATE + online + semantic diff). [`docs/live-proof/README.md`](docs/live-proof/README.md): vault §4 / validation caveat pointer.   [`README.md`](README.md): layout comment for `VAULT_L1_DESIGN.md`.
-  [`docs/PAM_PARITY_PROGRAM.md`](docs/PAM_PARITY_PROGRAM.md): vault inventory + Phase 0 validate wording + `vault_*` JSON modes in Phase 1a.
-  [`docs/EXECUTION_PLAN_HEAVY_ORCHESTRATION.md`](docs/EXECUTION_PLAN_HEAVY_ORCHESTRATION.md): Phase D V6 / exit criteria aligned with shipped Commander vault apply + V8 split.
+- **Docs — vault L1 contracts** — [`docs/VAULT_L1_DESIGN.md`](docs/VAULT_L1_DESIGN.md) §4;
+  [`docs/VALIDATION_STAGES.md`](docs/VALIDATION_STAGES.md) (operator caveats + remediation);
+  [`AGENTS.md`](AGENTS.md) (vault paragraph after `validate` pointer);
+  [`docs/live-proof/README.md`](docs/live-proof/README.md) (caveat links);
+  [`README.md`](README.md) (readiness + honest limits + layout tree).
+- **Docs — indexes + orchestration** — [`docs/SCAFFOLD.md`](docs/SCAFFOLD.md);
+  [`keeper_sdk/providers/SCAFFOLD.md`](keeper_sdk/providers/SCAFFOLD.md);
+  [`docs/ORCHESTRATION_PAM_PARITY.md`](docs/ORCHESTRATION_PAM_PARITY.md) (§1 G2–G6 + §3 status pointer + V6 train row);
+  [`docs/ORCHESTRATION_UNTIL_COMPLETE.md`](docs/ORCHESTRATION_UNTIL_COMPLETE.md) (§7 checklist, §10, revision log).
+- **Docs — parity program + execution plan** — [`docs/PAM_PARITY_PROGRAM.md`](docs/PAM_PARITY_PROGRAM.md)
+  (inventory, Phase 0 `validate`, Phase 1a JSON modes);
+  [`docs/EXECUTION_PLAN_HEAVY_ORCHESTRATION.md`](docs/EXECUTION_PLAN_HEAVY_ORCHESTRATION.md) (Phase D V6 / L1 vs V8 exit criteria).
 
 ### Added
 - **V8 prep** — [`docs/live-proof/keeper-vault.v1.sanitized.template.json`](docs/live-proof/keeper-vault.v1.sanitized.template.json)
