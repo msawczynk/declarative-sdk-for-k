@@ -96,6 +96,31 @@ jobs:
             echo "::endgroup::"
           done
 
+  schema-validate:
+    name: schema-validate (RFC 8259)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # Plain stdlib json.tool — RFC 8259 strict (no trailing commas, no
+      # comments). Sprint 7h-15 LESSON [worker][format-on-rebase-jsonc-trap]:
+      # ruff format over the schemas dir introduces JSONC trailing commas
+      # that pytest tolerates but external schema validators reject.
+      - name: Validate every schema file is RFC 8259-compliant JSON
+        run: |
+          set -e
+          fail=0
+          for f in $(find keeper_sdk/core/schemas -name '*.json' -type f); do
+            if ! python -m json.tool < "$f" > /dev/null 2>&1; then
+              echo "::error file=$f::not RFC 8259-compliant JSON (trailing comma? comment? unquoted key?)"
+              fail=1
+            fi
+          done
+          [ "$fail" -eq 0 ] || exit 1
+          echo "All schema files clean."
+
   drift-check:
     name: drift-check (upstream capability mirror)
     runs-on: ubuntu-latest
@@ -129,7 +154,7 @@ jobs:
   build:
     name: build (sdist + wheel)
     runs-on: ubuntu-latest
-    needs: [lint, typecheck, test, drift-check, examples]
+    needs: [lint, typecheck, test, drift-check, examples, schema-validate]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
