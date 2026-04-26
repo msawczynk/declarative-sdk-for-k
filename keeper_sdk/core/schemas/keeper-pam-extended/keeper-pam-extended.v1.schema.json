@@ -1,23 +1,189 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/msawczynk/declarative-sdk-for-k/schemas/keeper-pam-extended/v1.json",
-  "title": "keeper-pam-extended.v1 (scaffold)",
-  "description": "Scaffold-only schema for the keeper-pam-extended family (P14 in docs/V2_DECISIONS.md). No body yet \u2014 landing as part of P14 work. Validators MUST reject any manifest that declares this schema with a non-empty body until x-keeper-live-proof.status leaves 'scaffold-only'.",
+  "title": "keeper-pam-extended.v1",
+  "description": "Offline schema body for cross-project PAM gateway pool, rotation schedules that target vault records, and discovery rule definitions. service_mappings and saas_mappings stay empty scaffold stubs until v1.1 (no Commander backing yet). See docs/V2_DECISIONS.md Q1 and memo 2026-04-26_keeper-pam-extended-v1-schema-design.md.",
+  "$comment": "TODO v1.1: populate service_mappings and saas_mappings after Commander surface audit.",
   "x-keeper-live-proof": {
     "status": "scaffold-only",
-    "evidence": "pending",
+    "evidence": "memo:2026-04-26_keeper-pam-extended-v1-schema-design.md",
     "since_pin": "89047920a0df857e01fb59adcb0bfb9fa6db70bf",
-    "notes": "Top-level keys planned: gateway_configs, rotation_schedules, discovery_rules, service_mappings, saas_mappings. See docs/V2_DECISIONS.md Q1."
+    "notes": "P14 slice M: gateway_configs, rotation_schedules, discovery_rules. Mappings deferred (maxItems 0). Cross-refs: keeper-vault records, keeper-enterprise nodes, keeper-ksm ksm_apps."
   },
   "type": "object",
-  "required": [
-    "schema"
-  ],
+  "required": ["schema"],
+  "additionalProperties": false,
   "properties": {
     "schema": {
       "type": "string",
       "const": "keeper-pam-extended.v1"
+    },
+    "gateway_configs": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/gateway_config"
+      }
+    },
+    "rotation_schedules": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/rotation_schedule_row"
+      }
+    },
+    "discovery_rules": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/discovery_rule"
+      }
+    },
+    "service_mappings": {
+      "$comment": "TODO v1.1 deferred per P14 memo: no Commander command backing yet.",
+      "type": "array",
+      "maxItems": 0,
+      "default": [],
+      "items": {
+        "type": "object",
+        "additionalProperties": false
+      }
+    },
+    "saas_mappings": {
+      "$comment": "TODO v1.1 deferred per P14 memo: no Commander command backing yet.",
+      "type": "array",
+      "maxItems": 0,
+      "default": [],
+      "items": {
+        "type": "object",
+        "additionalProperties": false
+      }
     }
   },
-  "additionalProperties": false
+  "$defs": {
+    "uid_ref": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "record_ref": {
+      "type": "string",
+      "pattern": "^keeper-vault:records:[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "node_ref": {
+      "type": "string",
+      "pattern": "^keeper-enterprise:nodes:[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "ksm_app_ref": {
+      "type": "string",
+      "pattern": "^keeper-ksm:ksm_apps:[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "rotation_schedule": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type"],
+          "properties": {
+            "type": {
+              "const": "on-demand"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "cron"],
+          "properties": {
+            "type": {
+              "const": "CRON"
+            },
+            "cron": {
+              "type": "string",
+              "minLength": 9
+            }
+          }
+        }
+      ]
+    },
+    "gateway_config": {
+      "type": "object",
+      "required": ["uid_ref", "title", "ksm_application_name"],
+      "additionalProperties": false,
+      "properties": {
+        "uid_ref": {
+          "$ref": "#/$defs/uid_ref"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ksm_application_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "enterprise_node_uid_ref": {
+          "$ref": "#/$defs/node_ref"
+        },
+        "ksm_app_uid_ref": {
+          "$ref": "#/$defs/ksm_app_ref"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "rotation_schedule_row": {
+      "type": "object",
+      "required": ["uid_ref", "schedule", "record_refs"],
+      "additionalProperties": false,
+      "properties": {
+        "uid_ref": {
+          "$ref": "#/$defs/uid_ref"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "schedule": {
+          "$ref": "#/$defs/rotation_schedule"
+        },
+        "record_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/record_ref"
+          },
+          "default": []
+        }
+      }
+    },
+    "discovery_rule": {
+      "type": "object",
+      "required": ["uid_ref", "title", "match_kind", "match_value"],
+      "additionalProperties": false,
+      "properties": {
+        "uid_ref": {
+          "$ref": "#/$defs/uid_ref"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "match_kind": {
+          "type": "string",
+          "enum": ["hostname_regex", "ip_cidr", "tcp_port"]
+        },
+        "match_value": {
+          "type": "string",
+          "minLength": 1
+        },
+        "enterprise_node_uid_ref": {
+          "$ref": "#/$defs/node_ref"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    }
+  }
 }
