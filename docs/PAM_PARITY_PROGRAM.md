@@ -80,7 +80,9 @@ about Commander coverage.
 
 **Still open in later phases:**
 
-- Typed models + provider slices per non-PAM family (rows 3–8 of the PAM bar).
+- Typed models + Commander/provider slices for non-PAM families that are still
+  **no** or **scaffold-only** in the [inventory table](#current-inventory-honest-snapshot)
+  below (excluding the **`keeper-vault.v1` L1 partial** row, which already has models + graph + mock + Commander slice — **G6/V8** + §7 remain).
 - README hero stays PAM-first until those land.
 
 ### Phase 1 — Vault + sharing (highest agent value)
@@ -90,12 +92,16 @@ validates them; `dsk validate --json` exposes `schema_only`, `pam_full`,
 `vault_offline`, and `vault_online` (latter requires Commander + folder) for
 agents.
 
-- Typed models + graph rules for `keeper-vault` / `keeper-vault-sharing`.
-- Commander discover via existing `keeper get` / `keeper ls` patterns extended
-  to non-PAM record UIDs in the declarative folder (design: ownership marker
-  convention parity with PAM).
-- Plan/apply mapping to Commander record APIs; live proof L1 per
-  `docs/live-proof/README.md`.
+- **`keeper-vault.v1` L1 (on `main`):** typed models (`vault_models.py`), graph
+  (`vault_graph.py`), `compute_vault_diff` + mock round-trip, Commander discover
+  (`login` filter) + apply (create, **v3** `RecordEditCommand` UPDATE + `return_result`
+  guard, marker, `rm`), `dsk validate --online`, semantic scalar `login` diff — see
+  [`VAULT_L1_DESIGN.md`](./VAULT_L1_DESIGN.md) §4. **PAM-bar closure** still needs
+  **G6/V8** live proof + matrix + `VAULT_L1_DESIGN` §7 per
+  [`ORCHESTRATION_UNTIL_COMPLETE.md`](./ORCHESTRATION_UNTIL_COMPLETE.md) §7 and
+  [`docs/live-proof/README.md`](./live-proof/README.md).
+- **`keeper-vault-sharing.v1`:** typed models + graph + mock + Commander + live
+  proof (reuse vault patterns — [`ORCHESTRATION_PAM_PARITY.md`](./ORCHESTRATION_PAM_PARITY.md) **V7**).
 
 ### Phase 2 — Enterprise + integrations
 

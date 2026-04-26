@@ -9,7 +9,7 @@ Click-based CLI. Owns the exit-code contract (`docs/VALIDATION_STAGES.md`,
 |---|---:|---|
 | `__init__.py` | 5 | Package marker. |
 | `__main__.py` | 6 | `python -m keeper_sdk.cli` shim → `main:cli`. |
-| `main.py` | 469+ | Click commands (`validate`, `plan`, `diff`, `apply`, `import`, `export`, `report …`) + exit-code orchestration. `EXIT_CHANGES == EXIT_SCHEMA == 2` (intentional overload — see comment + DOR). |
+| `main.py` | 1200+ | Click commands (`validate`, `plan`, `diff`, `apply`, `import`, `export`, `report …`, `live-smoke`) + exit-code orchestration. `EXIT_CHANGES == EXIT_SCHEMA == 2` (intentional overload — see comment + DOR). |
 | `_report/` | — | `dsk report` wrappers: `runner.py` (batch subprocess), `common.py` (JSON envelope + UID fingerprints), `password.py`, `compliance.py`, `security_audit.py`. |
 | `renderer.py` | 104 | `RichRenderer` — human tables for plan/outcomes/diff. Snapshot-tested in `tests/test_renderer_snapshots.py`. |
 
@@ -17,7 +17,7 @@ Click-based CLI. Owns the exit-code contract (`docs/VALIDATION_STAGES.md`,
 
 | Verb | Exit codes | Machine flag | JSON contract |
 |---|---|---|---|
-| `validate` | 0/2/3/5 | `--emit-canonical`, `--json` | `mode` + `family` + stage list (`schema_only` vs `pam_full`) |
+| `validate` | 0/2/3/5 | `--emit-canonical`, `--json`, `--online` | `mode` + `family` + stage list (`schema_only`, `pam_full`, `vault_offline`, `vault_online`; `--online` for **PAM** or **`keeper-vault.v1`** with Commander + folder) |
 | `plan` | 0/2/3/4 | `--json` | shape in `AGENTS.md` |
 | `diff` | 0/2/3 | – | – |
 | `apply` | 0/1/3/4/5 | `--dry-run` (= plan) | per-row outcomes |
@@ -51,4 +51,5 @@ implemented in `main.py` and delegates tenant mutation to
 
 - `DELIVERY_PLAN.md` L92 exit-code semantics: matched.
 - `keeper-sdk` and `pamform` aliases: shipped, deprecation noted in `AGENTS.md`.
-- `validate --online` stages 4 + 5: shipped (W17, then `Provider.check_tenant_bindings()`).
+- `validate --online` stages 4 + 5: shipped for **PAM** (W17, then `Provider.check_tenant_bindings()`)
+  and for **`keeper-vault.v1`** (discover + `compute_vault_diff` + bindings hook; vault L1 hook no-op today).

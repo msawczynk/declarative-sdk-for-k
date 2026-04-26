@@ -27,6 +27,7 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 - **Docs — v1.0.0 GA checklist** — [`V1_GA_CHECKLIST.md`](V1_GA_CHECKLIST.md): `keeper-vault.v1` `validate --online` note under §5 (not a v1.0.0 blocker; PAM-bar / Tier A docs apply).
 - **Docs — examples index** — [`examples/SCAFFOLD.md`](examples/SCAFFOLD.md): CI validate vs mock-plan split; `vaultOneLogin.yaml`; reconciliation note. [`docs/NEXT_SPRINT_PARALLEL_ORCHESTRATION.md`](docs/NEXT_SPRINT_PARALLEL_ORCHESTRATION.md): §7 checklist pointer on hub link.
 - **Docs — CI ladder** — [`docs/ORCHESTRATION_PAM_PARITY.md`](docs/ORCHESTRATION_PAM_PARITY.md) §7: `examples` job vs pytest for vault; optional scaffold `plan` row. [`README.md`](README.md): layout tree includes `examples/SCAFFOLD.md`. [`docs/SCAFFOLD.md`](docs/SCAFFOLD.md): “Where to land” row → §7 + `examples/SCAFFOLD.md`.
+- **Docs — parity Phase 1 + CLI scaffold** — [`docs/PAM_PARITY_PROGRAM.md`](docs/PAM_PARITY_PROGRAM.md): vault L1 shipped vs sharing open; “still open” excludes vault L1 partial row. [`keeper_sdk/cli/SCAFFOLD.md`](keeper_sdk/cli/SCAFFOLD.md): `validate` modes + `--online`; reconciliation vault note; `main.py` LOC band.
 
 ### Added
 - **V8 prep** — [`docs/live-proof/keeper-vault.v1.sanitized.template.json`](docs/live-proof/keeper-vault.v1.sanitized.template.json)
