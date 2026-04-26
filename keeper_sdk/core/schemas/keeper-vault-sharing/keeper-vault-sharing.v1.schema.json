@@ -1,23 +1,212 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/msawczynk/declarative-sdk-for-k/schemas/keeper-vault-sharing/v1.json",
-  "title": "keeper-vault-sharing.v1 (scaffold)",
-  "description": "Scaffold-only schema for the keeper-vault-sharing family (P10 in docs/V2_DECISIONS.md). No body yet \u2014 landing as part of P10 work. Validators MUST reject any manifest that declares this schema with a non-empty body until x-keeper-live-proof.status leaves 'scaffold-only'.",
+  "title": "keeper-vault-sharing.v1",
+  "description": "Offline schema body for Keeper Vault folder and sharing ACL rows. Live tenant proof is still pending.",
   "x-keeper-live-proof": {
     "status": "scaffold-only",
     "evidence": "pending",
     "since_pin": "89047920a0df857e01fb59adcb0bfb9fa6db70bf",
-    "notes": "Top-level keys planned: folders, shared_folders, share_records, share_folders. See docs/V2_DECISIONS.md Q1."
+    "notes": "memo: 2026-04-26_keeper-vault-sharing-v1-schema-design.md. Proof gate: live transcript must show direct record user share plus shared-folder user and record ACL rows converge to a clean re-plan."
   },
   "type": "object",
-  "required": [
-    "schema"
-  ],
+  "required": ["schema"],
+  "additionalProperties": false,
   "properties": {
     "schema": {
       "type": "string",
       "const": "keeper-vault-sharing.v1"
+    },
+    "folders": {
+      "type": "array",
+      "default": [],
+      "items": { "$ref": "#/$defs/folder" }
+    },
+    "shared_folders": {
+      "type": "array",
+      "default": [],
+      "items": { "$ref": "#/$defs/shared_folder" }
+    },
+    "share_records": {
+      "type": "array",
+      "default": [],
+      "items": { "$ref": "#/$defs/record_share" }
+    },
+    "share_folders": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "oneOf": [
+          { "$ref": "#/$defs/shared_folder_grantee_share" },
+          { "$ref": "#/$defs/shared_folder_record_share" },
+          { "$ref": "#/$defs/shared_folder_default_share" }
+        ]
+      }
     }
   },
-  "additionalProperties": false
+  "$defs": {
+    "uid_ref": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "record_ref": {
+      "type": "string",
+      "pattern": "^keeper-vault:records:[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "team_ref": {
+      "type": "string",
+      "pattern": "^keeper-enterprise:teams:[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "sharing_ref": {
+      "type": "string",
+      "pattern": "^keeper-vault-sharing:(folders|shared_folders):[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "record_permissions": {
+      "type": "object",
+      "required": ["can_edit", "can_share"],
+      "additionalProperties": false,
+      "properties": {
+        "can_edit": { "type": "boolean" },
+        "can_share": { "type": "boolean" }
+      }
+    },
+    "folder_grantee_permissions": {
+      "type": "object",
+      "required": ["manage_records", "manage_users"],
+      "additionalProperties": false,
+      "properties": {
+        "manage_records": { "type": "boolean" },
+        "manage_users": { "type": "boolean" }
+      }
+    },
+    "grantee": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind", "user_email"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "user" },
+            "user_email": { "type": "string", "format": "email" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "team_uid_ref"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "team" },
+            "team_uid_ref": { "$ref": "#/$defs/team_ref" }
+          }
+        }
+      ]
+    },
+    "folder": {
+      "type": "object",
+      "required": ["uid_ref", "path"],
+      "additionalProperties": false,
+      "properties": {
+        "uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "path": { "type": "string", "minLength": 1 },
+        "parent_folder_uid_ref": { "$ref": "#/$defs/sharing_ref" },
+        "color": {
+          "type": "string",
+          "enum": ["red", "green", "blue", "orange", "yellow", "gray"]
+        }
+      }
+    },
+    "shared_folder": {
+      "type": "object",
+      "required": ["uid_ref", "path"],
+      "additionalProperties": false,
+      "properties": {
+        "uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "path": { "type": "string", "minLength": 1 },
+        "defaults": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "manage_users": { "type": "boolean" },
+            "manage_records": { "type": "boolean" },
+            "can_edit": { "type": "boolean" },
+            "can_share": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "record_share": {
+      "type": "object",
+      "required": ["uid_ref", "record_uid_ref", "user_email", "permissions"],
+      "additionalProperties": false,
+      "properties": {
+        "uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "record_uid_ref": { "$ref": "#/$defs/record_ref" },
+        "user_email": { "type": "string", "format": "email" },
+        "permissions": { "$ref": "#/$defs/record_permissions" },
+        "expires_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "shared_folder_grantee_share": {
+      "type": "object",
+      "required": [
+        "kind",
+        "uid_ref",
+        "shared_folder_uid_ref",
+        "grantee",
+        "permissions"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "grantee" },
+        "uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "shared_folder_uid_ref": { "$ref": "#/$defs/sharing_ref" },
+        "grantee": { "$ref": "#/$defs/grantee" },
+        "permissions": { "$ref": "#/$defs/folder_grantee_permissions" },
+        "expires_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "shared_folder_record_share": {
+      "type": "object",
+      "required": [
+        "kind",
+        "uid_ref",
+        "shared_folder_uid_ref",
+        "record_uid_ref",
+        "permissions"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "record" },
+        "uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "shared_folder_uid_ref": { "$ref": "#/$defs/sharing_ref" },
+        "record_uid_ref": { "$ref": "#/$defs/record_ref" },
+        "permissions": { "$ref": "#/$defs/record_permissions" },
+        "expires_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "shared_folder_default_share": {
+      "type": "object",
+      "required": [
+        "kind",
+        "uid_ref",
+        "shared_folder_uid_ref",
+        "target",
+        "permissions"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "default" },
+        "uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "shared_folder_uid_ref": { "$ref": "#/$defs/sharing_ref" },
+        "target": { "type": "string", "enum": ["grantee", "record"] },
+        "permissions": {
+          "oneOf": [
+            { "$ref": "#/$defs/folder_grantee_permissions" },
+            { "$ref": "#/$defs/record_permissions" }
+          ]
+        }
+      }
+    }
+  }
 }
