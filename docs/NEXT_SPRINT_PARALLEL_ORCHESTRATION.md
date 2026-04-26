@@ -6,7 +6,7 @@
 
 **Authority:** When this conflicts with a wish-list roadmap, [`SDK_DA_COMPLETION_PLAN.md`](./SDK_DA_COMPLETION_PLAN.md) and [`SDK_ORCHESTRATED_FEATURE_COMPLETE.md`](./SDK_ORCHESTRATED_FEATURE_COMPLETE.md) win on support claims.
 
-**Program exit:** §**15** sequences large sprints to **close capability gaps**, then **§15.3 maintenance mode** for Commander pin / upstream drift only. **§16** is mandatory **after every sprint**: review against daybook and **optimize** the next run (operator optional if integrator is autonomous).
+**Program exit:** §**15** sequences large sprints to **close capability gaps**, then **§15.3 maintenance mode** for Commander pin / upstream drift only. **§16** is mandatory **after every sprint**: review against daybook and **optimize** the next run. **Live tenant / L1:** orchestrator **and** Codex CLI are allowed (same harness + sanitization as `AGENTS.md`). **`.commander-pin`:** never left ambiguous — resolve candidates with **live testing** + drift-check, not guesswork. **Support wording** for Commander semantics lives in **upstream** Commander / Keeper repos; this SDK documents integration + gates only. **Daybook:** private GitHub repo + `sync_daybook.sh`; orchestrator has access (no separate “grant daybook” step).
 
 ---
 
@@ -344,8 +344,9 @@ Use this file as the **single procedure** (not a one-off essay). Order:
 **Goal:** Large sprints burn down **honest gaps** (matrix + SDK_DA “Current Truth” +
 live-proof where you claim `supported`), then the program **downshifts**: work
 runs **independently of the day-to-day operator** via integrator + CI + granted
-agents — operator only on escalations (secrets, support claim, legal, pin
-source of truth ambiguity).
+agents (including **Codex CLI**). Escalate to a human only for **secrets
+exposure**, **legal**, or **out-of-repo** policy — not for pin choice (use live
+evidence) or Commander support copy (upstream owns that).
 
 ### 15.1 What “capability gaps finished” means (exit bar)
 
@@ -378,9 +379,11 @@ strict serialization:
 | D | SDK_DA PAM gaps (rotation, RBI, …) | Per-issue proof or `preview-gated` honesty |
 | E | Optional `dsk report` verbs | Only with R3-style memo |
 
-**Operator-independent:** assign integrator agent + CI for **A/B** smoke and
-drift jobs per `AGENTS.md`; human only for **gate lift** wording if org policy
-requires it.
+**Autonomous:** assign orchestrator agent + **Codex CLI** + CI for **A/B**
+smoke, drift, and L1 per `AGENTS.md` + `docs/live-proof/README.md`. **Supported**
+claims in *this* repo still pass SDK_DA completion gates; user-facing Commander
+**feature** support text is owned by **upstream** Commander / Keeper repos —
+link there rather than duplicating long support prose here.
 
 ### 15.3 Maintenance mode (after gap closure)
 
@@ -389,9 +392,9 @@ only” decision with date (honest partial closure is allowed).
 
 **Sprints look like:**
 
-| Work type | Typical owner | Operator needed? |
-|-----------|---------------|-------------------|
-| Bump `.commander-pin` + regenerate matrix/snapshot | CI or integrator agent | Only if pin source ambiguous |
+| Work type | Typical owner | Human needed? |
+|-----------|---------------|----------------|
+| Bump `.commander-pin` + regenerate matrix/snapshot | CI or integrator / Codex | **No** — if two SHAs are plausible, **live-test** both (smoke subset) and pin the one that passes; document in JOURNAL |
 | `sync_upstream.py --check` on schedule | CI | No |
 | Security / dep bumps (Dependabot, Python floor) | CI + integrator | Rare |
 | Commander breaking API caught by CI | Integrator opens issue + minimal patch | Review PR |
@@ -444,6 +447,8 @@ dated); otherwise JOURNAL only.
    clobber (daybook skill).
 4. Write **next** sprint §1 outcome sentence + §3 board rows **after** §16.3.1–3.
 
-**Operator-independent:** an autonomous integrator may perform §16.1–16.3 if
-daybook paths are writable and `sync_daybook.sh` is available; **human** review
-when support claims or org policy require it.
+**Autonomous integrator** performs §16.1–16.3 using the **private GitHub
+daybook** repo (clone + branch + `sync_daybook.sh` after edits). **Human**
+review only for secret leak, legal, or policies **outside** this repo’s
+contracts — not for Commander product support text (upstream) nor for pin
+arbitration (use live evidence per §15.3).

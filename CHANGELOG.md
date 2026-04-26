@@ -21,6 +21,10 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   parent-only. **§14** plans through this file; **§15** closes capability gaps
   then defines **maintenance mode** (Commander pin / drift, operator-optional);
   **§16** mandates a **daybook review + optimization** after every sprint.
+  **Policy:** orchestrator + **Codex CLI** may run live L1/smoke; **pin** never
+  ambiguous (resolve with live test + drift-check); **support prose** for
+  Commander defers to **upstream** repos; **daybook** = private GitHub +
+  `sync_daybook.sh`.
 - **Live-proof runbook** — `docs/live-proof/README.md` (L1 checklist,
   committed-artifact naming, sanitization expectations). `keeper-vault.v1`
   and `keeper-vault-sharing.v1` now cite it from

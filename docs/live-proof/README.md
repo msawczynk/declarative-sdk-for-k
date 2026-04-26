@@ -1,21 +1,22 @@
 # Live-proof artifacts (`docs/live-proof/`)
 
-**Audience:** maintainer, **or** any agent / automation **explicitly granted**
-live access to a lab tenant for this repo (same bar as
-[`AGENTS.md`](../AGENTS.md) § Autonomous execution). Read this before changing
-`x-keeper-live-proof.status` on a family schema.
+**Audience:** maintainer, **Cursor orchestrator**, **Codex CLI**, or any other
+agent / CI **explicitly granted** live access to a lab tenant for this repo
+(same bar as [`AGENTS.md`](../AGENTS.md) § Autonomous execution). Read this
+before changing `x-keeper-live-proof.status` on a family schema.
 
 **Normative rules:** `keeper_sdk/core/schemas/CONVENTIONS.md` (block shape,
 `since_pin` = full 40-char SHA from `.commander-pin`). Meta schema:
 `keeper_sdk/core/schemas/_meta/x-keeper-live-proof.schema.json`.
 
-## Live access for code (agents, workers, CI)
+## Live access for code (agents, workers, CI, Codex)
 
-Live proof is **not** parent-only. Code may hold the L1 gate **when**:
+Live proof is **not** parent-only. The orchestrator, **Codex CLI**, workers, or
+CI may hold the L1 gate **when**:
 
 - The maintainer has granted **standing or per-sprint** permission (see
-  `AGENTS.md` — smoke harness, or a task body that whitelists exact argv /
-  scenarios and tenant scope).
+  `AGENTS.md` — smoke harness, **Codex/orchestrator** runs with the same
+  whitelist, or a task body that lists exact argv / scenarios and tenant scope).
 - The actor uses **committed** harnesses or documented CLI steps — not
   exploratory shell on the tenant.
 - Raw capture stays **out of git** until sanitized; the same rules as

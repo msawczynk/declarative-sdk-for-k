@@ -100,6 +100,17 @@ for the L1 checklist. **At most one concurrent live session** per tenant
 (coordinate humans + automation so two writers never trample the same
 tenant state).
 
+**Orchestrator + Codex CLI** are in the same grant class as other autonomous
+agents: same harness, same no-secret-dump rules, same L1 checklist in
+`docs/live-proof/README.md`.
+
+**Support text:** end-user documentation for **Commander product behavior**
+belongs in **upstream** Commander / Keeper Security repositories. This SDK’s
+`README`, `AGENTS`, and `docs/` describe **how to use the SDK** (install,
+validate/plan/apply, drift, live-proof discipline) — not a duplicate of
+upstream feature support pages. Link out when semantics need Commander
+authority.
+
 ## Agent playbook
 
 ### A. "Apply this manifest"
