@@ -7,6 +7,13 @@ that needs SDK access. The record stays encrypted at rest, access is controlled
 by the KSM application's shared-folder grants, and reads are audit-logged in
 the Keeper Web UI.
 
+## Bootstrap
+
+Use [`dsk bootstrap-ksm`](./KSM_BOOTSTRAP.md) as the recommended production
+on-ramp. It provisions the KSM application, shares the admin login record,
+redeems a client config, and verifies the config before you switch steady-state
+SDK runs to `KsmLoginHelper`.
+
 ## Admin login record schema
 
 Create one Keeper record for the Commander admin login with these typed fields:
@@ -27,21 +34,37 @@ Web UI screenshot path: `(no image attached)`.
    pip install 'declarative-sdk-for-k[ksm]'
    ```
 
-2. Create a KSM application in Keeper Web UI; share the admin record into its
-   folder.
-3. Download the device config to `~/.keeper/caravan-ksm-config.json`, or put it
-   anywhere and point `KEEPER_SDK_KSM_CONFIG` at it.
+2. Authenticate the source admin Commander session once:
+
+   ```bash
+   keeper login
+   ```
+
+3. Bootstrap KSM:
+
+   ```bash
+   dsk bootstrap-ksm \
+     --app-name dsk-service-admin \
+     --admin-record-uid <uid> \
+     --config-out ~/.keeper/dsk-service-admin-ksm-config.json
+   ```
+
 4. Enable the in-tree helper:
 
    ```bash
    export KEEPER_SDK_LOGIN_HELPER=ksm
    ```
 
-5. Point the helper at the admin record:
+5. Point the helper at the admin record and config:
 
    ```bash
    export KEEPER_SDK_KSM_CREDS_RECORD_UID=<uid>
+   export KEEPER_SDK_KSM_CONFIG=~/.keeper/dsk-service-admin-ksm-config.json
    ```
+
+Manual fallback: if you cannot use interactive Commander, create the KSM
+application in Keeper Web UI, share the admin record into the app, download the
+device config to disk, and set `KEEPER_SDK_KSM_CONFIG` to that path.
 
 ## Env-var matrix
 

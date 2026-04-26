@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 import types
+from pathlib import Path
 from typing import Any
 
 from keeper_sdk.core.errors import CapabilityError
@@ -52,9 +53,12 @@ class FakeSecretsManager:
     records: dict[str, FakeRecord] = {}
     init_calls: list[Any] = []
 
-    def __init__(self, *, config: Any) -> None:
+    def __init__(self, *, config: Any, token: str | None = None, **kwargs: Any) -> None:
+        _ = kwargs
         self.config = config
-        self.__class__.init_calls.append(config)
+        self.__class__.init_calls.append({"config": config, "token_supplied": token is not None})
+        if token is not None and getattr(config, "path", None):
+            Path(config.path).write_text('{"fake":"ksm-config"}', encoding="utf-8")
 
     def get_secrets(self, uids: list[str]) -> list[FakeRecord]:
         return [self.records[uid] for uid in uids if uid in self.records]

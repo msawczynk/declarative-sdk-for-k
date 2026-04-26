@@ -19,6 +19,8 @@ Exit codes:
 
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import os
 import sys
@@ -26,6 +28,7 @@ from pathlib import Path
 
 import click
 
+from keeper_sdk.auth import KsmLoginHelper, LoginHelper, load_helper_from_path
 from keeper_sdk.cli.renderer import RichRenderer
 from keeper_sdk.core import (
     CapabilityError,
@@ -45,6 +48,7 @@ from keeper_sdk.core import (
 )
 from keeper_sdk.core.planner import Plan
 from keeper_sdk.providers import CommanderCliProvider, MockProvider
+from keeper_sdk.secrets import bootstrap_ksm_application
 
 EXIT_OK = 0
 EXIT_GENERIC = 1
@@ -201,6 +205,98 @@ def export_cmd(commander_json: Path, name: str | None, output: Path | None) -> N
         click.echo(f"wrote {output}")
     else:
         click.echo(rendered)
+
+
+# ---------------------------------------------------------------------------
+# bootstrap-ksm
+
+
+@main.command("bootstrap-ksm")
+@click.option("--app-name", required=True, help="KSM application name, 64 characters max")
+@click.option("--admin-record-uid", default=None, help="Existing admin login record UID")
+@click.option("--create-admin-record", is_flag=True, help="Create a placeholder admin login record")
+@click.option(
+    "--config-out",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="Output ksm-config.json path (defaults to ~/.keeper/<app-name>-ksm-config.json)",
+)
+@click.option(
+    "--first-access-minutes",
+    type=click.IntRange(0, 1440),
+    default=10,
+    show_default=True,
+    help="Client token first-access expiry in minutes",
+)
+@click.option("--unlock-ip", is_flag=True, help="Create the KSM client without IP lock")
+@click.option("--with-bus", is_flag=True, help="Create or reuse the Phase B bus directory record")
+@click.option("--bus-title", default="dsk-agent-bus-directory", show_default=True)
+@click.option("--overwrite", is_flag=True, help="Overwrite an existing --config-out file")
+@click.option(
+    "--login-helper",
+    default="commander",
+    show_default=True,
+    help="Source admin session: commander, ksm, or /path/to/custom_helper.py",
+)
+def bootstrap_ksm_cmd(
+    app_name: str,
+    admin_record_uid: str | None,
+    create_admin_record: bool,
+    config_out: Path | None,
+    first_access_minutes: int,
+    unlock_ip: bool,
+    with_bus: bool,
+    bus_title: str,
+    overwrite: bool,
+    login_helper: str,
+) -> None:
+    """Provision a KSM application, admin-record share, client token, and config."""
+    try:
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            params = _params_for_bootstrap(login_helper)
+            config_path = config_out or (Path.home() / ".keeper" / f"{app_name}-ksm-config.json")
+            result = bootstrap_ksm_application(
+                params=params,
+                app_name=app_name,
+                admin_record_uid=admin_record_uid,
+                create_admin_record=create_admin_record,
+                config_out=config_path.expanduser().resolve(),
+                first_access_minutes=first_access_minutes,
+                unlock_ip=unlock_ip,
+                create_bus_directory=with_bus,
+                bus_directory_title=bus_title,
+                overwrite=overwrite,
+            )
+    except CapabilityError as exc:
+        click.echo(
+            json.dumps(
+                {
+                    "status": "fail",
+                    "reason": exc.reason,
+                    "next_action": exc.next_action or "",
+                },
+                separators=(",", ":"),
+            )
+        )
+        sys.exit(EXIT_CAPABILITY)
+
+    payload = {
+        "status": "ok",
+        "app_uid": _uid_prefix(result.app_uid),
+        "record_uid": _uid_prefix(result.admin_record_uid),
+        "config_path": str(Path(result.config_path).expanduser().resolve()),
+        "bus_uid": _uid_prefix(result.bus_directory_uid) if result.bus_directory_uid else None,
+        "expires_at": result.expires_at_iso,
+        "created_admin_record": result.created_admin_record,
+        "created_bus_directory": result.created_bus_directory,
+    }
+    if result.created_admin_record:
+        payload["warning"] = (
+            "admin record created with placeholder fields; populate login/password/oneTimeCode "
+            "in Web UI"
+        )
+    click.echo(json.dumps(payload, separators=(",", ":")))
+    sys.exit(EXIT_OK)
 
 
 # ---------------------------------------------------------------------------
@@ -428,6 +524,61 @@ def _make_provider(ctx: click.Context, manifest_path: Path, *, manifest=None):
             manifest_source=manifest_source,
         )
     raise click.ClickException(f"unknown provider '{provider_name}'")
+
+
+def _params_for_bootstrap(login_helper: str):
+    if login_helper == "commander":
+        return _load_commander_config_params()
+    helper: LoginHelper
+    if login_helper == "ksm":
+        helper = KsmLoginHelper()
+    else:
+        helper = load_helper_from_path(login_helper)
+    creds = helper.load_keeper_creds()
+    params = helper.keeper_login(**creds)
+    if not getattr(params, "session_token", None):
+        raise CapabilityError(
+            reason="login helper returned no Commander session token",
+            next_action="verify the helper authenticates successfully before running bootstrap-ksm",
+        )
+    return params
+
+
+def _load_commander_config_params():
+    try:
+        from keepercommander.config_storage.loader import load_config_properties
+        from keepercommander.params import KeeperParams
+    except ImportError as exc:
+        raise CapabilityError(
+            reason=f"keepercommander is required for bootstrap-ksm commander login mode: {exc}",
+            next_action="pip install keepercommander>=17.2.13,<18",
+        ) from exc
+
+    config_path = Path.home() / ".keeper" / "config.json"
+    config: dict[str, object] = {}
+    if config_path.is_file():
+        try:
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            raise CapabilityError(
+                reason=f"cannot parse Commander config at {config_path}: {exc}",
+                next_action="run 'keeper login' again to refresh the source admin session",
+            ) from exc
+
+    params = KeeperParams(config_filename=str(config_path), config=config)
+    load_config_properties(params)
+    if not getattr(params, "session_token", None):
+        raise CapabilityError(
+            reason="Commander config has no authenticated session token",
+            next_action="run 'keeper login' first to authenticate the source admin session",
+        )
+    return params
+
+
+def _uid_prefix(uid: str | None) -> str:
+    if not uid:
+        return ""
+    return uid[:6] + "..." if len(uid) > 6 else uid
 
 
 def _exit_from_plan(plan_obj: Plan) -> int:

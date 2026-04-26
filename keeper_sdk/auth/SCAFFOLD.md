@@ -40,6 +40,7 @@ Receives optional overrides; returns an authenticated `keepercommander.params.Ke
 | Helper protocol: pure function returning `KeeperParams`. No side effects on import. | shipped | `LoginHelper` protocol |
 | Tests use mocks; never network. | shipped | `tests/test_auth_helper.py`, `tests/test_auth_ksm.py` |
 | `KsmLoginHelper` works without `keeper_secrets_manager_core` import (lazy) | shipped | `tests/test_secrets_ksm.py::test_lazy_import_does_not_crash` |
+| Bootstrap path: `dsk bootstrap-ksm` provisions app + share + client token + config | shipped | `keeper_sdk/secrets/bootstrap.py`, `tests/test_bootstrap_ksm.py` |
 
 ## Reconciliation vs design
 
