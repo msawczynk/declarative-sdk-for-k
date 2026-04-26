@@ -7,7 +7,8 @@ Subcommands:
     import     - adopt unmanaged matching records and write ownership markers
     diff       - plan + field-by-field render
     apply      - execute a plan via the selected provider
-    report     - read-only Commander reports (JSON, redacted)
+    report     - read-only Commander reports: password-report, compliance-report,
+                 security-audit-report (JSON, redacted)
 
 Exit codes:
     0 success, clean
@@ -661,6 +662,116 @@ def report_password_report(
             policy=policy,
             folder=folder,
             verbose=verbose,
+            quiet=quiet,
+            keeper_bin=keeper_bin,
+            config_file=os.environ.get("KEEPER_CONFIG"),
+            password=os.environ.get("KEEPER_PASSWORD"),
+        )
+    except CapabilityError as exc:
+        click.echo(f"report error: {exc}", err=True)
+        sys.exit(EXIT_CAPABILITY)
+    click.echo(json.dumps(payload, indent=2))
+    sys.exit(EXIT_OK)
+
+
+@report_cli.command("compliance-report")
+@click.option("--node", default=None, help="Node ID or name (Commander --node)")
+@click.option("--username", multiple=True, help="Filter by username (repeatable)")
+@click.option("--team", multiple=True, help="Filter by team name or UID (repeatable)")
+@click.option("--rebuild", is_flag=True, help="Rebuild local compliance cache from source")
+@click.option("--no-cache", is_flag=True, help="Remove local compliance cache after report")
+@click.option(
+    "--quiet",
+    is_flag=True,
+    help="Fingerprint record_uid values in JSON output",
+)
+@click.option(
+    "--keeper-bin",
+    default=None,
+    envvar="KEEPER_BIN",
+    help="Path to keeper CLI (default: keeper on PATH)",
+)
+def report_compliance_report(
+    node: str | None,
+    username: tuple[str, ...],
+    team: tuple[str, ...],
+    rebuild: bool,
+    no_cache: bool,
+    quiet: bool,
+    keeper_bin: str | None,
+) -> None:
+    """Default enterprise compliance table via ``keeper compliance report``."""
+    from keeper_sdk.cli._report.compliance import run_compliance_report
+
+    try:
+        payload = run_compliance_report(
+            node=node,
+            username=username,
+            team=team,
+            rebuild=rebuild,
+            no_cache=no_cache,
+            quiet=quiet,
+            keeper_bin=keeper_bin,
+            config_file=os.environ.get("KEEPER_CONFIG"),
+            password=os.environ.get("KEEPER_PASSWORD"),
+        )
+    except CapabilityError as exc:
+        click.echo(f"report error: {exc}", err=True)
+        sys.exit(EXIT_CAPABILITY)
+    click.echo(json.dumps(payload, indent=2))
+    sys.exit(EXIT_OK)
+
+
+@report_cli.command("security-audit-report")
+@click.option("--node", multiple=True, help="Node name or UID filter (repeatable)")
+@click.option(
+    "--record-details",
+    is_flag=True,
+    help="Per-record password strength rows (when incremental data exists)",
+)
+@click.option("--breachwatch", is_flag=True, help="Include BreachWatch columns when licensed")
+@click.option(
+    "--score-type",
+    type=click.Choice(["default", "strong_passwords"]),
+    default="default",
+    show_default=True,
+)
+@click.option(
+    "-f",
+    "--force",
+    is_flag=True,
+    help="Skip confirmation prompts (Commander non-interactive)",
+)
+@click.option(
+    "--quiet",
+    is_flag=True,
+    help="Fingerprint record_uid when using --record-details",
+)
+@click.option(
+    "--keeper-bin",
+    default=None,
+    envvar="KEEPER_BIN",
+    help="Path to keeper CLI (default: keeper on PATH)",
+)
+def report_security_audit_report(
+    node: tuple[str, ...],
+    record_details: bool,
+    breachwatch: bool,
+    score_type: str,
+    force: bool,
+    quiet: bool,
+    keeper_bin: str | None,
+) -> None:
+    """Enterprise security audit summary via ``keeper security-audit report``."""
+    from keeper_sdk.cli._report.security_audit import run_security_audit_report
+
+    try:
+        payload = run_security_audit_report(
+            nodes=node,
+            record_details=record_details,
+            breachwatch=breachwatch,
+            score_type=score_type,
+            force=force,
             quiet=quiet,
             keeper_bin=keeper_bin,
             config_file=os.environ.get("KEEPER_CONFIG"),
