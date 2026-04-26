@@ -131,6 +131,26 @@ and `tests/test_smoke_scenarios.py`.
       Partial-apply outcomes + `keepercommander` floor gate are covered in
       `test_commander_cli.py` (`test_apply_partial_failure_records_outcomes_then_raises`,
       `test_apply_rejects_keepercommander_below_minimum`).
+- [x] **KSM as first-class SDK feature** — `dsk bootstrap-ksm` provisions
+      the app + admin-record share + one-time client token + redeemed
+      `ksm-config.json` end-to-end (`keeper_sdk/secrets/bootstrap.py`);
+      `KsmLoginHelper` reads Commander credentials *back out* of that
+      vault (`keeper_sdk/auth/helper.py` + `keeper_sdk/secrets/ksm.py`);
+      Phase B inter-agent bus directory provisioned but client sealed
+      (`secrets/bus.py` raises `NotImplementedError`). 264 unit tests;
+      docs at `docs/KSM_BOOTSTRAP.md` + `docs/KSM_INTEGRATION.md`. Was
+      a v1.x roadmap row; delivered in 2026-04-26 Sprint 7h-6
+      (PRs #13/#14). End-to-end live bootstrap → login → apply loop is
+      the next proof gate (offline tests are green).
+- [x] **Coverage ratchet floor 83 → 84** with new baseline 86.32% across
+      315 tests after redact / schema / normalize 100%-coverage slices
+      (PRs #17/#18/#19) and ratchet bump (PR #20). `ci.yml` comment
+      updated for the new baseline + test count.
+- [x] **Scope-fence CI workflow** (`.github/workflows/scope-fence.yml`)
+      — structural denylist for orchestration / daybook / per-session
+      path globs; only ADDS trip the fence (`--diff-filter=A`).
+      Prevents the recurring orchestration-leak bug class.
+      Delivered 2026-04-26 Sprint 7h-6 (PR #16).
 - [ ] Module rename from `keeper_sdk` → `declarative_sdk_k` (breaking, v2.0.0;
       will ship a shim module so `import keeper_sdk` keeps working for
       one minor cycle).

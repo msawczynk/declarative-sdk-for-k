@@ -6,6 +6,86 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- **KSM as first-class SDK feature** — three new modules in
+  `keeper_sdk/secrets/` close the credential loop end-to-end:
+  - `bootstrap.py` provisions a Keeper Secrets Manager application,
+    shares the Commander admin record into it, generates a one-time
+    client token, redeems that token into a local
+    `~/.keeper/<app-name>-ksm-config.json`, and verifies the resulting
+    KSM client can see the admin-record shape `KsmLoginHelper` expects.
+    Exposed as `dsk bootstrap-ksm --app-name … [--admin-record-uid …]
+    [--create-admin-record] [--first-access-minutes …] [--unlock-ip]
+    [--with-bus] [--login-helper commander|ksm|<path>]`.
+  - `ksm.py` ships `KsmSecretStore` (thin façade over
+    `keeper_secrets_manager_core.SecretsManager` with field-value
+    caching), `KsmLoginCreds` dataclass, and
+    `load_keeper_login_from_ksm()` — used by
+    `keeper_sdk.auth.KsmLoginHelper` so SDK callers can authenticate
+    Commander *from* KSM with no plaintext env vars on the host.
+    Resolves the config from `$KEEPER_SDK_KSM_CONFIG`, `$KSM_CONFIG`,
+    `~/.keeper/caravan-ksm-config.json`, or
+    `~/.keeper/ksm-config.json` (first usable wins). Field-name
+    overrides via `KEEPER_SDK_KSM_LOGIN_FIELD` /
+    `KEEPER_SDK_KSM_PASSWORD_FIELD` / `KEEPER_SDK_KSM_TOTP_FIELD` /
+    `KEEPER_SDK_KSM_CREDS_RECORD_UID`. TOTP normalisation accepts
+    both `otpauth://` URIs and bare base32 secrets.
+  - `bus.py` is a sealed Phase B skeleton — every public entry point
+    raises `NotImplementedError` with a precise next-action so
+    accidental imports fail loudly. The `bootstrap_ksm_application
+    (create_bus_directory=True, …)` flow already provisions the
+    on-tenant directory record this module will read/write; that
+    contract is frozen and unit-tested. Wire format, CAS semantics,
+    and implementation checklist are documented in the module
+    docstring.
+  - `keeper_sdk.auth.KsmLoginHelper` joins `EnvLoginHelper` as a
+    reference `LoginHelper` impl; `keeper_sdk.providers.commander_cli`
+    accepts `--login-helper ksm` or `--login-helper /path/to/helper.py`.
+  - New docs: `docs/KSM_BOOTSTRAP.md` (operator runbook for
+    `dsk bootstrap-ksm`) and `docs/KSM_INTEGRATION.md` (end-to-end
+    bootstrap → `ksm-config.json` → `KsmLoginHelper` → SDK story).
+  - 264 unit tests across `tests/test_auth_ksm.py`,
+    `tests/test_secrets_ksm.py`, `tests/test_bootstrap_ksm.py`, and
+    `tests/_fakes/{ksm,commander}.py` (offline-green; live
+    bootstrap → login → apply loop is the next gate).
+- **Scope-fence CI workflow** (`.github/workflows/scope-fence.yml`) —
+  structural denylist that fails on newly-ADDED paths matching the
+  orchestration / daybook / per-session globs (union of LESSONS
+  `[scope][drift][prevention]` and historical pruning branches).
+  `git diff --diff-filter=A` so only ADDS trip the fence;
+  modifications to pre-existing tracked files don't fire. Activated
+  alongside the regular `lint / typecheck / test / examples /
+  drift-check` jobs.
+- **Per-module 100% coverage** for three core modules with no API
+  changes — `keeper_sdk/core/redact.py`, `keeper_sdk/core/schema.py`,
+  `keeper_sdk/core/normalize.py` — via expanded edge-case tests in
+  `tests/test_redact.py`, `tests/test_schema.py`,
+  `tests/test_normalize.py`. Total suite now 315 tests / 86.32% line
+  coverage (was 277 / 85.4%).
+- **Cov ratchet floor raised to 84%** in
+  `.github/workflows/ci.yml::test` — `pytest --cov-fail-under=84`
+  (was 83). Comment block updated for the new baseline (86% across
+  3604 LOC / 315 tests). Floor stays at `baseline - 2` so small
+  refactors don't gate CI while still catching ~70 LOC regressions.
+
+### Fixed
+- **Rotation drift resume** — `keeper_sdk/providers/commander_cli.py`
+  no longer loops on `session_token_expired` during rotation re-plan
+  after a session refresh. The bounded in-process refresh helper now
+  walks `__cause__` correctly when the original exception is wrapped
+  by Commander's session-management layer; pinned by
+  `tests/test_session_refresh_*` regression tests.
+
+### Changed
+- `README.md` reconciled against the new `main`: dated 2026-04-26,
+  test count 216 → 315, coverage 86.32% (CI floor 84), KSM-as-feature
+  surfaced with offline-green / live-gate-pending caveat. Capability
+  scope KSM row rewritten to include `dsk bootstrap-ksm` and
+  `KsmLoginHelper`. Layout block adds `keeper_sdk/secrets/`, the
+  `KsmLoginHelper` mention under `auth/`, `bootstrap-ksm` in the CLI
+  list, and `docs/KSM_BOOTSTRAP.md` + `docs/KSM_INTEGRATION.md` in
+  the docs index. New "Quick start (KSM bootstrap)" subsection.
+
 ### Removed
 - In-tree orchestration / Codex CLI stack: `docs/CODEX_CLI.md`,
   `docs/CODEX_GITHUB.md`, `docs/ORCHESTRATION_PHASE0_PARALLEL.md`,
