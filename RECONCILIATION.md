@@ -1,7 +1,7 @@
 # RECONCILIATION — design vs tree
 
-Written: 2026-04-26 (agent scaffold pass).
-Source of truth: this repo @ HEAD `7b2c022` (clean working tree).
+Written: 2026-04-26 (agent scaffold pass; refreshed 2026-04-26 Sprint 7h-7 for the KSM-as-feature delivery).
+Source of truth: this repo @ HEAD `98bb3a4` (post-merge cascade: PRs #13/#14/#15/#16/#17/#18/#19/#20/#21).
 Cross-checks against `V1_GA_CHECKLIST.md`, `docs/SDK_DA_COMPLETION_PLAN.md`,
 `docs/SDK_ORCHESTRATED_FEATURE_COMPLETE.md`, `AUDIT.md`, `REVIEW.md`, and
 DOR pointers in `keeper-pam-declarative/`.
@@ -68,6 +68,9 @@ Every modeled capability must classify as `supported` / `preview-gated` / `upstr
 | Standalone top-level `pamUser` | preview-gated → v1.1 | guarded | – | – | `V1_GA_CHECKLIST.md` § 6 |
 | Gateway `mode: create` | preview-gated / design-only | guarded | – | – | `docs/ISSUE_7_GATEWAY_CREATE_PROJECTS_DESIGN.md` |
 | Top-level `projects[]` | preview-gated / design-only | guarded | – | – | same |
+| KSM application provisioning (`dsk bootstrap-ksm`) | supported | shipped | offline-green; live gate next | open | `keeper_sdk/secrets/bootstrap.py`; 89 unit tests in `tests/test_bootstrap_ksm.py`; docs in `docs/KSM_BOOTSTRAP.md`. End-to-end live bootstrap → login → apply loop is the next proof. |
+| `KsmLoginHelper` (Commander credentials read from KSM) | supported | shipped | offline-green; live gate next | open | `keeper_sdk/auth/helper.py::KsmLoginHelper` + `keeper_sdk/secrets/ksm.py`; 175 unit tests across `tests/test_auth_ksm.py` + `tests/test_secrets_ksm.py`; docs in `docs/KSM_INTEGRATION.md`. |
+| Phase B inter-agent KSM bus (`secrets/bus.py`) | preview-gated / skeleton | sealed (raises `NotImplementedError`) | – | – | Bootstrap already provisions the directory record via `--with-bus`; client implementation deferred. Wire format + CAS semantics + implementation checklist frozen in module docstring. |
 
 DA Definition-of-Done compliance:
 - ✅ GitHub install path works (git URL + release wheel/sdist).
@@ -109,6 +112,10 @@ Prior `SCAFFOLD.md` predates several committed paths. Refresh applied:
 
 - `tests/test_errors.py` — `DeleteUnsupportedError` compat shim.
 - `tests/test_rbi_readback.py` — RBI discover + DAG-merge unit tests.
+- `keeper_sdk/secrets/{bootstrap,ksm,bus}.py` — KSM-as-feature delivery (Sprint 7h-6).
+- `tests/test_auth_ksm.py`, `tests/test_secrets_ksm.py`, `tests/test_bootstrap_ksm.py`, `tests/_fakes/{ksm,commander}.py` — 264 KSM unit tests.
+- `docs/KSM_BOOTSTRAP.md`, `docs/KSM_INTEGRATION.md` — KSM operator docs.
+- `.github/workflows/scope-fence.yml` — structural orchestration-path denylist.
 - This file (`RECONCILIATION.md`) and the per-folder `SCAFFOLD.md` set.
 
 The `scripts/agent/` Codex CLI orchestration tree (offline slice / live

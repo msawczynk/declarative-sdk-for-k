@@ -4,7 +4,12 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    # Trigger on PRs targeting `main` AND PRs targeting any `cursor/**`
+    # or `codex/**` branch so stacked PRs (child PRs whose base is a
+    # parent PR's branch instead of `main`) receive CI signal before
+    # they're rebased onto `main`. Lesson `[pr-merge][stacked-base-retarget]`
+    # 2026-04-26 traced a CI-blind merge to this gap.
+    branches: [main, 'cursor/**', 'codex/**']
 
 permissions:
   contents: read
