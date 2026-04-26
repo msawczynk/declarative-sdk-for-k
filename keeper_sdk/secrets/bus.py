@@ -5,7 +5,7 @@ Status
 
 This module is **not implemented**. It is a sealed scaffold so the next
 agent can wire the API without re-deriving the design. Every public entry
-point raises :class:`NotImplementedError` with a precise next-action so
+point raises :class:`CapabilityError` with a precise next-action so
 accidental imports fail loudly instead of silently no-oping.
 
 The ``bootstrap_ksm_application(create_bus_directory=True, ...)`` flow
@@ -117,8 +117,8 @@ Next-action checklist for the implementing agent
    operators can debug without writing Python.
 
 Until the steps above are done this module stays sealed: importing it is
-fine, instantiating ``BusClient`` raises so the guardrail is structural,
-not aspirational.
+fine, instantiating ``BusClient`` raises :class:`CapabilityError` so the
+guardrail is structural, not aspirational.
 """
 
 from __future__ import annotations
