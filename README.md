@@ -25,7 +25,7 @@ in the maintainer's private daybook, not this repo.
 | PAM resources        | machines, databases, directories, nested users, remote-browsers (GA lifecycle; preview-gated tuning gaps called out below) | rotation settings, standalone users, JIT, gateway `mode: create` (behind `DSK_PREVIEW=1`) |
 | Gateways             | `reference_existing` mode            | `create` mode                |
 | Shared folders       | scope + membership refs              | permissions matrix           |
-| KSM applications     | reference_existing + share-bindings; **`dsk bootstrap-ksm` provisions an app + admin-record share + one-time client token + redeemed `ksm-config.json`**; `KsmLoginHelper` pulls Commander credentials *from* KSM (close the loop). Phase B inter-agent bus directory is provisioned but the client is sealed (`secrets/bus.py` raises `NotImplementedError`). | client-token rotation; bus client implementation |
+| KSM applications     | reference_existing + share-bindings; **`dsk bootstrap-ksm` provisions an app + admin-record share + one-time client token + redeemed `ksm-config.json`**; `KsmLoginHelper` pulls Commander credentials *from* KSM (close the loop). Phase B inter-agent bus directory is provisioned but the client is sealed (`secrets/bus.py` raises `CapabilityError`). | client-token rotation; bus client implementation |
 | Ownership markers    | read + write + adopt                 | multi-manager arbitration    |
 | Vault records (non-PAM) | typed-model read/write via `login` resource | generic records, file records |
 | Teams / roles        | discover surface only                | full declarative lifecycle   |

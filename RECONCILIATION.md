@@ -1,7 +1,7 @@
 # RECONCILIATION — design vs tree
 
-Written: 2026-04-26 (agent scaffold pass; refreshed 2026-04-26 Sprint 7h-7 for the KSM-as-feature delivery).
-Source of truth: this repo @ HEAD `98bb3a4` (post-merge cascade: PRs #13/#14/#15/#16/#17/#18/#19/#20/#21).
+Written: 2026-04-26 (agent scaffold pass; refreshed 2026-04-26 Sprint 7h-9 for the KSM-as-feature delivery).
+Source of truth: this repo @ HEAD `b2a50b3` (post-merge cascade: PRs #13/#14/#15/#16/#17/#18/#19/#20/#21/#22).
 Cross-checks against `V1_GA_CHECKLIST.md`, `docs/SDK_DA_COMPLETION_PLAN.md`,
 `docs/SDK_ORCHESTRATED_FEATURE_COMPLETE.md`, `AUDIT.md`, `REVIEW.md`, and
 DOR pointers in `keeper-pam-declarative/`.
@@ -16,7 +16,7 @@ This is for human + agent review. Per-folder maps live in `<dir>/SCAFFOLD.md`.
 - **Two open clean-re-plan gates** (preview-gated, not GA blockers): nested-`pamUser` rotation (P2.1), `pamRemoteBrowser` RBI tuning (P3). Apply paths shipped; re-plan parent-verification is the final lift.
 - **Three v1.1 deferrals tracked + accepted:** adoption smoke against unmanaged records, field-drift→UPDATE smoke, two-writer ownership-marker race smoke.
 - **One v2 deferral:** module rename `keeper_sdk` → `declarative_sdk_k` (will ship compat shim).
-- **Nothing has been silently dropped.** Every preview-gated key fails loud at apply via `_assert_no_unsupported_capabilities` + plan-surface CONFLICT rows (C3 fix; H6 regression test).
+- **Nothing has been silently dropped.** Every preview-gated key fails loud at apply via `_detect_unsupported_capabilities` + plan-surface CONFLICT rows (C3 fix; H6 regression test).
 
 ---
 
@@ -70,13 +70,13 @@ Every modeled capability must classify as `supported` / `preview-gated` / `upstr
 | Top-level `projects[]` | preview-gated / design-only | guarded | – | – | same |
 | KSM application provisioning (`dsk bootstrap-ksm`) | supported | shipped | offline-green; live gate next | open | `keeper_sdk/secrets/bootstrap.py`; 89 unit tests in `tests/test_bootstrap_ksm.py`; docs in `docs/KSM_BOOTSTRAP.md`. End-to-end live bootstrap → login → apply loop is the next proof. |
 | `KsmLoginHelper` (Commander credentials read from KSM) | supported | shipped | offline-green; live gate next | open | `keeper_sdk/auth/helper.py::KsmLoginHelper` + `keeper_sdk/secrets/ksm.py`; 175 unit tests across `tests/test_auth_ksm.py` + `tests/test_secrets_ksm.py`; docs in `docs/KSM_INTEGRATION.md`. |
-| Phase B inter-agent KSM bus (`secrets/bus.py`) | preview-gated / skeleton | sealed (raises `NotImplementedError`) | – | – | Bootstrap already provisions the directory record via `--with-bus`; client implementation deferred. Wire format + CAS semantics + implementation checklist frozen in module docstring. |
+| Phase B inter-agent KSM bus (`secrets/bus.py`) | preview-gated / skeleton | sealed (raises `CapabilityError`) | – | – | Bootstrap already provisions the directory record via `--with-bus`; client implementation deferred. Wire format + CAS semantics + implementation checklist frozen in module docstring. |
 
 DA Definition-of-Done compliance:
 - ✅ GitHub install path works (git URL + release wheel/sdist).
 - ✅ Full local checks + GitHub CI green on `main`.
 - ✅ All modeled keys classify into one bucket.
-- ✅ No preview-gated key silently applies or silently drops (`_assert_no_unsupported_capabilities` + plan CONFLICT rows; C3 + D-4 + H6).
+- ✅ No preview-gated key silently applies or silently drops (`_detect_unsupported_capabilities` + plan CONFLICT rows; C3 + D-4 + H6).
 - ⚠️ Live smoke matrix green for **all** supported mutating surfaces — yes for machine/db/dir; RBI + nested-rotation are **preview-gated**, so this DOD row holds.
 - ✅ Unsupported capabilities fail with clear `next_action`.
 - ✅ Docs + scaffold match current behaviour.
