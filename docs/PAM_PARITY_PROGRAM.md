@@ -45,7 +45,7 @@ complete the JSON file looks.
 | Family | Packaged schema | Wired into `dsk` core + Commander provider | Typical `x-keeper-live-proof` |
 |--------|-----------------|------------------------------------------|--------------------------------|
 | `pam-environment.v1` | yes (`pam-environment.v1.schema.json`) | **yes** | `supported` on proven paths |
-| `keeper-vault.v1` | yes | **partial** — `dsk validate` (offline + `--online` Commander), `plan` / `diff` / `apply` on mock + Commander L1 **`login`** slice; `compute_vault_diff` semantic **login** compare (manifest `fields[]` vs flattened live); matrix “F” + `supported` live proof still open | `scaffold-only` |
+| `keeper-vault.v1` | yes | **partial** — `dsk validate` (offline + `--online` Commander + folder), `plan` / `diff` / `apply` on mock + Commander L1 **`login`** (create + **v3 JSON UPDATE** via `RecordEditCommand` + `return_result` guard, marker refresh, `rm`); `compute_vault_diff` semantic scalar **login** compare (manifest `fields[]` vs flattened live — see [`VAULT_L1_DESIGN.md`](./VAULT_L1_DESIGN.md) §4); matrix + `supported` live proof still **G6 / V8** | `scaffold-only` |
 | `keeper-vault-sharing.v1` | yes | **no** | `scaffold-only` |
 | `keeper-enterprise.v1` | yes | **no** | scaffold / partial slices in design memos only |
 | `keeper-integrations-identity.v1` | yes | **no** | scaffold-only |
@@ -73,8 +73,10 @@ about Commander coverage.
 - Optional `schema: pam-environment.v1` on PAM manifests (JSON Schema + canonicalise).
 - `keeper_sdk/core/manifest.py`: `read_manifest_document`; `load_manifest` refuses
   non-PAM typed loads with a clear `ManifestError`.
-- `dsk validate`: JSON Schema for any packaged family; uid_ref graph + `--online`
-  only for `pam-environment.v1`.
+- `dsk validate`: JSON Schema for any packaged family. **`pam-environment.v1`**
+  runs uid_ref graph offline and full stages 4–5 with `--online`. **`keeper-vault.v1`**
+  runs `build_vault_graph` offline (stages 1–3 analogue) and stages 4–5 with
+  `--online` + Commander + folder scope (no PAM gateway probe).
 
 **Still open in later phases:**
 
@@ -84,7 +86,8 @@ about Commander coverage.
 ### Phase 1 — Vault + sharing (highest agent value)
 
 **1a (shipped incrementally):** `examples/scaffold_only/*.yaml` samples; CI
-validates them; `dsk validate --json` exposes `schema_only` vs `pam_full` for
+validates them; `dsk validate --json` exposes `schema_only`, `pam_full`,
+`vault_offline`, and `vault_online` (latter requires Commander + folder) for
 agents.
 
 - Typed models + graph rules for `keeper-vault` / `keeper-vault-sharing`.

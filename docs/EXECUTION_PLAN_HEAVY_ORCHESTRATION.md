@@ -87,11 +87,10 @@ scaffold vault file **only** when safe).
 | PR | Focus | Notes |
 |----|--------|------|
 | **V5** | Commander **discover** for vault slice | Mocked tests + minimal live smoke optional |
-| **V6** | Commander **apply** + delete policy | Contract tests; live proof rehearsal |
+| **V6** | Commander **apply** — `RecordAddCommand` create, **v3** `RecordEditCommand` UPDATE (body merge + `return_result` guard), `_write_marker`, **`rm`** delete policy | Contract tests; `dsk validate --online` rehearsal optional; **sanitized L1 transcript = L1 row / V8** (not implied by V6 alone) |
 | **L1** | Sanitized transcript + evidence file | **One** actor on tenant; follow `docs/live-proof/README.md` |
 
-**Exit criteria:** V6 green offline; L1 artifact exists and is linked from schema
-draft (prep for V8).
+**Exit criteria:** V6 green offline (and in CI); **L1** / **V8** = committed sanitized JSON + schema/matrix/README per live-proof checklist (may trail V6 merge).
 
 ---
 
