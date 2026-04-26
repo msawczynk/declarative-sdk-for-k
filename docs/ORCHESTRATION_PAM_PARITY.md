@@ -75,11 +75,14 @@ stale versus `main` — it is **not** a second source of truth.
 Each row is a **mergeable** unit; integrator runs **full** `pytest` + `ruff` +
 `mypy` + `sync_upstream.py --check` (if touched) before merge.
 
+> **Skim:** if any “Delivers” / “Touches” cell below disagrees with `main`, treat **§1**
+> + [`ORCHESTRATION_UNTIL_COMPLETE.md`](./ORCHESTRATION_UNTIL_COMPLETE.md) §2 as authoritative — this table is **chronological**, not a second status source.
+
 | PR | Title (suggested) | Delivers | Touches (typical) | Blocked by |
 |:--:|-------------------|----------|-------------------|--------------|
 | **V0** | `docs: vault L1 design memo` | Marker convention, folder UID scope, `LiveRecord` mapping for vault records, explicit **non-goals** for slice 1 | `docs/VAULT_L1_DESIGN.md` (new) | Product nod on scope |
 | **V1** | `core: keeper-vault typed models` | Pydantic + `load_vault_manifest`; **§7 sign-off** closes V1 fully; **no** CLI/graph yet | `keeper_sdk/core/vault_models.py`, `tests/test_vault_models.py` | V0 body (design) stable |
-| **V2** | `core: vault uid_ref graph` | Graph builder or `graph.py` dispatch; ref cycles for vault `uid_ref` / `folder_ref` | `keeper_sdk/core/graph*.py`, tests | V1 |
+| **V2** | `core: vault uid_ref graph` | Graph builder or `graph.py` dispatch; ref cycles for vault `uid_ref` / `folder_ref` | `keeper_sdk/core/vault_graph.py`, `tests/test_vault_graph.py` | V1 |
 | **V3** | `core+providers: mock vault discover/plan` | `compute_vault_diff` + existing `MockProvider` + `build_plan` / `vault_record_apply_order` | `keeper_sdk/core/vault_diff.py`, `tests/test_vault_mock_provider.py` | V2 |
 | **V4** | `cli+manifest: typed dispatch` | **Option A:** `load_declarative_manifest` + plan/diff/apply branch (vault + PAM); `load_manifest` stays PAM-only | `manifest.py`, `cli/main.py` | V3 |
 | **V5** | `providers: commander vault discover` | Same ``ls``/``get`` path; **login-only** filter when ``manifest_source`` is vault | `commander_cli.py`, `tests/test_commander_cli.py` | V4 |
@@ -89,6 +92,10 @@ Each row is a **mergeable** unit; integrator runs **full** `pytest` + `ruff` +
 
 **Anti-pattern:** V5 and V6 in one mega-PR unless the integrator explicitly
 accepts review burden.
+
+*Historical note:* **V1** “Delivers” still says “no CLI/graph yet” (original slice
+boundary); later PRs added CLI + graph — do not infer current repo layout from that
+cell alone.
 
 ---
 
