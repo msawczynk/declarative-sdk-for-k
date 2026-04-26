@@ -195,6 +195,7 @@ full pytest before handoff; update JOURNAL snapshot not repo daybook.
 | 2026-04-27 | `PAM_PARITY_PROGRAM` inventory + Phase 0/1a validate modes; `EXECUTION_PLAN` Phase D V6 + L1/V8 exit criteria. |
 | 2026-04-27 | `ORCHESTRATION_PAM_PARITY` §3: status pointer (§1 + ledger authoritative; train table historical). `CHANGELOG` Unreleased **Changed** split into bullets. |
 | 2026-04-27 | `V1_GA_CHECKLIST` §5 vault `validate --online` footnote; `EXECUTION_PLAN` Phase A exit pointer post–V0–V6. |
+| 2026-04-27 | `examples/SCAFFOLD.md`: CI validate vs plan loop, `vaultOneLogin`; `NEXT_SPRINT` hub link → §7. |
 
 ---
 

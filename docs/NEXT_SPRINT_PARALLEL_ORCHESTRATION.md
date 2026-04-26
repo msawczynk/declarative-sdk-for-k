@@ -71,7 +71,8 @@ map, worker preambles, and CI ladder in
 Integrators: use **§3 (PR-V0…V8)** there for vault L1; use **§2 below** for
 cross-program parallelism (P18 / P11 / reports). **Phased checklists + daybook
 hooks:** [`docs/EXECUTION_PLAN_HEAVY_ORCHESTRATION.md`](./EXECUTION_PLAN_HEAVY_ORCHESTRATION.md).
-**Master run-to-exit orchestration:** [`docs/ORCHESTRATION_UNTIL_COMPLETE.md`](./ORCHESTRATION_UNTIL_COMPLETE.md).
+**Master run-to-exit orchestration:** [`docs/ORCHESTRATION_UNTIL_COMPLETE.md`](./ORCHESTRATION_UNTIL_COMPLETE.md)
+(§2 ledger + **§7** actionable checklist).
 
 ---
 
