@@ -7,6 +7,7 @@ Subcommands:
     import     - adopt unmanaged matching records and write ownership markers
     diff       - plan + field-by-field render
     apply      - execute a plan via the selected provider
+    report     - read-only Commander reports (JSON, redacted)
 
 Exit codes:
     0 success, clean
@@ -614,6 +615,62 @@ def _plan_to_dict(plan_obj: Plan) -> dict:
             for change in plan_obj.changes
         ],
     }
+
+
+@main.group("report")
+def report_cli() -> None:
+    """Run read-only Commander reports; prints redacted JSON to stdout."""
+
+
+@report_cli.command("password-report")
+@click.option(
+    "--policy",
+    default="12,2,2,2,0",
+    show_default=True,
+    help="Password policy Length,Lower,Upper,Digits,Special (Commander format)",
+)
+@click.option(
+    "--folder",
+    default=None,
+    help="Optional folder path or UID to scope the report",
+)
+@click.option("-v", "--verbose", is_flag=True, help="Verbose Commander columns")
+@click.option(
+    "--quiet",
+    is_flag=True,
+    help="Fingerprint record_uid values instead of printing raw UIDs",
+)
+@click.option(
+    "--keeper-bin",
+    default=None,
+    envvar="KEEPER_BIN",
+    help="Path to keeper CLI (default: keeper on PATH)",
+)
+def report_password_report(
+    policy: str,
+    folder: str | None,
+    verbose: bool,
+    quiet: bool,
+    keeper_bin: str | None,
+) -> None:
+    """Weak-password rows from Commander ``password-report`` (JSON envelope)."""
+    from keeper_sdk.cli._report.password import run_password_report
+
+    try:
+        payload = run_password_report(
+            policy=policy,
+            folder=folder,
+            verbose=verbose,
+            quiet=quiet,
+            keeper_bin=keeper_bin,
+            config_file=os.environ.get("KEEPER_CONFIG"),
+            password=os.environ.get("KEEPER_PASSWORD"),
+        )
+    except CapabilityError as exc:
+        click.echo(f"report error: {exc}", err=True)
+        sys.exit(EXIT_CAPABILITY)
+    click.echo(json.dumps(payload, indent=2))
+    sys.exit(EXIT_OK)
 
 
 @main.command("live-smoke")

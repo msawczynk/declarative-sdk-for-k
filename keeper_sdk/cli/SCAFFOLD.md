@@ -9,7 +9,8 @@ Click-based CLI. Owns the exit-code contract (`docs/VALIDATION_STAGES.md`,
 |---|---:|---|
 | `__init__.py` | 5 | Package marker. |
 | `__main__.py` | 6 | `python -m keeper_sdk.cli` shim → `main:cli`. |
-| `main.py` | 469 | Click commands (`validate`, `plan`, `diff`, `apply`, `import`, `export`) + exit-code orchestration. `EXIT_CHANGES == EXIT_SCHEMA == 2` (intentional overload — see comment + DOR). |
+| `main.py` | 469+ | Click commands (`validate`, `plan`, `diff`, `apply`, `import`, `export`, `report …`) + exit-code orchestration. `EXIT_CHANGES == EXIT_SCHEMA == 2` (intentional overload — see comment + DOR). |
+| `_report/` | — | `dsk report` read-only Commander wrappers; `password.py` runs `keeper password-report --format json`, builds envelope, redacts / `--quiet` UID fingerprints. |
 | `renderer.py` | 104 | `RichRenderer` — human tables for plan/outcomes/diff. Snapshot-tested in `tests/test_renderer_snapshots.py`. |
 
 ## Commands

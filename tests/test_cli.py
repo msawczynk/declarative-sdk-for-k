@@ -295,3 +295,35 @@ def test_import_dry_run_does_not_mutate(
 
     live = next(record for record in provider.discover() if record.keeper_uid == "LIVE_UID")
     assert live.marker is None
+
+
+def test_report_password_report_emits_envelope(monkeypatch: pytest.MonkeyPatch) -> None:
+    sample = [{"record_uid": "AbCdEfGhIjKlMnOpQrSt", "title": "svc", "length": 8}]
+
+    def _fake_batch(*_a: object, **_k: object) -> str:
+        return json.dumps(sample)
+
+    monkeypatch.setattr("keeper_sdk.cli._report.password._run_keeper_batch", _fake_batch)
+
+    result = _run(["report", "password-report", "--policy", "8,0,0,0,0"])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["command"] == "password-report"
+    assert payload["dsk_report_version"] == 1
+    assert payload["rows"] == sample
+
+
+def test_report_password_report_quiet_fingerprints_uid(monkeypatch: pytest.MonkeyPatch) -> None:
+    uid = "AbCdEfGhIjKlMnOpQrSt"
+    sample = [{"record_uid": uid, "title": "svc", "length": 8}]
+
+    def _fake_batch(*_a: object, **_k: object) -> str:
+        return json.dumps(sample)
+
+    monkeypatch.setattr("keeper_sdk.cli._report.password._run_keeper_batch", _fake_batch)
+
+    result = _run(["report", "password-report", "--policy", "8,0,0,0,0", "--quiet"])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["rows"][0]["record_uid"] != uid
+    assert payload["rows"][0]["record_uid"].startswith("<uid:")

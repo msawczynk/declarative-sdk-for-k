@@ -53,6 +53,7 @@ agents.
 | `dsk apply PATH`    | manifest             | outcomes table         | `--dry-run`           |
 | `dsk import PATH`   | manifest             | adoption plan          | `--dry-run`           |
 | `dsk export JSON`   | `pam project export` | manifest YAML          | `-o FILE`             |
+| `dsk report password-report` | Commander session | redacted JSON envelope | `--quiet` (UID fingerprints) |
 
 Aliases `pamform` and `keeper-sdk` resolve to the same entrypoint for
 backward compatibility with pre-1.0 callers; they will be removed in 2.0.
