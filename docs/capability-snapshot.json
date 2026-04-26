@@ -3,6 +3,752 @@
   "commander_sha": "89047920",
   "commands": [
     {
+      "class": "GetEnterpriseDataCommand",
+      "flags": [
+        {
+          "aliases": [
+            "--force"
+          ],
+          "dest": "force",
+          "help": "full data sync",
+          "name": "-f",
+          "required": false,
+          "type": "flag"
+        }
+      ],
+      "group_command": "enterprise-down",
+      "module": "keepercommander.commands.enterprise"
+    },
+    {
+      "class": "EnterpriseInfoCommand",
+      "flags": [
+        {
+          "aliases": [],
+          "dest": "columns",
+          "help": "comma-separated list of available columns per argument:\n for `nodes` (parent_node, parent_id, user_count, users, team_count, teams, role_count, roles, provisioning, isolated)\n for `users` (name, status, transfer_status, node, team_count, teams, role_count, roles, alias, 2fa_enabled, job_title)\n for `teams` (restricts, node, user_count, users, queued_user_count, queued_users, role_count, roles)\n for `roles` (visible_below, default_role, admin, node, user_count, users, team_count, teams, enforcement_count, enforcements, managed_node_count, managed_nodes, managed_nodes_permissions)",
+          "name": "--columns",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "format",
+          "help": "format of output",
+          "name": "--format",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "node",
+          "help": "limit results to node (name or ID)",
+          "name": "--node",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "output",
+          "help": "path to resulting output file (ignored for \"table\" format)",
+          "name": "--output",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "--nodes"
+          ],
+          "dest": "nodes",
+          "help": "print node tree",
+          "name": "-n",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "--quiet"
+          ],
+          "dest": "quiet",
+          "help": "minimize screen output",
+          "name": "-q",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "--roles"
+          ],
+          "dest": "roles",
+          "help": "print role list",
+          "name": "-r",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "--teams"
+          ],
+          "dest": "teams",
+          "help": "print team list",
+          "name": "-t",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "--users"
+          ],
+          "dest": "users",
+          "help": "print user list",
+          "name": "-u",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "--verbose"
+          ],
+          "dest": "verbose",
+          "help": "print ids",
+          "name": "-v",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "pattern",
+          "help": "search pattern. applicable to users, teams, and roles.",
+          "name": "<pattern>",
+          "required": false,
+          "type": "str"
+        }
+      ],
+      "group_command": "enterprise-info",
+      "module": "keepercommander.commands.enterprise"
+    },
+    {
+      "class": "EnterpriseNodeCommand",
+      "flags": [
+        {
+          "aliases": [],
+          "dest": "add",
+          "help": "create node",
+          "name": "--add",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "delete",
+          "help": "delete node",
+          "name": "--delete",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "invite_email",
+          "help": "Sets invite email template from file. Saves current template if file does not exist. dash (-) use stdout",
+          "name": "--invite-email",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "logo_file",
+          "help": "Sets company logo using local image file (max size: 500 kB, min dimensions: 10x10, max dimensions: 320x320)",
+          "name": "--logo-file",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "displayname",
+          "help": "set node display name",
+          "name": "--name",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "parent",
+          "help": "Parent Node Name or ID",
+          "name": "--parent",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "toggle_isolated",
+          "help": "Render node invisible",
+          "name": "--toggle-isolated",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "wipe_out",
+          "help": "wipe out node content",
+          "name": "--wipe-out",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "--force"
+          ],
+          "dest": "force",
+          "help": "do not prompt for confirmation",
+          "name": "-f",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "node",
+          "help": "Node Name or ID. Can be repeated.",
+          "name": "<node>",
+          "required": true,
+          "type": "str"
+        }
+      ],
+      "group_command": "enterprise-node",
+      "module": "keepercommander.commands.enterprise"
+    },
+    {
+      "class": "EnterpriseRoleCommand",
+      "flags": [
+        {
+          "aliases": [],
+          "dest": "add",
+          "help": "create role",
+          "name": "--add",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "cascade",
+          "help": "apply to the children nodes. 'add-admin' only",
+          "name": "--cascade",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "clone",
+          "help": "copy role with users and enforcements",
+          "name": "--clone",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "copy",
+          "help": "copy role with enforcements",
+          "name": "--copy",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "delete",
+          "help": "delete role",
+          "name": "--delete",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "enforcements",
+          "help": "sets role enforcement",
+          "name": "--enforcement",
+          "required": false,
+          "type": "append[str]"
+        },
+        {
+          "aliases": [],
+          "dest": "format",
+          "help": "output format.",
+          "name": "--format",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "name",
+          "help": "role's new name",
+          "name": "--name",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "new_user",
+          "help": "assign this role to new users. 'add' only",
+          "name": "--new-user",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "node",
+          "help": "node Name or ID",
+          "name": "--node",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "output",
+          "help": "output file name. (ignored for table format)",
+          "name": "--output",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "--add-admin"
+          ],
+          "dest": "add_admin",
+          "help": "add managed node to role",
+          "name": "-aa",
+          "required": false,
+          "type": "append[str]"
+        },
+        {
+          "aliases": [
+            "--add-privilege"
+          ],
+          "dest": "add_privilege",
+          "help": "add privilege to managed node",
+          "name": "-ap",
+          "required": false,
+          "type": "append[str]"
+        },
+        {
+          "aliases": [
+            "--add-team"
+          ],
+          "dest": "add_team",
+          "help": "add team to role",
+          "name": "-at",
+          "required": false,
+          "type": "append[str]"
+        },
+        {
+          "aliases": [
+            "--add-user"
+          ],
+          "dest": "add_user",
+          "help": "add user to role",
+          "name": "-au",
+          "required": false,
+          "type": "append[str]"
+        },
+        {
+          "aliases": [
+            "--force"
+          ],
+          "dest": "force",
+          "help": "do not prompt for confirmation",
+          "name": "-f",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "--remove-admin"
+          ],
+          "dest": "remove_admin",
+          "help": "remove managed node from role",
+          "name": "-ra",
+          "required": false,
+          "type": "append[str]"
+        },
+        {
+          "aliases": [
+            "--remove-privilege"
+          ],
+          "dest": "remove_privilege",
+          "help": "remove privilege from managed node",
+          "name": "-rp",
+          "required": false,
+          "type": "append[str]"
+        },
+        {
+          "aliases": [
+            "--remove-team"
+          ],
+          "dest": "remove_team",
+          "help": "remove team from role",
+          "name": "-rt",
+          "required": false,
+          "type": "append[str]"
+        },
+        {
+          "aliases": [
+            "--remove-user"
+          ],
+          "dest": "remove_user",
+          "help": "remove user from role",
+          "name": "-ru",
+          "required": false,
+          "type": "append[str]"
+        },
+        {
+          "aliases": [
+            "--verbose"
+          ],
+          "dest": "verbose",
+          "help": "print ids",
+          "name": "-v",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "role",
+          "help": "Role Name or ID. Can be repeated.",
+          "name": "<role>",
+          "required": true,
+          "type": "str"
+        }
+      ],
+      "group_command": "enterprise-role",
+      "module": "keepercommander.commands.enterprise"
+    },
+    {
+      "class": "EnterpriseTeamCommand",
+      "flags": [
+        {
+          "aliases": [],
+          "dest": "add",
+          "help": "create team",
+          "name": "--add",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "approve",
+          "help": "approve queued team",
+          "name": "--approve",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "delete",
+          "help": "delete team",
+          "name": "--delete",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "name",
+          "help": "team's new name",
+          "name": "--name",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "node",
+          "help": "node name or node ID",
+          "name": "--node",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "restrict_edit",
+          "help": "disable record edits",
+          "name": "--restrict-edit",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "restrict_share",
+          "help": "disable record re-shares",
+          "name": "--restrict-share",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "restrict_view",
+          "help": "disable view/copy passwords",
+          "name": "--restrict-view",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "--add-role"
+          ],
+          "dest": "add_role",
+          "help": "add user to team",
+          "name": "-ar",
+          "required": false,
+          "type": "append[str]"
+        },
+        {
+          "aliases": [
+            "--add-user"
+          ],
+          "dest": "add_user",
+          "help": "add user to team",
+          "name": "-au",
+          "required": false,
+          "type": "append[str]"
+        },
+        {
+          "aliases": [
+            "--force"
+          ],
+          "dest": "force",
+          "help": "do not prompt for confirmation",
+          "name": "-f",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "--hide-shared-folders"
+          ],
+          "dest": "hide_shared_folders",
+          "help": "User does not see shared folders. --add-user only",
+          "name": "-hsf",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "--remove-role"
+          ],
+          "dest": "remove_role",
+          "help": "remove user from team",
+          "name": "-rr",
+          "required": false,
+          "type": "append[str]"
+        },
+        {
+          "aliases": [
+            "--remove-user"
+          ],
+          "dest": "remove_user",
+          "help": "remove user from team",
+          "name": "-ru",
+          "required": false,
+          "type": "append[str]"
+        },
+        {
+          "aliases": [
+            "--verbose"
+          ],
+          "dest": "verbose",
+          "help": "print ids",
+          "name": "-v",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "team",
+          "help": "Team Name or UID",
+          "name": "<team>",
+          "required": true,
+          "type": "str"
+        }
+      ],
+      "group_command": "enterprise-team",
+      "module": "keepercommander.commands.enterprise"
+    },
+    {
+      "class": "EnterpriseUserCommand",
+      "flags": [
+        {
+          "aliases": [],
+          "dest": "add",
+          "help": "invite user. same as --invite",
+          "name": "--add",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "add_alias",
+          "help": "new email alias for a user",
+          "name": "--add-alias",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "add_role",
+          "help": "role name or role ID",
+          "name": "--add-role",
+          "required": false,
+          "type": "append[str]"
+        },
+        {
+          "aliases": [],
+          "dest": "add_team",
+          "help": "team name or team UID",
+          "name": "--add-team",
+          "required": false,
+          "type": "append[str]"
+        },
+        {
+          "aliases": [],
+          "dest": "delete",
+          "help": "delete user",
+          "name": "--delete",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "delete_alias",
+          "help": "delete email alias",
+          "name": "--delete-alias",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "disable_2fa",
+          "help": "disable 2fa for user",
+          "name": "--disable-2fa",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "expire",
+          "help": "expire master password",
+          "name": "--expire",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "extend",
+          "help": "extend vault transfer consent by 7 days. Supports the following pseudo users: @all",
+          "name": "--extend",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "invite",
+          "help": "invite user",
+          "name": "--invite",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "jobtitle",
+          "help": "set user job title",
+          "name": "--job-title",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "lock",
+          "help": "lock user",
+          "name": "--lock",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "displayname",
+          "help": "set user display name",
+          "name": "--name",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "node",
+          "help": "node name or node ID",
+          "name": "--node",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "remove_role",
+          "help": "role name or role ID",
+          "name": "--remove-role",
+          "required": false,
+          "type": "append[str]"
+        },
+        {
+          "aliases": [],
+          "dest": "remove_team",
+          "help": "team name or team UID",
+          "name": "--remove-team",
+          "required": false,
+          "type": "append[str]"
+        },
+        {
+          "aliases": [],
+          "dest": "unlock",
+          "help": "unlock user. Supports the following pseudo users: @all",
+          "name": "--unlock",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "--force"
+          ],
+          "dest": "force",
+          "help": "do not prompt for confirmation",
+          "name": "-f",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "--hide-shared-folders"
+          ],
+          "dest": "hide_shared_folders",
+          "help": "User does not see shared folders. --add-team only",
+          "name": "-hsf",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "--verbose"
+          ],
+          "dest": "verbose",
+          "help": "print ids",
+          "name": "-v",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "email",
+          "help": "User Email or ID. Can be repeated.",
+          "name": "<email>",
+          "required": true,
+          "type": "str"
+        }
+      ],
+      "group_command": "enterprise-user",
+      "module": "keepercommander.commands.enterprise"
+    },
+    {
       "class": "PAMConnectionEditCommand",
       "flags": [
         {
@@ -447,7 +1193,7 @@
       "type": "BOOLEAN"
     }
   ],
-  "generated_at": "2026-04-26T18:26:31+00:00",
+  "generated_at": "2026-04-26T21:54:21+00:00",
   "groups": [
     {
       "class": "PAMProjectCommand",

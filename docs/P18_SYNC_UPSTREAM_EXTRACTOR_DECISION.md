@@ -1,7 +1,7 @@
 # P18 — `sync_upstream.py` extractor expansion (decision memo, R1)
 
-**Status:** decision only — implement in a follow-up F1 package after this memo
-is accepted. **Authority:** `docs/V2_DECISIONS.md` (P18), `docs/NEXT_SPRINT_PARALLEL_ORCHESTRATION.md` §15.1–15.2.
+**Status:** **P18a landed** in `scripts/sync_upstream.py` (enterprise command
+registry + matrix section). Later phases (P18b/c) remain open. **Authority:** `docs/V2_DECISIONS.md` (P18), `docs/NEXT_SPRINT_PARALLEL_ORCHESTRATION.md` §15.1–15.2.
 
 ## 1. Current state (fact)
 
@@ -9,7 +9,9 @@ is accepted. **Authority:** `docs/V2_DECISIONS.md` (P18), `docs/NEXT_SPRINT_PARA
 classes:
 
 - **`_GROUPS`:** `PAMProjectCommand` (`pam project`), `PAMRbiCommand` (`pam rbi`)
-- **`_COMMAND_CLASSES`:** import/extend/rbi-edit/connection-edit command classes
+- **`_COMMAND_CLASSES`:** PAM import/extend/rbi-edit/connection-edit **plus**
+  six enterprise commands (`GetEnterpriseDataCommand`, `EnterpriseInfoCommand`,
+  …) — P18a
 - **`extract_enforcements`:** filtered `keepercommander.constants` rows
 - **`parse_readme_shapes`:** `pam_import/README.md` for resource-type JSON hints
 
@@ -70,7 +72,7 @@ the PR, not production.
 
 | Phase | Scope | Exit |
 |-------|--------|------|
-| **P18a** | Add 3–5 **enterprise**-related `GroupCommand` / command classes that `keeper-enterprise.v1` references in memos | Matrix gains an “Enterprise (extracted)” section; snapshot keys documented |
+| **P18a** | Add 3–5 **enterprise**-related `GroupCommand` / command classes that `keeper-enterprise.v1` references in memos | **Done:** six `Enterprise*` / `GetEnterpriseDataCommand` rows + `## Enterprise commands (extracted, P18a)` in matrix |
 | **P18b** | Vault / sharing / integrations command roots used by V2 families | Same pattern |
 | **P18c** | Optional generic helper that **reads** a static JSON allowlist file in-repo (`scripts/upstream_command_allowlist.json`) so non-Python owners can propose rows | Still explicit; no runtime crawl |
 

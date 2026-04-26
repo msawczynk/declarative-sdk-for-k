@@ -372,6 +372,38 @@ _COMMAND_CLASSES: tuple[tuple[str, str, str], ...] = (
         "PAMConnectionEditCommand",
         "pam connection edit",
     ),
+    # P18a — enterprise surface for keeper-enterprise.v1 (explicit registry; see
+    # docs/P18_SYNC_UPSTREAM_EXTRACTOR_DECISION.md).
+    (
+        "keepercommander.commands.enterprise",
+        "GetEnterpriseDataCommand",
+        "enterprise-down",
+    ),
+    (
+        "keepercommander.commands.enterprise",
+        "EnterpriseInfoCommand",
+        "enterprise-info",
+    ),
+    (
+        "keepercommander.commands.enterprise",
+        "EnterpriseNodeCommand",
+        "enterprise-node",
+    ),
+    (
+        "keepercommander.commands.enterprise",
+        "EnterpriseUserCommand",
+        "enterprise-user",
+    ),
+    (
+        "keepercommander.commands.enterprise",
+        "EnterpriseRoleCommand",
+        "enterprise-role",
+    ),
+    (
+        "keepercommander.commands.enterprise",
+        "EnterpriseTeamCommand",
+        "enterprise-team",
+    ),
 )
 
 
@@ -496,9 +528,14 @@ def render_markdown(snapshot: dict[str, Any], warnings: Sequence[str]) -> str:
         lines.append("_No groups extracted — see extraction warnings below._")
     lines.append("")
 
-    lines.append("## Command flags")
-    lines.append("")
-    for cmd in snapshot["commands"]:
+    pam_cmds = [
+        c for c in snapshot["commands"] if not str(c["group_command"]).startswith("enterprise")
+    ]
+    ent_cmds = [
+        c for c in snapshot["commands"] if str(c["group_command"]).startswith("enterprise")
+    ]
+
+    def _append_command_flag_section(cmd: dict[str, Any]) -> None:
         lines.append(f"### {cmd['group_command']}")
         lines.append("")
         lines.append(f"_Class: `{cmd['module']}.{cmd['class']}`_")
@@ -517,6 +554,22 @@ def render_markdown(snapshot: dict[str, Any], warnings: Sequence[str]) -> str:
         else:
             lines.append("_No flags extracted._")
         lines.append("")
+
+    lines.append("## Command flags (PAM)")
+    lines.append("")
+    for cmd in pam_cmds:
+        _append_command_flag_section(cmd)
+
+    if ent_cmds:
+        lines.append("## Enterprise commands (extracted, P18a)")
+        lines.append("")
+        lines.append(
+            "_Explicit `sync_upstream.py` registry rows for `keeper-enterprise.v1` "
+            "— see `docs/P18_SYNC_UPSTREAM_EXTRACTOR_DECISION.md`._"
+        )
+        lines.append("")
+        for cmd in ent_cmds:
+            _append_command_flag_section(cmd)
 
     lines.append("## Role enforcements checked at validate-stage-4")
     lines.append("")

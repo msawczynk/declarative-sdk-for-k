@@ -28,6 +28,10 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   daybook sync (`AGENTS.md`, `docs/live-proof/README.md`, orchestration header).
   **§0** autonomous cold start: new sessions use repo + daybook, not repeated
   chat prompts.
+- **P18a** — `scripts/sync_upstream.py` registers six enterprise CLI command
+  classes (`enterprise-down` / `-info` / `-node` / `-user` / `-role` / `-team`);
+  capability matrix gains **Enterprise commands (extracted, P18a)** section;
+  `capability-snapshot.json` expanded accordingly.
 - **P18 R1** — `docs/P18_SYNC_UPSTREAM_EXTRACTOR_DECISION.md` (extractor
   expansion: registry model, nesting, phasing P18a–c, risks). `keeper-enterprise`
   `x-keeper-live-proof.evidence` aligned to `docs/live-proof/README.md` (same as
