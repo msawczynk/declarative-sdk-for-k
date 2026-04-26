@@ -7,6 +7,12 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- **`dsk report` — `--sanitize-uids`** on `password-report`,
+  `compliance-report`, and `security-audit-report`: fingerprints
+  Base64-style UIDs that appear inside string values. Raw
+  `record_uid` (and related) key values stay as returned by Commander
+  unless **`--quiet`** is also set (which fingerprints those UID
+  fields). See `AGENTS.md` command table.
 - **KSM as first-class SDK feature** — three new modules in
   `keeper_sdk/secrets/` close the credential loop end-to-end:
   - `bootstrap.py` provisions a Keeper Secrets Manager application,
@@ -67,6 +73,15 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   (was 83). Comment block updated for the new baseline (86% across
   3604 LOC / 315 tests). Floor stays at `baseline - 2` so small
   refactors don't gate CI while still catching ~70 LOC regressions.
+
+### Changed
+- **Report row preprocessing** always applies **secret-key-only**
+  redaction to row-shaped data before the existing `redact` pass, so
+  Commander fields whose names match known secret keys (for example
+  `token`) are replaced with `<redacted>` even when UID fields remain
+  visible. Implemented via `sanitize_secret_keys_only` in
+  `keeper_sdk/cli/_live/transcript.py` and `prepare_report_rows` in
+  `keeper_sdk/cli/_report/common.py`.
 
 ### Fixed
 - **Rotation drift resume** — `keeper_sdk/providers/commander_cli.py`
