@@ -27,6 +27,7 @@ import json
 import os
 import sys
 from pathlib import Path
+from typing import Any
 
 import click
 
@@ -618,6 +619,18 @@ def _plan_to_dict(plan_obj: Plan) -> dict:
     }
 
 
+def _emit_report_json(payload: dict[str, Any]) -> None:
+    """Print report envelope; exit 1 if ``secret_leak_check`` flags output."""
+    from keeper_sdk.cli._report.common import ReportOutputLeakError, serialize_report_payload
+
+    try:
+        click.echo(serialize_report_payload(payload))
+    except ReportOutputLeakError as exc:
+        click.echo(f"report refused: output failed leak check: {exc.warnings!r}", err=True)
+        sys.exit(EXIT_GENERIC)
+    sys.exit(EXIT_OK)
+
+
 @main.group("report")
 def report_cli() -> None:
     """Run read-only Commander reports; prints redacted JSON to stdout."""
@@ -670,8 +683,7 @@ def report_password_report(
     except CapabilityError as exc:
         click.echo(f"report error: {exc}", err=True)
         sys.exit(EXIT_CAPABILITY)
-    click.echo(json.dumps(payload, indent=2))
-    sys.exit(EXIT_OK)
+    _emit_report_json(payload)
 
 
 @report_cli.command("compliance-report")
@@ -718,8 +730,7 @@ def report_compliance_report(
     except CapabilityError as exc:
         click.echo(f"report error: {exc}", err=True)
         sys.exit(EXIT_CAPABILITY)
-    click.echo(json.dumps(payload, indent=2))
-    sys.exit(EXIT_OK)
+    _emit_report_json(payload)
 
 
 @report_cli.command("security-audit-report")
@@ -780,8 +791,7 @@ def report_security_audit_report(
     except CapabilityError as exc:
         click.echo(f"report error: {exc}", err=True)
         sys.exit(EXIT_CAPABILITY)
-    click.echo(json.dumps(payload, indent=2))
-    sys.exit(EXIT_OK)
+    _emit_report_json(payload)
 
 
 @main.command("live-smoke")

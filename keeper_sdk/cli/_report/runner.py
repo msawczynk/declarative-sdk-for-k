@@ -6,6 +6,14 @@ import os
 import shutil
 import subprocess
 
+# Keep in sync with ``CommanderCliProvider`` session retry heuristics.
+_SESSION_EXPIRED_CODE = "session_token_expired"
+
+
+def _is_retryable_keeper_session_text(stdout: str | None, stderr: str | None) -> bool:
+    text = f"{stdout or ''}\n{stderr or ''}".casefold()
+    return _SESSION_EXPIRED_CODE in text or ("session token" in text and "expired" in text)
+
 
 def run_keeper_batch(
     argv: list[str],
@@ -16,9 +24,9 @@ def run_keeper_batch(
 ) -> str:
     """Run ``keeper --batch-mode … argv``; return stdout (trimmed).
 
-    Mirrors the subprocess discipline in ``CommanderCliProvider._run_cmd``:
-    ``--batch-mode``, optional ``--config``, ``KEEPER_PASSWORD`` in env,
-    ``stdin=DEVNULL``.
+    Mirrors ``CommanderCliProvider._run_cmd``: ``--batch-mode``, optional
+    ``--config``, ``KEEPER_PASSWORD`` in env, ``stdin=DEVNULL``, and up to
+    **two** attempts when stderr/stdout indicates a refreshable session error.
     """
     from keeper_sdk.core.errors import CapabilityError
 
@@ -36,14 +44,21 @@ def run_keeper_batch(
     pwd = password or os.environ.get("KEEPER_PASSWORD")
     if pwd:
         env["KEEPER_PASSWORD"] = pwd
-    result = subprocess.run(
-        base + argv,
-        check=False,
-        capture_output=True,
-        text=True,
-        stdin=subprocess.DEVNULL,
-        env=env,
-    )
+    result: subprocess.CompletedProcess[str] | None = None
+    for attempt in range(2):
+        result = subprocess.run(
+            base + argv,
+            check=False,
+            capture_output=True,
+            text=True,
+            stdin=subprocess.DEVNULL,
+            env=env,
+        )
+        if result.returncode == 0 or attempt == 1:
+            break
+        if not _is_retryable_keeper_session_text(result.stdout, result.stderr):
+            break
+    assert result is not None
     if result.returncode != 0:
         raise CapabilityError(
             reason=f"keeper {' '.join(argv)} failed (rc={result.returncode})",

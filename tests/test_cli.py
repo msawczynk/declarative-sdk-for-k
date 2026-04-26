@@ -10,7 +10,14 @@ import pytest
 from click.testing import CliRunner
 
 from keeper_sdk.cli import main
-from keeper_sdk.cli.main import EXIT_CAPABILITY, EXIT_CHANGES, EXIT_CONFLICT, EXIT_REF, EXIT_SCHEMA
+from keeper_sdk.cli.main import (
+    EXIT_CAPABILITY,
+    EXIT_CHANGES,
+    EXIT_CONFLICT,
+    EXIT_GENERIC,
+    EXIT_REF,
+    EXIT_SCHEMA,
+)
 from keeper_sdk.core import build_graph, build_plan, compute_diff, execution_order, load_manifest
 from keeper_sdk.core.interfaces import LiveRecord
 from keeper_sdk.core.metadata import encode_marker
@@ -358,3 +365,19 @@ def test_report_security_audit_report_emits_envelope(monkeypatch: pytest.MonkeyP
     assert payload["command"] == "security-audit-report"
     assert payload["meta"]["nodes"] == ["n1"]
     assert payload["rows"] == sample
+
+
+def test_report_password_report_refuses_when_output_echoes_env_password(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = "UniqueKeeperPassPhraseForLeakTest99"
+    monkeypatch.setenv("KEEPER_PASSWORD", secret)
+
+    def _fake_batch(*_a: object, **_k: object) -> str:
+        return json.dumps([{"record_uid": "ab", "title": secret}])
+
+    monkeypatch.setattr("keeper_sdk.cli._report.runner.run_keeper_batch", _fake_batch)
+
+    result = _run(["report", "password-report", "--policy", "8,0,0,0,0"])
+    assert result.exit_code == EXIT_GENERIC, result.output
+    assert "refused" in result.output.lower() or "leak" in result.output.lower()

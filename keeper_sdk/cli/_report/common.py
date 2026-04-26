@@ -4,9 +4,37 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from typing import Any
 
+from keeper_sdk.cli._live.transcript import secret_leak_check
 from keeper_sdk.core.errors import CapabilityError
+
+
+class ReportOutputLeakError(Exception):
+    """Raised when serialized report JSON fails ``secret_leak_check``."""
+
+    def __init__(self, warnings: list[str]) -> None:
+        self.warnings = warnings
+        super().__init__(", ".join(warnings))
+
+
+def serialize_report_payload(payload: dict[str, Any]) -> str:
+    """``json.dumps`` envelope + belt-and-brangles leak grep (P17 / live-smoke parity).
+
+    Monkeypatch note: callers should invoke ``keeper_runner.run_keeper_batch`` so
+    tests can patch ``keeper_sdk.cli._report.runner.run_keeper_batch``.
+    """
+    text = json.dumps(payload, indent=2)
+    leaks = secret_leak_check(
+        text,
+        env_keys=tuple(
+            k for k in ("KEEPER_PASSWORD", "KEEPER_TOTP_SECRET") if (os.environ.get(k) or "")
+        ),
+    )
+    if leaks:
+        raise ReportOutputLeakError(leaks)
+    return text
 
 
 def _fingerprint_uid(value: str) -> str:
