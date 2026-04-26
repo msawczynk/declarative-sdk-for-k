@@ -616,5 +616,123 @@ def _plan_to_dict(plan_obj: Plan) -> dict:
     }
 
 
+@main.command("live-smoke")
+@click.option(
+    "--ksm-record-uid",
+    required=True,
+    envvar="KEEPER_LIVE_KSM_RECORD_UID",
+    help="UID of the Keeper record holding the KSM bootstrap config",
+)
+@click.option(
+    "--ksm-config",
+    type=click.Path(path_type=Path),
+    envvar="KEEPER_LIVE_KSM_CONFIG",
+    help="Optional path to a KSM config file (alternative to --ksm-record-uid)",
+)
+@click.option(
+    "--manifest",
+    "manifest_path",
+    required=True,
+    type=click.Path(exists=True, path_type=Path),
+    help="Smoke manifest to apply + diff",
+)
+@click.option(
+    "--workdir",
+    type=click.Path(path_type=Path),
+    default=Path("./.live-smoke"),
+    show_default=True,
+    help="Working directory for transcripts + per-run artefacts",
+)
+@click.option(
+    "--evidence-out",
+    type=click.Path(path_type=Path),
+    required=True,
+    help="Where to write the sanitized proof transcript JSON",
+)
+@click.option(
+    "--schema-family",
+    required=True,
+    help="Schema family being proven (e.g. pam-environment, keeper-vault)",
+)
+@click.option(
+    "--schema-version",
+    default="v1",
+    show_default=True,
+    help="Schema version being proven",
+)
+@click.option(
+    "--commander-pin",
+    default=None,
+    help="Commander pin SHA; defaults to reading .commander-pin",
+)
+@click.pass_context
+def live_smoke(
+    ctx: click.Context,
+    ksm_record_uid: str,
+    ksm_config: Path | None,
+    manifest_path: Path,
+    workdir: Path,
+    evidence_out: Path,
+    schema_family: str,
+    schema_version: str,
+    commander_pin: str | None,
+) -> None:
+    """Run the live-tenant smoke loop and write a sanitized proof transcript.
+
+    Phases: bootstrap-ksm → login → apply → diff (clean re-plan) → cleanup.
+
+    Skipped without an active KSM-provisioned tenant. Sanitization in
+    `keeper_sdk.cli._live.transcript` strips secrets, fingerprints UIDs;
+    `secret_leak_check` is the post-write belt-and-braces grep.
+    """
+    from keeper_sdk.cli._live.runbook import iter_default_phases
+    from keeper_sdk.cli._live.transcript import (
+        Transcript,
+        secret_leak_check,
+    )
+
+    if commander_pin is None:
+        pin_path = Path(__file__).resolve().parents[2] / ".commander-pin"
+        commander_pin = pin_path.read_text().strip() if pin_path.exists() else "unknown"
+
+    workdir.mkdir(parents=True, exist_ok=True)
+    empty = workdir / "_smoke_empty.yml"
+    if not empty.exists():
+        empty.write_text("schema: pam-environment.v1\n")
+
+    transcript = Transcript(
+        schema_family=schema_family,
+        schema_version=schema_version,
+        commander_pin=commander_pin,
+    )
+    for phase in iter_default_phases(
+        ksm_record_uid=ksm_record_uid,
+        ksm_config_path=ksm_config,
+        manifest_path=manifest_path,
+        workdir=workdir,
+    ):
+        transcript.add_phase(phase)
+        click.echo(f"[live-smoke] {phase.name}: {phase.status} ({phase.elapsed_ms}ms)")
+
+    transcript.finalize()
+    written_path = transcript.write(evidence_out)
+    leaks = secret_leak_check(
+        written_path.read_text(),
+        env_keys=("KEEPER_CONFIG", "KEEPER_LIVE_KSM_CONFIG", "KEEPER_LOGIN_TOKEN"),
+    )
+    if leaks:
+        click.echo(
+            f"live-smoke: SECRET LEAK DETECTED — refusing to leave evidence file. warnings={leaks}",
+            err=True,
+        )
+        written_path.unlink(missing_ok=True)
+        sys.exit(EXIT_GENERIC)
+    click.echo(f"[live-smoke] transcript: {written_path}")
+    summary = transcript.summary()
+    if summary["failed"] > 0:
+        sys.exit(EXIT_GENERIC)
+    sys.exit(EXIT_OK)
+
+
 if __name__ == "__main__":
     main()
