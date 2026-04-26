@@ -24,8 +24,10 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   **Policy:** orchestrator + **Codex CLI** may run live L1/smoke; **pin** never
   ambiguous (resolve with live test + drift-check); **support prose** for
   Commander defers to **upstream** repos; **daybook** = private GitHub +
-  `sync_daybook.sh`. **Orchestrator** explicitly **owns** prerequisite health +
+  `sync_daybook.sh`.   **Orchestrator** explicitly **owns** prerequisite health +
   daybook sync (`AGENTS.md`, `docs/live-proof/README.md`, orchestration header).
+  **§0** autonomous cold start: new sessions use repo + daybook, not repeated
+  chat prompts.
 - **Live-proof runbook** — `docs/live-proof/README.md` (L1 checklist,
   committed-artifact naming, sanitization expectations). `keeper-vault.v1`
   and `keeper-vault-sharing.v1` now cite it from

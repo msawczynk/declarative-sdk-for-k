@@ -117,6 +117,10 @@ validate/plan/apply, drift, live-proof discipline) — not a duplicate of
 upstream feature support pages. Link out when semantics need Commander
 authority.
 
+**Autonomous entry:** long-running orchestration without repeating chat context
+starts from [`docs/NEXT_SPRINT_PARALLEL_ORCHESTRATION.md`](./docs/NEXT_SPRINT_PARALLEL_ORCHESTRATION.md) **§0**
++ Downloads `JOURNAL.md` newest “next queue”.
+
 ## Agent playbook
 
 ### A. "Apply this manifest"
