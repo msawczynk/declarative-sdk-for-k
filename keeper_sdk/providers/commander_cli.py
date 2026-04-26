@@ -1604,9 +1604,15 @@ class CommanderCliProvider(Provider):
         # fallback kicks in only when the var is unset — an operator
         # pointing at a missing file gets a loud error (the point of
         # setting the var is to say "do not use the default").
-        from keeper_sdk.auth import EnvLoginHelper, KsmLoginHelper, load_helper_from_path
+        from keeper_sdk.auth import (
+            EnvLoginHelper,
+            KsmLoginHelper,
+            LoginHelper,
+            load_helper_from_path,
+        )
 
         helper_path = os.environ.get("KEEPER_SDK_LOGIN_HELPER")
+        helper: LoginHelper
         try:
             if helper_path == "ksm":
                 helper = KsmLoginHelper()

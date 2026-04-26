@@ -279,7 +279,7 @@ class KsmSecretStore:
                 ),
                 next_action=(
                     "verify the KSM application has the record's shared folder, or "
-                    f"point KEEPER_SDK_KSM_CONFIG at the application that does"
+                    "point KEEPER_SDK_KSM_CONFIG at the application that does"
                 ),
             )
         return records[0]
@@ -308,9 +308,7 @@ class KsmSecretStore:
                     values = entry.get("value") or []
                     return (values[0] if values else None) if single else values
         raise CapabilityError(
-            reason=(
-                f"KSM record {uid[:6]}... has no field type={field_type!r} label={label!r}"
-            ),
+            reason=(f"KSM record {uid[:6]}... has no field type={field_type!r} label={label!r}"),
             next_action=(
                 "verify the field exists on the record (Keeper Web UI → record → fields), "
                 "or drop the label to take the first matching typed field"

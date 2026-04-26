@@ -309,7 +309,9 @@ class KsmLoginHelper:
                 ),
             )
         self.record_uid = resolved_record_uid
-        self.config_path = config_path if config_path is not None else os.environ.get(KSM_CONFIG_ENV)
+        self.config_path = (
+            config_path if config_path is not None else os.environ.get(KSM_CONFIG_ENV)
+        )
 
     def load_keeper_creds(self) -> dict[str, str]:
         """Load Commander login credentials from the configured KSM record."""
