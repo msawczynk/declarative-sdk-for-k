@@ -34,6 +34,8 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   vault families).
 - **Orchestration** — `NEXT_SPRINT` §0 adds explicit **session boundary** note:
   nudges between chats are normal; §0 shortens what each nudge must carry.
+  **§0.1** compares queued “continue” heartbeats vs CI / PR / background-agent
+  cadence.
 - **Live-proof runbook** — `docs/live-proof/README.md` (L1 checklist,
   committed-artifact naming, sanitization expectations). `keeper-vault.v1`
   and `keeper-vault-sharing.v1` now cite it from

@@ -29,6 +29,26 @@ open**, not zero nudges forever. If you want fewer human nudges, add **machine
 triggers**: e.g. scheduled `sync_upstream.py --check` CI, Cron + Codex CLI
 against this branch, or Cursor **background agent** on the integration branch.
 
+### 0.1 Cadence — twenty “continue” nudges vs alternatives
+
+**Twenty queued continues** is a valid **heartbeat** if each run picks **one**
+concrete package from JOURNAL “next queue” and exits with a **landed SHA or
+documented blocker**. Risk: idle runs that do nothing still cost context and
+attention — prefer **fewer, fatter** nudges when the queue is thin.
+
+**Leaner options (pick any mix):**
+
+| Approach | When it wins |
+|----------|----------------|
+| **CI schedule** (`pytest -q` + `sync_upstream.py --check` weekly on `main`) | You only open chat when CI goes red or monthly hygiene |
+| **PR-driven** | Every dependabot / feature PR is its own “nudge” — agent reviews CI |
+| **5 continues + CI** | Smaller human queue; machines catch drift |
+| **Background agent** (Cursor) | Same intent as queued continues but one configured runner |
+
+**Recommendation:** keep **≤5** manual continues ahead unless the board is
+bursting with parallel R\* work; add **one** scheduled workflow for drift+tests
+so “nothing to do” does not require your token budget.
+
 ---
 
 **Program exit:** §**15** sequences large sprints to **close capability gaps**, then **§15.3 maintenance mode** for Commander pin / upstream drift only. **§16** is mandatory **after every sprint**: review against daybook and **optimize** the next run. **Live tenant / L1:** orchestrator **and** Codex CLI are allowed (same harness + sanitization as `AGENTS.md`). **`.commander-pin`:** never left ambiguous — resolve candidates with **live testing** + drift-check, not guesswork. **Support wording** for Commander semantics lives in **upstream** Commander / Keeper repos; this SDK documents integration + gates only. **Daybook:** private GitHub repo + `sync_daybook.sh`; orchestrator has access (no separate “grant daybook” step).
