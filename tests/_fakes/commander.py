@@ -116,7 +116,9 @@ class FakeKsmCommand:
         cls.add_app_calls.append(app_name)
         if cls.get_app_record(params, app_name):
             if format_type == "json":
-                return json.dumps({"error": f'Application with the same name "{app_name}" already exists.'})
+                return json.dumps(
+                    {"error": f'Application with the same name "{app_name}" already exists.'}
+                )
             return None
         cls._app_counter += 1
         app_uid = f"APP{cls._app_counter:09d}"
