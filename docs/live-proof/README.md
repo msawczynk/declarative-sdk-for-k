@@ -9,6 +9,8 @@ before changing `x-keeper-live-proof.status` on a family schema.
 `since_pin` = full 40-char SHA from `.commander-pin`). Meta schema:
 `keeper_sdk/core/schemas/_meta/x-keeper-live-proof.schema.json`.
 
+**Vault L1 semantics (before interpreting a vault transcript):** [`VAULT_L1_DESIGN.md`](../VAULT_L1_DESIGN.md) §4 and [`VALIDATION_STAGES.md`](../VALIDATION_STAGES.md) (*Vault — operator caveats*) — scalar diff limits, races, offline vs `vault_online` CI.
+
 **Prerequisite health:** the **orchestrator** keeps smoke/L1 prerequisites
 aligned with `scripts/smoke/README.md` and records pass/fail in the daybook —
 same ownership as `AGENTS.md` § Autonomous execution.

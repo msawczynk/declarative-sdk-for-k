@@ -17,6 +17,7 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   [`docs/VALIDATION_STAGES.md`](docs/VALIDATION_STAGES.md): vault operator caveats, remediation rows.
   [`AGENTS.md`](AGENTS.md): vault L1 caveats + links after the `validate` stage pointer.
   [`docs/SCAFFOLD.md`](docs/SCAFFOLD.md): index `VAULT_L1_DESIGN`, `ORCHESTRATION_UNTIL_COMPLETE`, vault rows; [`keeper_sdk/providers/SCAFFOLD.md`](keeper_sdk/providers/SCAFFOLD.md): Commander vault UPDATE + caveat links.
+  [`docs/ORCHESTRATION_PAM_PARITY.md`](docs/ORCHESTRATION_PAM_PARITY.md): G2–G6 state machine reconciled to vault vs PAM; V6 train row (UPDATE + online + semantic diff). [`docs/live-proof/README.md`](docs/live-proof/README.md): vault §4 / validation caveat pointer. [`README.md`](README.md): layout comment for `VAULT_L1_DESIGN.md`.
 
 ### Added
 - **V8 prep** — [`docs/live-proof/keeper-vault.v1.sanitized.template.json`](docs/live-proof/keeper-vault.v1.sanitized.template.json)

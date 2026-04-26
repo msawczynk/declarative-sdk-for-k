@@ -191,6 +191,7 @@ full pytest before handoff; update JOURNAL snapshot not repo daybook.
 | 2026-04-27 | §7 publish item: routine push + CI check on head SHA (merge-wave hygiene). |
 | 2026-04-27 | `AGENTS.md`: vault L1 semantic-diff + race pointer after `VALIDATION_STAGES` link. |
 | 2026-04-27 | `docs/SCAFFOLD.md` + `keeper_sdk/providers/SCAFFOLD.md`: vault doc index + Commander row / Vault L1 caveat links. |
+| 2026-04-27 | `ORCHESTRATION_PAM_PARITY` §1 gate table + V6 row reconciled; `live-proof/README` + README layout vault pointers. |
 
 ---
 

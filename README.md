@@ -135,7 +135,7 @@ docs/
   ORCHESTRATION_PAM_PARITY.md        # merge train, workers, CI ladder (vault L1 + gates)
   EXECUTION_PLAN_HEAVY_ORCHESTRATION.md  # phased checklist A–E + metrics + sprint close
   ORCHESTRATION_UNTIL_COMPLETE.md       # tiers A/B/C, family ledger, waves to program exit
-  VAULT_L1_DESIGN.md                 # integrator-owned scope/marker/discover memo (draft shell)
+  VAULT_L1_DESIGN.md                 # vault L1 scope / §4 caveats; §7 sign-off pending (G2 ◐)
   PAM_PARITY_PROGRAM.md              # Definition of Done + phases to full support (not scaffold)
   NEXT_SPRINT_PARALLEL_ORCHESTRATION.md  # wave mechanics, R/F packages, tenant rules
   V2_DECISIONS.md                    # schema families, runtime scope, MSP/EPM, explicit non-goals

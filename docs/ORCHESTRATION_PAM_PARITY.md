@@ -25,18 +25,18 @@ mechanics and names concrete PR slices.
 
 ## 1. State machine (where we are)
 
-| Gate | Meaning | Status (2026-04) |
-|:----:|---------|-------------------|
-| G0 | Packaged JSON Schema per family | **Done** |
-| G1 | `resolve_manifest_family` + `validate_manifest` + `dropped-design` guard | **Done** |
-| G1a | `dsk validate --json` + `examples/scaffold_only/` CI | **Done** |
-| G2 | Typed models for family **F** | **In progress** — `vault_models.py` + `load_vault_manifest` (no graph yet) |
-| G3 | `build_graph` / ref rules for **F** | **In progress** — vault: `build_vault_graph` + `vault_record_apply_order`; PAM: existing `graph.py` |
-| G4 | `MockProvider` discover + diff + plan for **F** | **In progress** — vault: `compute_vault_diff` + tests; PAM: existing |
-| G5 | `CommanderCliProvider` slice for **F** | **In progress** — vault: discover filter + `_apply_vault_plan`; PAM: existing |
-| G6 | Live proof + `x-keeper-live-proof` + matrix row | **Open** |
+| Gate | Meaning | Status (vault `keeper-vault.v1` vs PAM) |
+|:----:|---------|----------------------------------------|
+| G0 | Packaged JSON Schema per family | **Done** (both) |
+| G1 | `resolve_manifest_family` + `validate_manifest` + `dropped-design` guard | **Done** (both) |
+| G1a | `dsk validate --json` + `examples/scaffold_only/` CI | **Done** (both) |
+| G2 | Typed models for family **F** | **Vault: ◐** — `vault_models.py` + `load_vault_manifest` shipped; **complete** when [`VAULT_L1_DESIGN.md`](./VAULT_L1_DESIGN.md) §7 signed (see [`ORCHESTRATION_UNTIL_COMPLETE.md`](./ORCHESTRATION_UNTIL_COMPLETE.md) §2). **PAM: Done.** |
+| G3 | `build_graph` / ref rules for **F** | **Vault: Done** — `build_vault_graph` + `vault_record_apply_order`. **PAM: Done** (`graph.py`). |
+| G4 | `MockProvider` discover + diff + plan for **F** | **Vault: Done** — `compute_vault_diff` + mock round-trip tests. **PAM: Done.** |
+| G5 | `CommanderCliProvider` slice for **F** | **Vault: Done** — `login` discover filter; `_apply_vault_plan` (`RecordAddCommand`, v3 `RecordEditCommand` UPDATE + `return_result` guard, `_write_marker`, `rm`); `dsk validate --online`; semantic scalar `login` diff. **PAM: Done.** |
+| G6 | Live proof + `x-keeper-live-proof` + matrix row | **Vault: Open** (V8). **PAM: Done** (proven paths). |
 
-Anything below G6 is **not** “GA like PAM” in README or support language.
+Canonical per-family ticks: [`ORCHESTRATION_UNTIL_COMPLETE.md`](./ORCHESTRATION_UNTIL_COMPLETE.md) §2. Anything below **vault G6** is **not** “GA like PAM” for `keeper-vault.v1` in README or support language.
 
 ---
 
@@ -77,7 +77,7 @@ Each row is a **mergeable** unit; integrator runs **full** `pytest` + `ruff` +
 | **V3** | `core+providers: mock vault discover/plan` | `compute_vault_diff` + existing `MockProvider` + `build_plan` / `vault_record_apply_order` | `keeper_sdk/core/vault_diff.py`, `tests/test_vault_mock_provider.py` | V2 |
 | **V4** | `cli+manifest: typed dispatch` | **Option A:** `load_declarative_manifest` + plan/diff/apply branch (vault + PAM); `load_manifest` stays PAM-only | `manifest.py`, `cli/main.py` | V3 |
 | **V5** | `providers: commander vault discover` | Same ``ls``/``get`` path; **login-only** filter when ``manifest_source`` is vault | `commander_cli.py`, `tests/test_commander_cli.py` | V4 |
-| **V6** | `providers: commander vault apply` | ``_apply_vault_plan``: ``RecordAddCommand`` + :meth:`_write_marker` + ``rm``; live idempotency = **V8** | `commander_cli.py` | V5 |
+| **V6** | `providers: commander vault apply` | ``_apply_vault_plan``: ``RecordAddCommand`` + v3 ``RecordEditCommand`` UPDATE (:meth:`~keeper_sdk.providers.commander_cli.CommanderCliProvider._vault_apply_login_body_update`, ``return_result`` guard) + :meth:`_write_marker` + ``rm``; ``dsk validate --online`` + semantic ``login`` diff land with V4/V5; live **idempotency** proof = **V8** | `commander_cli.py`, `cli/main.py`, `keeper_sdk/core/diff.py` | V5 |
 | **V7** | `core+providers: vault-sharing slice` | Sharing models/graph/mock/Commander **or** second wave after V6 stable | `keeper-vault-sharing` paths | V6 for patterns |
 | **V8** | `docs: vault L1 live proof` | Sanitized transcript, schema `x-keeper-live-proof`, matrix, README row (prep: [`keeper-vault.v1.sanitized.template.json`](./live-proof/keeper-vault.v1.sanitized.template.json) + sample [`examples/scaffold_only/vaultOneLogin.yaml`](../examples/scaffold_only/vaultOneLogin.yaml)) | `docs/live-proof/`, schemas, `CAPABILITY_MATRIX.md`, `README.md` | L1 tenant run |
 
