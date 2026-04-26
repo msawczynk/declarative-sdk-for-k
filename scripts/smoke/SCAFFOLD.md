@@ -42,8 +42,12 @@ tenant. The only sanctioned path for live mutation. No ad-hoc CLI.
 - **Live mutation only via this harness.** Never script ad-hoc `keeper` mutations from agents.
 - **No secrets in stdout/stderr/log artifacts.** Honour redaction patterns; `SMOKE_NO_CLEANUP=1` for failure-case inspection only.
 - **Cleanup is destroy-by-marker.** Never delete records the SDK doesn't own.
-- **One scenario per `--scenario` invocation.** Matrix runs use `scripts/agent/run_smoke_matrix.sh`.
-- Login helper defaults to `deploy_watcher` for matrix, `env` for the GA login proof. Override via `--login-helper`.
+- **One scenario per `--scenario` invocation.** Operator-side matrix
+  runners (sequential / parallel) live in the maintainer's private
+  daybook (`msawczynk/cursor-daybook`: `templates/agent/`); they are not
+  shipped from this repo.
+- Login helper defaults to `deploy_watcher`; `env` is the GA login proof
+  via the in-tree `EnvLoginHelper`. Override via `--login-helper`.
 
 ## Reconciliation vs design
 

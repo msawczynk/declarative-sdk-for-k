@@ -6,6 +6,36 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Removed
+- In-tree orchestration / Codex CLI stack: `docs/CODEX_CLI.md`,
+  `docs/CODEX_GITHUB.md`, `docs/ORCHESTRATION_PHASE0_PARALLEL.md`,
+  `scripts/agent/` (the whole tree: `_codex_resolve.sh`,
+  `codex_offline_slice.sh`, `codex_live_smoke.sh`, `phase0_gates.sh`,
+  `run_parallel_codex.sh`, `run_smoke_matrix.sh`, `prompts/*.prompt.md`,
+  READMEs and SCAFFOLD), `.github/codex/prompts/scoped-task.md`,
+  `.github/ISSUE_TEMPLATE/codex_task.yml`, and
+  `.github/workflows/codex-task.yml`. Cursor / Codex / daybook
+  orchestration is now operator-side infrastructure only — maintained
+  canonically in the maintainer's private daybook
+  (`msawczynk/cursor-daybook`: `docs/orchestration/` + `templates/`).
+  Adopters who want the same parent / worker workflow copy templates
+  from there with `# adapt:` markers; this repo no longer ships any of
+  those files.
+
+### Changed
+- `AGENTS.md`, `README.md`, `SCAFFOLD.md`, `.cursorrules`,
+  `V1_GA_CHECKLIST.md`, `RECONCILIATION.md`, `AUDIT.md`,
+  `docs/SCAFFOLD.md`, `scripts/SCAFFOLD.md`, `scripts/smoke/SCAFFOLD.md`,
+  `scripts/smoke/README.md`, `.github/SCAFFOLD.md`,
+  `docs/SDK_DA_COMPLETION_PLAN.md`,
+  `docs/SDK_COMPLETION_PLAN.md`, and
+  `docs/SDK_ORCHESTRATED_FEATURE_COMPLETE.md` reconciled against the
+  removal — every link to a deleted path replaced with a thin pointer
+  to the operator-side daybook or with the equivalent direct command
+  (`pytest`, `ruff`, `mypy`, `python3 scripts/smoke/smoke.py …`).
+- `.gitignore` drops `.codex-runs/` (no longer applicable); `.smoke-runs/`
+  retained for ad-hoc local logs.
+
 ## [1.1.0] - 2026-04-26
 
 Tag policy decision: annotated-only, GitHub-only repo (no PyPI, no `git

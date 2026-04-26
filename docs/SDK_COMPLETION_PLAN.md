@@ -6,20 +6,21 @@ Devil's-advocate execution gate: use
 [`docs/SDK_DA_COMPLETION_PLAN.md`](./SDK_DA_COMPLETION_PLAN.md) as the
 current completion contract when this roadmap conflicts with live evidence.
 
-**Parent / child + devil's advocate:** the orchestrator plays **parent**
-(adversarial review, gate lifts, live proof) vs **child** workers (Codex CLI,
-narrow agents). Learning from what the parent catches belongs in personal
-daybook `LESSONS` / `JOURNAL` (Downloads workspace methodology section), not
-only in PR comments.
+**Parent / worker split** (operator-side methodology; not enforced by this
+repo): the orchestrator plays **parent** (adversarial review, gate lifts,
+live proof) vs **worker** (narrow scoped implementer — Codex CLI, cheap
+subagent, single tight Cursor turn). Learning from what the parent catches
+belongs in personal daybook `LESSONS` / `JOURNAL`. The Codex CLI / Phase-0
+gate scripts that previously lived under `scripts/agent/` are now
+operator-side infrastructure in the maintainer's private daybook
+(`msawczynk/cursor-daybook`: `docs/orchestration/` + `templates/`); this
+repo no longer ships them.
 
-**Operational contract (repo-local):** [`docs/ORCHESTRATION_PHASE0_PARALLEL.md`](./ORCHESTRATION_PHASE0_PARALLEL.md) + `scripts/agent/phase0_gates.sh` — mirrored in global Cursor rules + daybook drift-guard so every workspace sees the same parent/script/Codex split.
-
-This plan is written for a parent orchestrator plus cheap Codex workers:
+This plan still presumes a parent orchestrator plus cheap workers:
 
 - Parent owns live-test design, credential boundaries, GitHub release assets, roadmap decisions, merge safety, and final review.
-- **Codex CLI (`codex exec`) is the default worker** for scoped offline implementation; GitHub Codex (issues, Actions, `@codex`) is optional for async packetized work — see [`docs/CODEX_CLI.md`](./CODEX_CLI.md).
-- Codex owns scoped implementation slices and can run live smoke only when explicitly delegated through a whitelisted harness command.
-- Every Codex task returns a branch/patch, test output, caveats, and next steps. Parent verifies before merge.
+- Workers own scoped implementation slices and may run live smoke only when explicitly delegated through a whitelisted harness command.
+- Every worker task returns a branch/patch, test output, caveats, and next steps. Parent verifies before merge.
 
 ## Current Baseline
 
@@ -28,8 +29,8 @@ Main branch as of 2026-04-25:
 - `v1.0.0` GitHub release exists.
 - **Distribution is GitHub only** (no PyPI): `publish.yml` attaches `dist/*` to
   each GitHub Release; install via git URL or downloaded wheel per `docs/RELEASING.md`.
-- Local/core checks: **236 passed / 2 xfailed** (re-verify with
-  `scripts/agent/phase0_gates.sh full` on current `main`),
+- Local/core checks: **236 passed / 2 xfailed** (re-verify on current `main`
+  with `python3 -m pytest -q && python3 -m ruff check . && python3 -m ruff format --check . && python3 -m mypy keeper_sdk && python3 -m build && python3 -m twine check dist/*`),
   ruff, format, mypy, build/twine clean. CI is green across lint, mypy,
   py3.11/3.12/3.13 tests, examples, drift-check, and build.
 - Commander provider supports current GA PAM lifecycle for manifests without preview keys.
@@ -54,7 +55,7 @@ Closed / classified:
 Latest #5 live proof (updated):
 
 - Code: post-apply smoke builds `CommanderCliProvider(..., manifest_source=<temp yaml>)`; `discover()` best-effort bootstraps in-process params when RBI records exist so TunnelDAG merge can populate `pam_settings.options` (`remote_browser_isolation` / session recording tri-states). Offline partial overlay diff remains in `tests/test_rbi_readback.py`.
-- **Still required for gate lift:** parent-run `python3 scripts/smoke/smoke.py … --scenario pamRemoteBrowser` (or `codex_live_smoke.sh`) showing **verify + re-plan exit 0** on a tenant where TunnelDAG is available; if verify fails, capture whether `CapabilityError` masked login or DAG had no graph.
+- **Still required for gate lift:** parent-run `python3 scripts/smoke/smoke.py … --scenario pamRemoteBrowser` showing **verify + re-plan exit 0** on a tenant where TunnelDAG is available; if verify fails, capture whether `CapabilityError` masked login or DAG had no graph.
 - Classification: **`preview-gated`** until that live matrix row is green end-to-end.
 
 ## Definition Of Complete
@@ -106,10 +107,11 @@ Risk gates before merge:
 
 Cost target: spend cheap worker tokens on exploration/execution, spend parent tokens on review, gates, and decisions.
 
-Worker tiers:
+Worker tiers (operator-side; the wrappers themselves live in the
+maintainer's private daybook `templates/agent/`, not in this repo):
 
-1. **Offline Codex CLI worker** — **default first** for code/docs/tests. Parent invokes `scripts/agent/codex_offline_slice.sh` with a prompt file (task + scope + DONE contract per [`.github/codex/prompts/scoped-task.md`](../.github/codex/prompts/scoped-task.md)). No network, no live Keeper calls; focused `pytest` / `ruff` only as allowed in the prompt.
-2. **Live Codex smoke worker** — `scripts/agent/codex_live_smoke.sh` (or one explicit `scripts/smoke/smoke.py` line in the prompt). Network on; one harness command; no secret/env printing; no credential file inspection outside the harness.
+1. **Offline scoped worker** — **default first** for code/docs/tests. Parent supplies a prompt file (task + scope + DONE contract). No network, no live Keeper calls; focused `pytest` / `ruff` only as allowed in the prompt.
+2. **Live smoke worker** — one explicit `scripts/smoke/smoke.py …` line. Network on; one harness command; no secret/env printing; no credential file inspection outside the harness.
 3. **Parent** — runs final diff review, full local checks once per integrated branch, classifies live results, updates issues, and merges/releases.
 
 Check budget:
@@ -132,7 +134,7 @@ For each work package:
 
 1. Read issue, code, and latest CI state.
 2. Create/refresh a GitHub issue with acceptance criteria.
-3. Spawn 1-3 **Codex CLI** workers (preferred) or GitHub-isolated branches/worktrees — same DONE contract; see [`docs/CODEX_CLI.md`](./CODEX_CLI.md).
+3. Spawn 1-3 scoped offline workers (Codex CLI / cheap subagents / single tight Cursor turns) on isolated branches/worktrees — same DONE contract.
 4. Give each worker one narrow slice; if live proof is needed, give one whitelisted harness command, not credentials.
 5. Review returned diff like a PR: correctness first, then tests/docs.
 6. Run parent checks:
@@ -146,9 +148,9 @@ For each work package:
 8. Parent delegates or runs live smoke for tenant-sensitive items, then reviews the transcript.
 9. Update `CHANGELOG.md`, `SCAFFOLD.md`, and issues.
 
-### Codex Rules
+### Worker Rules
 
-Codex must:
+Workers must:
 
 - Work on one branch/worktree.
 - Avoid live Keeper calls unless the parent explicitly delegates one whitelisted smoke harness command.
@@ -158,7 +160,7 @@ Codex must:
 - Keep gates honest: do not remove preview/provider conflicts until apply is proven.
 - Return exact commands run and exact files changed.
 
-Codex must not:
+Workers must not:
 
 - Change release tags.
 - Push to `main`.
@@ -694,120 +696,14 @@ Tasks:
 - Keep `CHANGELOG.md` high signal.
 - Keep examples runnable offline.
 
-## Codex Prompt Template
+## Worker Prompt Template
 
-**Run locally:** save the filled template as `task.md`, then `CODEX_MODEL=gpt-5.5 scripts/agent/codex_offline_slice.sh task.md` (see [`docs/CODEX_CLI.md`](./CODEX_CLI.md)). Align the final DONE block with [`.github/codex/prompts/scoped-task.md`](../.github/codex/prompts/scoped-task.md) when you want the stricter footer.
-
-Use this exact shape for worker prompts:
-
-```text
-PREAMBLE: If your orchestrator uses a worker preamble file, read it first and follow it.
-Work in repo `/Users/martin/Downloads/Cursor tests/declarative-sdk-for-k`.
-
-Task: <one narrow task>.
-
-Context:
-- Issue: #<n> <title>
-- Current state: <short state>
-- Do not use live Keeper credentials.
-- Do not push to main.
-- Do not remove preview/provider gates unless acceptance says so.
-
-Files likely involved:
-- <path>
-- <path>
-
-Acceptance:
-- <behavior>
-- <tests>
-- <docs>
-
-Commands to run:
-- python3 -m pytest -q <focused tests>
-- python3 -m ruff check <changed files>
-- python3 -m ruff format --check <changed files>
-
-Return:
-DONE | branch=<branch> commits=<commits> tests=<summary> ruff=<summary>
-CHG:
-- <files + behavior>
-CAVEATS:
-- <unknowns>
-NEXT:
-- <exact parent merge/test/live step>
-ORCHESTRATION NOTES:
-- <none or brief follow-ups for parent>
-```
-
-## First Five Codex Jobs
-
-### Job A: Smoke Diagnostics for Env Helper
-
-Issue: #3.
-
-Prompt summary:
-
-- Add auth-path and subprocess stderr/stdout diagnostics to smoke harness.
-- No live calls.
-- Tests in `tests/test_smoke_args.py`.
-
-Parent after:
-
-- Run `--login-helper env` live smoke.
-
-### Job B: Session Retry Negative Tests
-
-Issue: #3.
-
-Prompt summary:
-
-- Add tests for retry-once-only and no retry for non-session failures.
-- Preserve context.
-
-Parent after:
-
-- Merge if CI green.
-
-### Job C: Rotation Ref Resolver
-
-Issue: #4.
-
-Prompt summary:
-
-- Add pure helper producing rotation argv entries from manifest + live records.
-- No apply wiring.
-- Tests only.
-
-Parent after:
-
-- Review model assumptions before wiring.
-
-### Job D: Tuning Field Map Audit
-
-Issue: #5.
-
-Prompt summary:
-
-- Produce docs table of import/tuning/unsupported fields.
-- No behavior change.
-
-Parent after:
-
-- Decide supported first field subset.
-
-### Job E: JIT Boundary Research
-
-Issue: #6.
-
-Prompt summary:
-
-- Read Commander source and capability matrix.
-- Return implementation/no-implementation decision with source links.
-- No code unless obvious pure mapping helper.
-
-Parent after:
-
-- Decide whether JIT enters v1.1 or remains preview.
+Operator-side: the canonical shape lives in the maintainer's private
+daybook (`msawczynk/cursor-daybook`:
+`templates/github/codex/prompts/scoped-task.md`). Use the DONE-block
+contract there for any worker (Codex CLI, cheap subagent, single tight
+Cursor turn). This repo deliberately does not ship a prompt template;
+forks and consumers should not expect one.
 
 ## PR / Release Cadence
 

@@ -76,10 +76,9 @@ Tasks:
    - Commander provider rotation/discover fixes,
    - smoke scenario/docs,
    - validation/docs hardening.
-2. Re-run focused checks (or **`scripts/agent/phase0_gates.sh quick`** — same commands bundled):
+2. Re-run focused checks:
    - `python3 -m pytest -q tests/test_cli.py tests/test_commander_cli.py tests/test_smoke_scenarios.py tests/test_smoke_args.py`
    - `python3 -m ruff check keeper_sdk/cli/main.py keeper_sdk/providers/commander_cli.py tests/test_cli.py tests/test_commander_cli.py`
-   - `bash -n scripts/agent/codex_live_smoke.sh`
    - GitHub YAML parse.
 3. Run full integration checks before merge:
    - `python3 -m pytest -q`
@@ -161,7 +160,8 @@ Focused tests:
 Live proof:
 
 ```bash
-scripts/agent/codex_live_smoke.sh pamUserNestedRotation
+DSK_PREVIEW=1 DSK_EXPERIMENTAL_ROTATION_APPLY=1 \
+  python3 scripts/smoke/smoke.py --login-helper env --scenario pamUserNestedRotation
 ```
 
 Acceptance:
@@ -339,29 +339,13 @@ Acceptance:
 
 ## Process Plan
 
-### Codex / GitHub Work Queue
-
-**Prefer local Codex CLI** for the default inner loop (`codex exec` via `scripts/agent/codex_offline_slice.sh` and the DONE contract in `.github/codex/prompts/scoped-task.md`). Full pattern: [`docs/CODEX_CLI.md`](./CODEX_CLI.md).
-
-Use GitHub issues for hands-off work only when each issue has:
-
-- task,
-- hard scope,
-- success criteria,
-- allowed commands,
-- live access policy,
-- required `DONE` output.
-
-Use `.github/workflows/codex-task.yml` for manual Codex Action runs after
-`OPENAI_API_KEY` is configured. Keep `contents: read`; upload patch artifacts;
-parent applies/reviews locally. Do not auto-push Codex output to `main`.
-
-Local Codex CLI:
-
-- Use `scripts/agent/codex_offline_slice.sh` + a prompt file for offline slices; set `CODEX_MODEL=gpt-5.5` (and `CODEX_BIN` if `codex` is not on `PATH`).
-- Use no network by default (offline script does not enable sandbox network).
-- Use `scripts/agent/codex_live_smoke.sh` only for one whitelisted smoke command.
-- Smoke-only workers skip private preamble/orchestration files to avoid token leaks.
+Cursor / Codex / daybook orchestration (parent / worker split, Codex CLI
+wrappers, slice prompts, GitHub-Codex Action / issue template, Phase-0
+gate scripts) is **operator-side infrastructure** maintained canonically
+in the maintainer's private daybook (`msawczynk/cursor-daybook`:
+`docs/orchestration/` + `templates/`). It is not shipped from this repo.
+Adopters who want the same parent-orchestrator workflow can copy
+templates from there with `# adapt:` markers.
 
 ### Parent Review Loop
 

@@ -2,7 +2,7 @@
 
 This smoke is an autonomous, no-human-input harness for proving the SDK against a live Keeper tenant through Commander CLI 17.x, while honoring the current "no DAG writes" moratorium by routing all tenant mutations through Commander rather than direct `keeper_dag` writes. Both the `deploy_watcher` helper path and the public `EnvLoginHelper` path are wired into the same plan -> apply -> verify -> destroy harness; Issue #3 is live-proven for the full `pamMachine` cycle.
 
-The `pamRemoteBrowser` and `pamUserNestedRotation` scenarios are proof harnesses, not support claims for Issues #5 and #4. A 2026-04-25 `pamRemoteBrowser` live run created records and cleanup passed, but verification failed because Commander `pam rbi edit --remote-browser-isolation` writes DAG `allowedSettings.connections`, which current `discover()` does not read back as manifest-shaped `pam_settings.options.remote_browser_isolation`. Nested rotation now reaches apply and marker verification after `pam rotation edit`, but the follow-up plan still reports updates for the nested user and parent machine; keep the preview/experimental gates until readback/drift semantics are clean. **Phase 0 / merge gates:** `docs/SDK_DA_COMPLETION_PLAN.md` § Phase 0 and `scripts/agent/phase0_gates.sh` — do not lift preview gates without parent-reviewed live proof per that plan.
+The `pamRemoteBrowser` and `pamUserNestedRotation` scenarios are proof harnesses, not support claims for Issues #5 and #4. A 2026-04-25 `pamRemoteBrowser` live run created records and cleanup passed, but verification failed because Commander `pam rbi edit --remote-browser-isolation` writes DAG `allowedSettings.connections`, which current `discover()` does not read back as manifest-shaped `pam_settings.options.remote_browser_isolation`. Nested rotation now reaches apply and marker verification after `pam rotation edit`, but the follow-up plan still reports updates for the nested user and parent machine; keep the preview/experimental gates until readback/drift semantics are clean. **Pre-merge contract:** `docs/SDK_DA_COMPLETION_PLAN.md` § Phase 0 — do not lift preview gates without parent-reviewed live proof per that plan.
 
 ## Prerequisites
 
@@ -25,13 +25,6 @@ The `pamRemoteBrowser` and `pamUserNestedRotation` scenarios are proof harnesses
 
 ## One-command run
 
-Full matrix (all scenarios, logs under `.smoke-runs/`, gitignored):
-
-```bash
-scripts/agent/run_smoke_matrix.sh
-scripts/agent/run_smoke_matrix.sh --login-helper env
-```
-
 Single scenario:
 
 ```bash
@@ -44,6 +37,10 @@ python3 scripts/smoke/smoke.py --login-helper env --scenario pamMachine
 python3 scripts/smoke/smoke.py --login-helper env --scenario pamRemoteBrowser # Issue #5 proof; currently expected to expose RBI readback gap
 DSK_PREVIEW=1 DSK_EXPERIMENTAL_ROTATION_APPLY=1 python3 scripts/smoke/smoke.py --login-helper env --scenario pamUserNestedRotation
 ```
+
+Operator-side sequential or parallel matrix runners live in the
+maintainer's private daybook (`msawczynk/cursor-daybook`:
+`templates/agent/`); this repo only ships the per-scenario CLI.
 
 Registered scenarios live in `scripts/smoke/scenarios.py`. Every scenario
 is unit-tested offline (`tests/test_smoke_scenarios.py`) — schema,

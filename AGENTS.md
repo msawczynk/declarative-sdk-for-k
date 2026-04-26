@@ -81,14 +81,13 @@ binding), read [`docs/VALIDATION_STAGES.md`](./docs/VALIDATION_STAGES.md).
 
 ## Autonomous execution (maintainer grant)
 
-Maintainers grant **standing permission** to run this repo’s scripted gates and
-live smoke (`scripts/agent/phase0_gates.sh`, `scripts/smoke/smoke.py`,
-`scripts/agent/codex_live_smoke.sh` when scoped) without asking for approval
+Maintainers grant **standing permission** to run this repo's committed
+live-smoke harness (`scripts/smoke/smoke.py`) without asking for approval
 before each command—**when** the lab machine already has Commander + the
-expected `keeper-vault-rbi-pam-testenv` configs (see `scripts/smoke/README.md`).
-Agents still must not echo secrets, must use the smoke harness (not ad-hoc
-tenant edits), and must treat failures as evidence (fix, document, or stop per
-`docs/SDK_DA_COMPLETION_PLAN.md`).
+expected `keeper-vault-rbi-pam-testenv` configs (see
+`scripts/smoke/README.md`). Agents still must not echo secrets, must use the
+smoke harness (not ad-hoc tenant edits), and must treat failures as evidence
+(fix, document, or stop per `docs/SDK_DA_COMPLETION_PLAN.md`).
 
 ## Agent playbook
 
@@ -220,31 +219,34 @@ See `docs/LOGIN.md` for the 30-line helper skeleton.
    them.** Validation passes; `apply` converts them to CONFLICT rows;
    the tenant state is unchanged but the manifest contains a lie.
 
-## Orchestration — use Codex CLI first
+## Orchestration
 
-Canonical split + Phase 0 + parallel tracks: **[`docs/ORCHESTRATION_PHASE0_PARALLEL.md`](./docs/ORCHESTRATION_PHASE0_PARALLEL.md)**. Non-agentic gates: **`scripts/agent/phase0_gates.sh quick`** (iterate) and **`full`** (pre-merge).
+Cursor / Codex / daybook orchestration (parent / worker split, Codex CLI
+wrappers, parallel slice prompts, GitHub-Codex Action / issue template,
+Phase-0 gate scripts) is **operator-side infrastructure**, not part of
+this product. It is maintained canonically in the maintainer's private
+daybook (`msawczynk/cursor-daybook`: `docs/orchestration/` and
+`templates/`). This repo does not ship those files; consumers and forks
+should not expect them.
 
-For **scoped implementation** (new tests, provider wiring, docs), the default workflow is **parent delegates to Codex CLI**, not a single long Cursor turn:
+Inside this repo, the binding contracts agents read are:
 
-1. Parent writes a prompt file: task, **hard file scope**, success criteria, **allowed commands** (e.g. `python3 -m pytest -q tests/test_foo.py`, `ruff check path`), and the DONE footer from `.github/codex/prompts/scoped-task.md`.
-2. Parent runs `scripts/agent/codex_offline_slice.sh` against that file (see [`docs/CODEX_CLI.md`](./docs/CODEX_CLI.md)).
-3. Parent reviews the patch, runs **`phase0_gates.sh`** (or full CI parity), owns **live smoke** and **gate lifts**, **pushes to GitHub**.
-
-GitHub Codex (issues, Actions) is optional for async work — [`docs/CODEX_GITHUB.md`](./docs/CODEX_GITHUB.md).
-
-**Token / style (every agent, including workers):** user-visible text → **caveman-ultra** (short, fragments, abbrev, `→`). Hidden reasoning → **wenyan-ultra** only where the product separates thinking from chat — never paste 文言 to humans. Workers: prepend maintainer `AGENT_PREAMBLE.md` when available; see [`.cursorrules`](./.cursorrules) and [`docs/CODEX_CLI.md`](./docs/CODEX_CLI.md) § token efficiency.
+- The exit-code table above + `docs/VALIDATION_STAGES.md`.
+- `docs/SDK_DA_COMPLETION_PLAN.md` — devil's-advocate completion gates;
+  classifies every modeled capability as `supported` / `preview-gated` /
+  `upstream-gap`. Wins over wish-list roadmaps.
+- `docs/SDK_COMPLETION_PLAN.md` — long-form roadmap + risk gates.
+- `docs/SDK_ORCHESTRATED_FEATURE_COMPLETE.md` — master phase × gate ×
+  live-proof index.
+- `scripts/smoke/README.md` — committed live-smoke harness contract.
 
 ## Where to read next
 
 - `README.md` — human-oriented overview.
 - `docs/COMMANDER.md` — pinned Commander version + capability matrix.
-- `docs/SDK_DA_COMPLETION_PLAN.md` — current devil's-advocate completion
-  gates, phases, and stop conditions.
-- `docs/SDK_ORCHESTRATED_FEATURE_COMPLETE.md` — master table: phases × gates ×
-  Codex/live proofs (orchestration index).
-- `docs/SDK_COMPLETION_PLAN.md` — parent/Codex orchestration roadmap.
-- `docs/CODEX_CLI.md` — local `codex exec` as default worker; scripts under `scripts/agent/`.
-- `docs/ORCHESTRATION_PHASE0_PARALLEL.md` — Phase 0 clean tree, parallel Codex slices, scripted gates.
+- `docs/SDK_DA_COMPLETION_PLAN.md` — devil's-advocate completion gates.
+- `docs/SDK_ORCHESTRATED_FEATURE_COMPLETE.md` — master phase × gate × live-proof table.
+- `docs/SDK_COMPLETION_PLAN.md` — long-form completion roadmap.
 - `docs/LOGIN.md` — custom-helper contract.
 - `V1_GA_CHECKLIST.md` — roadmap toward v1.0.0 GA.
 - `AUDIT.md` — milestone history + reconciliation with the upstream DOR.

@@ -105,18 +105,23 @@ Cross-checking the 2026-04-24 AUDIT scope (W1–W20), DOR contract, REVIEW defer
 
 ## Drift detected vs prior root `SCAFFOLD.md`
 
-Prior `SCAFFOLD.md` predates these committed paths. Refresh applied:
+Prior `SCAFFOLD.md` predates several committed paths. Refresh applied:
 
-- `scripts/agent/_codex_resolve.sh` — Codex path resolver (sourced by wrappers).
-- `scripts/agent/run_parallel_codex.sh` — parallel offline slice runner.
-- `scripts/agent/prompts/00-ping.prompt.md` (no-edit ping).
-- `scripts/agent/prompts/{01-github-doc, 02-smoke-docs, 03-root-docs}.prompt.md`.
-- `scripts/agent/prompts/README.md`.
 - `tests/test_errors.py` — `DeleteUnsupportedError` compat shim.
 - `tests/test_rbi_readback.py` — RBI discover + DAG-merge unit tests.
 - This file (`RECONCILIATION.md`) and the per-folder `SCAFFOLD.md` set.
 
-These additions are reflected in the refreshed root `SCAFFOLD.md` table.
+The `scripts/agent/` Codex CLI orchestration tree (offline slice / live
+smoke / parallel runner / Phase-0 gate / slice prompts) was removed from
+this repo on 2026-04-26 along with `docs/CODEX_CLI.md`,
+`docs/CODEX_GITHUB.md`, `docs/ORCHESTRATION_PHASE0_PARALLEL.md`,
+`.github/codex/`, `.github/ISSUE_TEMPLATE/codex_task.yml`, and
+`.github/workflows/codex-task.yml`. Cursor / Codex / daybook orchestration
+is now operator-side infrastructure only, maintained canonically in the
+maintainer's private daybook (`msawczynk/cursor-daybook`:
+`docs/orchestration/` + `templates/`). Product repos that want it adopt
+templates with `# adapt:` markers; this repo no longer ships those
+files.
 
 ---
 
