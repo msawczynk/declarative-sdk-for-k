@@ -1,9 +1,9 @@
 """Keeper PAM Declarative CLI.
 
 Subcommands:
-    validate   - schema + typed-model validation
+    validate   - JSON Schema (all families); vault offline graph; PAM graph + online
     export     - Commander JSON export -> declarative YAML manifest
-    plan       - compute and render an execution plan
+    plan       - compute and render a plan (pam-environment.v1 or keeper-vault.v1 + mock)
     import     - adopt unmanaged matching records and write ownership markers
     diff       - plan + field-by-field render
     apply      - execute a plan via the selected provider
@@ -26,6 +26,7 @@ import io
 import json
 import os
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -34,22 +35,32 @@ import click
 from keeper_sdk.auth import KsmLoginHelper, LoginHelper, load_helper_from_path
 from keeper_sdk.cli.renderer import RichRenderer
 from keeper_sdk.core import (
+    VAULT_MANIFEST_FAMILY,
     CapabilityError,
     ChangeKind,
+    Manifest,
     ManifestError,
     OwnershipError,
     RefError,
     SchemaError,
     build_graph,
     build_plan,
+    build_vault_graph,
     compute_diff,
+    compute_vault_diff,
     dump_manifest,
     execution_order,
     from_pam_import_json,
-    load_manifest,
+    load_declarative_manifest,
     redact,
+    vault_record_apply_order,
 )
+from keeper_sdk.core.interfaces import LiveRecord
+from keeper_sdk.core.manifest import read_manifest_document
 from keeper_sdk.core.planner import Plan
+from keeper_sdk.core.preview import assert_preview_keys_allowed
+from keeper_sdk.core.schema import PAM_FAMILY, validate_manifest
+from keeper_sdk.core.vault_models import VaultManifestV1
 from keeper_sdk.providers import CommanderCliProvider, MockProvider
 from keeper_sdk.secrets import bootstrap_ksm_application
 
@@ -65,6 +76,18 @@ EXIT_SCHEMA = 2
 EXIT_REF = 3
 EXIT_CONFLICT = 4
 EXIT_CAPABILITY = 5
+
+
+@dataclass
+class PlanLoadBundle:
+    """Result of loading a manifest for plan/diff/apply (PAM or vault L1)."""
+
+    pam: Manifest | None
+    vault: VaultManifestV1 | None
+    manifest_name: str
+    order: list[str]
+    live: list[LiveRecord]
+    provider: Any
 
 
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
@@ -91,12 +114,20 @@ def main(ctx: click.Context, provider: str, folder_uid: str | None) -> None:
 @main.command()
 @click.argument("manifest_path", type=click.Path(exists=True, path_type=Path))
 @click.option("--emit-canonical", is_flag=True, help="Print the canonicalised document")
+@click.option("--json", "as_json", is_flag=True, help="Emit validation summary as JSON on stdout")
 @click.option("--online", is_flag=True, help="Run tenant-connectivity checks (stage 4-5)")
 @click.pass_context
-def validate(ctx: click.Context, manifest_path: Path, emit_canonical: bool, online: bool) -> None:
-    """Validate the manifest against the v1 schema."""
+def validate(
+    ctx: click.Context,
+    manifest_path: Path,
+    emit_canonical: bool,
+    as_json: bool,
+    online: bool,
+) -> None:
+    """Validate JSON Schema for any packaged family; vault offline graph; PAM graph + online."""
     try:
-        manifest = load_manifest(manifest_path)
+        document = read_manifest_document(manifest_path)
+        family = validate_manifest(document)
     except SchemaError as exc:
         click.echo(f"validation failed: {exc}", err=True)
         sys.exit(EXIT_SCHEMA)
@@ -110,6 +141,82 @@ def validate(ctx: click.Context, manifest_path: Path, emit_canonical: bool, onli
         click.echo(f"manifest error: {exc}", err=True)
         sys.exit(EXIT_GENERIC)
 
+    if family != PAM_FAMILY:
+        if online:
+            click.echo(
+                "`--online` applies to pam-environment.v1 only (discover + diff smoke).",
+                err=True,
+            )
+            sys.exit(EXIT_CAPABILITY)
+
+        if family == VAULT_MANIFEST_FAMILY:
+            from keeper_sdk.core.vault_models import load_vault_manifest
+
+            vm = load_vault_manifest(document)
+            build_vault_graph(vm)
+            uid_n = len(vm.iter_uid_refs())
+            if emit_canonical and not as_json:
+                import yaml
+
+                click.echo(yaml.safe_dump(document, sort_keys=False, allow_unicode=True))
+            if as_json:
+                vpayload: dict[str, Any] = {
+                    "ok": True,
+                    "family": family,
+                    "mode": "vault_offline",
+                    "manifest_path": str(manifest_path.resolve()),
+                    "stages_completed": [
+                        "json_schema",
+                        "semantic_rules",
+                        "typed_model",
+                        "uid_ref_graph",
+                    ],
+                    "uid_ref_count": uid_n,
+                }
+                if emit_canonical:
+                    import yaml
+
+                    vpayload["canonical_yaml"] = yaml.safe_dump(
+                        document, sort_keys=False, allow_unicode=True
+                    )
+                click.echo(json.dumps(vpayload, indent=2))
+            else:
+                click.echo(f"ok: vault ({uid_n} uid_refs)")
+            return
+
+        if emit_canonical and not as_json:
+            import yaml
+
+            click.echo(yaml.safe_dump(document, sort_keys=False, allow_unicode=True))
+        if as_json:
+            payload: dict[str, Any] = {
+                "ok": True,
+                "family": family,
+                "mode": "schema_only",
+                "manifest_path": str(manifest_path.resolve()),
+                "stages_completed": ["json_schema", "semantic_rules"],
+            }
+            if emit_canonical:
+                import yaml
+
+                payload["canonical_yaml"] = yaml.safe_dump(
+                    document, sort_keys=False, allow_unicode=True
+                )
+            click.echo(json.dumps(payload, indent=2))
+        else:
+            click.echo(
+                f"ok: schema-valid ({family}); uid_ref graph + online stages skipped "
+                f"(PAM-only until docs/PAM_PARITY_PROGRAM.md provider slices land)."
+            )
+        return
+
+    try:
+        assert_preview_keys_allowed(document)
+        manifest = Manifest.model_validate(document)
+    except SchemaError as exc:
+        click.echo(f"validation failed: {exc}", err=True)
+        sys.exit(EXIT_SCHEMA)
+
     # uid_ref graph sanity
     try:
         build_graph(manifest)
@@ -119,7 +226,7 @@ def validate(ctx: click.Context, manifest_path: Path, emit_canonical: bool, onli
 
     online_suffix = ""
     if online:
-        provider = _make_provider(ctx, manifest_path, manifest=manifest)
+        provider = _make_provider(ctx, manifest_path, pam=manifest, vault=None)
         try:
             live = provider.discover()
         except CapabilityError as exc:
@@ -129,9 +236,10 @@ def validate(ctx: click.Context, manifest_path: Path, emit_canonical: bool, onli
         gaps: list[str] = getattr(provider, "unsupported_capabilities", lambda _m: [])(manifest)
         stage4_failed = False
         if gaps:
-            click.echo("capability gaps (will appear as plan conflicts):", err=True)
-            for reason in gaps:
-                click.echo(f"  - {reason}", err=True)
+            if not as_json:
+                click.echo("capability gaps (will appear as plan conflicts):", err=True)
+                for reason in gaps:
+                    click.echo(f"  - {reason}", err=True)
             stage4_failed = True
 
         live_gateway_names = {record.title for record in live if record.resource_type == "gateway"}
@@ -140,7 +248,8 @@ def validate(ctx: click.Context, manifest_path: Path, emit_canonical: bool, onli
                 continue
             if gateway.name in live_gateway_names:
                 continue
-            click.echo(f"stage 4: gateway '{gateway.name}' not found in tenant", err=True)
+            if not as_json:
+                click.echo(f"stage 4: gateway '{gateway.name}' not found in tenant", err=True)
             stage4_failed = True
 
         try:
@@ -153,13 +262,14 @@ def validate(ctx: click.Context, manifest_path: Path, emit_canonical: bool, onli
         update_count = sum(1 for change in changes if change.kind.value == "update")
         delete_count = sum(1 for change in changes if change.kind.value == "delete")
         conflict_count = sum(1 for change in changes if change.kind.value == "conflict")
-        click.echo(
-            "stage 5: "
-            f"{create_count} create, "
-            f"{update_count} update, "
-            f"{delete_count} delete-candidates, "
-            f"{conflict_count} conflicts"
-        )
+        if not as_json:
+            click.echo(
+                "stage 5: "
+                f"{create_count} create, "
+                f"{update_count} update, "
+                f"{delete_count} delete-candidates, "
+                f"{conflict_count} conflicts"
+            )
 
         binding_issues: list[str] = getattr(provider, "check_tenant_bindings", lambda _m: [])(
             manifest
@@ -167,17 +277,46 @@ def validate(ctx: click.Context, manifest_path: Path, emit_canonical: bool, onli
         stage5_failed = False
         if binding_issues:
             stage5_failed = True
-            click.echo("stage 5: tenant binding failures:", err=True)
-            for issue in binding_issues:
-                click.echo(f"  - {issue}", err=True)
+            if not as_json:
+                click.echo("stage 5: tenant binding failures:", err=True)
+                for issue in binding_issues:
+                    click.echo(f"  - {issue}", err=True)
 
         online_suffix = f"; online: {len(live)} live records"
         if stage4_failed or stage5_failed:
             sys.exit(EXIT_CAPABILITY)
 
-    click.echo(f"ok: {manifest.name} ({len(manifest.iter_uid_refs())} uid_refs){online_suffix}")
-    if emit_canonical:
-        click.echo(dump_manifest(manifest, fmt="yaml"))
+    uid_n = len(manifest.iter_uid_refs())
+    if as_json:
+        payload = {
+            "ok": True,
+            "family": PAM_FAMILY,
+            "mode": "pam_full",
+            "manifest_name": manifest.name,
+            "uid_ref_count": uid_n,
+            "stages_completed": ["json_schema", "semantic_rules", "typed_model", "uid_ref_graph"],
+        }
+        if online:
+            payload["stages_completed"].extend(
+                ["tenant_capability", "tenant_bindings", "diff_smoke"]
+            )
+            payload["online"] = True
+            payload["live_record_count"] = len(live)
+            payload["stage5_summary"] = {
+                "create": create_count,
+                "update": update_count,
+                "delete": delete_count,
+                "conflict": conflict_count,
+            }
+        else:
+            payload["online"] = False
+        if emit_canonical:
+            payload["canonical_yaml"] = dump_manifest(manifest, fmt="yaml")
+        click.echo(json.dumps(payload, indent=2))
+    else:
+        click.echo(f"ok: {manifest.name} ({uid_n} uid_refs){online_suffix}")
+        if emit_canonical:
+            click.echo(dump_manifest(manifest, fmt="yaml"))
 
 
 # ---------------------------------------------------------------------------
@@ -350,7 +489,23 @@ def import_(
 
     Shows the adoption plan first, then writes markers only after confirmation.
     """
-    manifest, order, live, _provider = _load_plan_context(ctx, manifest_path)
+    try:
+        document = read_manifest_document(manifest_path)
+        fam = validate_manifest(document)
+    except SchemaError as exc:
+        click.echo(f"validation failed: {exc}", err=True)
+        sys.exit(EXIT_SCHEMA)
+    except ManifestError as exc:
+        click.echo(f"manifest error: {exc}", err=True)
+        sys.exit(EXIT_GENERIC)
+    if fam != PAM_FAMILY:
+        click.echo("`dsk import` applies to pam-environment.v1 only.", err=True)
+        sys.exit(EXIT_GENERIC)
+
+    bundle = _load_plan_context(ctx, manifest_path)
+    manifest = bundle.pam
+    assert manifest is not None
+    order, live = bundle.order, bundle.live
     try:
         changes = compute_diff(manifest, live, adopt=True)
     except OwnershipError as exc:
@@ -373,7 +528,7 @@ def import_(
     if not auto_approve:
         click.confirm("Proceed?", abort=True)
 
-    provider = _make_provider(ctx, manifest_path, manifest=manifest)
+    provider = bundle.provider
     try:
         outcomes = provider.apply_plan(plan_obj, dry_run=False)
     except CapabilityError as exc:
@@ -402,18 +557,6 @@ def apply(
     dry_run: bool,
 ) -> None:
     """Apply a manifest via the selected provider."""
-    try:
-        manifest = load_manifest(manifest_path)
-    except SchemaError as exc:
-        click.echo(f"validation failed: {exc}", err=True)
-        sys.exit(EXIT_SCHEMA)
-    except RefError as exc:
-        click.echo(f"reference error: {exc}", err=True)
-        sys.exit(EXIT_REF)
-    except CapabilityError as exc:
-        click.echo(f"capability error: {exc}", err=True)
-        sys.exit(EXIT_CAPABILITY)
-
     plan_obj = _build_plan(ctx, manifest_path, allow_delete=allow_delete)
     if dry_run:
         click.echo(ctx.obj["renderer"].render_plan(plan_obj))
@@ -428,7 +571,8 @@ def apply(
         sys.exit(EXIT_CONFLICT)
     if not auto_approve and not dry_run:
         click.confirm("Proceed?", abort=True)
-    provider = _make_provider(ctx, manifest_path, manifest=manifest)
+    bundle = ctx.obj["_plan_bundle"]
+    provider = bundle.provider
     try:
         outcomes = provider.apply_plan(plan_obj, dry_run=dry_run)
     except CapabilityError as exc:
@@ -446,9 +590,26 @@ def apply(
 
 
 def _build_plan(ctx: click.Context, manifest_path: Path, *, allow_delete: bool) -> Plan:
-    manifest, order, live, provider = _load_plan_context(ctx, manifest_path)
+    bundle = _load_plan_context(ctx, manifest_path)
+    ctx.obj["_plan_bundle"] = bundle
     try:
-        changes = compute_diff(manifest, live, allow_delete=allow_delete)
+        if bundle.pam is not None:
+            changes = compute_diff(
+                bundle.pam,
+                bundle.live,
+                manifest_name=bundle.manifest_name,
+                allow_delete=allow_delete,
+            )
+            capability_subject = bundle.pam
+        else:
+            assert bundle.vault is not None
+            changes = compute_vault_diff(
+                bundle.vault,
+                bundle.live,
+                manifest_name=bundle.manifest_name,
+                allow_delete=allow_delete,
+            )
+            capability_subject = bundle.vault
     except OwnershipError as exc:
         click.echo(f"ownership error: {exc}", err=True)
         sys.exit(EXIT_CAPABILITY)
@@ -459,7 +620,7 @@ def _build_plan(ctx: click.Context, manifest_path: Path, *, allow_delete: bool) 
     # raise at real-apply time — operators would see green plans. See
     # REVIEW.md "Update — second pass / C3".
     try:
-        capability_gaps = provider.unsupported_capabilities(manifest)
+        capability_gaps = bundle.provider.unsupported_capabilities(capability_subject)
     except AttributeError:
         # Older third-party providers may not implement the hook; treat
         # as "no gaps" rather than breaking their integration.
@@ -478,12 +639,12 @@ def _build_plan(ctx: click.Context, manifest_path: Path, *, allow_delete: bool) 
             ),
         )
 
-    return build_plan(manifest.name, changes, order)
+    return build_plan(bundle.manifest_name, changes, bundle.order)
 
 
-def _load_plan_context(ctx: click.Context, manifest_path: Path):
+def _load_plan_context(ctx: click.Context, manifest_path: Path) -> PlanLoadBundle:
     try:
-        manifest = load_manifest(manifest_path)
+        typed = load_declarative_manifest(manifest_path)
     except SchemaError as exc:
         click.echo(f"validation failed: {exc}", err=True)
         sys.exit(EXIT_SCHEMA)
@@ -493,35 +654,60 @@ def _load_plan_context(ctx: click.Context, manifest_path: Path):
     except CapabilityError as exc:
         click.echo(f"capability error: {exc}", err=True)
         sys.exit(EXIT_CAPABILITY)
+    except ManifestError as exc:
+        click.echo(f"manifest error: {exc}", err=True)
+        sys.exit(EXIT_GENERIC)
+
+    pam: Manifest | None = typed if isinstance(typed, Manifest) else None
+    vault: VaultManifestV1 | None = typed if isinstance(typed, VaultManifestV1) else None
+    manifest_name = pam.name if pam is not None else manifest_path.stem
 
     try:
-        graph = build_graph(manifest)
-        order = execution_order(graph)
+        if pam is not None:
+            graph = build_graph(pam)
+            order = execution_order(graph)
+        else:
+            assert vault is not None
+            order = vault_record_apply_order(vault)
     except RefError as exc:
         click.echo(f"reference error: {exc}", err=True)
         sys.exit(EXIT_REF)
 
-    provider = _make_provider(ctx, manifest_path, manifest=manifest)
+    provider = _make_provider(ctx, manifest_path, pam=pam, vault=vault)
     try:
         live = provider.discover()
     except CapabilityError as exc:
         click.echo(f"discovery failed: {exc}", err=True)
         sys.exit(EXIT_CAPABILITY)
 
-    return manifest, order, live, provider
+    return PlanLoadBundle(
+        pam=pam,
+        vault=vault,
+        manifest_name=manifest_name,
+        order=order,
+        live=live,
+        provider=provider,
+    )
 
 
-def _make_provider(ctx: click.Context, manifest_path: Path, *, manifest=None):
+def _make_provider(
+    ctx: click.Context,
+    manifest_path: Path,
+    *,
+    pam: Manifest | None = None,
+    vault: VaultManifestV1 | None = None,
+):
     provider_name = ctx.obj.get("provider", "mock")
     folder_uid = ctx.obj.get("folder_uid")
+    manifest_name = pam.name if pam is not None else manifest_path.stem
     if provider_name == "mock":
-        return ctx.obj.setdefault(
-            "_provider_instance", MockProvider(manifest.name if manifest else None)
-        )
+        return ctx.obj.setdefault("_provider_instance", MockProvider(manifest_name))
     if provider_name == "commander":
-        manifest_source = {}
-        if manifest is not None:
-            manifest_source = manifest.model_dump(mode="python", exclude_none=True)
+        manifest_source: dict[str, Any] = {}
+        if pam is not None:
+            manifest_source = pam.model_dump(mode="python", exclude_none=True)
+        elif vault is not None:
+            manifest_source = vault.model_dump(mode="python", exclude_none=True, by_alias=True)
         return CommanderCliProvider(
             folder_uid=folder_uid or os.environ.get("KEEPER_DECLARATIVE_FOLDER"),
             manifest_source=manifest_source,
@@ -897,7 +1083,11 @@ def live_smoke(
     workdir.mkdir(parents=True, exist_ok=True)
     empty = workdir / "_smoke_empty.yml"
     if not empty.exists():
-        empty.write_text("schema: pam-environment.v1\n")
+        empty.write_text(
+            'version: "1"\n'
+            "name: _smoke_placeholder\n"
+            "schema: pam-environment.v1\n"
+        )
 
     transcript = Transcript(
         schema_family=schema_family,

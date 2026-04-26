@@ -1,0 +1,2 @@
+# Schema-only sample — validates against keeper-vault-sharing.v1 (no plan/apply yet).
+schema: keeper-vault-sharing.v1

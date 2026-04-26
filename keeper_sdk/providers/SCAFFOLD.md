@@ -7,7 +7,7 @@ Implement `keeper_sdk.core.interfaces.Provider`. Two ship today.
 | File | LOC | Role |
 |---|---:|---|
 | `__init__.py` | 6 | Re-exports `MockProvider`, `CommanderCliProvider`. |
-| `mock.py` | 207 | Offline in-memory provider. Default for tests + examples CI. Honours markers; emits same outcome shape as live. |
+| `mock.py` | 207 | Offline in-memory provider. Default for tests + examples CI. Honours markers; emits same outcome shape as live. For **keeper-vault.v1** slice-1, pair with :func:`keeper_sdk.core.vault_diff.compute_vault_diff` + :func:`keeper_sdk.core.vault_graph.vault_record_apply_order` (see `tests/test_vault_mock_provider.py`). |
 | `commander_cli.py` | 2402 | Live provider. Routes through `subprocess` against `keeper` CLI **or** in-process `keepercommander.*` API. **Never** touches `keeper_dag.*` directly. |
 | `_commander_cli_helpers.py` | 407 | Pure module-level helpers extracted out of `commander_cli.py` (D-1 partial split). `_record_from_get`, `_payload_from_get`, `_canonical_payload_from_field`, `_FIELD_LABEL_ALIASES`, `_merge_rbi_dag_options_into_pam_settings`, `_pam_gateway_rows`, `_pam_config_rows`, etc. Heavily unit-tested (`tests/test_commander_cli.py`, `tests/test_rbi_readback.py`). |
 

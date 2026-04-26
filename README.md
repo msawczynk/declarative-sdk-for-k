@@ -1,10 +1,20 @@
 # declarative-sdk-for-k
 
-> `dsk` — a declarative, agent-first SDK for Keeper tenant state:
-> GA PAM lifecycle for machines, databases, directories, nested users,
-> and remote browsers, plus scoped shared-folder, KSM, and typed-record
-> surfaces. Rotation settings, JIT, gateway create, and RBI tuning remain
-> preview-gated until live proof is complete.
+> `dsk` — a declarative, agent-first SDK for Keeper tenant state.
+> **Production today (PAM bar):** `pam-environment.v1` — full
+> `validate` / `plan` / `apply` / `discover` on mock + Commander for the
+> PAM lifecycle (machines, databases, directories, nested users, remote
+> browsers, shared folders, gateways, configurations). Rotation settings, JIT,
+> gateway `mode: create`, and RBI tuning remain preview-gated until live proof
+> completes.
+>
+> **Other manifest families** (`keeper-vault`, `keeper-enterprise`, …) ship as
+> **packaged JSON Schema** for design, CI, and agent ergonomics; they are **not**
+> “GA like PAM” until they pass the same gates (typed core, provider wiring, live
+> proof). See [**Readiness vs the PAM bar**](#readiness-vs-the-pam-bar) and
+> [`docs/PAM_PARITY_PROGRAM.md`](docs/PAM_PARITY_PROGRAM.md) for the program that
+> lifts scaffolds to full support. The README hero will only claim universal GA
+> after that program completes — not when schemas land alone.
 
 Pure-Python core, no network I/O until you reach a provider. Machine-
 readable everywhere (`--json`, typed exit codes, `next_action` on
@@ -29,13 +39,59 @@ in the maintainer's private daybook, not this repo.
 | Ownership markers    | read + write + adopt                 | multi-manager arbitration    |
 | Vault records (non-PAM) | typed-model read/write via `login` resource | generic records, file records |
 | Teams / roles        | discover surface only                | full declarative lifecycle   |
-| Enterprise config    | not yet                              | SSO, SCIM, node tree         |
-| Compliance / audit   | not yet                              | reports-as-manifest          |
+| Enterprise config    | scaffold + partial slices (see matrix) | SSO, SCIM, richer nodes     |
+| Compliance / audit   | read-only `dsk report` verbs (password, compliance, security-audit) | extra report verbs; **no** posture-as-manifest (V2) |
 
 The schema stays stable across capability additions — new top-level
 blocks join `pam-environment.v1` rather than bumping the version. See
 [`V1_GA_CHECKLIST.md`](V1_GA_CHECKLIST.md) for the commitment list
 gating the `1.0.0` tag.
+
+## Readiness vs the PAM bar
+
+“**Ready like PAM**” means more than a JSON file: typed models, Commander-backed
+discover/plan/apply, tests, live proof, and matrix alignment — see
+[`docs/PAM_PARITY_PROGRAM.md`](docs/PAM_PARITY_PROGRAM.md). **Do not** treat
+packaged schema alone as GA.
+
+| Manifest family (`schema:` key) | Schema in repo | Clears PAM bar today |
+|----------------------------------|----------------|----------------------|
+| `pam-environment.v1` | yes | **Yes** (PAM scope; preview-gated sub-features called out in AGENTS / checklist) |
+| `keeper-vault.v1` | yes | **No** — scaffold-only; no `CommanderCliProvider` slice |
+| `keeper-vault-sharing.v1` | yes | **No** — scaffold-only |
+| `keeper-enterprise.v1` | yes | **No** — scaffold / partial design only |
+| `keeper-integrations-identity.v1` | yes | **No** — scaffold-only |
+| `keeper-integrations-events.v1` | yes | **No** — scaffold-only |
+| `keeper-ksm.v1` | yes | **No** — KSM bootstrap + helpers exist; declarative family not wired end-to-end |
+| `keeper-pam-extended.v1` | yes | **No** — stubs / upstream gaps until Commander paths graduate |
+| `keeper-epm.v1` | yes | **No** — watchlist per V2 Q5 |
+| `keeper-security-posture.v1` | yes (trap) | **N/A** — `dropped-design`; use `dsk report` verbs |
+
+Separate runtime: **`dsk report`** verbs (password / compliance / security-audit)
+are production read paths; they are not manifest families.
+
+## Keeper Security Platform: what DSK does not cover (by design)
+
+The Keeper Security Platform includes Commander surfaces that **stay
+outside** declarative `dsk apply` and, for many categories, outside
+wrapped `dsk report` / `dsk run` until an explicit product decision
+re-opens them. That is intentional boundary, not a missing Commander
+feature. Canonical rationale: [`docs/V2_DECISIONS.md`](docs/V2_DECISIONS.md)
+(Q1 posture drop, Q3 runtime scope, Q5 MSP/EPM, and the out-of-scope block).
+
+| Platform capability | Typical Commander / product surface | Why DSK does not touch it | What to use instead |
+|---------------------|--------------------------------------|---------------------------|---------------------|
+| Posture as declarative state | BreachWatch posture, compliance baselines, continuous audit as a manifest family | **P15 dropped-design** — surfaces are read-only / one-shot; remediation is per-record user action, not an idempotent manifest reconcile (V2 Q1). | Shipped: `dsk report password-report`, `compliance-report`, `security-audit-report`. Still Commander-direct until wrapped at the same bar: e.g. `breachwatch-list`, richer `enterprise-reports`. |
+| MSP / distributor | MSP tree, distributor-only flows | **Q5 watch-only** — no schema until MSP test tenant + customer ask; Q3 keeps wrappers off until product re-opens. | Drift tracking in matrix/snapshot only; operate via Commander. |
+| Auth factor enrollment | `two_fa` enrollment-style flows | **Q3** — out of scope for both `dsk run` and `dsk report` until reversed. | Commander direct. |
+| Vault repair / migration | `verify_records`, `convert` | **Q3 + V2 out-of-scope** — explicit non-goals for v2.0+. | Commander direct. |
+| Debug / graph writers | `pam_debug` and similar | **Q3** — not treated as end-user SDK surface. | Commander direct. |
+| Live privileged sessions | `connect`, tunnels, supershell, ssh-agent, interactive PAM launch | Mutating / TTY session semantics (**Q3 `dsk run` bucket**); never modeled as `dsk apply` state. | Commander today; possible future `dsk run` passthrough — still not manifest lifecycle. |
+| Full EPM / PEDM control plane | PEDM deployments, agents, policies, collections | **P16 watchlist** — gated on source audit + EPM customer + licensed tenant smoke (Q5). | Commander until triggers clear; schema stays roadmap-only. |
+
+For how much of Commander is mapped into docs and CI drift checks, see
+[`docs/CAPABILITY_MATRIX.md`](docs/CAPABILITY_MATRIX.md) and
+[`docs/capability-snapshot.json`](docs/capability-snapshot.json).
 
 ## Layout
 
@@ -43,15 +99,23 @@ gating the `1.0.0` tag.
 keeper_sdk/                          # import path stable through 1.x
                                      # (renamed to declarative_sdk_k in 2.0 with a shim)
   core/                              # pure models, schema, graph, diff, planner, metadata, redact
-    schemas/                         # packaged pam-environment.v1.schema.json
+    schemas/                         # pam-environment.v1.schema.json + per-family dirs (see PAM bar)
   providers/                         # MockProvider, CommanderCliProvider
   auth/                              # LoginHelper protocol + EnvLoginHelper / KsmLoginHelper reference impls
   secrets/                           # KSM as first-class SDK feature: bootstrap.py (Commander-driven
                                      # provisioning), ksm.py (KsmSecretStore + load_keeper_login_from_ksm),
                                      # bus.py (Phase B inter-agent bus directory — sealed skeleton)
   cli/                               # `dsk` (validate / export / plan / diff / apply / import / bootstrap-ksm)
-tests/                               # 315 passing tests + 2 expected v1.1 deferrals (run pytest); coverage 86% (CI floor 84)
+tests/                               # run `pytest` — on the order of 470+ tests; CI ratchets coverage
 docs/
+  ORCHESTRATION_PAM_PARITY.md        # merge train, workers, CI ladder (vault L1 + gates)
+  EXECUTION_PLAN_HEAVY_ORCHESTRATION.md  # phased checklist A–E + metrics + sprint close
+  ORCHESTRATION_UNTIL_COMPLETE.md       # tiers A/B/C, family ledger, waves to program exit
+  VAULT_L1_DESIGN.md                 # integrator-owned scope/marker/discover memo (draft shell)
+  PAM_PARITY_PROGRAM.md              # Definition of Done + phases to full support (not scaffold)
+  NEXT_SPRINT_PARALLEL_ORCHESTRATION.md  # wave mechanics, R/F packages, tenant rules
+  V2_DECISIONS.md                    # schema families, runtime scope, MSP/EPM, explicit non-goals
+  CAPABILITY_MATRIX.md               # Commander roots vs DSK buckets (synced from scripts/sync_upstream.py)
   COMMANDER.md                       # pinned Commander version + capability matrix
   LOGIN.md                           # login helper contract + 30-line skeleton
   KSM_BOOTSTRAP.md                   # `dsk bootstrap-ksm` operator runbook
@@ -79,6 +143,12 @@ dsk validate examples/pamMachine.yaml
 dsk --provider mock plan examples/pamMachine.yaml --json
 dsk --provider mock apply examples/pamMachine.yaml --auto-approve
 ```
+
+Any packaged manifest family (`schema: keeper-vault.v1`, …) can run
+`dsk validate` for **JSON Schema + dropped-design guard**; uid_ref graph and
+`--online` stay **PAM-only** until per-family providers ship (`docs/PAM_PARITY_PROGRAM.md`).
+Use **`dsk validate PATH --json`** for a single JSON object (`mode`: `schema_only`
+vs `pam_full`) for agents and CI parsers.
 
 ## Quick start (live tenant)
 
@@ -134,8 +204,8 @@ KSM is now a first-class SDK feature: `dsk bootstrap-ksm` provisions an
 app + share + client token + `ksm-config.json` end-to-end, and
 `KsmLoginHelper` reads Commander credentials back out of that vault — so
 the SDK can authenticate without any plaintext env vars on the host.
-Current local suite: **315 passing tests** + 2 expected v1.1 deferrals;
-total line coverage **86.32%** (CI ratchet floor `84`); core modules
+Current local suite: on the order of **470+ tests** collected; line coverage
+is CI-ratcheted (see `pyproject.toml` / workflows); core modules
 `redact`, `schema`, `normalize` at 100%.
 Live `EnvLoginHelper` smoke proved full apply for `pamMachine`; Issue #5
 RBI readback and Issue #4 nested-user rotation remain preview-gated until

@@ -37,6 +37,53 @@ def test_validate_ok(minimal_manifest_path: Path) -> None:
     assert "ok:" in result.output
 
 
+def test_validate_json_pam_offline(minimal_manifest_path: Path) -> None:
+    result = _run(["validate", str(minimal_manifest_path), "--json"])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output.strip())
+    assert data["ok"] is True
+    assert data["family"] == "pam-environment.v1"
+    assert data["mode"] == "pam_full"
+    assert data["online"] is False
+    assert "uid_ref_count" in data
+
+
+def test_validate_json_scaffold_vault() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    path = repo_root / "examples" / "scaffold_only" / "vaultMinimal.yaml"
+    result = _run(["validate", str(path), "--json"])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output.strip())
+    assert data["ok"] is True
+    assert data["family"] == "keeper-vault.v1"
+    assert data["mode"] == "vault_offline"
+    assert data["uid_ref_count"] == 0
+    assert "uid_ref_graph" in data["stages_completed"]
+
+
+def test_plan_vault_mock_creates(tmp_path: Path) -> None:
+    p = tmp_path / "vault-one.yaml"
+    p.write_text(
+        "schema: keeper-vault.v1\n"
+        "records:\n"
+        "  - uid_ref: cli.v.login\n"
+        "    type: login\n"
+        "    title: CLI Vault Login\n",
+        encoding="utf-8",
+    )
+    result = _run(["--provider", "mock", "plan", str(p)])
+    assert result.exit_code == EXIT_CHANGES, result.output
+    assert "create" in result.output
+
+
+def test_import_rejects_vault(tmp_path: Path) -> None:
+    p = tmp_path / "vault.yaml"
+    p.write_text("schema: keeper-vault.v1\nrecords: []\n", encoding="utf-8")
+    result = _run(["import", str(p)])
+    assert result.exit_code == EXIT_GENERIC
+    assert "pam-environment" in result.output
+
+
 def test_validate_rejects_missing_ref(invalid_manifest) -> None:
     path = invalid_manifest("missing-ref.yaml")
     result = _run(["validate", str(path)])

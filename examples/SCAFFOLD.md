@@ -1,7 +1,12 @@
 # `examples/` — canonical minimal manifests
 
-Each file is one resource type, minimal shape, valid against
+Root `*.yaml` files are one PAM resource type each, minimal shape, valid against
 `keeper_sdk/core/schemas/pam-environment.v1.schema.json`.
+
+`examples/scaffold_only/*.yaml` are **non-PAM** packaged-schema samples
+(`keeper-vault`, `keeper-vault-sharing`, …): `dsk validate` only (no mock
+`plan` — `load_manifest` stays PAM-only until Phase 1). CI validates them in the
+same offline gate as root examples.
 
 CI validates every file offline AND `--provider mock`-plans them clean
 (`.github/workflows/ci.yml` examples job + `tests/test_smoke_scenarios.py`
@@ -15,6 +20,13 @@ shape coverage).
 | `pamDatabase.yaml` | `pamDatabase` | Includes `database_type` to satisfy verifier. |
 | `pamDirectory.yaml` | `pamDirectory` | Includes directory-specific binding fields. |
 | `pamRemoteBrowser.yaml` | `pamRemoteBrowser` | Connection settings only — RBI tri-state and audio keys remain preview-gated. |
+
+### `scaffold_only/` (schema gate only)
+
+| File | `schema:` | Notes |
+|------|-----------|--------|
+| `vaultMinimal.yaml` | `keeper-vault.v1` | Empty `records` — offline CI + `dsk validate --json`. |
+| `vaultSharingMinimal.yaml` | `keeper-vault-sharing.v1` | Empty sharing blocks (defaults). |
 
 ## Where to land new work
 

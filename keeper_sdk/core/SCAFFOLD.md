@@ -7,10 +7,13 @@ This is the contract layer — every behaviour change here ripples into provider
 
 | File | LOC | Role | Public exports (via `core/__init__.py`) |
 |---|---:|---|---|
-| `manifest.py` | 88 | Load/dump YAML/JSON manifest; canonicalize. | `load_manifest`, `dump_manifest` |
+| `manifest.py` | 173 | Load/dump YAML/JSON manifest; canonicalize. | `load_manifest`, `load_declarative_manifest`, `load_declarative_manifest_string`, `dump_manifest` |
 | `schema.py` | 114 | JSON-schema loader + `validate_manifest`. | `load_schema`, `validate_manifest` |
 | `models.py` | 469 | Pydantic models for the manifest surface (Manifest, Gateway, PamConfiguration, PamMachine, PamDatabase, PamDirectory, PamRemoteBrowser, PamUser, LoginRecord, Project, SharedFolderBlock, SharedFoldersBlock). `extra="allow"` neither widened nor narrowed. | All resource models |
 | `graph.py` | 178 | Build dep DAG + topo `execution_order`; walks `shared_folders`, `projects`, resource `pam_configuration_uid_ref` edges. | `build_graph`, `execution_order` |
+| `vault_models.py` | 92 | `keeper-vault.v1` slice-1 Pydantic + `load_vault_manifest`; L1 `login`-only. | `VaultManifestV1`, `VaultRecord`, `load_vault_manifest`, `VAULT_MANIFEST_FAMILY` |
+| `vault_graph.py` | 87 | Vault dep DAG: duplicate `uid_ref`, `folder_ref` → synthetic prerequisite nodes; `vault_record_apply_order` strips folder nodes. | `build_vault_graph`, `vault_record_apply_order` |
+| `vault_diff.py` | 83 | Vault desired-vs-live; delegates to ``diff`` private classifiers. | `compute_vault_diff` |
 | `diff.py` | 487 | `compute_diff` decomposed into `_index_live` + `_classify_desired` + `_classify_orphans`. Owns `_DIFF_IGNORED_FIELDS` (placement metadata: `pam_configuration_uid_ref`, `shared_folder`, `users`, `gateway*`). Also nested-`pamUser` `rotation_settings` semantic equality (P2.1 fix). | `Change`, `ChangeKind`, `compute_diff` |
 | `planner.py` | 90 | Build `Plan` from changes; summary accounting (create/update/delete/conflict/noop). | `Plan`, `build_plan` |
 | `interfaces.py` | 125 | Typed protocols: `Provider`, `MetadataStore`, `Renderer`, `LiveRecord`, `ApplyOutcome`. Provider exposes `discover()`, `apply_plan()`, `unsupported_capabilities()`, `check_tenant_bindings()`. | `Provider`, `MetadataStore`, `Renderer` |

@@ -7,6 +7,28 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- **Master orchestration** — [`docs/ORCHESTRATION_UNTIL_COMPLETE.md`](docs/ORCHESTRATION_UNTIL_COMPLETE.md):
+  exit **tiers A/B/C**, per-family **completion ledger** (G0–G6), repeating
+  **waves** W.1–W.6, parallelism do/don’t, metrics dashboard, §7 vault +
+  program checklist through Tier B.
+- **Vault L1** — `docs/VAULT_L1_DESIGN.md` (slice 1 design; sign-off §7 still
+  pending) plus **`keeper_sdk/core/vault_models.py`**: `VaultManifestV1`,
+  `VaultRecord`, `load_vault_manifest()` with L1 **`login`-only** record rule;
+  tests in `tests/test_vault_models.py`.
+- **Vault PR-V2** — **`keeper_sdk/core/vault_graph.py`**: `build_vault_graph`,
+  `vault_record_apply_order` (duplicate `uid_ref`, `folder_ref` prerequisite
+  nodes, invalid `folder_ref` pattern → `RefError`); tests in
+  `tests/test_vault_graph.py`.
+- **Vault PR-V4** — **`load_declarative_manifest`** / **`load_declarative_manifest_string`**
+  in `keeper_sdk/core/manifest.py` (PAM :class:`~keeper_sdk.core.models.Manifest` or
+  :class:`~keeper_sdk.core.vault_models.VaultManifestV1`). CLI **plan** / **diff** /
+  **apply** dispatch on family; **validate --json** uses ``vault_offline`` for
+  ``keeper-vault.v1`` (typed model + ``build_vault_graph``). **import** stays
+  PAM-only. Tests: `tests/test_cli.py`.
+- **Vault PR-V3** — **`keeper_sdk/core/vault_diff.py`**: `compute_vault_diff`
+  (reuses PAM diff classification for vault ``records[]``); integration tests with
+  existing :class:`~keeper_sdk.providers.mock.MockProvider` in
+  `tests/test_vault_mock_provider.py`. CLI family dispatch = PR-V4+.
 - **`dsk report` — `--sanitize-uids`** on `password-report`,
   `compliance-report`, and `security-audit-report`: fingerprints
   Base64-style UIDs that appear inside string values. Raw

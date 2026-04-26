@@ -7,6 +7,11 @@
   "additionalProperties": false,
   "required": ["version", "name"],
   "properties": {
+    "schema": {
+      "type": "string",
+      "const": "pam-environment.v1",
+      "description": "Optional explicit family pin (same as other keeper_* families). Legacy manifests omit this key."
+    },
     "version": { "type": "string", "const": "1" },
     "name": { "type": "string", "minLength": 1 },
     "projects": {

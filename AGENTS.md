@@ -47,7 +47,7 @@ agents.
 
 | Command             | Input                | Output                 | Machine flag          |
 |---------------------|----------------------|------------------------|-----------------------|
-| `dsk validate PATH` | manifest YAML/JSON   | `ok: <name> (<n>refs)` | `--emit-canonical`    |
+| `dsk validate PATH` | manifest YAML/JSON   | PAM: `ok: <name> (<n>refs)`; other `schema:` families: `ok: schema-valid (<family>)` (graph/`--online` PAM-only) | `--emit-canonical`, `--json` |
 | `dsk plan PATH`     | manifest             | plan summary + table   | `--json`              |
 | `dsk diff PATH`     | manifest             | field-level diff       | —                     |
 | `dsk apply PATH`    | manifest             | outcomes table         | `--dry-run`           |

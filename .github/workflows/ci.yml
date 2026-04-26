@@ -79,7 +79,9 @@ jobs:
       - run: pip install -e ".[dev]"
       - name: Validate every example manifest (offline schema gate)
         run: |
-          for f in examples/*.yaml; do
+          set -euo pipefail
+          shopt -s nullglob
+          for f in examples/*.yaml examples/scaffold_only/*.yaml; do
             echo "::group::validate $f"
             dsk validate "$f"
             echo "::endgroup::"

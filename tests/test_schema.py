@@ -25,9 +25,9 @@ _INVALID_FILES = sorted(p.name for p in _INVALID_DIR.glob("*.yaml"))
 
 @pytest.fixture(autouse=True)
 def _clear_schema_cache():
-    schema_module.load_schema.cache_clear()
+    schema_module.load_schema_for_family.cache_clear()
     yield
-    schema_module.load_schema.cache_clear()
+    schema_module.load_schema_for_family.cache_clear()
 
 
 def _raise_file_not_found(_name: str):
@@ -120,7 +120,7 @@ def test_schema_pydantic_fallback_raises_schema_error(monkeypatch: pytest.Monkey
     _without_jsonschema(monkeypatch)
 
     with pytest.raises(SchemaError) as exc:
-        validate_manifest({"version": "2", "name": "lab"})
+        validate_manifest({"version": "1", "name": "lab", "resources": "not-a-list"})
 
     assert exc.value.context["error_count"] >= 1
 

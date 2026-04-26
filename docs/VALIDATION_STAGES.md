@@ -1,8 +1,16 @@
 # Validation stages and exit codes
 
-`dsk validate` runs a layered check. The layers are cumulative — stage N
-only executes if stages 1 through N-1 all passed. `--online` enables
-stages 4 and 5; without it, validation stops after stage 3.
+`dsk validate` runs a layered check. **Family dispatch:** manifests with
+`schema: keeper-*` (or any packaged non-PAM family) complete **stages 1–2
+only** today — JSON Schema plus semantic rules that still apply — then exit
+success without typed `Manifest` load, uid_ref graph, or tenant probes (see
+`docs/PAM_PARITY_PROGRAM.md`). Legacy PAM manifests (`version` + `name`, or
+`schema: pam-environment.v1`) run the full stack below. Use `dsk validate
+--json` for a machine-readable summary (`mode`: `schema_only` vs `pam_full`).
+
+The layers are cumulative for **PAM** — stage N only executes if stages 1
+through N-1 all passed. `--online` enables stages 4 and 5 for PAM only; without
+it, PAM validation stops after stage 3.
 
 Every stage has a deterministic exit code so CI pipelines can branch on
 the specific failure class without parsing stderr.
@@ -11,9 +19,9 @@ the specific failure class without parsing stderr.
 
 | Stage | Name | Failure exit code | What it checks | Requires `--online` |
 |------:|------|:-----------------:|----------------|:-------------------:|
-| 1 | JSON Schema (structural) | `EXIT_SCHEMA` (`2`) | Manifest parses, required keys present, type-narrow unions resolve, `pam-environment.v1.schema.json` passes `jsonschema.validate`. | no |
-| 2 | Typed model | `EXIT_SCHEMA` (`2`) | Pydantic v2 validation, enum coercion, canonical field-name rule (aliases fold to canonical). | no |
-| 3 | Manifest-internal references | `EXIT_REF` (`3`) | Every `*_uid_ref` targets a declared `uid_ref`; no cycles; ownership-marker shape is sane. | no |
+| 1 | JSON Schema (structural) | `EXIT_SCHEMA` (`2`) | Manifest parses; family resolved from `schema:` or legacy PAM keys; packaged JSON Schema for that family passes `jsonschema.validate`. `dropped-design` families fail here. | no |
+| 2 | Typed model | `EXIT_SCHEMA` (`2`) | **PAM only:** Pydantic v2 validation, enum coercion, canonical field-name rule (aliases fold to canonical). Non-PAM families skip this stage. | no |
+| 3 | Manifest-internal references | `EXIT_REF` (`3`) | **PAM only:** every `*_uid_ref` targets a declared `uid_ref`; no cycles; ownership-marker shape is sane. | no |
 | 4 | Tenant-side capabilities | `EXIT_CAPABILITY` (`5`) | Session active, `discover()` works, gateways declared as `reference_existing` exist on the tenant, provider `unsupported_capabilities()` returns `[]`. | **yes** |
 | 5 | Tenant-side bindings | `EXIT_CAPABILITY` (`5`) | Provider `check_tenant_bindings()` returns `[]`. For commander: pam_configuration titles resolve, shared_folder bindings exist on each config, `gateway_uid_ref` pairings match the live gateway UID, declared `ksm_application_name` matches the tenant's. | **yes** |
 

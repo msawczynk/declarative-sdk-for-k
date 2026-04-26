@@ -17,7 +17,7 @@ Click-based CLI. Owns the exit-code contract (`docs/VALIDATION_STAGES.md`,
 
 | Verb | Exit codes | Machine flag | JSON contract |
 |---|---|---|---|
-| `validate` | 0/2/3/5 | `--emit-canonical` | – |
+| `validate` | 0/2/3/5 | `--emit-canonical`, `--json` | `mode` + `family` + stage list (`schema_only` vs `pam_full`) |
 | `plan` | 0/2/3/4 | `--json` | shape in `AGENTS.md` |
 | `diff` | 0/2/3 | – | – |
 | `apply` | 0/1/3/4/5 | `--dry-run` (= plan) | per-row outcomes |

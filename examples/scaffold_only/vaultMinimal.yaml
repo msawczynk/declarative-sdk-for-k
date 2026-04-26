@@ -1,0 +1,5 @@
+# Minimal keeper-vault.v1 sample — `dsk validate` / `dsk validate --json` (offline graph).
+# `dsk plan` / `dsk apply --provider mock` supported via load_declarative_manifest (PR-V4).
+# See docs/PAM_PARITY_PROGRAM.md Phase 1.
+schema: keeper-vault.v1
+records: []

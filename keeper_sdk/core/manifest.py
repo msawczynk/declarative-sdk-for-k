@@ -9,13 +9,35 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from keeper_sdk.core.errors import ManifestError, SchemaError
 from keeper_sdk.core.models import Manifest
 from keeper_sdk.core.normalize import canonicalize
 from keeper_sdk.core.preview import assert_preview_keys_allowed
-from keeper_sdk.core.schema import validate_manifest
+from keeper_sdk.core.schema import PAM_FAMILY, validate_manifest
+
+if TYPE_CHECKING:
+    from keeper_sdk.core.vault_models import VaultManifestV1
+
+
+def read_manifest_document(source: str | Path) -> dict[str, Any]:
+    """Parse + canonicalise a manifest file without typed-model load.
+
+    Used by ``dsk validate`` for non-PAM families and by tests.
+    """
+    path = Path(source)
+    if not path.is_file():
+        raise ManifestError(reason=f"manifest not found: {path}", next_action="check the path")
+    raw = path.read_text(encoding="utf-8")
+    return read_manifest_document_string(raw, suffix=path.suffix)
+
+
+def read_manifest_document_string(raw: str, *, suffix: str = ".yaml") -> dict[str, Any]:
+    data = _parse(raw, suffix)
+    if not isinstance(data, dict):
+        raise SchemaError(reason="manifest must be a JSON object / YAML mapping")
+    return canonicalize(data)
 
 
 def load_manifest(source: str | Path, *, validate: bool = True) -> Manifest:
@@ -32,12 +54,20 @@ def load_manifest(source: str | Path, *, validate: bool = True) -> Manifest:
 
 
 def load_manifest_string(raw: str, *, suffix: str = ".yaml", validate: bool = True) -> Manifest:
-    data = _parse(raw, suffix)
-    if not isinstance(data, dict):
-        raise SchemaError(reason="manifest must be a JSON object / YAML mapping")
-    document = canonicalize(data)
+    document = read_manifest_document_string(raw, suffix=suffix)
     if validate:
-        validate_manifest(document)
+        family = validate_manifest(document)
+        if family != PAM_FAMILY:
+            raise ManifestError(
+                reason=(
+                    f"typed manifest load supports {PAM_FAMILY} only (document declares {family})"
+                ),
+                next_action=(
+                    "for keeper-vault.v1 use load_declarative_manifest(); "
+                    "for schema-only checks use read_manifest_document + validate_manifest; "
+                    "see docs/PAM_PARITY_PROGRAM.md for other families."
+                ),
+            )
         # Schema accepts more than the SDK implements; the preview gate
         # closes that gap at load time with a one-line remediation
         # (DSK_PREVIEW=1) instead of forcing operators to read plan
@@ -50,6 +80,61 @@ def load_manifest_string(raw: str, *, suffix: str = ".yaml", validate: bool = Tr
             reason=f"typed validation failed: {exc}",
             next_action="fix the reported fields",
         ) from exc
+
+
+def load_declarative_manifest(
+    source: str | Path, *, validate: bool = True
+) -> Manifest | VaultManifestV1:
+    """Load a typed manifest for families the engine can plan (PAM + vault L1).
+
+    Returns :class:`~keeper_sdk.core.models.Manifest` for ``pam-environment.v1``
+    or :class:`~keeper_sdk.core.vault_models.VaultManifestV1` for
+    ``keeper-vault.v1``. Other schema-valid families raise :class:`ManifestError`
+    (use :func:`read_manifest_document` + :func:`validate_manifest` for
+    schema-only checks).
+
+    ``keeper-vault.v1`` does not use the PAM preview gate.
+    """
+    path = Path(source)
+    if not path.is_file():
+        raise ManifestError(reason=f"manifest not found: {path}", next_action="check the path")
+    raw = path.read_text(encoding="utf-8")
+    return load_declarative_manifest_string(raw, suffix=path.suffix, validate=validate)
+
+
+def load_declarative_manifest_string(
+    raw: str, *, suffix: str = ".yaml", validate: bool = True
+) -> Manifest | VaultManifestV1:
+    from keeper_sdk.core.vault_models import VAULT_FAMILY, load_vault_manifest
+
+    document = read_manifest_document_string(raw, suffix=suffix)
+    if not validate:
+        raise ManifestError(
+            reason="load_declarative_manifest_string requires validate=True",
+            next_action="parse with read_manifest_document_string then validate_manifest",
+        )
+    family = validate_manifest(document)
+    if family == PAM_FAMILY:
+        assert_preview_keys_allowed(document)
+        try:
+            return Manifest.model_validate(document)
+        except (ValueError, TypeError) as exc:
+            raise SchemaError(
+                reason=f"typed validation failed: {exc}",
+                next_action="fix the reported fields",
+            ) from exc
+    if family == VAULT_FAMILY:
+        return load_vault_manifest(document)
+    raise ManifestError(
+        reason=(
+            f"typed plan/load supports {PAM_FAMILY} and {VAULT_FAMILY} only "
+            f"(document declares {family!r})"
+        ),
+        next_action=(
+            "use `dsk validate` for schema-only checks on other families; "
+            "see docs/PAM_PARITY_PROGRAM.md"
+        ),
+    )
 
 
 def dump_manifest(manifest: Manifest, *, fmt: str = "yaml") -> str:
