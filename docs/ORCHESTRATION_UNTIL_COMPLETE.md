@@ -132,8 +132,8 @@ capping tier (archive reason in JOURNAL).
 - [ ] **Publish:** `main` ahead of `origin/main` → `git push` + confirm CI on pushed SHA
 - [x] **Hardening (post-UPDATE):** assert Commander **vault UPDATE** success (no silent
   `RecordEditCommand` no-op) via `return_result["update_record_v3"]` when body still changes
-- [ ] **Hardening (docs):** document semantic **login** diff limits (duplicate labels,
-  non-scalar typed fields, Commander version skew) in `VAULT_L1_DESIGN` / `VALIDATION_STAGES`
+- [x] **Hardening (docs):** semantic **login** diff limits, concurrent-edit + CI split for
+  `vault_online` in [`VAULT_L1_DESIGN.md`](./VAULT_L1_DESIGN.md) §4 and [`VALIDATION_STAGES.md`](./VALIDATION_STAGES.md)
 - [ ] **Concurrency:** call out in §7 / `VAULT_L1_DESIGN` — `validate --online` is a point-in-time
   snapshot; concurrent mobile/admin edits can invalidate assumptions before `apply`
 
@@ -187,6 +187,7 @@ full pytest before handoff; update JOURNAL snapshot not repo daybook.
 | 2026-04-27 | `examples/scaffold_only/vaultOneLogin.yaml` L1 sample; live-proof + PAM parity V8 cross-links; `test_validate_json_scaffold_vault_one_login`. |
 | 2026-04-27 | Plan + README: §7 checklist adds publish, post-UPDATE hardening, concurrency; §10 wave table retargets hardening + devil’s-advocate block; README fixes `--online` scope, adds honest vault limits, bumps status + test count. |
 | 2026-04-27 | Vault UPDATE: `RecordEditCommand` `return_result` guard + no-op skip when merged == existing (`commander_cli.py`); §7/§10 hardening rows split code vs docs. |
+| 2026-04-27 | Doc hardening: `VAULT_L1_DESIGN` §4 semantic diff + races + UPDATE guard; `VALIDATION_STAGES` vault caveats + remediation rows; §7 docs checkbox closed. |
 
 ---
 
@@ -204,7 +205,7 @@ CI; JSON modes need redaction discipline. README § “Honest limits” mirrors 
 |------|-------|------------------|--------------|
 | **Vault G6 / V8** | Integrator + one live slot | Sanitized transcript per `docs/live-proof/README.md`; bump `x-keeper-live-proof` on `keeper-vault.v1`; matrix + README row | **No** parallel tenant writers |
 | **§7 sign-off** | Integrator + reviewer | Close **G2** ledger row (removes `DRAFT` on `VAULT_L1_DESIGN.md`) | Readonly review only |
-| **Vault hardening** | Foreground dev | **Code:** `return_result` guard on vault UPDATE (**done**). **Docs:** semantic diff limits + concurrent-edit caveat (`VAULT_L1_DESIGN` / `VALIDATION_STAGES`) | **No** second PR touching same `commander_cli.py` region without queue |
+| **Vault hardening** | Foreground dev | **Code:** `return_result` guard (**done**). **Docs:** §4 + validation caveats (**done**); extend only if L1.1 / new Commander shapes need more | **No** second PR touching same `commander_cli.py` region without queue |
 | **P18c F1** | Worker / Codex | R1 memo + extractor allowlist (does **not** gate vault) | **Yes** |
 | **P11 F2** | Worker | Memos first; schema edits after integrator merge | **Yes** if disjoint `$defs` |
 | **Wave close** | Integrator | W.5 merge + full pytest + **NEXT_SPRINT §16** skim; JOURNAL 5-line snapshot | — |

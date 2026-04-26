@@ -11,6 +11,11 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   when the merged v3 JSON still differs from cache data (Commander otherwise logs and returns
   without raising); skip the call when patch yields no net change.
 
+### Changed
+- **Docs** — [`docs/VAULT_L1_DESIGN.md`](docs/VAULT_L1_DESIGN.md) §4: semantic `login` diff limits,
+  concurrent-edit caveat, Commander UPDATE / `CapabilityError` note.
+  [`docs/VALIDATION_STAGES.md`](docs/VALIDATION_STAGES.md): vault operator caveats, remediation rows.
+
 ### Added
 - **V8 prep** — [`docs/live-proof/keeper-vault.v1.sanitized.template.json`](docs/live-proof/keeper-vault.v1.sanitized.template.json)
   (`template: true`, shape-only) plus README section; **§2 ledger** in

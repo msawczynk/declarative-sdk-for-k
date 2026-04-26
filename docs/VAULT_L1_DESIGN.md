@@ -134,6 +134,39 @@ comments + tests).
   Exact stage mapping documented in [VALIDATION_STAGES.md](./VALIDATION_STAGES.md)
   when implemented (likely stage 5 parity).
 
+### Semantic `login` diff (L1 limits)
+
+`compute_vault_diff` compares manifest ``login`` ``fields[]`` to Commander-shaped
+live payloads by flattening **scalar** typed entries to a ``label → value`` map
+(labels matched case-insensitively when live data uses top-level keys). Operators
+should assume:
+
+- **Duplicate field labels** in ``fields[]`` collapse in the flatten map — drift
+  can be hidden or attributed to the wrong slot until apply semantics are tightened.
+- **Non-scalar / structured** typed values (nested dicts, multi-value shapes the
+  flattener skips) are **out of scope for L1** equality — false “clean” diffs are
+  possible until **L1.1** extends the rules.
+- **Commander pin / tenant policy skew** — unit tests encode expectations for the
+  pinned Commander JSON shape; other versions or enterprise flags may differ.
+
+A **clean** `plan` / `diff` / `validate --online` is **evidence**, not a formal
+correctness proof, until **G6** live transcripts and matrix rows cover the slice.
+
+### Concurrent edits vs `validate --online`
+
+Stages 4–5 (and offline **plan** / **diff**) observe tenant state **only at call
+time**. Mobile clients, admins, or a second automation can change records **after**
+`validate --online` and **before** `apply`. The SDK does **not** lock records —
+rerun **plan** / **diff** or `validate --online` immediately before **apply** when
+races matter.
+
+### Commander `login` UPDATE (v3 JSON)
+
+**UPDATE** uses in-process ``RecordEditCommand`` with full v3 ``data`` JSON; the
+provider only proceeds when the cached record is **version 3**. If Commander logs
+an error and returns without calling ``api.update_record_v3``, the provider raises
+``CapabilityError`` (stderr tail in the reason) instead of silently succeeding.
+
 ---
 
 ## 5. `keeper-vault-sharing.v1` relationship
@@ -200,3 +233,4 @@ This design **recommends Option A** long-term; Option B is acceptable only as a
 | 2026-04-26 | Initial slice-1 technical body for PR-V0 / Phase A. |
 | 2026-04-26 | PR-V1: `vault_models.py` + tests (sign-off still pending on §7). |
 | 2026-04-27 | §8: `validate --online` / `vault_online` JSON mode (PR-V4+); no §7 sign-off. |
+| 2026-04-27 | §4: semantic `login` diff limits, concurrent-edit caveat, Commander UPDATE / `CapabilityError` guard (no §7 sign-off). |

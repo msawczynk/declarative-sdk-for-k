@@ -92,6 +92,7 @@ until **G6** (sanitized live transcript + matrix) and **§7** sign-off on
   and log discipline still matter (`docs/live-proof/README.md`).
 
 Orchestration checklist: [`docs/ORCHESTRATION_UNTIL_COMPLETE.md`](docs/ORCHESTRATION_UNTIL_COMPLETE.md).
+Integrator detail: [`docs/VAULT_L1_DESIGN.md`](docs/VAULT_L1_DESIGN.md) §4 (semantic diff, races, UPDATE).
 
 ## Keeper Security Platform: what DSK does not cover (by design)
 

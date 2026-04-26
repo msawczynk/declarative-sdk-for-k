@@ -13,7 +13,10 @@
   ``reference_existing`` probe on vault paths. Offline ``plan`` / ``diff`` use the
   same ``compute_vault_diff`` rules: manifest ``login`` ``fields[]`` is compared
   to flattened Commander-style live payloads so benign shape drift does not look
-  like drift when values agree (see ``tests/test_vault_diff.py``).
+  like drift when values agree (see ``tests/test_vault_diff.py``). That compare is
+  **best-effort for scalar logins** — duplicate labels, non-scalar typed fields, or
+  Commander shape skew can still yield misleading “clean” output; see
+  [Vault — operator caveats](#vault--operator-caveats-keeper-vaultv1-l1) below.
 - **Other packaged non-PAM families** complete stages 1–2 (JSON Schema + rules
   that apply) then exit success without typed PAM ``Manifest`` load, uid_ref
   graph, or tenant probes (see ``docs/PAM_PARITY_PROGRAM.md``).
@@ -138,6 +141,8 @@ $ echo $?
 | stage 5: pam_configuration has no shared_folder | The configuration was created without a shared folder — recreate it, or select a different configuration. |
 | stage 5: gateway pairing mismatch | Either edit the manifest's `gateway_uid_ref` to match the live pairing, or re-pair the configuration to the expected gateway in Keeper. |
 | stage 5: ksm_application_name mismatch | Same as pairing mismatch — declared KSM app must match the one actually bound in the tenant. |
+| vault: `validate --online` flaky / transient 5 | Session, network, or Commander hiccup — retry; for PR CI prefer `vault_offline` unless you intend an integration gate. |
+| vault: clean validate then apply surprises | Concurrent edits or semantic-diff limits — re-run plan/diff/online validate before apply; read [VAULT_L1_DESIGN.md](./VAULT_L1_DESIGN.md) §4. |
 
 ## Why stages 4 and 5 are split
 
