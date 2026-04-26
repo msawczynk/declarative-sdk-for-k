@@ -43,6 +43,11 @@ document a blocker using [`ORCHESTRATION_PAM_PARITY.md`](./ORCHESTRATION_PAM_PAR
 
 **Exit criteria:** V0 merged **or** JOURNAL blocker with owner + next date.
 
+**As of 2026-04:** V0–V6 are on `main`; Phase A **R\*** packages stay valid parallel
+work. Remaining **vault-critical** items are **`VAULT_L1_DESIGN` §7** (ledger G2)
+and **G6 / V8** live proof — see [`ORCHESTRATION_UNTIL_COMPLETE.md`](./ORCHESTRATION_UNTIL_COMPLETE.md) §7,
+not a second “wait for V0 merge” gate.
+
 **Forbidden in Phase A:** edits to `commander_cli.py`, new `dsk report` verbs, new
 top-level orchestration **scripts** inside this repo (scope-fence per daybook).
 

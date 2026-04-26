@@ -81,6 +81,13 @@ not shipped from this repo.
 - [x] Documented exit codes for each stage failure — see
       [`docs/VALIDATION_STAGES.md`](./docs/VALIDATION_STAGES.md).
 
+**Post–v1.0.0 (vault, not a v1.0.0 tag blocker):** `keeper-vault.v1` uses the same
+`validate --online` exit-code ladder for **stages 4–5** (Commander `discover`,
+`compute_vault_diff`, `check_tenant_bindings` — vault L1 hook is a **no-op** today).
+It does **not** gate the annotated `v1.0.0` checklist above; README / PAM-bar
+honesty for vault follows [`docs/PAM_PARITY_PROGRAM.md`](./docs/PAM_PARITY_PROGRAM.md)
+and [`docs/ORCHESTRATION_UNTIL_COMPLETE.md`](./docs/ORCHESTRATION_UNTIL_COMPLETE.md) §2.
+
 ### 6. Live-smoke coverage
 - [x] `pamMachine` create → verify → delete cycle.
 - [x] `pamDatabase` cycle (scenario registered, offline-tested; live run
