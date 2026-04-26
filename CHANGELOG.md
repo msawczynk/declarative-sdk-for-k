@@ -32,6 +32,7 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 - **Core** — [`keeper_sdk/core/manifest.py`](keeper_sdk/core/manifest.py) module docstring: `load_manifest` (PAM-only) vs `load_declarative_manifest` (PAM + `keeper-vault.v1`).
 - **Docs** — [`README.md`](README.md) programmatic use: vault import path + `load_manifest` PAM-only note. [`docs/EXECUTION_PLAN_HEAVY_ORCHESTRATION.md`](docs/EXECUTION_PLAN_HEAVY_ORCHESTRATION.md) Phase C precondition/V4 row uses `load_declarative_manifest`. [`keeper_sdk/core/SCAFFOLD.md`](keeper_sdk/core/SCAFFOLD.md): `manifest.py` LOC + loader note.
 - **Core** — [`keeper_sdk/core/vault_models.py`](keeper_sdk/core/vault_models.py) module docstring: loader + CLI pointer (stale “PR-V3+” removed).
+- **Docs** — [`AGENTS.md`](AGENTS.md): playbook **§E** — programmatic `load_manifest` vs `load_declarative_manifest` for vault L1. [`docs/SCAFFOLD.md`](docs/SCAFFOLD.md): “Where to land” row cites §E.
 
 ### Added
 - **V8 prep** — [`docs/live-proof/keeper-vault.v1.sanitized.template.json`](docs/live-proof/keeper-vault.v1.sanitized.template.json)

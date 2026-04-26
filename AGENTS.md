@@ -178,6 +178,12 @@ dsk diff env.yaml > diff.txt                 # human-readable
 dsk plan env.yaml --json | jq '.changes[] | select(.kind=="update")'
 ```
 
+### E. Programmatic load (Python: PAM vs vault)
+
+- **PAM (`pam-environment.v1`):** `from keeper_sdk.core import load_manifest, build_graph, compute_diff, build_plan, …` — see [`README.md`](./README.md) § Programmatic use.
+- **`keeper-vault.v1`:** use **`load_declarative_manifest`** (returns `VaultManifestV1`), **`build_vault_graph`**, **`compute_vault_diff`**, **`vault_record_apply_order`**, then **`build_plan`** + provider — same exit-code / marker patterns as CLI. **`load_manifest` is PAM-only** and refuses vault documents.
+- **Reference:** [`keeper_sdk/core/manifest.py`](./keeper_sdk/core/manifest.py) module docstring; offline round-trip tests in [`tests/test_vault_mock_provider.py`](./tests/test_vault_mock_provider.py).
+
 ## JSON contracts agents can parse
 
 ### `dsk plan --json` → shape

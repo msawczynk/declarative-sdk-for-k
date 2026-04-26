@@ -27,7 +27,7 @@ contract.
 | Change | File | Sibling to copy |
 |---|---|---|
 | New CLI exit code / stage | `VALIDATION_STAGES.md` + `AGENTS.md` exit-code table | existing stage row |
-| Vault L1 semantics / caveats | `VAULT_L1_DESIGN.md` §4 + `VALIDATION_STAGES.md` (vault section) + `AGENTS.md` vault paragraph | §4 revision row |
+| Vault L1 semantics / caveats | `VAULT_L1_DESIGN.md` §4 + `VALIDATION_STAGES.md` (vault section) + `AGENTS.md` (validate pointer + playbook **§E** programmatic loaders) | §4 revision row |
 | New Commander surface used | `COMMANDER.md` capability table | existing row |
 | New phase or gate | `SDK_DA_COMPLETION_PLAN.md` + `SDK_ORCHESTRATED_FEATURE_COMPLETE.md` | P3 row |
 | New design boundary doc | `ISSUE_<n>_<topic>.md` | `ISSUE_6_JIT_SUPPORT_BOUNDARY.md` |
