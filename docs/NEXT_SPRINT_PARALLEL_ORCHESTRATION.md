@@ -6,6 +6,8 @@
 
 **Authority:** When this conflicts with a wish-list roadmap, [`SDK_DA_COMPLETION_PLAN.md`](./SDK_DA_COMPLETION_PLAN.md) and [`SDK_ORCHESTRATED_FEATURE_COMPLETE.md`](./SDK_ORCHESTRATED_FEATURE_COMPLETE.md) win on support claims.
 
+**Program exit:** §**15** sequences large sprints to **close capability gaps**, then **§15.3 maintenance mode** for Commander pin / upstream drift only. **§16** is mandatory **after every sprint**: review against daybook and **optimize** the next run (operator optional if integrator is autonomous).
+
 ---
 
 ## 1. Sprint outcome (one sentence)
@@ -197,6 +199,7 @@ Each worker ends with:
 - **Workers:** read Downloads `JOURNAL.md` / `LESSONS.md` silently; **no** edits unless task whitelists them.
 - **Orchestrator (often human):** append one sprint block + rollup test count; run `sync_daybook.sh` after `JOURNAL`/`LESSONS` edits.
 - **Distillation:** if sprint tail > ~2 screens, collapse older SDK sprints into one “burst” summary (per daybook skill).
+- **End of every sprint:** run **§16** (review + optimize) before opening the next §14 cycle — daybook is the scoreboard, not optional narration.
 
 ---
 
@@ -330,5 +333,117 @@ Use this file as the **single procedure** (not a one-off essay). Order:
 9. **Merge** — §4 Wave 5 + §6 CI gates; integrator runs full pre-merge pass.
 10. **Exit** — §12 large-sprint success bar (stricter) or §10 for smaller sprints.
 11. **Close** — §11 checklist + §8 daybook (rollup line, `sync_daybook.sh` if you edit JOURNAL/LESSONS).
+12. **Retro** — **§16** (mandatory): review sprint vs daybook, optimize next sprint’s WIP / hot files, then write next §1 + board.
 
-**Answer:** Yes — larger sprints are planned **by filling §3, then executing §4 with §12 limits, then closing with §10/§12 and §11.** No separate “big sprint” template is required beyond this path.
+**Answer:** Yes — larger sprints are planned **by filling §3, then executing §4 with §12 limits, then closing with §10/§12 and §11, then §16.** No separate “big sprint” template is required beyond this path.
+
+---
+
+## 15. Capability-gap closure → maintenance mode
+
+**Goal:** Large sprints burn down **honest gaps** (matrix + SDK_DA “Current Truth” +
+live-proof where you claim `supported`), then the program **downshifts**: work
+runs **independently of the day-to-day operator** via integrator + CI + granted
+agents — operator only on escalations (secrets, support claim, legal, pin
+source of truth ambiguity).
+
+### 15.1 What “capability gaps finished” means (exit bar)
+
+Not “every Commander command wrapped.” Means:
+
+1. **Every** schema family in scope has a truthful `x-keeper-live-proof.status`
+   (and evidence path rules per [`CONVENTIONS.md`](../keeper_sdk/core/schemas/CONVENTIONS.md)).
+2. **`docs/CAPABILITY_MATRIX.md` + `capability-snapshot.json`** match what the
+   SDK claims after [`scripts/sync_upstream.py`](../scripts/sync_upstream.py)
+   `--check` at the pinned [`.commander-pin`](../.commander-pin) (P18 or
+   interim slice — no silent drift).
+3. **SDK_DA “Not yet supported”** list is either **closed with proof**, **moved
+   to `upstream-gap` with issue**, or **explicitly deferred** with a dated line
+   in JOURNAL (not limbo).
+4. **No new `supported`** rows without completion gates in SDK_DA.
+
+Until (1)–(4) hold, you are still in **gap-closure** mode — use §12 large sprints
+and parallel tracks from §3.
+
+### 15.2 Large-sprint backlog order (recommended)
+
+Run as **parallel packages** where §5 allows; this order is **priority**, not
+strict serialization:
+
+| Priority | Track | Outcome |
+|----------|--------|---------|
+| A | Live-proof: `keeper-vault` + `keeper-vault-sharing` | `supported` or documented `upstream-gap` / blocker |
+| B | P18 (memo → impl) | Snapshot / matrix cover claimed Commander surface |
+| C | P11 enterprise depth | Slices until memo scope met or deferred with cause |
+| D | SDK_DA PAM gaps (rotation, RBI, …) | Per-issue proof or `preview-gated` honesty |
+| E | Optional `dsk report` verbs | Only with R3-style memo |
+
+**Operator-independent:** assign integrator agent + CI for **A/B** smoke and
+drift jobs per `AGENTS.md`; human only for **gate lift** wording if org policy
+requires it.
+
+### 15.3 Maintenance mode (after gap closure)
+
+**Enter when:** §15.1 exit bar met **or** JOURNAL records explicit “maintenance
+only” decision with date (honest partial closure is allowed).
+
+**Sprints look like:**
+
+| Work type | Typical owner | Operator needed? |
+|-----------|---------------|-------------------|
+| Bump `.commander-pin` + regenerate matrix/snapshot | CI or integrator agent | Only if pin source ambiguous |
+| `sync_upstream.py --check` on schedule | CI | No |
+| Security / dep bumps (Dependabot, Python floor) | CI + integrator | Rare |
+| Commander breaking API caught by CI | Integrator opens issue + minimal patch | Review PR |
+| **New schema family / new supported claim** | — | **Exits** maintenance — full SDK_DA loop |
+
+**Cadence:** at least **monthly** drift-check; on Commander **release** tags you
+care about, run an **ad-hoc** maintenance sprint (pin bump train only).
+
+---
+
+## 16. Post-sprint review & optimization (daybook — every sprint)
+
+**Rule:** No new §14 planning cycle until §16 is **done** for the sprint that
+just closed. This keeps the program self-correcting **without** waiting for the
+operator to “feel” retro time.
+
+### 16.1 Review (evidence-based)
+
+1. **Read** Downloads `JOURNAL.md` (newest sprint block + family board + rollup
+   line) and `LESSONS.md` (tail ~20 lines).
+2. **Reconcile numbers:** `pytest` count, coverage %, SHAs cited in JOURNAL vs
+   `git log -1 --oneline` on `main` / integration branch — fix ghost metrics.
+3. **Reconcile scope:** board rows vs `docs/V2_DECISIONS.md` / matrix — any row
+   lying (says shipped, isn’t) gets one corrective line or ticket link.
+4. **Classify outcomes:** each §3 package ID → **done** / **carried** /
+   **killed** with one-line reason for carried/killed.
+
+### 16.2 Optimize (change how the *next* sprint runs)
+
+Pick **at least one** adjustment for the next sprint:
+
+| Signal this sprint | Next-sprint optimization |
+|--------------------|----------------------------|
+| Merge conflicts on same hot file twice | Tighten §5 assignment; smaller F\* |
+| L1 slipped entire sprint | Reserve calendar slot in Wave 0; smaller parallel F\* |
+| Readonly memos contradicted each other | Add “triage memo” package before F\* |
+| `pytest` / rollup drifted again | Automate rollup line update in DONE template |
+| Orchestration theatre (§12) | Drop one F\* row; raise integrator-only merge |
+| Live-proof sanitizer near-miss | Add grep pattern to `docs/live-proof/README.md` |
+
+Append a **single** `LESSONS.md` line if a **reusable** pattern appeared (tagged,
+dated); otherwise JOURNAL only.
+
+### 16.3 Close-out commands (integrator)
+
+1. Update JOURNAL: sprint tail + **one** “next queue” ordered list (newest sprint
+   only — §6 hygiene).
+2. If JOURNAL or `LESSONS.md` edited: `bash ~/.cursor-daybook-sync/sync_daybook.sh`
+3. Read sync diff output; if deletions ≫ additions, **stop** — possible
+   clobber (daybook skill).
+4. Write **next** sprint §1 outcome sentence + §3 board rows **after** §16.3.1–3.
+
+**Operator-independent:** an autonomous integrator may perform §16.1–16.3 if
+daybook paths are writable and `sync_daybook.sh` is available; **human** review
+when support claims or org policy require it.
