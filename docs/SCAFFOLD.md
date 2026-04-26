@@ -34,6 +34,7 @@ contract.
 | New login flow | `LOGIN.md` | helper-skeleton block |
 | New release knob | `RELEASING.md` | publish-workflow row |
 | Live-proof / `x-keeper-live-proof` | `live-proof/README.md` + family schema block | `CONVENTIONS.md` + `_meta/x-keeper-live-proof.schema.json` |
+| CI `examples` job vs pytest (vault mock plan) | [`ORCHESTRATION_PAM_PARITY.md`](./ORCHESTRATION_PAM_PARITY.md) §7 + [`examples/SCAFFOLD.md`](../examples/SCAFFOLD.md) | §7 table row |
 
 ## Hard rules
 
