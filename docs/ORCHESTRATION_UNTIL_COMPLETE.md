@@ -129,7 +129,7 @@ capping tier (archive reason in JOURNAL).
 - [x] **`dsk validate --online`** for vault (Commander `discover` + `compute_vault_diff` smoke;
   requires `--provider commander` + folder scope)
 - [ ] **L1** live proof transcript + **V8** schema + matrix + README
-- [ ] **Publish:** `main` ahead of `origin/main` → `git push` + confirm CI on pushed SHA
+- [x] **Publish:** `main` pushed to `origin`; confirm GitHub **CI green** on the head SHA after each merge wave (re-check whenever `main` is ahead again)
 - [x] **Hardening (post-UPDATE):** assert Commander **vault UPDATE** success (no silent
   `RecordEditCommand` no-op) via `return_result["update_record_v3"]` when body still changes
 - [x] **Hardening (docs):** semantic **login** diff limits, concurrent-edit + CI split for
@@ -188,6 +188,7 @@ full pytest before handoff; update JOURNAL snapshot not repo daybook.
 | 2026-04-27 | Plan + README: §7 checklist adds publish, post-UPDATE hardening, concurrency; §10 wave table retargets hardening + devil’s-advocate block; README fixes `--online` scope, adds honest vault limits, bumps status + test count. |
 | 2026-04-27 | Vault UPDATE: `RecordEditCommand` `return_result` guard + no-op skip when merged == existing (`commander_cli.py`); §7/§10 hardening rows split code vs docs. |
 | 2026-04-27 | Doc hardening: `VAULT_L1_DESIGN` §4 semantic diff + races + UPDATE guard; `VALIDATION_STAGES` vault caveats + remediation rows; §7 docs checkbox closed. |
+| 2026-04-27 | §7 publish item: routine push + CI check on head SHA (merge-wave hygiene). |
 
 ---
 
