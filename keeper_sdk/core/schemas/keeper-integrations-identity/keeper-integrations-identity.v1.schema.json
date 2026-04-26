@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/msawczynk/declarative-sdk-for-k/schemas/keeper-integrations-identity/v1.json",
+  "title": "keeper-integrations-identity.v1",
+  "description": "Offline schema for enterprise identity integrations: verified domains, SCIM endpoints, and outbound email configuration. Split from legacy keeper-integrations (P12 memo 2026-04-26). Automator and runtime keys live under keeper-integrations-events.v1.",
+  "x-keeper-live-proof": {
+    "status": "scaffold-only",
+    "evidence": "memo:2026-04-26_keeper-integrations-v1-schema-design.md",
+    "since_pin": "89047920a0df857e01fb59adcb0bfb9fa6db70bf",
+    "notes": "P12 N=2 split — identity half. Live proof pending."
+  },
+  "type": "object",
+  "required": ["schema"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "keeper-integrations-identity.v1"
+    },
+    "domains": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/domain"
+      }
+    },
+    "scim_endpoints": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/scim_endpoint"
+      }
+    },
+    "email_configs": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/email_config"
+      }
+    }
+  },
+  "$defs": {
+    "uid_ref": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "domain_ref": {
+      "type": "string",
+      "pattern": "^keeper-integrations-identity:domains:[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "domain": {
+      "type": "object",
+      "required": ["uid_ref", "domain"],
+      "additionalProperties": false,
+      "properties": {
+        "uid_ref": {
+          "$ref": "#/$defs/uid_ref"
+        },
+        "domain": {
+          "type": "string",
+          "minLength": 3,
+          "pattern": "^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "scim_endpoint": {
+      "type": "object",
+      "required": [
+        "uid_ref",
+        "title",
+        "issuer_url",
+        "scim_base_url",
+        "identity_provider"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "uid_ref": {
+          "$ref": "#/$defs/uid_ref"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "issuer_url": {
+          "type": "string",
+          "format": "uri",
+          "minLength": 8
+        },
+        "scim_base_url": {
+          "type": "string",
+          "format": "uri",
+          "minLength": 8
+        },
+        "identity_provider": {
+          "type": "string",
+          "enum": ["azure_ad", "okta", "google_workspace", "generic"]
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "email_config": {
+      "type": "object",
+      "required": ["uid_ref", "title", "domain_uid_ref"],
+      "additionalProperties": false,
+      "properties": {
+        "uid_ref": {
+          "$ref": "#/$defs/uid_ref"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "domain_uid_ref": {
+          "$ref": "#/$defs/domain_ref"
+        },
+        "default_from_label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

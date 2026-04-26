@@ -24,7 +24,8 @@ Naming + ownership:
 | `keeper-vault` | `v1` (P9) | `records`, `record_types`, `attachments`, `keeper_fill` | P9 |
 | `keeper-vault-sharing` | `v1` (P10) | `folders`, `shared_folders`, `share_records`, `share_folders` | P10 |
 | `keeper-enterprise` | `v1` (P11) | `nodes`, `users`, `roles`, `teams`, `enforcements`, `aliases` | P11 |
-| `keeper-integrations` | `v1` (P12) | `domains`, `scim_endpoints`, `automator_endpoints`, `email_configs`, `audit_alerts`, `api_keys` | P12 |
+| `keeper-integrations-identity` | `v1` (P12) | `domains`, `scim_endpoints`, `email_configs` | P12 |
+| `keeper-integrations-events` | `v1` (P12) | `automator_endpoints`, `audit_alerts`, `api_keys` | P12 |
 | `keeper-ksm` | `v1` (P13) | `ksm_apps`, `ksm_clients`, `ksm_shares` | P13 |
 | `keeper-pam-extended` | `v1` (P14) | `gateway_configs`, `rotation_schedules`, `discovery_rules`, `service_mappings`, `saas_mappings` | P14 |
 | ~~`keeper-security-posture`~~ | ~~`v1` (P15)~~ — **dropped-design 2026-04-26** | replaced by `dsk report` verbs (Q3) | P15 → Q3 verbs |
@@ -35,6 +36,18 @@ existing `pam-environment.v1`. Cross-family references use
 `<family>:<key>:<lookup>` form (e.g. `keeper-enterprise:teams:eng-team`)
 so a vault-share can target an enterprise-team without bundling them in
 one document.
+
+### Q1 amendment — 2026-04-26: P12 `keeper-integrations` → N=2 families
+
+The 2026-04-26 schema-design memo for integrations
+(`codex-prompts/_memos/2026-04-26_keeper-integrations-v1-schema-design.md`)
+recommended splitting declarative-friendly identity surfaces (domains,
+SCIM, outbound email) from one-shot / webhook-heavy surfaces (automator,
+audit alerts, API keys). The monolithic `keeper-integrations.v1` scaffold
+is **removed**; manifests MUST use `keeper-integrations-identity.v1` and/or
+`keeper-integrations-events.v1`. Cross-refs between halves use the same
+`family:key:lookup` grammar (e.g. events-side `keeper-vault:records:` for
+key material).
 
 ### Q1 amendment — 2026-04-26: `keeper-security-posture` dropped-design
 

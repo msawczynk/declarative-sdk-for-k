@@ -1,0 +1,146 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/msawczynk/declarative-sdk-for-k/schemas/keeper-integrations-events/v1.json",
+  "title": "keeper-integrations-events.v1",
+  "description": "Offline schema for event-style integrations: automator webhooks, audit alert rows, and enterprise API keys. Split from legacy keeper-integrations (P12 memo 2026-04-26). Domains and SCIM live under keeper-integrations-identity.v1.",
+  "x-keeper-live-proof": {
+    "status": "scaffold-only",
+    "evidence": "memo:2026-04-26_keeper-integrations-v1-schema-design.md",
+    "since_pin": "89047920a0df857e01fb59adcb0bfb9fa6db70bf",
+    "notes": "P12 N=2 split — events half. Live proof pending; api_keys may bind to KSM in later slices."
+  },
+  "type": "object",
+  "required": ["schema"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "keeper-integrations-events.v1"
+    },
+    "automator_endpoints": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/automator_endpoint"
+      }
+    },
+    "audit_alerts": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/audit_alert"
+      }
+    },
+    "api_keys": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/api_key"
+      }
+    }
+  },
+  "$defs": {
+    "uid_ref": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "record_ref": {
+      "type": "string",
+      "pattern": "^keeper-vault:records:[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "ksm_app_ref": {
+      "type": "string",
+      "pattern": "^keeper-ksm:ksm_apps:[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "automator_endpoint": {
+      "type": "object",
+      "required": ["uid_ref", "title", "endpoint_url"],
+      "additionalProperties": false,
+      "properties": {
+        "uid_ref": {
+          "$ref": "#/$defs/uid_ref"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "endpoint_url": {
+          "type": "string",
+          "format": "uri",
+          "minLength": 8
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "event_kinds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "default": []
+        },
+        "signing_secret_record_uid_ref": {
+          "$ref": "#/$defs/record_ref"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "audit_alert": {
+      "type": "object",
+      "required": ["uid_ref", "title", "template_id"],
+      "additionalProperties": false,
+      "properties": {
+        "uid_ref": {
+          "$ref": "#/$defs/uid_ref"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "template_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "api_key": {
+      "type": "object",
+      "required": ["uid_ref", "title"],
+      "additionalProperties": false,
+      "properties": {
+        "uid_ref": {
+          "$ref": "#/$defs/uid_ref"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scopes": {
+          "type": "string"
+        },
+        "material_record_uid_ref": {
+          "$comment": "Optional vault record holding key material when not KSM-only.",
+          "$ref": "#/$defs/record_ref"
+        },
+        "ksm_app_uid_ref": {
+          "$ref": "#/$defs/ksm_app_ref"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

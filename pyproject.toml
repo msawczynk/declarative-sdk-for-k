@@ -78,7 +78,7 @@ include = ["keeper_sdk*"]
 exclude = ["tests*"]
 
 [tool.setuptools.package-data]
-"keeper_sdk.core.schemas" = ["*.json"]
+"keeper_sdk.core.schemas" = ["*.json", "**/*.json"]
 
 [tool.mypy]
 python_version = "3.11"
