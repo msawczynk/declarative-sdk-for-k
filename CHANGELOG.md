@@ -18,7 +18,7 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   **§13** sprint-size cheat sheet. **Live access:** docs + `AGENTS.md` now
   state that **granted code** (workers, CI, agents) may run L1 / live-proof
   under the same harness rules as humans; serialization is **per tenant**, not
-  parent-only.
+  parent-only. **§14** is the step-by-step “plan through this file” checklist.
 - **Live-proof runbook** — `docs/live-proof/README.md` (L1 checklist,
   committed-artifact naming, sanitization expectations). `keeper-vault.v1`
   and `keeper-vault-sharing.v1` now cite it from

@@ -312,3 +312,23 @@ Pick **four** of:
 | Multi-track + calendar pressure | Large = full §12 + program board + mid-sprint checkpoint |
 
 Larger sprints **increase orchestration overhead**; they do not replace proof, CI, or SDK_DA gates.
+
+---
+
+## 14. Planning a larger sprint **through** this document
+
+Use this file as the **single procedure** (not a one-off essay). Order:
+
+1. **Scope** — Write one sentence like §1 (sprint outcome). Pick size with §13.
+2. **Board** — Copy rows from §3 (R\*, F\*) into JOURNAL / sheet / issue epic: each row = one assignable package with ID.
+3. **Calendar** — Map wall time to §12 *Extra waves* (scale day bands to 1w / 2w / 3w).
+4. **Wave 0** — §4 Wave 0: branch / merge train, post package table, pin CONVENTIONS + V2 Q1 in every worker prompt.
+5. **Wave 1** — §4 Wave 1: launch all readonly packages in parallel; use preamble; **omit** “no keeper login” line only for tasks that explicitly grant live (§4 note).
+6. **Wave 2** — §4 Wave 2: triage memos; assign §5 hot files; schedule **L1** actor (human, CI, or granted agent per top of doc).
+7. **Wave 3** — §4 Wave 3 + §12 WIP limits: only as many F\* as caps allow; sequence `main.py` / single-schema conflicts.
+8. **Live** — §4 Wave 4 + `docs/live-proof/README.md`: one tenant lane; sanitize before git.
+9. **Merge** — §4 Wave 5 + §6 CI gates; integrator runs full pre-merge pass.
+10. **Exit** — §12 large-sprint success bar (stricter) or §10 for smaller sprints.
+11. **Close** — §11 checklist + §8 daybook (rollup line, `sync_daybook.sh` if you edit JOURNAL/LESSONS).
+
+**Answer:** Yes — larger sprints are planned **by filling §3, then executing §4 with §12 limits, then closing with §10/§12 and §11.** No separate “big sprint” template is required beyond this path.
