@@ -12,6 +12,12 @@ for that record, every adopter rebuilt the same wrapper around
 
 This package ships:
 
+- :func:`~keeper_sdk.secrets.bootstrap.bootstrap_ksm_application` — the
+  Commander-driven production on-ramp that creates or reuses a KSM
+  application, shares the admin login record, redeems a client config,
+  and verifies it before ``KsmLoginHelper`` becomes the steady-state
+  login path.
+
 - :class:`~keeper_sdk.secrets.ksm.KsmSecretStore` — thin, lazily-initialised
   client that reads any field from any KSM record the application has
   shared-folder access to. Useful for callers that already authenticate
@@ -53,6 +59,7 @@ Hardening
 
 from __future__ import annotations
 
+from keeper_sdk.secrets.bootstrap import BootstrapResult, bootstrap_ksm_application
 from keeper_sdk.secrets.ksm import (
     DEFAULT_CONFIG_PROBES,
     KSM_CONFIG_ENV,
@@ -63,10 +70,12 @@ from keeper_sdk.secrets.ksm import (
 )
 
 __all__ = [
+    "BootstrapResult",
     "DEFAULT_CONFIG_PROBES",
     "KSM_CONFIG_ENV",
     "KSM_TOTP_ENV_PARSE_FALLBACK",
     "KsmLoginCreds",
     "KsmSecretStore",
+    "bootstrap_ksm_application",
     "load_keeper_login_from_ksm",
 ]

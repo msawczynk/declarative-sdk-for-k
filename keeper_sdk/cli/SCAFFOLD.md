@@ -22,6 +22,7 @@ Click-based CLI. Owns the exit-code contract (`docs/VALIDATION_STAGES.md`,
 | `apply` | 0/1/3/4/5 | `--dry-run` (= plan) | per-row outcomes |
 | `import` | 0/1/3 | `--dry-run` | adoption plan |
 | `export` | 0/1 | `-o FILE` | manifest YAML |
+| `bootstrap-ksm` | 0/5/1 | final JSON line | app/record UID prefixes, config path, status |
 
 Every mutating command honours `--auto-approve` and `--allow-delete`.
 
@@ -33,6 +34,10 @@ Every mutating command honours `--auto-approve` and `--allow-delete`.
 | New flag | `main.py` (Click decorator) | `--allow-delete` on `apply` |
 | New renderer view | `renderer.py` + `tests/test_renderer_snapshots.py` | `render_diff` |
 | New stage in `validate` | `main.py` (`validate` cmd) + `docs/VALIDATION_STAGES.md` + `tests/test_stage_5_bindings.py` | stage-5 path |
+
+KSM bootstrap operator docs live in `docs/KSM_BOOTSTRAP.md`; the command path is
+implemented in `main.py` and delegates tenant mutation to
+`keeper_sdk/secrets/bootstrap.py`.
 
 ## Hard rules
 

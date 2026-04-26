@@ -22,6 +22,16 @@ venv/
 # Live smoke logs (operator-side; never commit)
 .smoke-runs/
 
+# Codex CLI worker scratch dirs (operator-side; never commit)
+# Workers occasionally write run artefacts here; keep them out of the SDK delivery.
+.codex-runs/
+
+# Daybook orchestration content that does NOT belong in the SDK delivery.
+# Workers have repeatedly leaked these files into the repo despite explicit
+# prompts; ignoring them by default makes scope leaks self-healing.
+WORKTREES.md
+scripts/agent/
+
 # Testing
 .pytest_cache/
 .coverage
