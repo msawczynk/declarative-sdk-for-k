@@ -22,6 +22,13 @@ This file + daybook **replace** a repeated “please continue” prompt for
 orchestration purposes. One human chat message cannot schedule future Cursor
 runs; **opening this repo + daybook** is the equivalent trigger.
 
+**Reality check (session boundary):** Between chats, **no LLM is running** — you
+will still need a **nudge** (empty `continue`, scheduled job, or new agent) to
+start the next unit of work. §0’s job is to make that nudge **one word + repo
+open**, not zero nudges forever. If you want fewer human nudges, add **machine
+triggers**: e.g. scheduled `sync_upstream.py --check` CI, Cron + Codex CLI
+against this branch, or Cursor **background agent** on the integration branch.
+
 ---
 
 **Program exit:** §**15** sequences large sprints to **close capability gaps**, then **§15.3 maintenance mode** for Commander pin / upstream drift only. **§16** is mandatory **after every sprint**: review against daybook and **optimize** the next run. **Live tenant / L1:** orchestrator **and** Codex CLI are allowed (same harness + sanitization as `AGENTS.md`). **`.commander-pin`:** never left ambiguous — resolve candidates with **live testing** + drift-check, not guesswork. **Support wording** for Commander semantics lives in **upstream** Commander / Keeper repos; this SDK documents integration + gates only. **Daybook:** private GitHub repo + `sync_daybook.sh`; orchestrator has access (no separate “grant daybook” step).

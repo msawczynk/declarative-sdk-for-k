@@ -32,6 +32,8 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   expansion: registry model, nesting, phasing P18a–c, risks). `keeper-enterprise`
   `x-keeper-live-proof.evidence` aligned to `docs/live-proof/README.md` (same as
   vault families).
+- **Orchestration** — `NEXT_SPRINT` §0 adds explicit **session boundary** note:
+  nudges between chats are normal; §0 shortens what each nudge must carry.
 - **Live-proof runbook** — `docs/live-proof/README.md` (L1 checklist,
   committed-artifact naming, sanitization expectations). `keeper-vault.v1`
   and `keeper-vault-sharing.v1` now cite it from
