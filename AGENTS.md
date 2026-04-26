@@ -92,6 +92,14 @@ expected `keeper-vault-rbi-pam-testenv` configs (see
 smoke harness (not ad-hoc tenant edits), and must treat failures as evidence
 (fix, document, or stop per `docs/SDK_DA_COMPLETION_PLAN.md`).
 
+The **same contract** applies when agents or CI produce **live-proof**
+evidence for schema graduation: whitelisted commands only (smoke harness,
+documented `dsk` steps, or a maintainer-approved command list in the task),
+sanitized artifacts before any git commit, and `docs/live-proof/README.md`
+for the L1 checklist. **At most one concurrent live session** per tenant
+(coordinate humans + automation so two writers never trample the same
+tenant state).
+
 ## Agent playbook
 
 ### A. "Apply this manifest"

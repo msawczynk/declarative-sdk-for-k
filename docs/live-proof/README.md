@@ -1,12 +1,29 @@
 # Live-proof artifacts (`docs/live-proof/`)
 
-**Audience:** parent / maintainer running lab smoke before changing
-`x-keeper-live-proof.status` on a family schema. Workers read this for
-R4-style prep; they do **not** commit raw transcripts unless sanitized.
+**Audience:** maintainer, **or** any agent / automation **explicitly granted**
+live access to a lab tenant for this repo (same bar as
+[`AGENTS.md`](../AGENTS.md) § Autonomous execution). Read this before changing
+`x-keeper-live-proof.status` on a family schema.
 
 **Normative rules:** `keeper_sdk/core/schemas/CONVENTIONS.md` (block shape,
 `since_pin` = full 40-char SHA from `.commander-pin`). Meta schema:
 `keeper_sdk/core/schemas/_meta/x-keeper-live-proof.schema.json`.
+
+## Live access for code (agents, workers, CI)
+
+Live proof is **not** parent-only. Code may hold the L1 gate **when**:
+
+- The maintainer has granted **standing or per-sprint** permission (see
+  `AGENTS.md` — smoke harness, or a task body that whitelists exact argv /
+  scenarios and tenant scope).
+- The actor uses **committed** harnesses or documented CLI steps — not
+  exploratory shell on the tenant.
+- Raw capture stays **out of git** until sanitized; the same rules as
+  `dsk report` / `secret_leak_check` apply to anything that lands in the repo.
+
+**Concurrency:** still **one live session / writer lane per tenant at a time**
+(human or automation). Two parallel agents against the same tenant without
+coordination is out of scope — use a lock, a queue, or different tenants.
 
 ## Naming convention (committed files only)
 
@@ -32,7 +49,7 @@ Use the same discipline as `dsk report` / `secret_leak_check` and the live
 transcript helpers (`keeper_sdk.cli._live.transcript`). When in doubt, keep
 **structure and lengths** (e.g. `"password": "<redacted>"`) not literal secrets.
 
-## Parent checklist (L1 gate)
+## L1 execution checklist (human or granted automation)
 
 1. **Branch** off current `main`; note `.commander-pin` SHA (full 40) in the
    sprint log.
@@ -65,5 +82,6 @@ README.
 
 ## Parallel orchestration
 
-See `docs/NEXT_SPRINT_PARALLEL_ORCHESTRATION.md` — **R4** is the readonly prep
-that feeds **L1** (serial live) then **F3** (schema pointer + artifact commit).
+See `docs/NEXT_SPRINT_PARALLEL_ORCHESTRATION.md` — **R4** is the prep that feeds
+**L1** (serial **per tenant**: one actor at a time, human or granted code) then
+**F3** (schema pointer + artifact commit).
