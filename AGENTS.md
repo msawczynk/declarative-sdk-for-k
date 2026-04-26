@@ -82,6 +82,14 @@ For the per-stage breakdown of what `validate` checks and which exit
 code fires for which failure (schema vs reference vs capability vs
 binding), read [`docs/VALIDATION_STAGES.md`](./docs/VALIDATION_STAGES.md).
 
+**`keeper-vault.v1`:** `plan` / `diff` / `validate --online` compare manifest
+`login` ``fields[]`` to Commander-flattened scalars **best-effort** (duplicate
+labels, non-scalar typed values, and Commander shape skew can still mislead).
+`validate --online` is a **point-in-time** snapshot — another client can change
+records before `apply`. Read the **Vault — operator caveats** section in
+[`docs/VALIDATION_STAGES.md`](./docs/VALIDATION_STAGES.md) and
+[`docs/VAULT_L1_DESIGN.md`](./docs/VAULT_L1_DESIGN.md) §4.
+
 ## Autonomous execution (maintainer grant)
 
 Maintainers grant **standing permission** to run this repo's committed

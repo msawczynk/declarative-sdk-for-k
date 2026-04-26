@@ -15,6 +15,7 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 - **Docs** — [`docs/VAULT_L1_DESIGN.md`](docs/VAULT_L1_DESIGN.md) §4: semantic `login` diff limits,
   concurrent-edit caveat, Commander UPDATE / `CapabilityError` note.
   [`docs/VALIDATION_STAGES.md`](docs/VALIDATION_STAGES.md): vault operator caveats, remediation rows.
+  [`AGENTS.md`](AGENTS.md): vault L1 caveats + links after the `validate` stage pointer.
 
 ### Added
 - **V8 prep** — [`docs/live-proof/keeper-vault.v1.sanitized.template.json`](docs/live-proof/keeper-vault.v1.sanitized.template.json)

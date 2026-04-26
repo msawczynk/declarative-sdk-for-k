@@ -189,6 +189,7 @@ full pytest before handoff; update JOURNAL snapshot not repo daybook.
 | 2026-04-27 | Vault UPDATE: `RecordEditCommand` `return_result` guard + no-op skip when merged == existing (`commander_cli.py`); §7/§10 hardening rows split code vs docs. |
 | 2026-04-27 | Doc hardening: `VAULT_L1_DESIGN` §4 semantic diff + races + UPDATE guard; `VALIDATION_STAGES` vault caveats + remediation rows; §7 docs checkbox closed. |
 | 2026-04-27 | §7 publish item: routine push + CI check on head SHA (merge-wave hygiene). |
+| 2026-04-27 | `AGENTS.md`: vault L1 semantic-diff + race pointer after `VALIDATION_STAGES` link. |
 
 ---
 
