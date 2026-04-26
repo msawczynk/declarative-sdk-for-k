@@ -81,6 +81,7 @@ transcript helpers (`keeper_sdk.cli._live.transcript`). When in doubt, keep
 |--------|---------------|------------------|
 | `keeper-vault.v1` | `scaffold-only` | This README until a transcript lands |
 | `keeper-vault-sharing.v1` | `scaffold-only` | This README until a transcript lands |
+| `keeper-enterprise.v1` | `scaffold-only` | This README until a transcript lands |
 
 When a real file exists, point `evidence` at that file path instead of this
 README.

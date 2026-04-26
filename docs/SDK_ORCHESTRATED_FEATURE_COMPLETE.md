@@ -80,4 +80,5 @@ live scenario → classify (`supported` / `preview-gated` / `upstream-gap`)
 | [`docs/SDK_COMPLETION_PLAN.md`](./SDK_COMPLETION_PLAN.md) | Long-form roadmap + risk gates |
 | [`docs/NEXT_SPRINT_PARALLEL_ORCHESTRATION.md`](./NEXT_SPRINT_PARALLEL_ORCHESTRATION.md) | **§0** cold start (no user re-prompt); parallel waves; **§15–§16** program + daybook retro |
 | [`docs/live-proof/README.md`](./live-proof/README.md) | L1 live gate: artifact naming, sanitization, schema `evidence` pointer |
+| [`docs/P18_SYNC_UPSTREAM_EXTRACTOR_DECISION.md`](./P18_SYNC_UPSTREAM_EXTRACTOR_DECISION.md) | P18 R1: extractor expansion decisions + phased plan before F1 code |
 | [`AGENTS.md`](../AGENTS.md) | CLI exit codes + agent playbook |

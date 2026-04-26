@@ -95,7 +95,7 @@ Each package has: **ID**, **type** (`R` = readonly memo, `F` = foreground impl),
 
 | ID | Deliverable | Worker output | Deps |
 |----|-------------|---------------|------|
-| **R1** | P18 extractor scope memo: which Commander entrypoints, nested `GroupCommand` rules, snapshot schema shape, `--check` behavior, risk list | `LESSON CANDIDATE` + `JOURNAL CANDIDATE` + file under operator `_memos/` if used | None |
+| **R1** | P18 extractor scope memo: which Commander entrypoints, nested `GroupCommand` rules, snapshot schema shape, `--check` behavior, risk list | **Canonical:** [`docs/P18_SYNC_UPSTREAM_EXTRACTOR_DECISION.md`](./P18_SYNC_UPSTREAM_EXTRACTOR_DECISION.md) (in-repo R1). Optional `LESSON CANDIDATE` / operator `_memos/` copy for convenience. | None |
 | **R2a** | P11 next slice: `enforcements` (or chosen slice) — Commander argv + readback shape + `$ref` needs | Memo only | CONVENTIONS.md |
 | **R2b** | P11 next slice: `aliases` / `enterprise_pushes` / richer `nodes` — **disjoint** from R2a | Memo only | CONVENTIONS.md |
 | **R3** | Optional 4th report verb: exact Commander argv, JSON shape sample, redaction story, leak-check edge cases | Memo only | AGENTS.md report table |

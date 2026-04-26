@@ -6,9 +6,9 @@
   "$comment": "TODO future slices per memo 2026-04-26_keeper-enterprise-v1-schema-design.md: nodes -> Decision 2; roles -> Decisions 3 and 5; teams -> Commander Surface Teams; enforcements -> Decision 3; aliases -> Decision 5 and Open Parent Calls; enterprise_pushes -> future slice after Commander surface audit.",
   "x-keeper-live-proof": {
     "status": "scaffold-only",
-    "evidence": "pending",
+    "evidence": "docs/live-proof/README.md",
     "since_pin": "89047920a0df857e01fb59adcb0bfb9fa6db70bf",
-    "notes": "memo: 2026-04-26_keeper-enterprise-v1-schema-design.md. Slice S covers active users and role_assignments only; nodes, roles, teams, enforcements, aliases, and enterprise_pushes are empty scaffold stubs pending future live-proof slices."
+    "notes": "memo: 2026-04-26_keeper-enterprise-v1-schema-design.md. Slice S covers active users and role_assignments only; nodes, roles, teams, enforcements, aliases, and enterprise_pushes are empty scaffold stubs pending future live-proof slices. Operator runbook path until L1 transcript exists (CONVENTIONS.md)."
   },
   "type": "object",
   "required": ["schema"],
