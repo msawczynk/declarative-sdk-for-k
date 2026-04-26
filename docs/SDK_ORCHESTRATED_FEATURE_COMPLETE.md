@@ -78,4 +78,6 @@ live scenario → classify (`supported` / `preview-gated` / `upstream-gap`)
 |------|------|
 | [`docs/SDK_DA_COMPLETION_PLAN.md`](./SDK_DA_COMPLETION_PLAN.md) | Devil's-advocate contract + phase detail |
 | [`docs/SDK_COMPLETION_PLAN.md`](./SDK_COMPLETION_PLAN.md) | Long-form roadmap + risk gates |
+| [`docs/NEXT_SPRINT_PARALLEL_ORCHESTRATION.md`](./NEXT_SPRINT_PARALLEL_ORCHESTRATION.md) | Parent flight checklist: parallel waves, merge fan-in, DONE contract |
+| [`docs/live-proof/README.md`](./live-proof/README.md) | L1 live gate: artifact naming, sanitization, schema `evidence` pointer |
 | [`AGENTS.md`](../AGENTS.md) | CLI exit codes + agent playbook |

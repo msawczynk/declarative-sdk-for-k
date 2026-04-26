@@ -5,9 +5,9 @@
   "description": "Offline schema body for Keeper Vault folder and sharing ACL rows. Live tenant proof is still pending.",
   "x-keeper-live-proof": {
     "status": "scaffold-only",
-    "evidence": "pending",
+    "evidence": "docs/live-proof/README.md",
     "since_pin": "89047920a0df857e01fb59adcb0bfb9fa6db70bf",
-    "notes": "memo: 2026-04-26_keeper-vault-sharing-v1-schema-design.md. Proof gate: live transcript must show direct record user share plus shared-folder user and record ACL rows converge to a clean re-plan."
+    "notes": "Design memo context retained in sprint notes; proof gate unchanged. Evidence path is operator runbook until sanitized transcript is committed per docs/live-proof/README.md."
   },
   "type": "object",
   "required": ["schema"],

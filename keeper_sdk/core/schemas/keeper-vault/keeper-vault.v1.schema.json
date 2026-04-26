@@ -5,9 +5,9 @@
   "description": "Offline schema body for Keeper Vault records, custom record types, attachments, and KeeperFill settings. Live tenant proof is still pending.",
   "x-keeper-live-proof": {
     "status": "scaffold-only",
-    "evidence": "pending",
+    "evidence": "docs/live-proof/README.md",
     "since_pin": "89047920a0df857e01fb59adcb0bfb9fa6db70bf",
-    "notes": "P9 schema body landed offline; live transcript pending before preview-gated graduation."
+    "notes": "P9 schema body offline-green. Operator runbook + naming convention in evidence path; replace with sanitized transcript JSON when L1 gate passes (CONVENTIONS.md)."
   },
   "type": "object",
   "additionalProperties": false,

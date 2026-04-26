@@ -13,6 +13,11 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   `record_uid` (and related) key values stay as returned by Commander
   unless **`--quiet`** is also set (which fingerprints those UID
   fields). See `AGENTS.md` command table.
+- **Live-proof runbook** — `docs/live-proof/README.md` (L1 checklist,
+  committed-artifact naming, sanitization expectations). `keeper-vault.v1`
+  and `keeper-vault-sharing.v1` now cite it from
+  `x-keeper-live-proof.evidence` while status remains `scaffold-only`
+  until a transcript JSON is added.
 - **KSM as first-class SDK feature** — three new modules in
   `keeper_sdk/secrets/` close the credential loop end-to-end:
   - `bootstrap.py` provisions a Keeper Secrets Manager application,
