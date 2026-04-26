@@ -1,8 +1,11 @@
 """Manifest IO (YAML and JSON).
 
-Load: parse file or string, canonicalize aliases, validate schema, build a
-typed Manifest model. Dump: produce a stable canonical JSON form suitable for
-git diffs and Commander interop.
+Parse paths or strings, canonicalise aliases, validate schema, build **typed**
+models. **PAM only:** :func:`load_manifest` / :func:`load_manifest_string` →
+:class:`~keeper_sdk.core.models.Manifest`. **PAM + vault L1:** :func:`load_declarative_manifest`
+/ :func:`load_declarative_manifest_string` → ``Manifest`` or
+:class:`~keeper_sdk.core.vault_models.VaultManifestV1` for ``keeper-vault.v1``.
+Dump: stable canonical YAML/JSON for git diffs and Commander interop.
 """
 
 from __future__ import annotations
