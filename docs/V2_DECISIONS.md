@@ -27,7 +27,7 @@ Naming + ownership:
 | `keeper-integrations` | `v1` (P12) | `domains`, `scim_endpoints`, `automator_endpoints`, `email_configs`, `audit_alerts`, `api_keys` | P12 |
 | `keeper-ksm` | `v1` (P13) | `ksm_apps`, `ksm_clients`, `ksm_shares` | P13 |
 | `keeper-pam-extended` | `v1` (P14) | `gateway_configs`, `rotation_schedules`, `discovery_rules`, `service_mappings`, `saas_mappings` | P14 |
-| `keeper-security-posture` | `v1` (P15) | `compliance_assertions`, `security_audit_assertions`, `breachwatch_config`, `risk_benchmarks` | P15 |
+| ~~`keeper-security-posture`~~ | ~~`v1` (P15)~~ — **dropped-design 2026-04-26** | replaced by `dsk report` verbs (Q3) | P15 → Q3 verbs |
 | `keeper-epm` | `v1` (P16) | `epm_deployments`, `epm_agents`, `epm_policies`, `epm_collections` | P16 |
 
 Manifests declare `schema: <family>.<version>` at the top — same shape as
@@ -35,6 +35,33 @@ existing `pam-environment.v1`. Cross-family references use
 `<family>:<key>:<lookup>` form (e.g. `keeper-enterprise:teams:eng-team`)
 so a vault-share can target an enterprise-team without bundling them in
 one document.
+
+### Q1 amendment — 2026-04-26: `keeper-security-posture` dropped-design
+
+The 2026-04-26 schema-design memo for this family
+(daybook-sync: `codex-prompts/_memos/2026-04-26_keeper-security-posture-v1-schema-design.md`)
+concluded that posture surface (BreachWatch, compliance, security-audit,
+weak-password / reused-password / expired-record reports) is intrinsically
+read-only and one-shot. A declarative manifest cannot create a breach, and
+assertions like "≤0 weak passwords" can't be reconciled idempotently — the
+remediation isn't a manifest mutation, it's user action on each flagged
+record.
+
+Surface ships as `dsk report` runtime verbs per Q3 instead. The scaffold
+file `keeper_sdk/core/schemas/keeper-security-posture/keeper-security-posture.v1.schema.json`
+remains in place with `x-keeper-live-proof.status: dropped-design` so any
+manifest pinning the family fails validation with the dropped-design status
+rather than a confusing "no provider" error. (This required adding
+`dropped-design` to the meta-schema enum in
+`keeper_sdk/core/schemas/_meta/x-keeper-live-proof.schema.json`.)
+
+Replacement verbs (already enumerated in Q3): `compliance-report`,
+`security-audit-report`, `password-report`, `breachwatch-list`,
+`record-totp`, `enterprise-reports`.
+
+Un-drop trigger: a customer asks for a posture-as-manifest API AND
+Commander grows an idempotent posture-mutation surface. Until both, no
+schema work.
 
 ## Q2 — Back-compat policy when Commander deprecates a flag DSK relies on
 
