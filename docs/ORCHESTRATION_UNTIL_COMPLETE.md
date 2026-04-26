@@ -200,6 +200,7 @@ full pytest before handoff; update JOURNAL snapshot not repo daybook.
 | 2026-04-27 | `docs/SCAFFOLD.md` “Where to land” → §7 CI ladder + `examples/SCAFFOLD.md`. |
 | 2026-04-27 | `PAM_PARITY_PROGRAM` Phase 1 vault L1 vs sharing; Phase 0 “still open” inventory pointer. `keeper_sdk/cli/SCAFFOLD.md` validate table + reconciliation. |
 | 2026-04-27 | `ORCHESTRATION_PAM_PARITY` §3: skim blockquote; V2 touches path; V1 historical footnote. |
+| 2026-04-27 | `vault_models` / `manifest` docstrings; README programmatic vault; `EXECUTION_PLAN` Phase C; `core/SCAFFOLD` manifest row. |
 
 ---
 

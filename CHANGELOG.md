@@ -30,6 +30,8 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 - **Docs — parity Phase 1 + CLI scaffold** — [`docs/PAM_PARITY_PROGRAM.md`](docs/PAM_PARITY_PROGRAM.md): vault L1 shipped vs sharing open; “still open” excludes vault L1 partial row. [`keeper_sdk/cli/SCAFFOLD.md`](keeper_sdk/cli/SCAFFOLD.md): `validate` modes + `--online`; reconciliation vault note; `main.py` LOC band.
 - **Docs — PAM parity train** — [`docs/ORCHESTRATION_PAM_PARITY.md`](docs/ORCHESTRATION_PAM_PARITY.md) §3: blockquote skim rule before PR table; **V2** touches → `vault_graph.py`; footnote on **V1** “Delivers” staleness.
 - **Core** — [`keeper_sdk/core/manifest.py`](keeper_sdk/core/manifest.py) module docstring: `load_manifest` (PAM-only) vs `load_declarative_manifest` (PAM + `keeper-vault.v1`).
+- **Docs** — [`README.md`](README.md) programmatic use: vault import path + `load_manifest` PAM-only note. [`docs/EXECUTION_PLAN_HEAVY_ORCHESTRATION.md`](docs/EXECUTION_PLAN_HEAVY_ORCHESTRATION.md) Phase C precondition/V4 row uses `load_declarative_manifest`. [`keeper_sdk/core/SCAFFOLD.md`](keeper_sdk/core/SCAFFOLD.md): `manifest.py` LOC + loader note.
+- **Core** — [`keeper_sdk/core/vault_models.py`](keeper_sdk/core/vault_models.py) module docstring: loader + CLI pointer (stale “PR-V3+” removed).
 
 ### Added
 - **V8 prep** — [`docs/live-proof/keeper-vault.v1.sanitized.template.json`](docs/live-proof/keeper-vault.v1.sanitized.template.json)

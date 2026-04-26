@@ -72,12 +72,12 @@ top-level orchestration **scripts** inside this repo (scope-fence per daybook).
 
 ## Phase C — CLI dispatch (days 10–14, one design-locked PR)
 
-**Precondition:** V3 merged; V0 answers **how** `plan`/`load_manifest` sees vault
-(one chosen approach — do not dual-path).
+**Precondition:** V3 merged; V0 answers **how** `plan` sees vault (single entry —
+**Option A** shipped as ``load_declarative_manifest`` in ``manifest.py``; do not dual-path).
 
 | PR | Focus | CI gate |
 |----|--------|---------|
-| **V4** | Single entry strategy (`load_manifest` dispatch **or** explicit sub-flag) + `AGENTS.md` one paragraph | full suite + update [`VALIDATION_STAGES.md`](./VALIDATION_STAGES.md) if behaviour changes |
+| **V4** | Single entry strategy (`load_declarative_manifest` + CLI dispatch **or** documented sub-flag) + `AGENTS.md` one paragraph | full suite + update [`VALIDATION_STAGES.md`](./VALIDATION_STAGES.md) if behaviour changes |
 
 **Exit criteria:** `dsk plan` (or documented equivalent) runs for vault fixture
 **offline**; **then** extend CI per orchestration hub **§7** (mock plan for one

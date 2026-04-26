@@ -7,7 +7,7 @@ This is the contract layer — every behaviour change here ripples into provider
 
 | File | LOC | Role | Public exports (via `core/__init__.py`) |
 |---|---:|---|---|
-| `manifest.py` | 173 | Load/dump YAML/JSON manifest; canonicalize. | `load_manifest`, `load_declarative_manifest`, `load_declarative_manifest_string`, `dump_manifest` |
+| `manifest.py` | 176 | Load/dump YAML/JSON manifest; canonicalize. PAM-only vs multi-family loaders (see module docstring). | `load_manifest`, `load_declarative_manifest`, `load_declarative_manifest_string`, `dump_manifest` |
 | `schema.py` | 114 | JSON-schema loader + `validate_manifest`. | `load_schema`, `validate_manifest` |
 | `models.py` | 469 | Pydantic models for the manifest surface (Manifest, Gateway, PamConfiguration, PamMachine, PamDatabase, PamDirectory, PamRemoteBrowser, PamUser, LoginRecord, Project, SharedFolderBlock, SharedFoldersBlock). `extra="allow"` neither widened nor narrowed. | All resource models |
 | `graph.py` | 178 | Build dep DAG + topo `execution_order`; walks `shared_folders`, `projects`, resource `pam_configuration_uid_ref` edges. | `build_graph`, `execution_order` |

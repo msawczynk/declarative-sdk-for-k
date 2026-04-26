@@ -2,7 +2,12 @@
 
 Slice 1 per ``docs/VAULT_L1_DESIGN.md``: ``records[]`` with ``type == "login"``
 only. Graph over ``uid_ref`` / ``folder_ref`` lives in :mod:`keeper_sdk.core.vault_graph`.
-Does **not** wire ``load_manifest`` / providers — that is PR-V3+.
+
+Load via :func:`~keeper_sdk.core.manifest.load_declarative_manifest` (or
+:func:`load_vault_manifest` after :func:`~keeper_sdk.core.schema.validate_manifest`).
+:func:`~keeper_sdk.core.manifest.load_manifest` is **PAM-only** and refuses this family.
+CLI + providers ship in ``keeper_sdk/cli`` and ``keeper_sdk.providers`` — see
+``docs/VAULT_L1_DESIGN.md`` §8.
 """
 
 from __future__ import annotations

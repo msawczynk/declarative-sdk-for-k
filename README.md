@@ -283,6 +283,12 @@ plan = build_plan(manifest.name, changes, order)
 provider.apply_plan(plan)
 ```
 
+For **`keeper-vault.v1`**, use **`load_declarative_manifest`**, **`build_vault_graph`**,
+**`compute_vault_diff`**, and **`vault_record_apply_order`** with **`build_plan`** and a
+provider (same `MockProvider` / `CommanderCliProvider` pattern). See
+[`tests/test_vault_mock_provider.py`](tests/test_vault_mock_provider.py) and
+[`AGENTS.md`](AGENTS.md). **`load_manifest`** stays **PAM-only** and rejects vault documents.
+
 `compute_diff` has a keyword-only `adopt=False` flag. Unmanaged live records
 that match a manifest resource by title surface as `CONFLICT` by default; pass
 `adopt=True` (or the future `keeper-sdk import` subcommand, per W18) to write
