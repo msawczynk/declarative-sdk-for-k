@@ -1054,13 +1054,32 @@ class CommanderCliProvider(Provider):
             raw_str = raw.decode("utf-8", errors="replace") if isinstance(raw, bytes) else str(raw)
             existing = json.loads(raw_str or "{}")
             merged = self._vault_patch_login_record_data(existing, patch)
+            if merged == existing:
+                return
             buf_out = io.StringIO()
             buf_err = io.StringIO()
+            return_result: dict[str, Any] = {}
             with contextlib.redirect_stdout(buf_out), contextlib.redirect_stderr(buf_err):
                 RecordEditCommand().execute(
                     params,
                     record=keeper_uid,
                     data=json.dumps(merged),
+                    return_result=return_result,
+                )
+            if not return_result.get("update_record_v3"):
+                err_tail = (buf_err.getvalue() or "").strip()
+                reason = (
+                    "vault update: RecordEditCommand returned without applying a v3 update "
+                    "(Commander may have logged an error and exited)"
+                )
+                if err_tail:
+                    reason = f"{reason}; stderr: {err_tail[:800]}"
+                raise CapabilityError(
+                    reason=reason,
+                    next_action=(
+                        "inspect Commander stderr for edit validation errors; "
+                        "confirm record type, v3 JSON shape, and account record-types policy, then retry"
+                    ),
                 )
 
         try:

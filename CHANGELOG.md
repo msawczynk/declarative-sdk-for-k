@@ -6,6 +6,11 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+- **Vault Commander UPDATE** — after `RecordEditCommand`, require `return_result["update_record_v3"]`
+  when the merged v3 JSON still differs from cache data (Commander otherwise logs and returns
+  without raising); skip the call when patch yields no net change.
+
 ### Added
 - **V8 prep** — [`docs/live-proof/keeper-vault.v1.sanitized.template.json`](docs/live-proof/keeper-vault.v1.sanitized.template.json)
   (`template: true`, shape-only) plus README section; **§2 ledger** in
