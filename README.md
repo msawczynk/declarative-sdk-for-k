@@ -12,10 +12,11 @@ every error). Designed so an LLM agent can plan, apply, and recover
 from failure without a human in the loop.
 
 **If you are an agent or LLM**: start at [`AGENTS.md`](AGENTS.md) for the
-command table, exit-code contract, and JSON shapes. For scoped
-implementation flow, use
-[`docs/ORCHESTRATION_PHASE0_PARALLEL.md`](docs/ORCHESTRATION_PHASE0_PARALLEL.md);
-daybook continuity lives in the private global sync, not this repo.
+command table, exit-code contract, and JSON shapes. Scoped completion
+contracts live in [`docs/SDK_DA_COMPLETION_PLAN.md`](docs/SDK_DA_COMPLETION_PLAN.md)
+and [`docs/SDK_COMPLETION_PLAN.md`](docs/SDK_COMPLETION_PLAN.md). Cursor /
+Codex / daybook orchestration is operator-side infrastructure and lives
+in the maintainer's private daybook, not this repo.
 
 ## Capability scope
 
@@ -50,7 +51,6 @@ tests/                               # ~231 passing tests + 2 expected v1.1 defe
 docs/
   COMMANDER.md                       # pinned Commander version + capability matrix
   LOGIN.md                           # login helper contract + 30-line skeleton
-  ORCHESTRATION_PHASE0_PARALLEL.md   # Phase 0 + parallel agent workflow
   VALIDATION_STAGES.md               # validate/plan/apply exit-code contract
 AGENTS.md                            # agent-first operating manual
 ```

@@ -3,9 +3,9 @@
 Derived from the 2026-04-24 devil's-advocate audit (see `AUDIT.md`).
 Items are **blocking** unless marked `[hardening]`. Check them off in
 PRs that close them so the next agent can tell at a glance what's left.
-Agent orchestration lives in
-[`docs/ORCHESTRATION_PHASE0_PARALLEL.md`](./docs/ORCHESTRATION_PHASE0_PARALLEL.md);
-daybook continuity is private/global sync, not a repo-local doc.
+Cursor / Codex / daybook orchestration is operator-side infrastructure
+in the maintainer's private daybook (`msawczynk/cursor-daybook`); it is
+not shipped from this repo.
 
 ## Shipping gates
 

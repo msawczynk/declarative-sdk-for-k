@@ -14,11 +14,10 @@ Agent-first Python SDK + CLI (`dsk`) for deterministic `validate -> plan -> appl
 | `keeper_sdk/auth/` | [`keeper_sdk/auth/SCAFFOLD.md`](./keeper_sdk/auth/SCAFFOLD.md) | `EnvLoginHelper` + helper-protocol contract |
 | `tests/` | [`tests/SCAFFOLD.md`](./tests/SCAFFOLD.md) | Per-test-file inventory + where to land new tests |
 | `docs/` | [`docs/SCAFFOLD.md`](./docs/SCAFFOLD.md) | Doc inventory + audience + ownership |
-| `scripts/` | [`scripts/SCAFFOLD.md`](./scripts/SCAFFOLD.md) | Orchestration + smoke top-level map |
-| `scripts/agent/` | [`scripts/agent/SCAFFOLD.md`](./scripts/agent/SCAFFOLD.md) | Codex CLI wrappers + Phase-0 gates + parallel runner |
+| `scripts/` | [`scripts/SCAFFOLD.md`](./scripts/SCAFFOLD.md) | Smoke + sync top-level map |
 | `scripts/smoke/` | [`scripts/smoke/SCAFFOLD.md`](./scripts/smoke/SCAFFOLD.md) | Live-smoke harness + scenario registry |
 | `examples/` | [`examples/SCAFFOLD.md`](./examples/SCAFFOLD.md) | Canonical minimal manifests + CI contract |
-| `.github/` | [`.github/SCAFFOLD.md`](./.github/SCAFFOLD.md) | Workflows + Codex Action + issue templates |
+| `.github/` | [`.github/SCAFFOLD.md`](./.github/SCAFFOLD.md) | Workflows + issue templates |
 
 Reconciliation against `V1_GA_CHECKLIST.md` + `docs/SDK_DA_COMPLETION_PLAN.md` +
 `AUDIT.md` + `REVIEW.md` lives in [`RECONCILIATION.md`](./RECONCILIATION.md).
@@ -32,12 +31,7 @@ Reconciliation against `V1_GA_CHECKLIST.md` + `docs/SDK_DA_COMPLETION_PLAN.md` +
 ├── .commander-pin                          # Pinned Commander SHA for drift-check CI + docs sync.
 ├── .cursorrules                            # Local editor/agent rule entrypoint.
 ├── .github/                                # GitHub automation root.
-│   ├── codex/                              # Codex GitHub prompt templates.
-│   │   └── prompts/scoped-task.md          # Reusable scoped-task DONE contract.
-│   ├── ISSUE_TEMPLATE/                     # GitHub issue forms.
-│   │   └── codex_task.yml                  # Task/scope/success packet for Codex workers.
 │   └── workflows/
-│       ├── codex-task.yml                  # Manual Codex Action task runner; uploads output + patch artifacts.
 │       ├── ci.yml                          # CI: lint, mypy, pytest, examples, drift-check, build.
 │       └── publish.yml                     # GitHub Release: build dist/* + upload assets (no PyPI).
 ├── .gitignore                              # Git ignore rules.
@@ -51,16 +45,13 @@ Reconciliation against `V1_GA_CHECKLIST.md` + `docs/SDK_DA_COMPLETION_PLAN.md` +
 ├── V1_GA_CHECKLIST.md                      # Blocking v1.0.0 checklist and hardening backlog.
 ├── docs/                                   # Focused docs for operator and agent workflows.
 │   ├── CAPABILITY_MATRIX.md                # Generated Commander capability mirror.
-│   ├── CODEX_CLI.md                        # Default local Codex CLI orchestration (offline + smoke pointers).
-│   ├── CODEX_GITHUB.md                     # GitHub issue/comment/action pattern for scoped Codex tasks.
 │   ├── COMMANDER.md                        # Version pin, CLI/API usage, drift policy, post-import tuning field map.
 │   ├── ISSUE_6_JIT_SUPPORT_BOUNDARY.md     # JIT apply boundary decision against pinned Commander.
 │   ├── ISSUE_7_GATEWAY_CREATE_PROJECTS_DESIGN.md # Gateway create / projects[] design boundary.
 │   ├── LOGIN.md                            # `EnvLoginHelper` + custom login-helper contract.
-│   ├── ORCHESTRATION_PHASE0_PARALLEL.md     # Phase 0 clean-tree + parallel Codex workflow; daybook sync is private/global.
 │   ├── RELEASING.md                        # Maintainer release ritual (GitHub-only; no PyPI).
 │   ├── SDK_DA_COMPLETION_PLAN.md           # Devil's-advocate completion gates, phases, and stop conditions.
-│   ├── SDK_ORCHESTRATED_FEATURE_COMPLETE.md # Phases × phase0_gates × Codex × live smoke (master index).
+│   ├── SDK_ORCHESTRATED_FEATURE_COMPLETE.md # Phases × gates × live smoke (master index).
 │   ├── SDK_COMPLETION_PLAN.md              # Parent/Codex orchestration plan for completing SDK support.
 │   ├── VALIDATION_STAGES.md                # Stage-by-stage `validate --online` contract.
 │   └── capability-snapshot.json            # Machine-readable mirror consumed by drift-check CI.
@@ -102,20 +93,6 @@ Reconciliation against `V1_GA_CHECKLIST.md` + `docs/SDK_DA_COMPLETION_PLAN.md` +
 │       └── mock.py                         # Offline mock provider used by tests/examples CI.
 ├── pyproject.toml                          # Packaging, deps, scripts, lint/type/test config.
 ├── scripts/                                # Maintenance and live-smoke tooling.
-│   ├── agent/                              # Codex CLI orchestration wrappers; see docs/CODEX_CLI.md.
-│   │   ├── README.md                       # When to use offline vs live-smoke scripts.
-│   │   ├── _codex_resolve.sh               # Resolve Codex path (CODEX_BIN → PATH → Cursor extension bundle).
-│   │   ├── phase0_gates.sh                 # Scripted quick/full merge gates (pytest, ruff, mypy, build).
-│   │   ├── run_smoke_matrix.sh             # Optional: all live smoke scenarios; logs `.smoke-runs/`.
-│   │   ├── run_parallel_codex.sh           # Run prompts/*.prompt.md via codex_offline_slice.sh in parallel; logs `.codex-runs/`.
-│   │   ├── codex_offline_slice.sh          # Default offline `codex exec` (no network, workspace-write).
-│   │   ├── codex_live_smoke.sh             # Whitelisted Codex live-smoke runner with network/redaction rules.
-│   │   └── prompts/                        # Disjoint slice prompts for parallel Codex runs.
-│   │       ├── README.md                   # How to add a slice prompt; DONE-block contract.
-│   │       ├── 00-ping.prompt.md           # No-edit connectivity check (skipped unless INCLUDE_PING=1).
-│   │       ├── 01-github-doc.prompt.md     # GitHub-doc slice prompt.
-│   │       ├── 02-smoke-docs.prompt.md     # Smoke-docs slice prompt.
-│   │       └── 03-root-docs.prompt.md      # Root-docs slice prompt.
 │   ├── smoke/                              # Live-smoke harness and scenario registry.
 │   │   ├── .commander-config-testuser2.json# Local smoke helper config fixture.
 │   │   ├── .gitignore                      # Keeps local smoke secrets/config out of git.

@@ -37,10 +37,9 @@ Resolved high-priority test gaps (H-series, new file `tests/test_h_series_gaps.p
 This document records the `sdk-completion` branch landing, 20 tasks (W1–W20),
 and the reconciliation against the design-of-record at
 `../keeper-pam-declarative/`. It is intended for reviewers and future agents
-picking up this work. Current orchestration lives in
-[`docs/ORCHESTRATION_PHASE0_PARALLEL.md`](docs/ORCHESTRATION_PHASE0_PARALLEL.md);
-daybook continuity is handled by the private global sync, not by a repo-local
-daybook file.
+picking up this work. Cursor / Codex / daybook orchestration is operator-side
+infrastructure in the maintainer's private daybook
+(`msawczynk/cursor-daybook`); it is not shipped from this repo.
 
 ## Scope
 

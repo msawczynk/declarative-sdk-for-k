@@ -5,9 +5,8 @@ misled agents toward removed modules. Use these repo-local sources instead:
 
 - `AGENTS.md` — agent operating manual, command table, exit codes, guardrails.
 - `SCAFFOLD.md` — current folder map, where to land work, design reconciliation.
-- `docs/SDK_COMPLETION_PLAN.md` — roadmap, parent/Codex split, live-proof gates.
-- `docs/CODEX_CLI.md` — default local `codex exec` orchestration (offline slice + live smoke pointers).
-- `docs/ORCHESTRATION_PHASE0_PARALLEL.md` — Phase 0 gates, parent vs Codex split, parallel feature tracks (canonical for this repo).
+- `docs/SDK_COMPLETION_PLAN.md` — roadmap, parent / worker split, live-proof gates.
+- `docs/SDK_DA_COMPLETION_PLAN.md` — devil's-advocate completion contract; classifies every modeled capability as `supported` / `preview-gated` / `upstream-gap`.
 - `docs/VALIDATION_STAGES.md` — validation stages and exit-code contract.
 
 Current architecture:
@@ -17,8 +16,6 @@ Current architecture:
 - `keeper_sdk/cli/` — `dsk` Click entrypoint and Rich renderer.
 - `keeper_sdk/providers/` — `MockProvider` and Commander-backed live provider.
 - `scripts/smoke/` — committed live-smoke harness; no ad hoc Keeper mutation commands.
-- `.github/codex/` and `.github/workflows/codex-task.yml` — scoped GitHub Codex task scaffolding.
-- `scripts/agent/` — `codex_offline_slice.sh` (offline), `codex_live_smoke.sh` (one harness command), `phase0_gates.sh` (quick|full merge gates).
 
 Hard rules:
 
@@ -26,6 +23,10 @@ Hard rules:
   only surface outcomes when blocked, scope shifts, or the user asks.
 - Preserve preview/provider gates until parent-reviewed live proof passes.
 - Do not write direct Keeper DAG state from SDK or lab scripts; route live mutation through Commander surfaces.
-- Prefer Codex/cheap workers for scoped offline edits; parent owns live proof, gate lifts, release, GitHub safety, and final review.
 - Keep tests focused to the touched area first; run broad checks only when risk or release scope requires it.
-- **Token / style (all agents):** user-facing replies → **caveman-ultra** (terse, fragments, `→`, abbrev, no filler). Internal reasoning → **wenyan-ultra** where the product has a separate thinking channel — no English prose paragraphs there. Spawned workers (Codex, Task): prepend `AGENT_PREAMBLE.md` when orchestrator has it (`~/.cursor/skills/AGENT_PREAMBLE.md` in maintainer workspace). Phase handoff → quick pass against `token-economy.mdc` checklist when that rule is loaded.
+
+Agent orchestration (Codex CLI scripts, parent / Codex split, Phase-0 gates,
+parallel slice prompts, GitHub-Codex Action / issue template) is **operator-side
+infrastructure**, not part of this product. It lives canonically in the
+maintainer's private daybook (`msawczynk/cursor-daybook`:
+`docs/orchestration/` + `templates/`). This repo does not ship those files.

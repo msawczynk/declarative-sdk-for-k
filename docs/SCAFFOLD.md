@@ -14,10 +14,7 @@ contract.
 | `VALIDATION_STAGES.md` | agent / CI | Per-stage `validate --online` contract; which exit code fires for which failure. Disambiguates exit-2 overload. |
 | `SDK_DA_COMPLETION_PLAN.md` | parent | **Devil's-advocate** completion gates. `supported`/`preview-gated`/`upstream-gap`. Wins over wish-list roadmaps. |
 | `SDK_COMPLETION_PLAN.md` | parent | Long-form roadmap + risk gates (companion to DA plan). |
-| `SDK_ORCHESTRATED_FEATURE_COMPLETE.md` | parent | Master index — phases × phase0_gates × Codex × live smoke. |
-| `ORCHESTRATION_PHASE0_PARALLEL.md` | parent | Phase 0 narrative; clean-tree gate; parent vs Codex split; parallel feature tracks. Daybook is private/global, NOT a repo doc. |
-| `CODEX_CLI.md` | parent | Default local Codex orchestration; offline slice + live smoke pointers. |
-| `CODEX_GITHUB.md` | parent (optional) | GitHub issue/comment/Action pattern for async Codex tasks. |
+| `SDK_ORCHESTRATED_FEATURE_COMPLETE.md` | parent | Master index — phases × gates × live smoke. |
 | `RELEASING.md` | maintainer | Release ritual. **GitHub-only**, no PyPI. |
 | `ISSUE_6_JIT_SUPPORT_BOUNDARY.md` | parent | JIT apply boundary against pinned Commander; no safe writer → `upstream-gap`. |
 | `ISSUE_7_GATEWAY_CREATE_PROJECTS_DESIGN.md` | parent | Gateway `mode: create` + top-level `projects[]` design boundary. |

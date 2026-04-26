@@ -19,10 +19,7 @@ venv/
 .vscode/
 *.swp
 
-# Codex parallel runner logs (parent-reviewed only; never commit)
-.codex-runs/
-
-# Live smoke matrix logs (scripts/agent/run_smoke_matrix.sh)
+# Live smoke logs (operator-side; never commit)
 .smoke-runs/
 
 # Testing
