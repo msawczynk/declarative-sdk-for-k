@@ -31,7 +31,7 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
     `KEEPER_SDK_KSM_CREDS_RECORD_UID`. TOTP normalisation accepts
     both `otpauth://` URIs and bare base32 secrets.
   - `bus.py` is a sealed Phase B skeleton — every public entry point
-    raises `NotImplementedError` with a precise next-action so
+    raises `CapabilityError` with a precise next-action so
     accidental imports fail loudly. The `bootstrap_ksm_application
     (create_bus_directory=True, …)` flow already provisions the
     on-tenant directory record this module will read/write; that
