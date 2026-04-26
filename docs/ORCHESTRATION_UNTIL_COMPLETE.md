@@ -197,6 +197,7 @@ full pytest before handoff; update JOURNAL snapshot not repo daybook.
 | 2026-04-27 | `V1_GA_CHECKLIST` §5 vault `validate --online` footnote; `EXECUTION_PLAN` Phase A exit pointer post–V0–V6. |
 | 2026-04-27 | `examples/SCAFFOLD.md`: CI validate vs plan loop, `vaultOneLogin`; `NEXT_SPRINT` hub link → §7. |
 | 2026-04-27 | `ORCHESTRATION_PAM_PARITY` §7 CI ladder reconciled to `ci.yml` + pytest; README layout `examples/SCAFFOLD.md`. |
+| 2026-04-27 | `docs/SCAFFOLD.md` “Where to land” → §7 CI ladder + `examples/SCAFFOLD.md`. |
 
 ---
 

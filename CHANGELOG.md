@@ -26,7 +26,7 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   [`docs/EXECUTION_PLAN_HEAVY_ORCHESTRATION.md`](docs/EXECUTION_PLAN_HEAVY_ORCHESTRATION.md) (Phase D V6 / L1 vs V8 exit criteria; Phase A pointer when V0–V6 merged).
 - **Docs — v1.0.0 GA checklist** — [`V1_GA_CHECKLIST.md`](V1_GA_CHECKLIST.md): `keeper-vault.v1` `validate --online` note under §5 (not a v1.0.0 blocker; PAM-bar / Tier A docs apply).
 - **Docs — examples index** — [`examples/SCAFFOLD.md`](examples/SCAFFOLD.md): CI validate vs mock-plan split; `vaultOneLogin.yaml`; reconciliation note. [`docs/NEXT_SPRINT_PARALLEL_ORCHESTRATION.md`](docs/NEXT_SPRINT_PARALLEL_ORCHESTRATION.md): §7 checklist pointer on hub link.
-- **Docs — CI ladder** — [`docs/ORCHESTRATION_PAM_PARITY.md`](docs/ORCHESTRATION_PAM_PARITY.md) §7: `examples` job vs pytest for vault; optional scaffold `plan` row. [`README.md`](README.md): layout tree includes `examples/SCAFFOLD.md`.
+- **Docs — CI ladder** — [`docs/ORCHESTRATION_PAM_PARITY.md`](docs/ORCHESTRATION_PAM_PARITY.md) §7: `examples` job vs pytest for vault; optional scaffold `plan` row. [`README.md`](README.md): layout tree includes `examples/SCAFFOLD.md`. [`docs/SCAFFOLD.md`](docs/SCAFFOLD.md): “Where to land” row → §7 + `examples/SCAFFOLD.md`.
 
 ### Added
 - **V8 prep** — [`docs/live-proof/keeper-vault.v1.sanitized.template.json`](docs/live-proof/keeper-vault.v1.sanitized.template.json)
