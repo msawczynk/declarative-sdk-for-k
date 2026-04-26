@@ -1,23 +1,356 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/msawczynk/declarative-sdk-for-k/schemas/keeper-vault/v1.json",
-  "title": "keeper-vault.v1 (scaffold)",
-  "description": "Scaffold-only schema for the keeper-vault family (P9 in docs/V2_DECISIONS.md). No body yet \u2014 landing as part of P9 work. Validators MUST reject any manifest that declares this schema with a non-empty body until x-keeper-live-proof.status leaves 'scaffold-only'.",
+  "title": "keeper-vault.v1",
+  "description": "Offline schema body for Keeper Vault records, custom record types, attachments, and KeeperFill settings. Live tenant proof is still pending.",
   "x-keeper-live-proof": {
     "status": "scaffold-only",
     "evidence": "pending",
     "since_pin": "89047920a0df857e01fb59adcb0bfb9fa6db70bf",
-    "notes": "Top-level keys planned: records, record_types, attachments, keeper_fill. See docs/V2_DECISIONS.md Q1."
+    "notes": "P9 schema body landed offline; live transcript pending before preview-gated graduation."
   },
   "type": "object",
-  "required": [
-    "schema"
-  ],
+  "additionalProperties": false,
+  "required": ["schema"],
   "properties": {
     "schema": {
       "type": "string",
       "const": "keeper-vault.v1"
+    },
+    "records": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/record" },
+      "uniqueItems": true,
+      "default": []
+    },
+    "record_types": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/record_type" },
+      "uniqueItems": true,
+      "default": []
+    },
+    "attachments": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/attachment" },
+      "uniqueItems": true,
+      "default": []
+    },
+    "keeper_fill": {
+      "$ref": "#/$defs/keeper_fill"
     }
   },
-  "additionalProperties": false
+  "$defs": {
+    "uid_ref": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "keeper_uid": {
+      "type": "string",
+      "minLength": 1
+    },
+    "on_off": {
+      "type": "string",
+      "enum": ["on", "off"]
+    },
+    "port": {
+      "oneOf": [
+        {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        {
+          "type": "string",
+          "pattern": "^[0-9]{1,5}$"
+        }
+      ]
+    },
+    "cross_family_ref": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z][a-z0-9-]*:[A-Za-z][A-Za-z0-9_-]*:.+$"
+    },
+    "folder_ref": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^keeper-vault-sharing:folders:.+$"
+    },
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["uid_ref", "type", "title"],
+      "properties": {
+        "uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "folder_ref": { "$ref": "#/$defs/folder_ref" },
+        "notes": {
+          "type": "string"
+        },
+        "fields": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/typed_field" },
+          "default": []
+        },
+        "custom": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/typed_field" },
+          "default": []
+        },
+        "keeper_uid": { "$ref": "#/$defs/keeper_uid" }
+      }
+    },
+    "typed_field": {
+      "type": "object",
+      "additionalProperties": false,
+      "x-keeper-secret-field-types": [
+        "password",
+        "securityQuestion",
+        "pinCode",
+        "secret",
+        "keyPair",
+        "bankAccount",
+        "paymentCard"
+      ],
+      "required": ["type", "value"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/field_value" }
+        }
+      }
+    },
+    "field_value": {
+      "oneOf": [
+        {
+          "type": ["string", "number", "boolean", "null"]
+        },
+        { "$ref": "#/$defs/security_question_value" },
+        { "$ref": "#/$defs/name_value" },
+        { "$ref": "#/$defs/address_value" },
+        { "$ref": "#/$defs/phone_value" },
+        { "$ref": "#/$defs/payment_card_value" },
+        { "$ref": "#/$defs/bank_account_value" },
+        { "$ref": "#/$defs/key_pair_value" },
+        { "$ref": "#/$defs/host_value" }
+      ]
+    },
+    "security_question_value": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["question", "answer"],
+      "properties": {
+        "question": {
+          "type": "string",
+          "minLength": 1
+        },
+        "answer": {
+          "type": "string"
+        }
+      }
+    },
+    "name_value": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "first": { "type": "string" },
+        "middle": { "type": "string" },
+        "last": { "type": "string" }
+      }
+    },
+    "address_value": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "street1": { "type": "string" },
+        "street2": { "type": "string" },
+        "city": { "type": "string" },
+        "state": { "type": "string" },
+        "zip": { "type": "string" },
+        "country": { "type": "string" }
+      }
+    },
+    "phone_value": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "region": { "type": "string" },
+        "number": { "type": "string" },
+        "ext": { "type": "string" },
+        "type": { "type": "string" }
+      }
+    },
+    "payment_card_value": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "cardNumber": { "type": "string" },
+        "cardExpirationDate": { "type": "string" },
+        "cardSecurityCode": { "type": "string" }
+      }
+    },
+    "bank_account_value": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "accountType": { "type": "string" },
+        "routingNumber": { "type": "string" },
+        "accountNumber": { "type": "string" },
+        "otherType": { "type": "string" }
+      }
+    },
+    "key_pair_value": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "publicKey": { "type": "string" },
+        "privateKey": { "type": "string" }
+      }
+    },
+    "host_value": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "hostName": { "type": "string" },
+        "port": { "$ref": "#/$defs/port" }
+      }
+    },
+    "record_type": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["uid_ref", "content"],
+      "properties": {
+        "uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "scope": {
+          "type": "string",
+          "enum": ["enterprise"]
+        },
+        "record_type_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "content": { "$ref": "#/$defs/record_type_content" }
+      }
+    },
+    "record_type_content": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["$id"],
+      "properties": {
+        "$id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "categories": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true,
+          "default": []
+        },
+        "description": {
+          "type": "string"
+        },
+        "fields": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/record_type_field" },
+          "default": []
+        }
+      }
+    },
+    "record_type_field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["$ref"],
+      "properties": {
+        "$ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "required": {
+          "type": "boolean"
+        }
+      }
+    },
+    "attachment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["uid_ref", "record_uid_ref", "source_path"],
+      "properties": {
+        "uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "record_uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "source_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mime_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "content_sha256": {
+          "type": "string",
+          "pattern": "^[A-Fa-f0-9]{64}$"
+        }
+      }
+    },
+    "keeper_fill": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["settings"],
+      "properties": {
+        "settings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/keeper_fill_setting" },
+          "uniqueItems": true,
+          "default": []
+        }
+      }
+    },
+    "keeper_fill_setting": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["record_uid_ref"],
+      "properties": {
+        "record_uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "auto_fill": { "$ref": "#/$defs/on_off" },
+        "auto_submit": { "$ref": "#/$defs/on_off" }
+      }
+    }
+  }
 }
