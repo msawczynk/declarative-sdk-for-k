@@ -73,6 +73,26 @@ def _fingerprint(value: str, prefix: str = "sha256") -> str:
     return f"<{prefix}:{digest}>"
 
 
+def sanitize_secret_keys_only(value: Any) -> Any:
+    """Redact ``_SECRET_KEYS`` dict entries recursively; leave other strings intact.
+
+    ``dsk report`` uses this by default so ``record_uid`` and similar columns
+    stay machine-readable. For transcript / evidence parity (fingerprint UID-like
+    substrings everywhere), call ``_sanitize_value`` or pass ``--sanitize-uids``.
+    """
+    if isinstance(value, dict):
+        out: dict[str, Any] = {}
+        for k, v in value.items():
+            if k.lower() in _SECRET_KEYS:
+                out[k] = "<redacted>"
+                continue
+            out[k] = sanitize_secret_keys_only(v)
+        return out
+    if isinstance(value, (list, tuple)):
+        return [sanitize_secret_keys_only(v) for v in value]
+    return value
+
+
 def _sanitize_value(value: Any, key_path: tuple[str, ...] = ()) -> Any:
     """Recursively scrub `value` for leakable content.
 
@@ -82,20 +102,24 @@ def _sanitize_value(value: Any, key_path: tuple[str, ...] = ()) -> Any:
     - Lists/tuples/dicts recurse.
     - Other primitives pass through.
     """
-    if isinstance(value, dict):
-        out: dict[str, Any] = {}
-        for k, v in value.items():
-            if k.lower() in _SECRET_KEYS:
-                out[k] = "<redacted>"
-                continue
-            out[k] = _sanitize_value(v, key_path + (k,))
-        return out
-    if isinstance(value, (list, tuple)):
-        return [_sanitize_value(v, key_path) for v in value]
-    if isinstance(value, str):
-        # Replace anything that looks like a UID with a fingerprint.
-        return _UID_RE.sub(lambda m: _fingerprint(m.group(0), "uid"), value)
-    return value
+    base = sanitize_secret_keys_only(value)
+    if isinstance(base, str):
+        return _UID_RE.sub(lambda m: _fingerprint(m.group(0), "uid"), base)
+    if isinstance(base, dict):
+
+        def _fp_strings(v: Any) -> Any:
+            if isinstance(v, str):
+                return _UID_RE.sub(lambda m: _fingerprint(m.group(0), "uid"), v)
+            if isinstance(v, dict):
+                return {k2: _fp_strings(v2) for k2, v2 in v.items()}
+            if isinstance(v, list):
+                return [_fp_strings(x) for x in v]
+            return v
+
+        return _fp_strings(base)
+    if isinstance(base, list):
+        return [_sanitize_value(v, key_path) for v in base]
+    return base
 
 
 @dataclass

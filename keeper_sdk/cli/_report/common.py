@@ -98,3 +98,22 @@ def build_envelope(
         "meta": meta,
         "rows": rows,
     }
+
+
+def prepare_report_rows(
+    rows: list[dict[str, Any]],
+    *,
+    sanitize_uids: bool,
+    quiet: bool,
+    fingerprint_keys: tuple[str, ...],
+) -> list[Any]:
+    """Transcript secret-key scrub → optional full UID scrub → ``--quiet`` → ``redact``."""
+    from keeper_sdk.cli._live.transcript import _sanitize_value, sanitize_secret_keys_only
+    from keeper_sdk.core.redact import redact
+
+    cleaned: list[dict[str, Any]] = [sanitize_secret_keys_only(dict(r)) for r in rows]
+    if sanitize_uids:
+        cleaned = [_sanitize_value(r) for r in cleaned]
+    if quiet:
+        cleaned = fingerprint_uid_fields(cleaned, fingerprint_keys)
+    return redact(cleaned)  # type: ignore[return-value]

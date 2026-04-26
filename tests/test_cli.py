@@ -367,6 +367,22 @@ def test_report_security_audit_report_emits_envelope(monkeypatch: pytest.MonkeyP
     assert payload["rows"] == sample
 
 
+def test_report_password_report_scrubs_secret_dict_keys(monkeypatch: pytest.MonkeyPatch) -> None:
+    sample = [{"record_uid": "ab", "title": "svc", "token": "should-not-appear"}]
+
+    def _fake_batch(*_a: object, **_k: object) -> str:
+        return json.dumps(sample)
+
+    monkeypatch.setattr("keeper_sdk.cli._report.runner.run_keeper_batch", _fake_batch)
+
+    result = _run(["report", "password-report", "--policy", "8,0,0,0,0"])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    row = payload["rows"][0]
+    assert row.get("token") == "<redacted>"
+    assert row.get("title") == "svc"
+
+
 def test_report_password_report_refuses_when_output_echoes_env_password(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

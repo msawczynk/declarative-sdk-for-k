@@ -7,10 +7,9 @@ from typing import Any
 import keeper_sdk.cli._report.runner as keeper_runner
 from keeper_sdk.cli._report.common import (
     build_envelope,
-    fingerprint_uid_fields,
     parse_report_json_array,
+    prepare_report_rows,
 )
-from keeper_sdk.core.redact import redact
 
 
 def run_security_audit_report(
@@ -21,6 +20,7 @@ def run_security_audit_report(
     score_type: str,
     force: bool,
     quiet: bool,
+    sanitize_uids: bool,
     keeper_bin: str | None = None,
     config_file: str | None = None,
     password: str | None = None,
@@ -41,9 +41,12 @@ def run_security_audit_report(
     )
     rows = parse_report_json_array(raw, command="security-audit report")
     fp_keys: tuple[str, ...] = ("record_uid",) if record_details else ()
-    if quiet and fp_keys:
-        rows = fingerprint_uid_fields(rows, fp_keys)
-    sanitized_rows: list[Any] = redact(rows)  # type: ignore[assignment]
+    sanitized_rows = prepare_report_rows(
+        rows,
+        sanitize_uids=sanitize_uids,
+        quiet=quiet,
+        fingerprint_keys=fp_keys,
+    )
     return build_envelope(
         command="security-audit-report",
         rows=sanitized_rows,
@@ -54,5 +57,6 @@ def run_security_audit_report(
             "score_type": score_type,
             "force": force,
             "quiet": quiet,
+            "sanitize_uids": sanitize_uids,
         },
     )

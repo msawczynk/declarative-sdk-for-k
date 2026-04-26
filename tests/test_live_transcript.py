@@ -16,8 +16,18 @@ from keeper_sdk.cli._live.transcript import (
     Transcript,
     _fingerprint,
     _sanitize_value,
+    sanitize_secret_keys_only,
     secret_leak_check,
 )
+
+
+def test_sanitize_secret_keys_only_skips_uid_fingerprinting() -> None:
+    uid = "AbCdEfGhIjKlMnOpQrStUv"
+    raw = {"record_uid": uid, "token": "abc", "msg": f"see {uid}"}
+    out = sanitize_secret_keys_only(raw)
+    assert out["record_uid"] == uid
+    assert out["msg"] == f"see {uid}"
+    assert out["token"] == "<redacted>"
 
 
 def test_sanitize_redacts_secret_keys() -> None:

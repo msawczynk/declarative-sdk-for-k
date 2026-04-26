@@ -7,10 +7,9 @@ from typing import Any
 import keeper_sdk.cli._report.runner as keeper_runner
 from keeper_sdk.cli._report.common import (
     build_envelope,
-    fingerprint_uid_fields,
     parse_report_json_array,
+    prepare_report_rows,
 )
-from keeper_sdk.core.redact import redact
 
 
 def run_compliance_report(
@@ -21,6 +20,7 @@ def run_compliance_report(
     rebuild: bool,
     no_cache: bool,
     quiet: bool,
+    sanitize_uids: bool,
     keeper_bin: str | None = None,
     config_file: str | None = None,
     password: str | None = None,
@@ -41,9 +41,12 @@ def run_compliance_report(
         argv, keeper_bin=keeper_bin, config_file=config_file, password=password
     )
     rows = parse_report_json_array(raw, command="compliance report")
-    if quiet:
-        rows = fingerprint_uid_fields(rows, ("record_uid",))
-    sanitized_rows: list[Any] = redact(rows)  # type: ignore[assignment]
+    sanitized_rows = prepare_report_rows(
+        rows,
+        sanitize_uids=sanitize_uids,
+        quiet=quiet,
+        fingerprint_keys=("record_uid",),
+    )
     return build_envelope(
         command="compliance-report",
         rows=sanitized_rows,
@@ -54,5 +57,6 @@ def run_compliance_report(
             "rebuild": rebuild,
             "no_cache": no_cache,
             "quiet": quiet,
+            "sanitize_uids": sanitize_uids,
         },
     )

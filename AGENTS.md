@@ -53,9 +53,9 @@ agents.
 | `dsk apply PATH`    | manifest             | outcomes table         | `--dry-run`           |
 | `dsk import PATH`   | manifest             | adoption plan          | `--dry-run`           |
 | `dsk export JSON`   | `pam project export` | manifest YAML          | `-o FILE`             |
-| `dsk report password-report` | Commander session | redacted JSON envelope | `--quiet` (UID fingerprints); stdout leak check → exit **1** |
-| `dsk report compliance-report` | Commander session | redacted JSON envelope | `--quiet`, `--node`, `--rebuild`; leak check → exit **1** |
-| `dsk report security-audit-report` | Commander session | redacted JSON envelope | `--record-details`, `--quiet`, `--node`; leak check → exit **1** |
+| `dsk report password-report` | Commander session | redacted JSON envelope | `--sanitize-uids` (fingerprint UIDs in values); `--quiet` (also fingerprint `record_uid` / `shared_folder_uid` keys); leak check → exit **1** |
+| `dsk report compliance-report` | Commander session | redacted JSON envelope | `--sanitize-uids`, `--quiet`, `--node`, `--rebuild`; leak check → exit **1** |
+| `dsk report security-audit-report` | Commander session | redacted JSON envelope | `--record-details`, `--sanitize-uids`, `--quiet`, `--node`; leak check → exit **1** |
 
 Aliases `pamform` and `keeper-sdk` resolve to the same entrypoint for
 backward compatibility with pre-1.0 callers; they will be removed in 2.0.

@@ -655,6 +655,11 @@ def report_cli() -> None:
     help="Fingerprint record_uid values instead of printing raw UIDs",
 )
 @click.option(
+    "--sanitize-uids",
+    is_flag=True,
+    help="Fingerprint UID-like substrings in all string fields (live-transcript mode)",
+)
+@click.option(
     "--keeper-bin",
     default=None,
     envvar="KEEPER_BIN",
@@ -665,6 +670,7 @@ def report_password_report(
     folder: str | None,
     verbose: bool,
     quiet: bool,
+    sanitize_uids: bool,
     keeper_bin: str | None,
 ) -> None:
     """Weak-password rows from Commander ``password-report`` (JSON envelope)."""
@@ -676,6 +682,7 @@ def report_password_report(
             folder=folder,
             verbose=verbose,
             quiet=quiet,
+            sanitize_uids=sanitize_uids,
             keeper_bin=keeper_bin,
             config_file=os.environ.get("KEEPER_CONFIG"),
             password=os.environ.get("KEEPER_PASSWORD"),
@@ -698,6 +705,11 @@ def report_password_report(
     help="Fingerprint record_uid values in JSON output",
 )
 @click.option(
+    "--sanitize-uids",
+    is_flag=True,
+    help="Fingerprint UID-like substrings in all string fields (live-transcript mode)",
+)
+@click.option(
     "--keeper-bin",
     default=None,
     envvar="KEEPER_BIN",
@@ -710,6 +722,7 @@ def report_compliance_report(
     rebuild: bool,
     no_cache: bool,
     quiet: bool,
+    sanitize_uids: bool,
     keeper_bin: str | None,
 ) -> None:
     """Default enterprise compliance table via ``keeper compliance report``."""
@@ -723,6 +736,7 @@ def report_compliance_report(
             rebuild=rebuild,
             no_cache=no_cache,
             quiet=quiet,
+            sanitize_uids=sanitize_uids,
             keeper_bin=keeper_bin,
             config_file=os.environ.get("KEEPER_CONFIG"),
             password=os.environ.get("KEEPER_PASSWORD"),
@@ -759,6 +773,11 @@ def report_compliance_report(
     help="Fingerprint record_uid when using --record-details",
 )
 @click.option(
+    "--sanitize-uids",
+    is_flag=True,
+    help="Fingerprint UID-like substrings in all string fields (live-transcript mode)",
+)
+@click.option(
     "--keeper-bin",
     default=None,
     envvar="KEEPER_BIN",
@@ -771,6 +790,7 @@ def report_security_audit_report(
     score_type: str,
     force: bool,
     quiet: bool,
+    sanitize_uids: bool,
     keeper_bin: str | None,
 ) -> None:
     """Enterprise security audit summary via ``keeper security-audit report``."""
@@ -784,6 +804,7 @@ def report_security_audit_report(
             score_type=score_type,
             force=force,
             quiet=quiet,
+            sanitize_uids=sanitize_uids,
             keeper_bin=keeper_bin,
             config_file=os.environ.get("KEEPER_CONFIG"),
             password=os.environ.get("KEEPER_PASSWORD"),
