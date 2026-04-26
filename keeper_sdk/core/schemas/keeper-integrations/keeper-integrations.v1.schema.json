@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/msawczynk/declarative-sdk-for-k/schemas/keeper-integrations/v1.json",
+  "title": "keeper-integrations.v1 (scaffold)",
+  "description": "Scaffold-only schema for the keeper-integrations family (P12 in docs/V2_DECISIONS.md). No body yet \u2014 landing as part of P12 work. Validators MUST reject any manifest that declares this schema with a non-empty body until x-keeper-live-proof.status leaves 'scaffold-only'.",
+  "x-keeper-live-proof": {
+    "status": "scaffold-only",
+    "evidence": "pending",
+    "since_pin": "89047920a0df857e01fb59adcb0bfb9fa6db70bf",
+    "notes": "Top-level keys planned: domains, scim_endpoints, automator_endpoints, email_configs, audit_alerts, api_keys. See docs/V2_DECISIONS.md Q1."
+  },
+  "type": "object",
+  "required": [
+    "schema"
+  ],
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "keeper-integrations.v1"
+    }
+  },
+  "additionalProperties": false
+}
