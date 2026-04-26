@@ -48,10 +48,18 @@ class FakeFileKeyValueStorage:
 
 
 class FakeSecretsManager:
-    """Fake ``SecretsManager`` with class-level records for easy patching."""
+    """Fake ``SecretsManager`` with class-level records for easy patching.
+
+    ``get_secrets_calls`` lets tests assert how many fetch attempts the
+    bootstrap verify loop made; ``visibility_delay`` simulates the
+    add_app_share → KSM-client propagation race by hiding the records
+    for the first N ``get_secrets`` calls.
+    """
 
     records: dict[str, FakeRecord] = {}
     init_calls: list[Any] = []
+    get_secrets_calls: int = 0
+    visibility_delay: int = 0
 
     def __init__(self, *, config: Any, token: str | None = None, **kwargs: Any) -> None:
         _ = kwargs
@@ -61,16 +69,24 @@ class FakeSecretsManager:
             Path(config.path).write_text('{"fake":"ksm-config"}', encoding="utf-8")
 
     def get_secrets(self, uids: list[str]) -> list[FakeRecord]:
+        cls = self.__class__
+        cls.get_secrets_calls += 1
+        if cls.get_secrets_calls <= cls.visibility_delay:
+            return []
         return [self.records[uid] for uid in uids if uid in self.records]
 
 
 def install_fake_ksm_core(
     monkeypatch: Any,
     records: dict[str, FakeRecord],
+    *,
+    visibility_delay: int = 0,
 ) -> type[FakeSecretsManager]:
     """Install fake KSM modules into ``sys.modules`` for one test."""
     FakeSecretsManager.records = dict(records)
     FakeSecretsManager.init_calls = []
+    FakeSecretsManager.get_secrets_calls = 0
+    FakeSecretsManager.visibility_delay = visibility_delay
 
     core = types.ModuleType("keeper_secrets_manager_core")
     core.SecretsManager = FakeSecretsManager

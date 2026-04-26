@@ -12,6 +12,8 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import os
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -117,6 +119,8 @@ def bootstrap_ksm_application(
             partial=partial,
         )
 
+    _sync_down(params=params, partial=partial)
+
     token = _generate_one_time_token(
         params=params,
         app_uid=app_uid,
@@ -125,14 +129,16 @@ def bootstrap_ksm_application(
         partial=partial,
     )
 
-    _redeem_one_time_token(token=token, config_path=config_path, overwrite=overwrite, partial=partial)
+    _redeem_one_time_token(
+        token=token, config_path=config_path, overwrite=overwrite, partial=partial
+    )
     _verify_redeemed_config(config_path=config_path, admin_record_uid=admin_uid, partial=partial)
 
     expires_at = None
     if first_access_minutes > 0:
-        expires_at = (
-            datetime.now(UTC) + timedelta(minutes=first_access_minutes)
-        ).isoformat(timespec="seconds")
+        expires_at = (datetime.now(UTC) + timedelta(minutes=first_access_minutes)).isoformat(
+            timespec="seconds"
+        )
 
     return BootstrapResult(
         app_uid=app_uid,
@@ -389,35 +395,97 @@ def _redeem_one_time_token(
         ) from exc
 
 
+VERIFY_RETRY_SECONDS_ENV = "KEEPER_SDK_KSM_BOOTSTRAP_VERIFY_TIMEOUT"
+"""Total budget (seconds) for the post-redeem verification retry loop.
+
+The vault-side ``add_app_share`` write and the KSM-side client fetch hit
+two different services with independent caches; in practice the new KSM
+client's first ``get_secrets`` call can race the share propagation. We
+poll with exponential-ish backoff until the admin record's typed fields
+become visible or this budget elapses. Default 20s is enough for the lab
+tenant; raise via env for slower deployments.
+"""
+
+
 def _verify_redeemed_config(
     *,
     config_path: Path,
     admin_record_uid: str,
     partial: dict[str, Any],
 ) -> None:
-    try:
-        described = KsmSecretStore(config_path=config_path).describe(admin_record_uid)
-        fields = described.get("fields") or []
-        if len(fields) < 3:
-            raise CapabilityError(
+    """Verify the redeemed KSM client can read the admin record's fields.
+
+    The ``add_app_share`` (vault) → ``add_client`` (KSM) → ``SecretsManager
+    (token=...)`` (KSM client) chain crosses a service boundary. The new
+    client's first fetch can race the share propagation; we poll with
+    bounded backoff so transient invisibility becomes a delay, not a
+    bootstrap failure.
+    """
+    budget_s = _verify_budget_seconds()
+    deadline = time.monotonic() + budget_s
+    delay = 0.5
+    last_error: Exception | None = None
+    last_field_count = 0
+    while True:
+        try:
+            store = KsmSecretStore(config_path=config_path)
+            described = store.describe(admin_record_uid)
+            fields = described.get("fields") or []
+            last_field_count = len(fields)
+            if last_field_count >= 3:
+                return
+            last_error = CapabilityError(
                 reason="redeemed KSM config cannot see the expected admin record fields",
                 next_action="verify the admin record has login/password/oneTimeCode and app sharing succeeded",
             )
-    except CapabilityError as exc:
+        except CapabilityError as exc:
+            last_error = exc
+        except Exception as exc:
+            last_error = exc
+        if time.monotonic() + delay > deadline:
+            break
+        time.sleep(delay)
+        delay = min(delay * 2.0, 4.0)
+
+    if isinstance(last_error, CapabilityError):
         raise CapabilityError(
-            reason=f"KSM config verification failed: {exc.reason}",
+            reason=(
+                f"KSM config verification failed after {budget_s:.0f}s "
+                f"(observed {last_field_count} fields): {last_error.reason}"
+            ),
             next_action=(
-                "remove any partial KSM app if desired, then rerun bootstrap with --overwrite"
+                "remove any partial KSM app if desired, then rerun bootstrap with --overwrite; "
+                f"raise {VERIFY_RETRY_SECONDS_ENV} if your tenant needs longer share-propagation"
             ),
             context=dict(partial),
-        ) from exc
-    except Exception as exc:
-        raise _bootstrap_error(
-            "KSM config verification failed",
-            "remove any partial KSM app if desired, then rerun bootstrap with --overwrite",
-            partial,
-            exc,
-        ) from exc
+        ) from last_error
+    raise _bootstrap_error(
+        f"KSM config verification failed after {budget_s:.0f}s",
+        (
+            "remove any partial KSM app if desired, then rerun bootstrap with --overwrite; "
+            f"raise {VERIFY_RETRY_SECONDS_ENV} if your tenant needs longer share-propagation"
+        ),
+        partial,
+        last_error
+        if last_error is not None
+        else RuntimeError("verification loop exited without an error"),
+    )
+
+
+def _verify_budget_seconds() -> float:
+    """Read the verification timeout budget; clamp to a safe range."""
+    raw = os.environ.get(VERIFY_RETRY_SECONDS_ENV, "")
+    if not raw:
+        return 20.0
+    try:
+        value = float(raw)
+    except ValueError:
+        return 20.0
+    if value < 0.0:
+        return 0.0
+    if value > 300.0:
+        return 300.0
+    return value
 
 
 def _create_record(*, params: Any, record_data: dict[str, Any], partial: dict[str, Any]) -> str:

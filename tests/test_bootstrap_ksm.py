@@ -30,7 +30,11 @@ def _admin_fields() -> list[dict[str, object]]:
     return [
         {"type": "login", "label": "", "value": ["operator@example.invalid"]},
         {"type": "password", "label": "", "value": ["password-value"]},
-        {"type": "oneTimeCode", "label": "", "value": ["otpauth://totp/SDK?secret=JBSWY3DPEHPK3PXP"]},
+        {
+            "type": "oneTimeCode",
+            "label": "",
+            "value": ["otpauth://totp/SDK?secret=JBSWY3DPEHPK3PXP"],
+        },
     ]
 
 
@@ -322,3 +326,65 @@ def test_bootstrap_cli_capability_error_outputs_failure_json(
     payload = json.loads(result.output)
     assert payload["status"] == "fail"
     assert "--overwrite" in payload["next_action"]
+
+
+def test_bootstrap_verify_retries_until_share_propagates(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """The verify loop should ride out a short share-propagation delay.
+
+    Simulates the live tenant's ``add_app_share`` → ``add_client`` →
+    ``SecretsManager(token=...)`` race: the first two ``get_secrets``
+    calls return an empty list (share not yet propagated), the third
+    returns the populated record. Bootstrap must succeed without
+    increasing the budget, and we should observe more than one verify
+    attempt via ``init_calls`` / ``get_secrets_calls``.
+    """
+    params = _params_with_admin()
+    fake_ksm = install_fake_ksm_core(
+        monkeypatch,
+        {ADMIN_UID: FakeRecord(uid=ADMIN_UID, title="Commander Admin", fields=_admin_fields())},
+        visibility_delay=2,
+    )
+    monkeypatch.setenv("KEEPER_SDK_KSM_BOOTSTRAP_VERIFY_TIMEOUT", "10")
+
+    result = bootstrap_ksm_application(
+        params=params,
+        app_name="dsk-service-admin",
+        admin_record_uid=ADMIN_UID,
+        config_out=tmp_path / "retry-config.json",
+    )
+
+    assert result.client_token_redeemed is True
+    assert fake_ksm.get_secrets_calls >= 3
+    assert len(fake_ksm.init_calls) >= 3
+
+
+def test_bootstrap_verify_gives_up_when_share_never_propagates(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """If propagation never lands within the budget, surface a clear error.
+
+    The retry loop is bounded; the failure mode must mention the env var
+    that operators can raise so the next-action is mechanical.
+    """
+    params = _params_with_admin()
+    install_fake_ksm_core(
+        monkeypatch,
+        {ADMIN_UID: FakeRecord(uid=ADMIN_UID, title="Commander Admin", fields=_admin_fields())},
+        visibility_delay=10_000,
+    )
+    monkeypatch.setenv("KEEPER_SDK_KSM_BOOTSTRAP_VERIFY_TIMEOUT", "0")
+
+    with pytest.raises(CapabilityError) as exc_info:
+        bootstrap_ksm_application(
+            params=params,
+            app_name="dsk-service-admin",
+            admin_record_uid=ADMIN_UID,
+            config_out=tmp_path / "give-up-config.json",
+        )
+
+    assert "verification failed" in exc_info.value.reason
+    assert "KEEPER_SDK_KSM_BOOTSTRAP_VERIFY_TIMEOUT" in (exc_info.value.next_action or "")
