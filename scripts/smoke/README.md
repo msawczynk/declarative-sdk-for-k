@@ -91,6 +91,12 @@ Exit codes come from `smoke.py::main()`:
 - Runs SDK `apply --auto-approve` to create the scenario records
 - Discovers live state through `CommanderCliProvider.discover()` and verifies every expected SDK-managed scenario record, including nested `pamUser` records for `pamUserNested`
 - Runs SDK `plan` again and expects exit `0` for a clean re-plan
+- After destroy apply, sweeps the project Resources and Users shared-folder
+  UIDs for any remaining SDK-marked records (handles ``reference_existing``
+  ``pam_configuration`` rows that empty-manifest plans do not always delete),
+  then re-discovers with an **empty** provider ``manifest_source`` so the
+  synthetic reference-configuration live row is not injected into the final
+  “no SDK-owned rows” check
 - Runs SDK `plan --allow-delete` against the empty manifest and expects exit `2` because deletes should be present
 - Runs SDK `apply --allow-delete --auto-approve` against the empty manifest
 - Re-discovers live state and verifies no records carrying this SDK ownership marker remain
