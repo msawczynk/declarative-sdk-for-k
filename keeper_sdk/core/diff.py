@@ -239,7 +239,41 @@ def _rotation_settings_equivalent(live: Any, desired: Any) -> bool:
     return norm(live_d) == norm(desired)
 
 
-def _field_diff_pam_user(live: dict[str, Any], desired: dict[str, Any]) -> list[str]:
+def _trust_missing_rotation_settings_readback(
+    live: dict[str, Any],
+    desired: dict[str, Any],
+    *,
+    marker: dict[str, Any] | None,
+    uid_ref: str,
+) -> bool:
+    """Option A: trust SDK-owned pamUser rotation apply when Commander get omits readback.
+
+    Repository fixtures and provider parsers have no proven
+    ``keeper get --format json`` typed field for nested user rotation; apply
+    writes it through ``pam rotation edit``. Until Commander exposes stable
+    readback, a matching SDK marker is the offline proof that suppresses the
+    desired-only re-plan drift.
+    """
+    if "rotation_settings" not in desired or "rotation_settings" in live:
+        return False
+    if desired.get("rotation_settings") is None:
+        return False
+    marker_d = marker or {}
+    return (
+        bool(uid_ref)
+        and marker_d.get("manager") == MANAGER_NAME
+        and marker_d.get("uid_ref") == uid_ref
+        and marker_d.get("resource_type") in (None, "pamUser")
+    )
+
+
+def _field_diff_pam_user(
+    live: dict[str, Any],
+    desired: dict[str, Any],
+    *,
+    marker: dict[str, Any] | None = None,
+    uid_ref: str = "",
+) -> list[str]:
     keys: set[str] = set(live) | set(desired)
     changed: list[str] = []
     for key in keys:
@@ -248,6 +282,13 @@ def _field_diff_pam_user(live: dict[str, Any], desired: dict[str, Any]) -> list[
         if key not in desired:
             continue
         if key == "rotation_settings":
+            if _trust_missing_rotation_settings_readback(
+                live,
+                desired,
+                marker=marker,
+                uid_ref=uid_ref,
+            ):
+                continue
             if not _rotation_settings_equivalent(live.get(key), desired.get(key)):
                 changed.append(key)
         elif live.get(key) != desired.get(key):
@@ -344,7 +385,12 @@ def _classify_desired(
     if resource_type == "pamRemoteBrowser":
         diff_fields = _field_diff_pam_remote_browser(live.payload, payload)
     elif resource_type == "pamUser":
-        diff_fields = _field_diff_pam_user(live.payload, payload)
+        diff_fields = _field_diff_pam_user(
+            live.payload,
+            payload,
+            marker=live.marker,
+            uid_ref=uid_ref,
+        )
     else:
         diff_fields = _field_diff(live.payload, payload)
     if not diff_fields:
