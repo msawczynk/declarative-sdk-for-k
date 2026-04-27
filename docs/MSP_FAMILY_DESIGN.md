@@ -485,11 +485,35 @@ Per §1 and [V2 Q5](./V2_DECISIONS.md#q5--msp-and-epm-in-product-scope):
    but affects **uid_ref** if future manifests link **PAM** resources to an MC
    (future memo).
 
+### TENTATIVE answers (2026-04-27 — Sprint 7h-57 P0 unblock)
+
+The maintainer chose **option 3** (best-guess defaults so MSP-B P0 can open in
+parallel; any answer below is **TENTATIVE — confirm at P0 review**, and a
+maintainer override invalidates only the affected P-phase work):
+
+| Q# | Tentative answer | Rationale |
+|---|---|---|
+| Q1 — entity vs `policies:` | `policies:` block stays **reserved** (not modeled in slice 1). MSP-permits read appears in `params.enterprise` for **CI validation messages** only. | Matches §1 scope fence + §2 schema stub; defers permits modeling without breaking forward compat. |
+| Q2 — seats absolute vs relative | **Absolute.** Manifest `seats` is the per-MC cap, identical to Commander `enterprise_registration_by_msp` shape. | Matches Commander semantics; relative-from-pool would require modeling pool state SDK-side (Q3 says no). |
+| Q3 — SDK pool allocation | **No.** SDK owns per-MC existence only. Out-of-seats errors surface as `CapabilityError` with `next_action` pointing operator at `msp pool …` (Commander-direct). | Mirrors PAM slice-1 pattern (one verb proven live, then expand); avoids modeling shared mutable global state. |
+| Q4 — `force=True` on remove | **Yes** for non-interactive automation, but **gated behind `--allow-delete`** flag (PAM contract parity). | Mirrors PAM `apply --allow-delete` semantics; preserves audit trail via plan. |
+| Q5 — rename semantics | **`update_mc`** via Commander `msp-update -n NEW`. **Delete + create** only on UID change (rare; explicit in plan output). | Matches Commander typed verb; preserves MC identity / records / sub-resources across rename. |
+| Q6 — addon YAML shape | **Structured** `{ name: <addon-id>, seats: <int> }`. Bare-string shorthand `"addon:5"` rejected at validate. | Schema rigor over typing convenience; matches `keeper-vault.v1` field-shape pattern. |
+| Q7 — plan / product_id normalisation | **Yes — always.** Live reads map through `keepercommander.commands.msp.constants.MSP_PLANS` to a single canonical string before compare. | Removes verbose vs non-verbose drift documented in §3 field-mapping table. |
+| Q8 — ownership marker | **Reuse `keeper_declarative_manager`** marker family. MC adoption follows the same import / dry-run / commit flow as PAM/vault. | Consistency with two existing families; one ownership story for operators. |
+| Q9 — duplicate names in manifest | **Reject** at validate (semantic-rule layer; exit `2`). No last-write-wins. | Matches PAM/vault rules layer; ambiguous manifest is a user error, not a silent merge. |
+| Q10 — cross-family refs | **Out of scope** for slice 1 (deferred). Future memo can add `pam-on-mc-tenant.v1` linkage if customer demand fires. | Scope fence per §1; preserves tenant-isolation invariant. |
+
+These defaults set the design surface for Sprint 7h-57 P0 — registry hook in
+`schema.py`, scaffold schema JSON, CHANGELOG entry. P1+ phases re-open the
+relevant Q answer for confirmation before that phase's gate.
+
 ### Document history
 
 | Date | Author | Note |
 |------|--------|------|
 | 2026-04-27 | SDK maintainers (draft) | Initial memo for Sprint 7h-56 — **msp-environment.v1** slice 1, aligned with [V2 Q5](./V2_DECISIONS.md#q5--msp-and-epm-in-product-scope). |
+| 2026-04-27 | SDK maintainers | Sprint 7h-57 P0 unblock — TENTATIVE §10 answers added; option 3 (best-guess + parallel implementation). Maintainer override invalidates only the affected P-phase work. |
 
 ### Cross-reference index (required docs)
 
