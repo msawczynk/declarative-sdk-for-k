@@ -1882,7 +1882,11 @@ class CommanderCliProvider(Provider):
                 with contextlib.redirect_stdout(buf_out), contextlib.redirect_stderr(buf_err):
                     parsed = vars(cmd.get_parser().parse_args(args[1:]))
                     api.sync_down(params)
-                    cmd.execute(params, **parsed)
+                    buf_out.seek(0)
+                    buf_out.truncate(0)
+                    result = cmd.execute(params, **parsed)
+                    if isinstance(result, str):
+                        print(result, end="")
             finally:
                 stdout = buf_out.getvalue()
                 stderr = buf_err.getvalue()
@@ -1922,7 +1926,11 @@ class CommanderCliProvider(Provider):
                 with contextlib.redirect_stdout(buf_out), contextlib.redirect_stderr(buf_err):
                     parsed = vars(cmd.get_parser().parse_args(args[1:]))
                     api.sync_down(params)
-                    cmd.execute(params, **parsed)
+                    buf_out.seek(0)
+                    buf_out.truncate(0)
+                    result = cmd.execute(params, **parsed)
+                    if isinstance(result, str):
+                        print(result, end="")
             finally:
                 stdout = buf_out.getvalue()
                 stderr = buf_err.getvalue()

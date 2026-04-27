@@ -483,6 +483,98 @@ def test_run_cmd_routes_get_in_process_when_login_helper_set(
     ]
 
 
+def test_run_cmd_ls_in_process_uses_returned_json_not_sync_spinner(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Commander 17.2.13 returns JSON from ``FolderListCommand.execute``.
+
+    ``api.sync_down`` can print progress noise; discover must parse only the
+    command result, not the sync spinner.
+    """
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
+    monkeypatch.setenv("KEEPER_SDK_LOGIN_HELPER", "/dev/null")
+
+    params = object()
+
+    def fake_get_params(self: CommanderCliProvider) -> object:
+        self._keeper_params = params
+        self._keeper_login_attempted = True
+        return params
+
+    class _FakeFolderListReturns:
+        def get_parser(self) -> argparse.ArgumentParser:
+            parser = argparse.ArgumentParser(prog="ls")
+            parser.add_argument("pattern", nargs="?")
+            parser.add_argument("--format", dest="format")
+            return parser
+
+        def execute(self, _params_arg: object, **_kwargs: object) -> str:
+            return '[{"type":"record","uid":"REC1","title":"lab-linux-1"}]'
+
+    monkeypatch.setattr(CommanderCliProvider, "_get_keeper_params", fake_get_params)
+    import keepercommander.api as keeper_api
+
+    monkeypatch.setattr(keeper_api, "sync_down", lambda _params: print("Syncing..."))
+    monkeypatch.setitem(
+        sys.modules,
+        "keepercommander.commands.folder",
+        types.SimpleNamespace(FolderListCommand=_FakeFolderListReturns),
+    )
+
+    provider = CommanderCliProvider(folder_uid="folder-uid")
+
+    assert provider._run_cmd(["ls", "FOLDER_UID", "--format", "json"]) == (
+        '[{"type":"record","uid":"REC1","title":"lab-linux-1"}]'
+    )
+
+
+def test_run_cmd_get_in_process_uses_returned_json_not_sync_spinner(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
+    )
+    monkeypatch.setenv("KEEPER_SDK_LOGIN_HELPER", "/dev/null")
+
+    params = object()
+
+    def fake_get_params(self: CommanderCliProvider) -> object:
+        self._keeper_params = params
+        self._keeper_login_attempted = True
+        return params
+
+    class _FakeRecordGetReturns:
+        def get_parser(self) -> argparse.ArgumentParser:
+            parser = argparse.ArgumentParser(prog="get")
+            parser.add_argument("uid")
+            parser.add_argument("--format", dest="format")
+            parser.add_argument("--unmask", dest="unmask", action="store_true")
+            parser.add_argument("--legacy", dest="legacy", action="store_true")
+            parser.add_argument("--include-dag", dest="include_dag", action="store_true")
+            return parser
+
+        def execute(self, _params_arg: object, **_kwargs: object) -> str:
+            return '{"record_uid":"REC1","title":"lab-linux-1","type":"login"}'
+
+    monkeypatch.setattr(CommanderCliProvider, "_get_keeper_params", fake_get_params)
+    import keepercommander.api as keeper_api
+
+    monkeypatch.setattr(keeper_api, "sync_down", lambda _params: print("Syncing..."))
+    monkeypatch.setitem(
+        sys.modules,
+        "keepercommander.commands.record",
+        types.SimpleNamespace(RecordGetUidCommand=_FakeRecordGetReturns),
+    )
+
+    provider = CommanderCliProvider(folder_uid="folder-uid")
+
+    assert provider._run_cmd(["get", "REC1", "--format", "json"]) == (
+        '{"record_uid":"REC1","title":"lab-linux-1","type":"login"}'
+    )
+
+
 def test_run_cmd_falls_back_to_subprocess_for_ls_get_without_login_config(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

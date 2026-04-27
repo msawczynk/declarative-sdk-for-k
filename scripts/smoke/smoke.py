@@ -268,7 +268,11 @@ def run_smoke(
 
     try:
         manifest_path = _write_manifest(sf_uid, context=run_context)
-        empty_manifest_path = _write_empty_manifest(sf_uid, context=run_context)
+        empty_manifest_path = _write_empty_manifest(
+            sf_uid,
+            context=run_context,
+            stem=manifest_path.stem if _ACTIVE_SCENARIO_FAMILY == VAULT_FAMILY else None,
+        )
         state["manifest_path"] = str(manifest_path)
         state["empty_manifest_path"] = str(empty_manifest_path)
         _mark(state, "temp manifests written")
@@ -490,13 +494,22 @@ def _write_manifest(sf_uid: str, *, context: SmokeRunContext | None = None) -> P
     return _write_temp_manifest(document, suffix=f".smoke-{_ACTIVE_SCENARIO.name}.yaml")
 
 
-def _write_empty_manifest(sf_uid: str, *, context: SmokeRunContext | None = None) -> Path:
+def _write_empty_manifest(
+    sf_uid: str,
+    *,
+    context: SmokeRunContext | None = None,
+    stem: str | None = None,
+) -> Path:
     run_context = context if context is not None else _default_context()
     if _ACTIVE_SCENARIO_FAMILY == VAULT_FAMILY:
         del sf_uid
         document: dict[str, Any] = {"schema": VAULT_FAMILY, "records": []}
         _preflight_manifest(document)
-        return _write_temp_manifest(document, suffix=".smoke-empty.yaml")
+        return _write_temp_manifest(
+            document,
+            suffix=".yaml" if stem else ".smoke-empty.yaml",
+            stem=stem,
+        )
     document = _base_manifest(sf_uid, context=run_context)
     document.pop("shared_folders", None)
     document.pop("gateways", None)
@@ -568,10 +581,14 @@ def _preflight_manifest(document: dict[str, Any]) -> None:
         path.unlink(missing_ok=True)
 
 
-def _write_temp_manifest(document: dict[str, Any], *, suffix: str) -> Path:
-    fd, raw_path = tempfile.mkstemp(prefix="keeper-sdk-", suffix=suffix)
-    path = Path(raw_path)
-    os.close(fd)
+def _write_temp_manifest(document: dict[str, Any], *, suffix: str, stem: str | None = None) -> Path:
+    if stem:
+        temp_dir = Path(tempfile.mkdtemp(prefix="keeper-sdk-"))
+        path = temp_dir / f"{stem}{suffix}"
+    else:
+        fd, raw_path = tempfile.mkstemp(prefix="keeper-sdk-", suffix=suffix)
+        path = Path(raw_path)
+        os.close(fd)
     path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
     return path
 
