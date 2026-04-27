@@ -48,12 +48,12 @@ def _wrap_manifest(resources: list[dict[str, Any]]) -> dict[str, Any]:
                 "can_share": True,
             }
         },
-        "gateways": [{"uid_ref": "lab-gw", "name": "Lab GW Rocky", "mode": "reference_existing"}],
+        "gateways": [{"uid_ref": "lab-gw", "name": "<gateway-name>", "mode": "reference_existing"}],
         "pam_configurations": [
             {
                 "uid_ref": PAM_CONFIG_UID_REF,
                 "environment": "local",
-                "title": "Lab Rocky PAM Configuration",
+                "title": "<pam-config-name>",
                 "gateway_uid_ref": "lab-gw",
             }
         ],

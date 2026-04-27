@@ -46,9 +46,9 @@ from keeper_sdk.providers.mock import MockProvider
 log = logging.getLogger("sdk_smoke.smoke")
 
 GATEWAY_UID_REF = "lab-gw"
-GATEWAY_NAME = "Lab GW Rocky"
+GATEWAY_NAME = "<gateway-name>"
 PAM_CONFIG_UID_REF = "lab-cfg"
-PAM_CONFIG_TITLE = "Lab Rocky PAM Configuration"
+PAM_CONFIG_TITLE = "<pam-config-name>"
 DEFAULT_SCENARIO_NAME = "pamMachine"
 SHARING_LIFECYCLE_SCENARIO_NAME = "vaultSharingLifecycle"
 SDK_OUTPUT_TAIL_LINES = 40
@@ -231,7 +231,7 @@ def run_smoke(
     keep_sf: bool = True,
     teardown_only: bool = False,
     keep_records: bool = False,
-    login_helper: str = "deploy_watcher",
+    login_helper: str = "profile",
     parallel_profile: bool = False,
     context: SmokeRunContext | None = None,
     state: dict[str, Any] | None = None,
@@ -348,16 +348,41 @@ def run_smoke(
         env["KEEPER_EMAIL"] = email
         env["KEEPER_TOTP_SECRET"] = totp_secret
         env.pop("KEEPER_SDK_LOGIN_HELPER", None)
+        env.pop("KEEPER_SDK_KSM_CREDS_RECORD_UID", None)
+        env.pop("KEEPER_SDK_KSM_CONFIG", None)
         os.environ.pop("KEEPER_SDK_LOGIN_HELPER", None)
+        os.environ.pop("KEEPER_SDK_KSM_CREDS_RECORD_UID", None)
+        os.environ.pop("KEEPER_SDK_KSM_CONFIG", None)
         auth_path = _auth_path_message("env")
     else:
-        # The SDK routes pam project import/extend + marker writes through the
-        # in-process Commander API; point it at the lab's deploy_watcher.py so
-        # _get_keeper_params() can bootstrap a KeeperParams session.
-        helper_path = str(run_context.profile.deploy_watcher_path)
-        env["KEEPER_SDK_LOGIN_HELPER"] = helper_path
-        os.environ["KEEPER_SDK_LOGIN_HELPER"] = helper_path
-        auth_path = _auth_path_message("deploy_watcher", helper_path=helper_path)
+        # The SDK routes PAM import/extend + marker writes through the
+        # in-process Commander API. Use the profile's explicit helper when set;
+        # otherwise use the in-tree KSM helper with the profile's record UID.
+        helper_path = (
+            str(run_context.profile.login_helper_path)
+            if run_context.profile.login_helper_path is not None
+            else None
+        )
+        if helper_path:
+            env["KEEPER_SDK_LOGIN_HELPER"] = helper_path
+        else:
+            env["KEEPER_SDK_LOGIN_HELPER"] = "ksm"
+            env["KEEPER_SDK_KSM_CREDS_RECORD_UID"] = run_context.profile.default_admin_record_uid
+            env["KEEPER_SDK_KSM_CONFIG"] = str(run_context.profile.ksm_config)
+        env["KEEPER_SERVER"] = run_context.profile.keeper_server
+        auth_path = _auth_path_message("profile", helper_path=helper_path)
+    for key in (
+        "KEEPER_CONFIG",
+        "KEEPER_PASSWORD",
+        "KEEPER_EMAIL",
+        "KEEPER_TOTP_SECRET",
+        "KEEPER_SDK_LOGIN_HELPER",
+        "KEEPER_SDK_KSM_CREDS_RECORD_UID",
+        "KEEPER_SDK_KSM_CONFIG",
+        "KEEPER_SERVER",
+    ):
+        if key in env:
+            os.environ[key] = env[key]
     log.info(auth_path)
     state["sdk_auth_path"] = auth_path
     _mark(state, auth_path)
@@ -691,7 +716,7 @@ def _base_manifest(sf_uid: str, *, context: SmokeRunContext | None = None) -> di
         "gateways": [
             {
                 "uid_ref": GATEWAY_UID_REF,
-                "name": GATEWAY_NAME,
+                "name": run_context.profile.gateway_name,
                 "mode": "reference_existing",
             }
         ],
@@ -699,7 +724,7 @@ def _base_manifest(sf_uid: str, *, context: SmokeRunContext | None = None) -> di
             {
                 "uid_ref": PAM_CONFIG_UID_REF,
                 "environment": "local",
-                "title": PAM_CONFIG_TITLE,
+                "title": run_context.profile.pam_config_title,
                 "gateway_uid_ref": GATEWAY_UID_REF,
             }
         ],
@@ -934,9 +959,11 @@ def _auth_path_message(login_helper: str, *, helper_path: str | None = None) -> 
             "(KEEPER_EMAIL/KEEPER_PASSWORD/KEEPER_TOTP_SECRET; "
             "KEEPER_SDK_LOGIN_HELPER unset)"
         )
-    if login_helper == "deploy_watcher":
+    if login_helper == "profile":
         suffix = f" ({helper_path})" if helper_path else ""
-        return f"sdk auth path: deploy_watcher helper path via KEEPER_SDK_LOGIN_HELPER{suffix}"
+        if helper_path:
+            return f"sdk auth path: profile helper path via KEEPER_SDK_LOGIN_HELPER{suffix}"
+        return "sdk auth path: profile KSM record via KEEPER_SDK_LOGIN_HELPER=ksm"
     raise ValueError(f"unknown login helper: {login_helper}")
 
 
@@ -976,20 +1003,8 @@ def _quote_cmd(command: list[str]) -> str:
 
 
 def _load_admin_creds(profile: identity.SmokeProfile | None = None) -> tuple[str, str, str]:
-    """Re-fetch admin creds via deploy_watcher.load_keeper_creds().
-
-    KeeperParams zeroes .password after successful login, so we can't pull
-    the password off admin_params. Re-reading from KSM is cheap (~1s) and
-    lets the smoke runner exercise either login-helper path without
-    plumbing secrets through identity.admin_login()'s return.
-    """
-    smoke_profile = profile if profile is not None else identity.DEFAULT_PROFILE
-    module_path = smoke_profile.deploy_watcher_path
-    deploy_watcher = identity._load_lab_module("sdk_smoke_admin_creds", module_path)
-    if hasattr(deploy_watcher, "ROOT"):
-        deploy_watcher.ROOT = smoke_profile.ksm_config.parent
-    email, password, totp_secret = deploy_watcher.load_keeper_creds()
-    return email, password, totp_secret
+    """Re-fetch admin creds from env, a profile helper, or KSM."""
+    return identity.load_admin_creds(profile)
 
 
 def _load_admin_password(profile: identity.SmokeProfile | None = None) -> str:
@@ -1237,11 +1252,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--login-helper",
-        default="deploy_watcher",
-        choices=["deploy_watcher", "env"],
+        default="profile",
+        choices=["profile", "env"],
         help=(
-            "How SDK subprocesses authenticate. 'deploy_watcher' exports "
-            "KEEPER_SDK_LOGIN_HELPER; 'env' clears that variable and relies on "
+            "How SDK subprocesses authenticate. 'profile' exports "
+            "KEEPER_SDK_LOGIN_HELPER from profile/KSM settings; 'env' clears that variable and relies on "
             "KEEPER_EMAIL/KEEPER_PASSWORD/KEEPER_TOTP_SECRET for the "
             "EnvLoginHelper fallback."
         ),

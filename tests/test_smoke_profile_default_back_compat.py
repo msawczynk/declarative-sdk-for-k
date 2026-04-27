@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -12,25 +13,43 @@ import identity  # noqa: E402
 import sandbox  # noqa: E402
 import smoke  # noqa: E402
 
+_FIXTURE = Path(__file__).resolve().parent / "fixtures" / "profiles" / "example-profile.json"
 
-def test_default_profile_matches_legacy_identity_constants() -> None:
-    profile = identity.DEFAULT_PROFILE
-    lab_root = Path.home() / "Downloads" / "Cursor tests" / "keeper-vault-rbi-pam-testenv"
 
-    assert profile.id == "default"
-    assert profile.target_email == "msawczyn+testuser2@acme-demo.com"
-    assert profile.ksm_config == lab_root / "ksm-config.json"
-    assert profile.admin_commander_config == lab_root / "commander-config.json"
-    assert profile.sdktest_commander_config == (
-        identity.SDK_ROOT / "scripts" / "smoke" / ".commander-config-testuser2.json"
-    )
-    assert profile.keeper_server == "keepersecurity.com"
-    assert profile.channel_name == "sdk-declarative"
-    assert profile.password == "AcmeDemo123!!"
-    assert profile.default_admin_record_uid == "MyiZN4cw-wtEIpY1jHlhLw"
-    assert profile.sdk_test_login_record_title == "SDK Test — testuser2 Login"
-    assert profile.project_name == "sdk-smoke-testuser2"
-    assert profile.title_prefix == "sdk-smoke"
+def _assert_email_or_placeholder(value: str, placeholder: str) -> None:
+    assert isinstance(value, str)
+    assert value == placeholder or "@" in value
+
+
+def _assert_profile_contract(profile: identity.SmokeProfile) -> None:
+    assert isinstance(profile.id, str) and profile.id
+    _assert_email_or_placeholder(profile.admin_email, "admin@example.com")
+    _assert_email_or_placeholder(profile.target_email, "target@example.com")
+    assert isinstance(profile.ksm_config, Path)
+    assert isinstance(profile.admin_commander_config, Path)
+    assert isinstance(profile.sdktest_commander_config, Path)
+    assert profile.keeper_server
+    assert profile.channel_name
+    assert profile.default_admin_record_uid
+    assert profile.sdk_test_login_record_title
+    assert profile.gateway_name
+    assert profile.pam_config_title
+    assert not hasattr(profile, "password")
+
+
+def test_default_profile_shape_uses_placeholder_contract(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.delenv(identity.EXTERNAL_PROFILE_ENV, raising=False)
+    monkeypatch.setattr(identity, "DEFAULT_PROFILE_PATH", tmp_path / "missing.json")
+
+    profile = identity.load_profile()
+
+    assert profile is identity.DEFAULT_PROFILE
+    _assert_profile_contract(profile)
+    assert profile.admin_email == "admin@example.com"
+    assert profile.target_email == "target@example.com"
+    assert profile.default_admin_record_uid == "<ADMIN_RECORD_UID>"
+    assert profile.gateway_name == "<gateway-name>"
+    assert profile.pam_config_title == "<pam-config-name>"
 
     assert identity.KSM_CONFIG == profile.ksm_config
     assert identity.ADMIN_COMMANDER_CONFIG == profile.admin_commander_config
@@ -40,23 +59,40 @@ def test_default_profile_matches_legacy_identity_constants() -> None:
     assert identity.ADMIN_CRED_RECORD_UID == profile.default_admin_record_uid
     assert identity.SDK_TEST_LOGIN_RECORD_TITLE == profile.sdk_test_login_record_title
     assert identity.CHANNEL_NAME == profile.channel_name
-    assert identity.DEFAULT_PASSWORD == profile.password
 
 
-def test_default_sandbox_config_matches_legacy_constants() -> None:
+def test_example_profile_fixture_matches_shape(monkeypatch) -> None:
+    monkeypatch.setenv(identity.EXTERNAL_PROFILE_ENV, str(_FIXTURE))
+
+    profile = identity.load_profile()
+
+    _assert_profile_contract(profile)
+    assert profile.id == "default"
+
+
+def test_default_sandbox_config_uses_profile_gateway() -> None:
     config = sandbox.config_for_profile(identity.DEFAULT_PROFILE)
 
     assert config.sf_title == "SDK Test (ephemeral)"
     assert config.ksm_app_name == "SDK Test KSM"
-    assert config.gateway_name == "Lab GW Rocky"
+    assert config.gateway_name == identity.DEFAULT_PROFILE.gateway_name
 
 
-def test_load_default_profile_returns_singleton() -> None:
+def test_load_default_profile_returns_singleton(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.delenv(identity.EXTERNAL_PROFILE_ENV, raising=False)
+    monkeypatch.setattr(identity, "DEFAULT_PROFILE_PATH", tmp_path / "missing.json")
+
     assert identity.load_profile() is identity.DEFAULT_PROFILE
     assert identity.load_profile("default") is identity.DEFAULT_PROFILE
 
 
-def test_default_smoke_invocation_preserves_legacy_manifest_shape() -> None:
+def test_fixture_has_no_password_field() -> None:
+    raw = json.loads(_FIXTURE.read_text(encoding="utf-8"))
+
+    assert "password" not in raw
+
+
+def test_default_smoke_manifest_uses_profile_identity() -> None:
     args = smoke._parse_args(["--scenario", "pamMachine"])
     profile = identity.load_profile(args.profile)
     context = smoke.SmokeRunContext(profile=profile, node_uid=args.node_uid)
@@ -71,12 +107,9 @@ def test_default_smoke_invocation_preserves_legacy_manifest_shape() -> None:
         if "manifest_path" in locals():
             manifest_path.unlink(missing_ok=True)
 
-    assert document["name"] == "sdk-smoke-testuser2"
-    assert [resource["title"] for resource in document["resources"]] == [
-        "sdk-smoke-host-1",
-        "sdk-smoke-host-2",
-    ]
-    assert [resource["uid_ref"] for resource in document["resources"]] == [
-        "sdk-smoke-host-1",
-        "sdk-smoke-host-2",
-    ]
+    assert document["name"] == profile.project_name
+    assert document["gateways"][0]["name"] == profile.gateway_name
+    assert document["pam_configurations"][0]["title"] == profile.pam_config_title
+    assert all(
+        resource["title"].startswith(profile.title_prefix) for resource in document["resources"]
+    )

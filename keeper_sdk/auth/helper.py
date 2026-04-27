@@ -346,8 +346,7 @@ class _AutoLoginUi:
     helper only stubbed two of them and returned strings/bools, which
     matched no real protocol method and caused ``api.login`` to hang
     waiting for a step that never completed. The current implementation
-    mirrors the lab's ``deploy_watcher.AutoUI`` (proven against this
-    tenant).
+    mirrors a battle-tested auto-login UI helper.
 
     The class is constructed dynamically so the SDK doesn't import
     ``keepercommander.auth.login_steps`` at module load time

@@ -2597,9 +2597,9 @@ def test_apply_post_import_tuning_resolves_user_from_project_users_folder(
                 {
                     "gateways": [
                         {
-                            "ksm_app_name": "Lab GW Application",
+                            "ksm_app_name": "Example Gateway Application",
                             "ksm_app_uid": "APP_UID",
-                            "gateway_name": "Lab GW Rocky",
+                            "gateway_name": "Example Gateway",
                             "gateway_uid": "GW_UID",
                         }
                     ]
@@ -2612,7 +2612,7 @@ def test_apply_post_import_tuning_resolves_user_from_project_users_folder(
                         {
                             "uid": "CFG_UID",
                             "config_name": "Local Config",
-                            "shared_folder": {"name": "Lab GW Folder", "uid": "SF_UID"},
+                            "shared_folder": {"name": "Example Gateway Folder", "uid": "SF_UID"},
                             "gateway_uid": "GW_UID",
                         }
                     ]
@@ -2673,7 +2673,9 @@ def test_apply_post_import_tuning_resolves_user_from_project_users_folder(
         manifest_source={
             "version": "1",
             "name": "customer-prod",
-            "gateways": [{"uid_ref": "gw", "name": "Lab GW Rocky", "mode": "reference_existing"}],
+            "gateways": [
+                {"uid_ref": "gw", "name": "Example Gateway", "mode": "reference_existing"}
+            ],
             "pam_configurations": [
                 {
                     "uid_ref": "cfg.local",
@@ -3385,10 +3387,10 @@ def test_apply_reference_existing_splits_to_extend(monkeypatch: pytest.MonkeyPat
                 {
                     "gateways": [
                         {
-                            "ksm_app_name": "Lab GW Application",
+                            "ksm_app_name": "Example Gateway Application",
                             "ksm_app_uid": "app-uid",
                             "ksm_app_accessible": True,
-                            "gateway_name": "Lab GW Rocky",
+                            "gateway_name": "Example Gateway",
                             "gateway_uid": "gw-uid",
                             "status": "ONLINE",
                             "gateway_version": "1.7.6",
@@ -3405,7 +3407,7 @@ def test_apply_reference_existing_splits_to_extend(monkeypatch: pytest.MonkeyPat
                             "config_name": "LW Gateway Configuration",
                             "config_type": "pamNetworkConfiguration",
                             "shared_folder": {
-                                "name": "Lab GW Folder - Resources",
+                                "name": "Example Gateway Folder - Resources",
                                 "uid": "folder-uid",
                             },
                             "gateway_uid": "gw-uid",
@@ -3462,11 +3464,13 @@ def test_apply_reference_existing_splits_to_extend(monkeypatch: pytest.MonkeyPat
         manifest_source={
             "version": "1",
             "name": "customer-prod",
-            "gateways": [{"uid_ref": "gw", "name": "Lab GW Rocky", "mode": "reference_existing"}],
+            "gateways": [
+                {"uid_ref": "gw", "name": "Example Gateway", "mode": "reference_existing"}
+            ],
             "pam_configurations": [
                 {
                     "uid_ref": "cfg",
-                    "title": "Lab Rocky PAM Configuration",
+                    "title": "Example PAM Configuration",
                     "environment": "local",
                     "gateway_uid_ref": "gw",
                 }
@@ -3481,8 +3485,8 @@ def test_apply_reference_existing_splits_to_extend(monkeypatch: pytest.MonkeyPat
                 kind=ChangeKind.CREATE,
                 uid_ref="cfg",
                 resource_type="pam_configuration",
-                title="Lab Rocky PAM Configuration",
-                after={"title": "Lab Rocky PAM Configuration"},
+                title="Example PAM Configuration",
+                after={"title": "Example PAM Configuration"},
             ),
             Change(
                 kind=ChangeKind.CREATE,

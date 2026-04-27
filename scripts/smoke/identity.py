@@ -1,4 +1,14 @@
 #!/usr/bin/env python3
+"""Load smoke-run tenant identity without embedding private lab values.
+
+Smoke profiles describe a tenant's connection identity: account emails,
+Commander/KSM config paths, record references, and pre-existing PAM resource
+names. The baked-in defaults are generic placeholders, not lab values.
+Operators supply real values through an external JSON profile
+(``DSK_SMOKE_PROFILE`` or ``~/.config/dsk/profiles/default.json``) and runtime
+environment/KSM credentials; passwords are never defaulted in this module.
+"""
+
 from __future__ import annotations
 
 import argparse
@@ -26,55 +36,65 @@ log = logging.getLogger("sdk_smoke.identity")
 log.setLevel(logging.INFO)
 
 SDK_ROOT = Path(__file__).resolve().parent.parent.parent
-LAB_ROOT = Path.home() / "Downloads" / "Cursor tests" / "keeper-vault-rbi-pam-testenv"
 PROFILES_DIR = Path(__file__).resolve().parent / "profiles"
+PROFILE_ROOT = Path("~/.config/dsk/profiles").expanduser()
+EXTERNAL_PROFILE_ENV = "DSK_SMOKE_PROFILE"
+DEFAULT_PROFILE_PATH = PROFILE_ROOT / "default.json"
+TARGET_PASSWORD_ENV = "DSK_SMOKE_TARGET_PASSWORD"
 
 
 @dataclass(frozen=True, kw_only=True)
 class SmokeProfile:
     id: str
+    admin_email: str
     target_email: str
     ksm_config: Path
     admin_commander_config: Path
     sdktest_commander_config: Path
     keeper_server: str = "keepersecurity.com"
     channel_name: str = "sdk-declarative"
-    password: str
     default_admin_record_uid: str
     sdk_test_login_record_title: str
+    gateway_name: str
+    pam_config_title: str
+    login_helper_path: Path | None = None
 
     @property
     def project_name(self) -> str:
-        """Return the PAM project name; default preserves the legacy live-smoke path."""
+        """Return the PAM project name for this smoke profile."""
         if self.id == "default":
-            return "sdk-smoke-testuser2"
+            return "sdk-smoke-default"
         return f"sdk-smoke-{self.id}"
 
     @property
     def title_prefix(self) -> str:
-        """Return scenario record title prefix; default preserves legacy record titles."""
+        """Return scenario record title prefix."""
         if self.id == "default":
             return "sdk-smoke"
         return f"sdk-smoke-{self.id}"
 
-    @property
-    def deploy_watcher_path(self) -> Path:
-        return self.ksm_config.parent / "scripts" / "deploy_watcher.py"
+
+def _placeholder_profile(profile_id: str) -> SmokeProfile:
+    profile_dir = PROFILE_ROOT / profile_id
+    return SmokeProfile(
+        id=profile_id,
+        admin_email="admin@example.com",
+        target_email="target@example.com",
+        ksm_config=profile_dir / "ksm-config.json",
+        admin_commander_config=profile_dir / "commander-config.json",
+        sdktest_commander_config=profile_dir / "target-commander-config.json",
+        keeper_server="keepersecurity.com",
+        channel_name="sdk-declarative"
+        if profile_id == "default"
+        else f"sdk-declarative-{profile_id}",
+        default_admin_record_uid="<ADMIN_RECORD_UID>",
+        sdk_test_login_record_title="<target-login-record-title>",
+        gateway_name="<gateway-name>",
+        pam_config_title="<pam-config-name>",
+    )
 
 
-DEFAULT_PROFILE = SmokeProfile(
-    id="default",
-    target_email="msawczyn+testuser2@acme-demo.com",
-    ksm_config=LAB_ROOT / "ksm-config.json",
-    admin_commander_config=LAB_ROOT / "commander-config.json",
-    sdktest_commander_config=SDK_ROOT / "scripts" / "smoke" / ".commander-config-testuser2.json",
-    keeper_server="keepersecurity.com",
-    channel_name="sdk-declarative",
-    # Lab-wide shared test password; matches provision_prospect_ots.py::DEFAULT_PASSWORD.
-    password="AcmeDemo123!!",
-    default_admin_record_uid="MyiZN4cw-wtEIpY1jHlhLw",
-    sdk_test_login_record_title="SDK Test — testuser2 Login",
-)
+DEFAULT_PROFILE = _placeholder_profile("default")
 
 # Legacy aliases kept for callers that imported smoke constants directly.
 KSM_CONFIG = DEFAULT_PROFILE.ksm_config
@@ -85,60 +105,97 @@ TARGET_EMAIL = DEFAULT_PROFILE.target_email
 ADMIN_CRED_RECORD_UID = DEFAULT_PROFILE.default_admin_record_uid
 SDK_TEST_LOGIN_RECORD_TITLE = DEFAULT_PROFILE.sdk_test_login_record_title
 CHANNEL_NAME = DEFAULT_PROFILE.channel_name
-DEFAULT_PASSWORD = DEFAULT_PROFILE.password
 
 _REQUIRED_PROFILE_FIELDS = (
     "id",
+    "admin_email",
     "target_email",
     "ksm_config",
     "admin_commander_config",
     "sdktest_commander_config",
-    "password",
     "default_admin_record_uid",
     "sdk_test_login_record_title",
+    "gateway_name",
+    "pam_config_title",
 )
 
 
 def load_profile(profile_id: str = "default") -> SmokeProfile:
-    if profile_id == "default":
-        return DEFAULT_PROFILE
-
-    path = PROFILES_DIR / f"{profile_id}.json"
+    base = DEFAULT_PROFILE if profile_id == "default" else _placeholder_profile(profile_id)
+    path = _profile_json_path(profile_id)
     if not path.is_file():
+        if profile_id == "default" and EXTERNAL_PROFILE_ENV not in os.environ:
+            return DEFAULT_PROFILE
         raise FileNotFoundError(
-            f"missing smoke profile {profile_id!r}: expected {path}. "
+            f"missing smoke profile {profile_id!r}: expected external JSON at {path}. "
+            f"Set {EXTERNAL_PROFILE_ENV} or copy scripts/smoke/profiles/default.example.json. "
             "See scripts/smoke/README.md § Profiles."
         )
 
     raw = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(raw, dict):
         raise ValueError(f"smoke profile {path} must contain a JSON object")
-    profile = _profile_from_mapping(raw, source=path)
+    profile = _profile_from_mapping(raw, source=path, base=base)
     if profile.id != profile_id:
         raise ValueError(f"smoke profile {path} has id {profile.id!r}; expected {profile_id!r}")
     return profile
 
 
-def _profile_from_mapping(raw: dict[str, Any], *, source: Path) -> SmokeProfile:
-    missing = [field for field in _REQUIRED_PROFILE_FIELDS if raw.get(field) in (None, "")]
+def _profile_json_path(profile_id: str) -> Path:
+    configured = os.environ.get(EXTERNAL_PROFILE_ENV)
+    if configured:
+        return Path(configured).expanduser()
+    if profile_id == "default":
+        return DEFAULT_PROFILE_PATH
+    return PROFILE_ROOT / f"{profile_id}.json"
+
+
+def _profile_from_mapping(
+    raw: dict[str, Any], *, source: Path, base: SmokeProfile | None = None
+) -> SmokeProfile:
+    merged = _profile_to_mapping(base or _placeholder_profile(str(raw.get("id") or "default")))
+    merged.update({key: value for key, value in raw.items() if not key.startswith("_")})
+
+    missing = [field for field in _REQUIRED_PROFILE_FIELDS if merged.get(field) in (None, "")]
     if missing:
         raise ValueError(
             f"smoke profile {source} is missing required field(s): {', '.join(missing)}"
         )
 
-    profile_id = str(raw["id"])
+    profile_id = str(merged["id"])
     return SmokeProfile(
         id=profile_id,
-        target_email=str(raw["target_email"]),
-        ksm_config=_profile_path(raw["ksm_config"]),
-        admin_commander_config=_profile_path(raw["admin_commander_config"]),
-        sdktest_commander_config=_profile_path(raw["sdktest_commander_config"]),
-        keeper_server=str(raw.get("keeper_server") or "keepersecurity.com"),
-        channel_name=str(raw.get("channel_name") or _default_channel_name(profile_id)),
-        password=str(raw["password"]),
-        default_admin_record_uid=str(raw["default_admin_record_uid"]),
-        sdk_test_login_record_title=str(raw["sdk_test_login_record_title"]),
+        admin_email=str(merged["admin_email"]),
+        target_email=str(merged["target_email"]),
+        ksm_config=_profile_path(merged["ksm_config"]),
+        admin_commander_config=_profile_path(merged["admin_commander_config"]),
+        sdktest_commander_config=_profile_path(merged["sdktest_commander_config"]),
+        keeper_server=str(merged.get("keeper_server") or "keepersecurity.com"),
+        channel_name=str(merged.get("channel_name") or _default_channel_name(profile_id)),
+        default_admin_record_uid=str(merged["default_admin_record_uid"]),
+        sdk_test_login_record_title=str(merged["sdk_test_login_record_title"]),
+        gateway_name=str(merged["gateway_name"]),
+        pam_config_title=str(merged["pam_config_title"]),
+        login_helper_path=_optional_profile_path(merged.get("login_helper_path")),
     )
+
+
+def _profile_to_mapping(profile: SmokeProfile) -> dict[str, Any]:
+    return {
+        "id": profile.id,
+        "admin_email": profile.admin_email,
+        "target_email": profile.target_email,
+        "ksm_config": profile.ksm_config,
+        "admin_commander_config": profile.admin_commander_config,
+        "sdktest_commander_config": profile.sdktest_commander_config,
+        "keeper_server": profile.keeper_server,
+        "channel_name": profile.channel_name,
+        "default_admin_record_uid": profile.default_admin_record_uid,
+        "sdk_test_login_record_title": profile.sdk_test_login_record_title,
+        "gateway_name": profile.gateway_name,
+        "pam_config_title": profile.pam_config_title,
+        "login_helper_path": profile.login_helper_path,
+    }
 
 
 def _profile_path(value: Any) -> Path:
@@ -146,6 +203,12 @@ def _profile_path(value: Any) -> Path:
     if path.is_absolute():
         return path
     return SDK_ROOT / path
+
+
+def _optional_profile_path(value: Any) -> Path | None:
+    if value in (None, ""):
+        return None
+    return _profile_path(value)
 
 
 def _default_channel_name(profile_id: str) -> str:
@@ -167,7 +230,7 @@ def _dependency_error(exc: Exception) -> ImportError:
     return err
 
 
-def _load_lab_module(module_name: str, path: Path):
+def _load_helper_module(module_name: str, path: Path):
     spec = importlib.util.spec_from_file_location(module_name, path)
     if spec is None or spec.loader is None:
         raise ImportError(f"could not load module {module_name} from {path}")
@@ -468,6 +531,86 @@ def _write_commander_config(params, config_path: Path) -> None:
         json.dump(filtered, fh)
 
 
+def _admin_creds_from_env(smoke_profile: SmokeProfile) -> tuple[str, str, str] | None:
+    password = os.environ.get("KEEPER_PASSWORD")
+    totp_secret = os.environ.get("KEEPER_TOTP_SECRET")
+    email = os.environ.get("KEEPER_EMAIL")
+    if not email and smoke_profile.admin_email != "admin@example.com":
+        email = smoke_profile.admin_email
+    if not (password or totp_secret):
+        return None
+    missing = [
+        name
+        for name, value in (
+            ("KEEPER_EMAIL or profile admin_email", email),
+            ("KEEPER_PASSWORD", password),
+            ("KEEPER_TOTP_SECRET", totp_secret),
+        )
+        if not value
+    ]
+    if missing:
+        raise ValueError(f"admin credential env is incomplete; missing {', '.join(missing)}")
+    return str(email), str(password), str(totp_secret)
+
+
+def _admin_creds_from_helper(smoke_profile: SmokeProfile) -> tuple[str, str, str] | None:
+    module_path = smoke_profile.login_helper_path
+    if module_path is None:
+        return None
+    if not module_path.is_file():
+        raise FileNotFoundError(f"missing smoke login helper: {module_path}")
+    helper = _load_helper_module("sdk_smoke_login_helper", module_path)
+    creds = helper.load_keeper_creds()
+    if isinstance(creds, dict):
+        email = creds["email"]
+        password = creds["password"]
+        totp_secret = creds["totp_secret"]
+    else:
+        email, password, totp_secret = creds
+    return str(email), str(password), str(totp_secret)
+
+
+def _admin_creds_from_ksm(smoke_profile: SmokeProfile) -> tuple[str, str, str]:
+    if smoke_profile.default_admin_record_uid == "<ADMIN_RECORD_UID>":
+        raise ValueError(
+            "smoke profile still has placeholder default_admin_record_uid; "
+            f"set {EXTERNAL_PROFILE_ENV} or provide KEEPER_EMAIL/KEEPER_PASSWORD/"
+            "KEEPER_TOTP_SECRET"
+        )
+    try:
+        from keeper_sdk.secrets import load_keeper_login_from_ksm
+    except ImportError as exc:
+        raise _dependency_error(exc)
+    creds = load_keeper_login_from_ksm(
+        smoke_profile.default_admin_record_uid,
+        config_path=smoke_profile.ksm_config,
+        server=smoke_profile.keeper_server,
+        config_path_for_login=str(smoke_profile.admin_commander_config),
+    )
+    return creds.email, creds.password, creds.totp_secret
+
+
+def load_admin_creds(profile: SmokeProfile | None = None) -> tuple[str, str, str]:
+    smoke_profile = _profile_or_default(profile)
+    env_creds = _admin_creds_from_env(smoke_profile)
+    if env_creds is not None:
+        return env_creds
+    helper_creds = _admin_creds_from_helper(smoke_profile)
+    if helper_creds is not None:
+        return helper_creds
+    return _admin_creds_from_ksm(smoke_profile)
+
+
+def _target_password() -> str:
+    password = os.environ.get(TARGET_PASSWORD_ENV)
+    if password:
+        return password
+    raise ValueError(
+        f"target identity enrollment requires {TARGET_PASSWORD_ENV}; "
+        "smoke profiles never embed passwords"
+    )
+
+
 def _build_identity_result(
     *,
     email: str,
@@ -492,26 +635,22 @@ def _build_identity_result(
 
 
 def admin_login(profile: SmokeProfile | None = None):
-    """Log in as the lab admin using the profile's lab KSM + TOTP helper.
-    Uses the exact same pattern as deploy_watcher.keeper_login — import it
-    via sys.path if practical, otherwise inline the helper. Prefer
-    importing to avoid drift.
-    """
+    """Log in as the profile admin using env, an external helper, or KSM."""
     smoke_profile = _profile_or_default(profile)
-    module_path = smoke_profile.deploy_watcher_path
-    if not module_path.is_file():
-        raise FileNotFoundError(f"missing lab helper: {module_path}")
 
     try:
-        deploy_watcher = _load_lab_module("sdk_smoke_deploy_watcher", module_path)
-        if hasattr(deploy_watcher, "ROOT"):
-            deploy_watcher.ROOT = smoke_profile.ksm_config.parent
-        email, password, totp_secret = deploy_watcher.load_keeper_creds()
-        params = deploy_watcher.keeper_login(email, password, totp_secret)
         from keepercommander import api
     except ImportError as exc:
         raise _dependency_error(exc)
 
+    email, password, totp_secret = load_admin_creds(smoke_profile)
+    params = _login_user(
+        email,
+        password,
+        config_path=smoke_profile.admin_commander_config,
+        totp_secret=totp_secret,
+        keeper_server=smoke_profile.keeper_server,
+    )
     api.query_enterprise(params)
     log.info(
         "admin session OK (%s); enterprise users=%d",
@@ -587,6 +726,8 @@ def ensure_sdktest_identity(
             except Exception as exc:
                 log.info("stored SDK smoke identity unusable; re-enrolling: %s", exc)
 
+    target_password = _target_password()
+
     log.info("=== admin clears target 2FA ===")
     cli.do_command(
         admin_params,
@@ -597,7 +738,7 @@ def ensure_sdktest_identity(
     log.info("=== target login (password only) ===")
     unenrolled_params = _login_user(
         smoke_profile.target_email,
-        smoke_profile.password,
+        target_password,
         config_path=smoke_profile.sdktest_commander_config,
         keeper_server=smoke_profile.keeper_server,
     )
@@ -610,7 +751,7 @@ def ensure_sdktest_identity(
     admin_record_uid = _upsert_admin_record(
         admin_params,
         user_email=smoke_profile.target_email,
-        user_password=smoke_profile.password,
+        user_password=target_password,
         otpauth_url=otpauth_url,
         profile=smoke_profile,
     )
@@ -622,7 +763,7 @@ def ensure_sdktest_identity(
     _wait_for_next_totp_window(log_label="post-enrollment settle")
     verified_params = _retry_totp_login(
         smoke_profile.target_email,
-        smoke_profile.password,
+        target_password,
         config_path=smoke_profile.sdktest_commander_config,
         totp_secret=totp_secret,
         keeper_server=smoke_profile.keeper_server,
@@ -632,7 +773,7 @@ def ensure_sdktest_identity(
 
     return _build_identity_result(
         email=smoke_profile.target_email,
-        password=smoke_profile.password,
+        password=target_password,
         totp_secret=totp_secret,
         otpauth_url=otpauth_url,
         params=verified_params,

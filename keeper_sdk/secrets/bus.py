@@ -29,10 +29,9 @@ We considered three substrates before settling on KSM directory records:
    for credentials; reusing it for low-volume agent coordination is
    strictly less infrastructure. Selected.
 
-3. **Filesystem under ``~/.cursor-daybook-sync``** — works on a single
-   workstation, falls apart for cross-host agents and CI runners. The
-   daybook stays human-readable; the bus stays machine-coordinated.
-   Out of scope.
+3. **Local filesystem fallback** — works on a single workstation, falls
+   apart for cross-host agents and CI runners. Human-readable notes stay
+   separate; the bus stays machine-coordinated. Out of scope.
 
 Wire format
 -----------

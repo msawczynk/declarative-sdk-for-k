@@ -35,15 +35,17 @@ def _profile(
 ) -> identity.SmokeProfile:
     return identity.SmokeProfile(
         id=profile_id,
-        target_email=f"msawczyn+sdk-{profile_id}@acme-demo.com",
+        admin_email=f"admin-{profile_id}@example.com",
+        target_email=f"target-{profile_id}@example.com",
         ksm_config=tmp_path / profile_id / "ksm-config.json",
         admin_commander_config=admin_config or tmp_path / profile_id / "commander-config.json",
         sdktest_commander_config=tmp_path / profile_id / "testuser-commander-config.json",
         keeper_server=TENANT,
         channel_name=f"sdk-declarative-{profile_id}",
-        password=f"profile-password-{profile_id}",
         default_admin_record_uid=f"ADMIN_UID_{profile_id}",
         sdk_test_login_record_title=f"SDK Test {profile_id} Login",
+        gateway_name=f"Gateway {profile_id}",
+        pam_config_title=f"PAM Configuration {profile_id}",
     )
 
 
@@ -272,5 +274,4 @@ def test_lock_payload_has_no_secrets(tmp_path: Path) -> None:
     forbidden_fields = {"password", "totp", "secret", "token", "session", "config_json"}
     assert forbidden_fields.isdisjoint(payload)
     payload_text = json.dumps(payload)
-    assert profile.password not in payload_text
     assert profile.default_admin_record_uid not in payload_text

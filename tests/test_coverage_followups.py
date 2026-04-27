@@ -203,10 +203,10 @@ def test_pam_gateway_rows_parses_release_json_shape(monkeypatch: pytest.MonkeyPa
         {
             "gateways": [
                 {
-                    "ksm_app_name": "Lab GW Application",
+                    "ksm_app_name": "Example Gateway Application",
                     "ksm_app_uid": "app-uid",
                     "ksm_app_accessible": True,
-                    "gateway_name": "Lab GW Rocky",
+                    "gateway_name": "Example Gateway",
                     "gateway_uid": "gw-uid",
                     "status": "ONLINE",
                     "gateway_version": "1.7.6",
@@ -225,9 +225,9 @@ def test_pam_gateway_rows_parses_release_json_shape(monkeypatch: pytest.MonkeyPa
     rows = provider._pam_gateway_rows()
     assert rows == [
         {
-            "app_title": "Lab GW Application",
+            "app_title": "Example Gateway Application",
             "app_uid": "app-uid",
-            "gateway_name": "Lab GW Rocky",
+            "gateway_name": "Example Gateway",
             "gateway_uid": "gw-uid",
         }
     ]
@@ -250,7 +250,10 @@ def test_pam_config_rows_parses_release_json_shape(monkeypatch: pytest.MonkeyPat
                     "uid": "cfg-uid",
                     "config_name": "LW Gateway Configuration",
                     "config_type": "pamNetworkConfiguration",
-                    "shared_folder": {"name": "Lab GW Folder - Resources", "uid": "folder-uid"},
+                    "shared_folder": {
+                        "name": "Example Gateway Folder - Resources",
+                        "uid": "folder-uid",
+                    },
                     "gateway_uid": "gw-uid",
                     "resource_record_uids": [],
                 }
@@ -269,7 +272,7 @@ def test_pam_config_rows_parses_release_json_shape(monkeypatch: pytest.MonkeyPat
             "config_uid": "cfg-uid",
             "config_name": "LW Gateway Configuration",
             "gateway_uid": "gw-uid",
-            "shared_folder_title": "Lab GW Folder - Resources",
+            "shared_folder_title": "Example Gateway Folder - Resources",
             "shared_folder_uid": "folder-uid",
         }
     ]
