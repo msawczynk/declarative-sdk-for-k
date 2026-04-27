@@ -19,6 +19,7 @@ _STYLES = {
     ChangeKind.DELETE: "red",
     ChangeKind.CONFLICT: "bold red",
     ChangeKind.NOOP: "dim",
+    ChangeKind.SKIP: "dim",
 }
 
 
