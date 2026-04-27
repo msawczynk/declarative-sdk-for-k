@@ -40,8 +40,9 @@ Closed / classified:
 Latest #5 live proof (updated):
 
 - Code: post-apply smoke builds `CommanderCliProvider(..., manifest_source=<temp yaml>)`; `discover()` best-effort bootstraps in-process params when RBI records exist so TunnelDAG merge can populate `pam_settings.options` (`remote_browser_isolation` / session recording tri-states). Commander exposes the target URL as field `rbiUrl` while the manifest uses `url` — `discover` maps that so re-plan is not spuriously dirty on URL alone. Offline partial overlay diff remains in `tests/test_rbi_readback.py`.
-- **Still required for gate lift:** `python3 scripts/smoke/smoke.py … --scenario pamRemoteBrowser` showing **verify + re-plan exit 0** on a tenant where TunnelDAG is available; if verify fails, capture whether `CapabilityError` masked login or DAG had no graph.
-- Classification: **`preview-gated`** until that live matrix row is green end-to-end.
+- **Live smoke (2026-04-28, `main` @ `975c777`):** `python3 scripts/smoke/smoke.py --scenario pamRemoteBrowser --login-helper profile` with Acme-lab KSM + profile → **SMOKE PASSED** (exit 0) — create, post-apply re-plan clean, destroy. Fixes **URL** readback: Commander field `rbiUrl` is merged into `url` in `discover()`. Warnings: post-destroy shared-folder sweeps may log `CommandError` (non-fatal in that run).
+- **Still required to lift *schema* / DA “supported” (beyond green smoke):** add committed evidence under `docs/live-proof/` + bump `x-keeper-live-proof` on the family, and align `docs/COMMANDER.md` / `SDK_DA_COMPLETION_PLAN.md` Phase 3 field classification with maintainer review (issue **#5**).
+- Classification: **implementation proven in lab smoke**; **product/doc gate** for `supported` remains per DA table until evidence + doc alignment land.
 
 ## Definition Of Complete
 

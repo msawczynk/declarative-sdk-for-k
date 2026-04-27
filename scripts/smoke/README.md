@@ -2,7 +2,7 @@
 
 This smoke is an autonomous, no-human-input harness for proving the SDK against a live Keeper tenant through Commander CLI 17.x, while honoring the current "no DAG writes" moratorium by routing all tenant mutations through Commander rather than direct `keeper_dag` writes. Profile-backed KSM/helper auth and the public `EnvLoginHelper` path are wired into the same plan -> apply -> verify -> destroy harness.
 
-The `pamRemoteBrowser` and `pamUserNestedRotation` scenarios are proof harnesses, not support claims for Issues #5 and #4. A 2026-04-25 `pamRemoteBrowser` live run created records and cleanup passed, but verification failed because Commander `pam rbi edit --remote-browser-isolation` writes DAG `allowedSettings.connections`, which current `discover()` does not read back as manifest-shaped `pam_settings.options.remote_browser_isolation`. Nested rotation now reaches apply and marker verification after `pam rotation edit`, but the follow-up plan still reports updates for the nested user and parent machine; keep the preview/experimental gates until readback/drift semantics are clean. **Pre-merge contract:** `docs/SDK_DA_COMPLETION_PLAN.md` § Phase 0 — do not lift preview gates without parent-reviewed live proof per that plan.
+The `pamRemoteBrowser` and `pamUserNestedRotation` scenarios are proof harnesses, not automatic support claims for Issues #5 and #4. **RBI (2026-04-28):** Acme-lab `pamRemoteBrowser` smoke **SMOKE PASSED** (create → post-apply re-plan clean → destroy) after `discover()` maps Commander field `rbiUrl` to manifest `url` (`docs/SDK_COMPLETION_PLAN` § issue #5). In-process TunnelDAG merge still backfills `pam_settings.options` tri-states for verification when the graph is available. **Rotation:** nested `pamUserNestedRotation` reaches apply and marker verification after `pam rotation edit`, but the follow-up plan can still show updates; keep the preview/experimental gates per `docs/SDK_DA_COMPLETION_PLAN.md` until that readback is clean. **Pre-merge contract:** do not lift preview gates in schema/docs without parent-reviewed live proof and DA alignment.
 
 ## Prerequisites
 
@@ -53,7 +53,7 @@ round-trip.
 | `pamMachine` | supported | Default two-host Linux machine cycle. |
 | `pamDatabase` | supported | Postgres cycle. |
 | `pamDirectory` | supported | OpenLDAP cycle. |
-| `pamRemoteBrowser` | experimental proof | Issue #5 RBI readback gap remains. |
+| `pamRemoteBrowser` | lab smoke green (2026-04-28) | Full “supported” gate still #5 + `docs/live-proof` + DA alignment. |
 | `pamUserNested` | supported nested shape | Machine with `resources[].users[]`; not standalone top-level user support. |
 | `pamUserNestedRotation` | experimental preview | Requires `DSK_PREVIEW` plus `DSK_EXPERIMENTAL_ROTATION_APPLY`; Issue #4 drift gap remains. |
 

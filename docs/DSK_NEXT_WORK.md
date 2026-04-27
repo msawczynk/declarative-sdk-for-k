@@ -21,7 +21,7 @@ implementation is at the wheel.
 
 | Focus | What “done” needs | Next command / doc |
 |-------|-------------------|-------------------|
-| **P3 — `pamRemoteBrowser` / RBI** | Live tenant: **verify + re-plan clean** (preview-gated until then) | [`docs/LIVE_TEST_RUNBOOK.md`](./LIVE_TEST_RUNBOOK.md), [`scripts/smoke/README.md`](../scripts/smoke/README.md) — `python3 scripts/smoke/smoke.py --scenario pamRemoteBrowser` with profile + KSM; see [`SDK_COMPLETION_PLAN.md`](./SDK_COMPLETION_PLAN.md) open issue #5 / RECONCILIATION |
+| **P3 — `pamRemoteBrowser` / RBI** | Lab: **smoke green** (2026-04-28). **Lift “supported”:** `docs/live-proof` + `x-keeper` + #5 / DA | Same commands; see [`SDK_COMPLETION_PLAN.md`](./SDK_COMPLETION_PLAN.md) issue #5 (live proof + remaining doc gate) |
 | **P2.1 — nested `pamUser` rotation** | Clean re-plan + destroy on parent-run live smoke | `scripts/smoke/README.md` (`pamUserNestedRotation` / preview flags) |
 | **KSM** — bootstrap + `KsmLoginHelper` live | End-to-end live loop in DA table | `pytest` live tests in [`docs/LIVE_TEST_RUNBOOK.md`](./LIVE_TEST_RUNBOOK.md); `tests/live/` |
 | **Vault L1, MSP, etc.** | Per DA classification — separate matrix | `SDK_DA` rows; not PAM-bar unless stated |
