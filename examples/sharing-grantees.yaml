@@ -1,0 +1,61 @@
+schema: keeper-vault-sharing.v1
+
+# Shared-folder grants demonstrating user, team, record, and default share rows.
+#
+# Run:
+#   dsk validate examples/sharing-grantees.yaml
+#   dsk plan     examples/sharing-grantees.yaml --provider mock --json
+
+shared_folders:
+  - uid_ref: sf.platform
+    path: /Shared/Platform
+    defaults:
+      manage_users: false
+      manage_records: true
+      can_edit: true
+      can_share: false
+
+share_records:
+  - uid_ref: share.record.admin.alice
+    record_uid_ref: keeper-vault:records:rec.login.web-admin
+    user_email: alice@example.com
+    permissions:
+      can_edit: false
+      can_share: false
+
+share_folders:
+  - kind: grantee
+    uid_ref: sf.platform.user.alice
+    shared_folder_uid_ref: keeper-vault-sharing:shared_folders:sf.platform
+    grantee:
+      kind: user
+      user_email: alice@example.com
+    permissions:
+      manage_records: true
+      manage_users: false
+
+  - kind: grantee
+    uid_ref: sf.platform.team.ops
+    shared_folder_uid_ref: keeper-vault-sharing:shared_folders:sf.platform
+    grantee:
+      kind: team
+      team_uid_ref: keeper-enterprise:teams:team.ops
+    permissions:
+      manage_records: true
+      manage_users: true
+
+  - kind: record
+    uid_ref: sf.platform.record.web-admin
+    shared_folder_uid_ref: keeper-vault-sharing:shared_folders:sf.platform
+    record_uid_ref: keeper-vault:records:rec.login.web-admin
+    permissions:
+      can_edit: true
+      can_share: false
+
+  - kind: default
+    uid_ref: sf.platform.default.grantee
+    shared_folder_uid_ref: keeper-vault-sharing:shared_folders:sf.platform
+    target: grantee
+    permissions:
+      manage_records: true
+      manage_users: false

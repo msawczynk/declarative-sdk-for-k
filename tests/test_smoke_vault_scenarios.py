@@ -162,9 +162,7 @@ def test_smoke_family_dispatch_writes_vault_manifests() -> None:
         try:
             manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
             empty = yaml.safe_load(empty_path.read_text(encoding="utf-8"))
-            same_stem_empty = yaml.safe_load(
-                same_stem_empty_path.read_text(encoding="utf-8")
-            )
+            same_stem_empty = yaml.safe_load(same_stem_empty_path.read_text(encoding="utf-8"))
         finally:
             manifest_path.unlink(missing_ok=True)
             empty_path.unlink(missing_ok=True)

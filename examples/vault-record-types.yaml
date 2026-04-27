@@ -1,0 +1,40 @@
+schema: keeper-vault.v1
+
+# Custom record-type definitions. These are schema-validated offline; provider
+# lifecycle coverage for record_types[] is intentionally separate from login L1.
+#
+# Run:
+#   dsk validate examples/vault-record-types.yaml
+
+record_types:
+  - uid_ref: rt.service-account
+    scope: enterprise
+    record_type_id: 3001001
+    content:
+      $id: serviceAccount
+      categories: ["login"]
+      description: "Service account credential"
+      fields:
+        - $ref: login
+          label: Username
+          required: true
+        - $ref: password
+          label: Password
+          required: true
+        - $ref: host
+          label: Endpoint
+
+  - uid_ref: rt.break-glass-admin
+    scope: enterprise
+    record_type_id: 3001002
+    content:
+      $id: breakGlassAdmin
+      categories: ["login", "admin"]
+      description: "Emergency access credential"
+      fields:
+        - $ref: login
+          required: true
+        - $ref: password
+          required: true
+        - $ref: securityQuestion
+          label: Recovery Question
