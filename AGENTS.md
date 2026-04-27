@@ -137,6 +137,12 @@ single one-shot probes, harness-self-modification, and tasks whose spec format
 genuinely cannot be captured (escalate the last; the spec format may need
 extension).
 
+**Git handoff without `git push` on this host:** if `main` is ahead of
+`origin/main` but the environment cannot authenticate to GitHub, create a
+`git bundle` with
+`bash scripts/phase_harness/bundle_unpushed_commits.sh` and apply it on a
+clone that can push; see [`scripts/phase_harness/README.md`](./scripts/phase_harness/README.md).
+
 ## Where “orchestration” lives (reconciles in-repo vs workspace)
 
 | Layer | What it is | Canonical location |
