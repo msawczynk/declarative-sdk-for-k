@@ -538,10 +538,16 @@ def test_redeem_one_time_token_requires_ksm_core(
 ) -> None:
     original_import = builtins.__import__
 
-    def fail_ksm_import(name: str, *args: object, **kwargs: object) -> object:
+    def fail_ksm_import(
+        name: str,
+        globals: dict[str, object] | None = None,
+        locals: dict[str, object] | None = None,
+        fromlist: tuple[str, ...] = (),
+        level: int = 0,
+    ) -> object:
         if name.startswith("keeper_secrets_manager_core"):
             raise ImportError("missing ksm core")
-        return original_import(name, *args, **kwargs)
+        return original_import(name, globals, locals, fromlist, level)
 
     monkeypatch.setattr(builtins, "__import__", fail_ksm_import)
 

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -25,6 +25,7 @@ from keeper_sdk.core.diff import compute_diff  # noqa: E402
 from keeper_sdk.core.errors import SchemaError  # noqa: E402
 from keeper_sdk.core.graph import build_graph, execution_order  # noqa: E402
 from keeper_sdk.core.manifest import load_manifest  # noqa: E402
+from keeper_sdk.core.models import PamMachine  # noqa: E402
 from keeper_sdk.core.normalize import to_pam_import_json  # noqa: E402
 from keeper_sdk.core.planner import build_plan  # noqa: E402
 from keeper_sdk.core.schema import validate_manifest  # noqa: E402
@@ -160,12 +161,13 @@ def test_pamuser_nested_scenario_exercises_full_offline_path(tmp_path: Path) -> 
     path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
 
     manifest = load_manifest(path)
-    assert manifest.resources[0].users[0].type == "pamUser"
+    resource = cast(PamMachine, manifest.resources[0])
+    assert resource.users[0].type == "pamUser"
     assert manifest.iter_all_users()[0].title == "sdk-smoke-pam-user-1"
 
     order = execution_order(build_graph(manifest))
-    host_ref = manifest.resources[0].uid_ref
-    user_ref = manifest.resources[0].users[0].uid_ref
+    host_ref = resource.uid_ref
+    user_ref = resource.users[0].uid_ref
     assert user_ref and host_ref
     assert order.index(host_ref) < order.index(user_ref)
     changes = compute_diff(manifest, [], allow_delete=True)
@@ -202,7 +204,7 @@ def test_pamuser_nested_rotation_scenario_is_preview_only_offline(
 
     monkeypatch.setenv("DSK_PREVIEW", "1")
     manifest = load_manifest(path)
-    resource = manifest.resources[0]
+    resource = cast(PamMachine, manifest.resources[0])
     assert resource.pam_settings is not None
     assert resource.pam_settings.connection is not None
     assert (

@@ -8,6 +8,7 @@ import subprocess
 import sys
 import types
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -595,7 +596,7 @@ def test_run_cmd_falls_back_to_subprocess_for_ls_get_without_login_config(
     seen_argv: list[list[str]] = []
 
     def fake_run(*args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
-        argv = list(args[0]) if args else []
+        argv = list(cast(list[str], args[0])) if args else []
         seen_argv.append(argv)
         return subprocess.CompletedProcess(argv, 0, stdout="[]", stderr="")
 
@@ -1625,7 +1626,7 @@ def test_apply_rotation_missing_live_ref_becomes_capability_error(
 
     assert "cannot apply resources[].users[].rotation_settings" in exc_info.value.reason
     assert "missing live nested pamUser" in exc_info.value.reason
-    assert "pam project import/extend created" in exc_info.value.next_action
+    assert "pam project import/extend created" in cast(str, exc_info.value.next_action)
 
 
 def test_discover_requires_folder_uid(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -3234,7 +3235,7 @@ def test_write_marker_refreshes_session_once_on_message_fallback(
 
     class _FakeTypedRecord:
         def __init__(self) -> None:
-            self.custom: list[object] = []
+            self.custom: list[Any] = []
 
     class _FakeKeeperRecord:
         @staticmethod
@@ -3633,7 +3634,7 @@ def test_vault_discover_keeps_login_records_only(monkeypatch: pytest.MonkeyPatch
         {"type": "record", "uid": "u-login", "details": "Type: login"},
         {"type": "record", "uid": "u-host", "details": "Type: pamMachine"},
     ]
-    get_payloads = {
+    get_payloads: dict[str, object] = {
         "u-login": {"type": "login", "title": "L", "record_uid": "u-login", "fields": []},
         "u-host": {"type": "pamMachine", "title": "H", "record_uid": "u-host", "fields": []},
     }

@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import pytest
 
 from keeper_sdk.core.errors import SchemaError
 from keeper_sdk.core.manifest import load_declarative_manifest_string
 from keeper_sdk.core.vault_models import (
     VAULT_FAMILY,
+    VaultManifestV1,
     VaultRecord,
     load_vault_manifest,
 )
@@ -61,6 +64,6 @@ def test_vault_record_model_direct() -> None:
 
 def test_load_declarative_manifest_string_vault() -> None:
     raw = '{"schema": "keeper-vault.v1", "records": []}'
-    m = load_declarative_manifest_string(raw, suffix=".json")
+    m = cast(VaultManifestV1, load_declarative_manifest_string(raw, suffix=".json"))
     assert m.vault_schema == VAULT_FAMILY
     assert m.records == []

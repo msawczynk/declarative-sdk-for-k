@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
@@ -101,7 +101,7 @@ def test_ksm_rotation_mid_apply_does_not_invalidate_session(
         provider.apply_plan(plan)
 
     assert len(calls) == 1
-    assert "re-login" in exc_info.value.next_action
+    assert "re-login" in cast(str, exc_info.value.next_action)
     assert exc_info.value.context == {"stderr": "session expired"}
 
 
