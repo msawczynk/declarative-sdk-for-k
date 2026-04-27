@@ -1,0 +1,13 @@
+schema: msp-environment.v1
+name: acme-msp-lab
+manager: keeper-msp-declarative
+managed_companies:
+  - name: "Acme Widgets MC"
+    plan: business
+    seats: 25
+    file_plan: storage_100gb
+    addons:
+      - name: secure_addon_chat
+        seats: 25
+      - name: secure_addon_compliance
+        seats: 5

@@ -1,0 +1,3 @@
+schema: msp-environment.v1
+name: msp-minimal-lab
+managed_companies: []
