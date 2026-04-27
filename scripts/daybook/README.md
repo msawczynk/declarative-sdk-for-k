@@ -15,6 +15,12 @@ rows. The daybook harness is **agent continuity and merge discipline**; run it i
 separate step from dsk work, and still run live tests when you change provider,
 planner, or anything that touches real Commander behavior.
 
+**Creds vs no creds (not “parent only”):** `AGENTS.md` and `LIVE_TEST_RUNBOOK.md`
+allow **any** agent or human on a host with the lab policy + KSM/Commander to run
+the **committed** live harnesses. A **credless** CI or default-offline worker must
+not ad hoc hit the tenant — that is a **missing credential** rule, not “only one
+agent type” may go live.
+
 ## Commands (from repository root)
 
 | Action | Command |

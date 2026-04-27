@@ -16,6 +16,7 @@ contract.
 | `live-proof/README.md` | operator / integrator | Sanitized transcript naming, redaction bar, L1 checklist, **V8 prep** template pointer; `keeper-vault.v1.sanitized.template.json` (shape-only, `template: true`). CI `schema-validate` runs `json.tool` on `docs/live-proof/*.json`. |
 | `SDK_DA_COMPLETION_PLAN.md` | maintainer | **Devil's-advocate** completion gates. `supported`/`preview-gated`/`upstream-gap`. Wins over wish-list roadmaps. |
 | `SDK_COMPLETION_PLAN.md` | maintainer | Long-form roadmap + risk gates (companion to DA plan). |
+| `DSK_NEXT_WORK.md` | maintainer / agent | In-repo **product** priority queue (live gates, `phase_harness`, pointers). Not daybook. |
 | `RELEASING.md` | maintainer | Release ritual. **GitHub-only**, no PyPI. |
 | `ISSUE_6_JIT_SUPPORT_BOUNDARY.md` | maintainer | JIT apply boundary against pinned Commander; no safe writer → `upstream-gap`. |
 | `ISSUE_7_GATEWAY_CREATE_PROJECTS_DESIGN.md` | maintainer | Gateway `mode: create` + top-level `projects[]` design boundary. |

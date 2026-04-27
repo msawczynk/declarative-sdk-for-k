@@ -137,6 +137,9 @@ Operator-side tooling is not part of this SDK and is not documented here.
 
 ## How to use this file (for agents)
 
+0. For an **ordered product queue** (P3, P2.1, KSM, live vs local gates), see
+   [`docs/DSK_NEXT_WORK.md`](./docs/DSK_NEXT_WORK.md) — it summarizes this file +
+   completion plans; it is not a second contract.
 1. Read this file to know what's open vs shipped vs deferred — **before** proposing new features.
 2. Cross-link from PR descriptions when closing a row.
 3. When closing a row, update **both** this file AND the source-of-truth (`V1_GA_CHECKLIST.md` or `docs/SDK_DA_COMPLETION_PLAN.md`) — never just this one.

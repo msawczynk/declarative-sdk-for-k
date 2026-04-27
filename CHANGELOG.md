@@ -12,6 +12,10 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   without raising); skip the call when patch yields no net change.
 
 ### Changed
+- **Docs — live access (any credentialed agent)** — [`docs/LIVE_TEST_RUNBOOK.md`](docs/LIVE_TEST_RUNBOOK.md),
+  [`AGENTS.md`](AGENTS.md) **Autonomous execution**, [`docs/DSK_NEXT_WORK.md`](docs/DSK_NEXT_WORK.md),
+  [`scripts/daybook/README.md`](scripts/daybook/README.md) — not “primary only”;
+  bar is KSM/Commander in effect, not agent kind; credless CI/sandbox must not ad hoc.
 - **Docs — vault L1 contracts** — [`docs/VAULT_L1_DESIGN.md`](docs/VAULT_L1_DESIGN.md) §4;
   [`docs/VALIDATION_STAGES.md`](docs/VALIDATION_STAGES.md) (operator caveats + remediation);
   [`AGENTS.md`](AGENTS.md) (vault paragraph after `validate` pointer);
@@ -31,6 +35,10 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 - **Docs** — [`AGENTS.md`](AGENTS.md): playbook **§E** — programmatic `load_manifest` vs `load_declarative_manifest` for vault L1. [`docs/SCAFFOLD.md`](docs/SCAFFOLD.md): “Where to land” row cites §E.
 
 ### Added
+- **Docs — `DSK_NEXT_WORK.md`** — in-repo **product** orchestration queue (P3 / P2.1 / KSM
+  priorities, `run_local_gates.sh`, `phase_runner` + `scripts/phase_harness/` pointer;
+  live runbook; explicitly not daybook). Indexed from [`AGENTS.md`](AGENTS.md) and
+  [`RECONCILIATION.md`](RECONCILIATION.md).
 - **Scripts — daybook harness** — [`scripts/daybook/README.md`](scripts/daybook/README.md):
   `harness.sh` forwards to `~/.cursor-daybook-sync` (boot, `doctor`, sync, append, …);
   canonical JOURNAL/LESSONS are **not** stored in this repo. Tests:

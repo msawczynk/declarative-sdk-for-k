@@ -1,8 +1,22 @@
 # LIVE_TEST_RUNBOOK
 
-**Audience:** project maintainer (parent agent / human) — workers MUST NOT
-attempt live runs because they don't have credentials and can't prompt
-for them.
+**Who may run live (Keeper / Commander on a tenant):**
+
+- **Any** maintainer, human, or **LLM agent** (Composer, subagent, Codex, etc.) **may**
+  run live against the lab tenant when this runbook is followed and the host has
+  a valid KSM/Commander credential path (see `ksm_login_preflight`, profile/env). It
+  is **not** limited to a “primary” or “parent” session — the discriminant is
+  **whether creds and policy are in effect**, not agent *kind*.
+- The lab tenant is a **developer sandbox**; use the committed harnesses only
+  (`scripts/smoke/smoke.py`, `pytest tests/live/…` with `KEEPER_LIVE_TENANT=1` per
+  this runbook). Matches [`AGENTS.md`](../AGENTS.md) **Autonomous execution**.
+- **Not** a blanket “agents have no access”: the gap is **no credential path**, not
+  “not primary.”
+- **Sessions that do not** receive KSM/Commander (typical: CI, default Codex
+  offline sandbox, Task without env) **MUST NOT** be pointed at ad hoc `keeper` /
+  tenant mutation. If a **worker** is to run live, the operator must pass the same
+  env and network as a human (e.g. `codex_live` / explicit cred injection) — still
+  via the **committed** harness, not ad hoc.
 
 ## Why this exists
 

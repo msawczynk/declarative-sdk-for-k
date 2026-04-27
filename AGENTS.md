@@ -94,9 +94,17 @@ records before `apply`. Read the **Vault — operator caveats** section in
 
 ## Autonomous execution
 
-Live tenant access is granted via the project's standing operator policy; use
-the committed live-smoke harness (`scripts/smoke/smoke.py`) and do not echo
-secrets in any output.
+**Live tenant (lab / dev sandbox) access** is in scope for **any** agent or
+human on a machine with the **standing operator policy** and a valid KSM /
+Commander credential path: run the **committed** live-smoke harness
+(`scripts/smoke/smoke.py`) and opt-in `tests/live/` tests per
+[`docs/LIVE_TEST_RUNBOOK.md`](./docs/LIVE_TEST_RUNBOOK.md) — not ad hoc
+Commander one-offs. There is **no** “only the primary model may touch live”
+rule: Composer, a Task subagent, or Codex are equally allowed **when** they
+receive the same env and follow the runbook. Sessions **without** injected
+credentials (default CI, offline Codex) must not ad hoc mutate the tenant — that
+is a **missing-cred** bar, not an agent *kind* bar. Do not echo secrets in any
+output.
 
 ## Phase runner harness (workspace-global, default for multi-step phases)
 
@@ -133,7 +141,7 @@ extension).
 
 | Layer | What it is | Canonical location |
 |-------|------------|-------------------|
-| **Product roadmap + honest gates** | PAM/vault/MSP scope, support labels, live-proof requirements | In-repo: [`docs/SDK_COMPLETION_PLAN.md`](./docs/SDK_COMPLETION_PLAN.md), [`docs/SDK_DA_COMPLETION_PLAN.md`](./docs/SDK_DA_COMPLETION_PLAN.md), [`docs/V2_DECISIONS.md`](./docs/V2_DECISIONS.md), [`RECONCILIATION.md`](./RECONCILIATION.md) |
+| **Product roadmap + honest gates** | PAM/vault/MSP scope, support labels, live-proof requirements | In-repo: [`docs/SDK_COMPLETION_PLAN.md`](./docs/SDK_COMPLETION_PLAN.md), [`docs/SDK_DA_COMPLETION_PLAN.md`](./docs/SDK_DA_COMPLETION_PLAN.md), [`docs/V2_DECISIONS.md`](./docs/V2_DECISIONS.md), [`RECONCILIATION.md`](./RECONCILIATION.md); **short next-work queue:** [`docs/DSK_NEXT_WORK.md`](./docs/DSK_NEXT_WORK.md) |
 | **Multi-step worker phases** | YAML spec + gates + commit/JOURNAL drafts; **not** a second harness inside this tree | `bash ~/.cursor-daybook-sync/scripts/phase_runner.sh /path/to/phase-spec.yaml` (see section above) |
 | **Sprint memos, Codex prompt bodies, per-session runbooks, daybook excerpts** | Operator coordination; **forbidden** under `docs/` here (see scope-fence) | `~/.cursor-daybook-sync/docs/orchestration/dsk/` |
 | **Style / cost / daybook loop** | Preamble, caveman, token-economy, boot scripts | `~/.cursor-daybook-sync/scripts/`, `~/.cursor/skills/AGENT_PREAMBLE.md` (paths in your rules stack) |

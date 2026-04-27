@@ -14,7 +14,7 @@ Agent-first Python SDK + CLI (`dsk`) for deterministic `validate -> plan -> appl
 | `keeper_sdk/auth/` | [`keeper_sdk/auth/SCAFFOLD.md`](./keeper_sdk/auth/SCAFFOLD.md) | `EnvLoginHelper` + helper-protocol contract |
 | `keeper_sdk/secrets/` | [`keeper_sdk/secrets/SCAFFOLD.md`](./keeper_sdk/secrets/SCAFFOLD.md) | KSM bootstrap + `ksm` reader + bus skeleton |
 | `tests/` | [`tests/SCAFFOLD.md`](./tests/SCAFFOLD.md) | Per-test-file inventory + where to land new tests |
-| `docs/` | [`docs/SCAFFOLD.md`](./docs/SCAFFOLD.md) | Doc inventory + audience + ownership |
+| `docs/` | [`docs/SCAFFOLD.md`](./docs/SCAFFOLD.md) | Doc inventory + audience + ownership; product queue: [`DSK_NEXT_WORK.md`](./docs/DSK_NEXT_WORK.md) |
 | `scripts/` | [`scripts/SCAFFOLD.md`](./scripts/SCAFFOLD.md) | Smoke, daybook harness (forwarder), phase_harness, sync — top-level map |
 | `scripts/daybook/` | [`scripts/daybook/SCAFFOLD.md`](./scripts/daybook/SCAFFOLD.md) | `harness.sh` → `~/.cursor-daybook-sync`; tests in `tests/test_daybook_harness.py` |
 | `scripts/smoke/` | [`scripts/smoke/SCAFFOLD.md`](./scripts/smoke/SCAFFOLD.md) | Live-smoke harness + scenario registry |
@@ -56,6 +56,7 @@ Tree snapshot: refresh when layout shifts; exact commit: `git rev-parse HEAD`. D
 │   ├── RELEASING.md                        # Maintainer release ritual (GitHub-only; no PyPI).
 │   ├── SDK_DA_COMPLETION_PLAN.md           # Devil's-advocate completion gates, phases, and stop conditions.
 │   ├── SDK_COMPLETION_PLAN.md              # Roadmap and risk gates for completing SDK support.
+│   ├── DSK_NEXT_WORK.md                    # In-repo product priority queue (live + phase harness pointers).
 │   ├── VALIDATION_STAGES.md                # Stage-by-stage `validate --online` contract.
 │   ├── capability-snapshot.json            # Machine-readable mirror consumed by drift-check CI.
 │   └── …                                   # KSM / vault / sharing / MSP / V2 / live-proof — `docs/SCAFFOLD.md`.
