@@ -13,7 +13,7 @@ Main branch as of 2026-04-27:
 - `v1.0.0` GitHub release exists.
 - **Distribution is GitHub only** (no PyPI): `publish.yml` attaches `dist/*` to
   each GitHub Release; install via git URL or downloaded wheel per `docs/RELEASING.md`.
-- Local/core checks: **954 passed** on current `main` (re-run
+- Local/core checks: **955 passed** on current `main` (re-run
   with `python3 -m pytest -q && python3 -m ruff check . && python3 -m ruff format --check . && python3 -m mypy keeper_sdk && python3 -m build && python3 -m twine check dist/*`),
   ruff, format, mypy, build/twine clean. CI is green across lint, mypy,
   py3.11/3.12/3.13 tests, examples, drift-check, and build.
@@ -39,7 +39,7 @@ Closed / classified:
 
 Latest #5 live proof (updated):
 
-- Code: post-apply smoke builds `CommanderCliProvider(..., manifest_source=<temp yaml>)`; `discover()` best-effort bootstraps in-process params when RBI records exist so TunnelDAG merge can populate `pam_settings.options` (`remote_browser_isolation` / session recording tri-states). Offline partial overlay diff remains in `tests/test_rbi_readback.py`.
+- Code: post-apply smoke builds `CommanderCliProvider(..., manifest_source=<temp yaml>)`; `discover()` best-effort bootstraps in-process params when RBI records exist so TunnelDAG merge can populate `pam_settings.options` (`remote_browser_isolation` / session recording tri-states). Commander exposes the target URL as field `rbiUrl` while the manifest uses `url` — `discover` maps that so re-plan is not spuriously dirty on URL alone. Offline partial overlay diff remains in `tests/test_rbi_readback.py`.
 - **Still required for gate lift:** `python3 scripts/smoke/smoke.py … --scenario pamRemoteBrowser` showing **verify + re-plan exit 0** on a tenant where TunnelDAG is available; if verify fails, capture whether `CapabilityError` masked login or DAG had no graph.
 - Classification: **`preview-gated`** until that live matrix row is green end-to-end.
 

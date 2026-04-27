@@ -175,6 +175,24 @@ def _entry_uid_by_name(entries: Any, name: str) -> str | None:
 _TYPED_FIELD_SINGLE_OBJECT = frozenset({"pamRemoteBrowserSettings"})
 
 
+def _coalesce_pam_remote_browser_url(payload: dict[str, Any]) -> None:
+    """Map Commander's ``rbiUrl`` field onto manifest ``url``.
+
+    `keeper get` exposes the RBI target as field type ``rbiUrl``; the
+    declarative schema uses top-level ``url``. Without this, post-apply
+    discover/plan reports ``url: null`` vs the manifest and live smoke
+    never reaches a clean re-plan.
+    """
+    current = payload.get("url")
+    if isinstance(current, str) and current.strip():
+        return
+    alt = payload.get("rbiUrl")
+    if isinstance(alt, str) and alt.strip():
+        payload["url"] = alt.strip()
+    elif isinstance(alt, list) and alt and isinstance(alt[0], str) and alt[0].strip():
+        payload["url"] = alt[0].strip()
+
+
 def _merge_pam_remote_browser_from_get_payload(payload: dict[str, Any]) -> None:
     """Lift Commander typed ``pamRemoteBrowserSettings`` into manifest ``pam_settings`` shape."""
     rbs = payload.pop("pamRemoteBrowserSettings", None)
@@ -248,6 +266,7 @@ def _record_from_get(item: dict[str, Any], *, listing_entry: dict[str, Any]) -> 
 
     if resource_type == "pamRemoteBrowser":
         _merge_pam_remote_browser_from_get_payload(payload)
+        _coalesce_pam_remote_browser_url(payload)
 
     marker_raw = _extract_marker_field(item)
     marker = decode_marker(marker_raw)

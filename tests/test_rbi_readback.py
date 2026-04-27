@@ -47,6 +47,39 @@ def test_record_from_get_merges_pam_remote_browser_settings() -> None:
     assert conn.get("allow_url_manipulation") is False
 
 
+def test_record_from_get_maps_rbi_url_field_to_url() -> None:
+    item = {
+        "record_uid": "abc22abc22abc22abc22",
+        "title": "rbi-1",
+        "type": "pamRemoteBrowser",
+        "fields": [
+            {
+                "type": "rbiUrl",
+                "value": ["https://example.com/app"],
+            },
+            {
+                "type": "pamRemoteBrowserSettings",
+                "value": [
+                    {
+                        "connection": {
+                            "protocol": "http",
+                        }
+                    }
+                ],
+            },
+        ],
+        "custom": [],
+    }
+    listing = {
+        "type": "record",
+        "uid": "abc22abc22abc22abc22",
+        "folder_uid": "folduid22folduid22folduid22",
+    }
+    rec = _record_from_get(item, listing_entry=listing)
+    assert rec is not None
+    assert rec.payload.get("url") == "https://example.com/app"
+
+
 def test_merge_rbi_dag_options_skips_default_and_empty() -> None:
     ps: dict = {"options": {"remote_browser_isolation": "on"}}
     _merge_rbi_dag_options_into_pam_settings(ps, connections="default", session_recording=None)
