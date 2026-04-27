@@ -38,6 +38,11 @@ def minimal_manifest_path(examples_dir: Path) -> Path:
 
 
 @pytest.fixture
+def pam_db_overlay_manifest_path(examples_dir: Path) -> Path:
+    return examples_dir / "diff-pamdb-overlay" / "environment.yaml"
+
+
+@pytest.fixture
 def full_local_manifest_path(examples_dir: Path) -> Path:
     return examples_dir / "full-local" / "environment.yaml"
 

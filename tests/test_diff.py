@@ -443,6 +443,51 @@ def test_diff_pam_machine_pam_settings_live_extra_options_is_noop(
     assert machine_change.kind is ChangeKind.NOOP
 
 
+def test_diff_pam_database_pam_settings_live_extra_options_is_noop(
+    pam_db_overlay_manifest_path: Path,
+) -> None:
+    """P2.1: ``pamDatabase.pam_settings`` must use the same overlay semantics as ``pamMachine``."""
+    manifest = load_manifest(pam_db_overlay_manifest_path)
+    assert isinstance(manifest, Manifest)
+    data = manifest.model_dump(mode="python", exclude_none=True)
+    cfg = next(c for c in data["pam_configurations"] if c["uid_ref"] == "acme-cfg")
+    database = next(r for r in data["resources"] if r["uid_ref"] == "acme-mysql-1")
+    live_settings = deepcopy(database["pam_settings"])
+    assert isinstance(live_settings, dict)
+    options = live_settings.get("options")
+    assert isinstance(options, dict)
+    options = {**options, "text_session_recording": "off", "ai_threat_detection": "off"}
+    live_settings["options"] = options
+    live_database = {**deepcopy(database), "pam_settings": live_settings}
+    live = [
+        LiveRecord(
+            keeper_uid="LIVE_CFG",
+            title=cfg.get("title") or "acme-cfg",
+            resource_type="pam_configuration",
+            payload=deepcopy(cfg),
+            marker=encode_marker(
+                uid_ref="acme-cfg",
+                manifest=manifest.name,
+                resource_type="pam_configuration",
+            ),
+        ),
+        LiveRecord(
+            keeper_uid="LIVE_DB",
+            title="mysql-1",
+            resource_type="pamDatabase",
+            payload=live_database,
+            marker=encode_marker(
+                uid_ref="acme-mysql-1",
+                manifest=manifest.name,
+                resource_type="pamDatabase",
+            ),
+        ),
+    ]
+    changes = compute_diff(manifest, live_records=live)
+    db_change = next(c for c in changes if c.uid_ref == "acme-mysql-1")
+    assert db_change.kind is ChangeKind.NOOP
+
+
 def test_diff_pam_user_rotation_same_cron_extra_schedule_keys_is_noop(
     minimal_manifest_path: Path,
 ) -> None:
