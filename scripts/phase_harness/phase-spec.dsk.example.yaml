@@ -1,0 +1,52 @@
+# Example phase spec for `~/.cursor-daybook-sync/scripts/phase_runner.sh`
+# (workspace-global harness — not duplicated in this repo).
+#
+# Copy and edit: sprint/phase/title, scope.*, context.*, prompt_body, gates.
+# Replace `repo_root` with your absolute clone path (or keep this one on this machine).
+#
+# Validate (preflight + prompt only):
+#   bash ~/.cursor-daybook-sync/scripts/phase_runner.sh --no-launch /path/to/your-spec.yaml
+#
+# Dry run:
+#   bash ~/.cursor-daybook-sync/scripts/phase_runner.sh --dry-run /path/to/your-spec.yaml
+#
+# Preflight requires: clean `git status` in the repo (no uncommitted work outside
+# the listed scope); see `phase_runner.README.md` in the daybook `scripts/templates/` dir.
+
+sprint: dsk
+phase: example-gates
+repo_root: "/Users/martin/Downloads/Cursor tests/declarative-sdk-for-k"
+title: "Example — worker runs local merge gates; scope is this README only (no-op worker)"
+builds_on_commit: ""
+scope:
+  new: []
+  modify:
+    - scripts/phase_harness/README.md
+    - scripts/phase_harness/run_local_gates.sh
+    - scripts/phase_harness/phase-spec.dsk.example.yaml
+    - AGENTS.md
+    - .cursorrules
+context:
+  read:
+    - AGENTS.md
+    - SCAFFOLD.md
+    - scripts/phase_harness/run_local_gates.sh
+  forbid:
+    - keeper_sdk/core/manifest.py
+gates:
+  worker:
+    - "bash scripts/phase_harness/run_local_gates.sh"
+  regression: []
+journal_close_template: phase_journal.md.tmpl
+prompt_body: |
+  This is a wiring smoke for the phase_runner: do NOT edit any files in scope unless
+  the parent explicitly asked for a doc change. If the worker gate (run_local_gates.sh)
+  is green, you are done — leave the tree unchanged and finish.
+  If gates fail, do not add hacks; return stderr summary only.
+out_of_scope: |
+  Any product code outside scripts/phase_harness/README.md for this example spec;
+  do not touch keeper_sdk/ or run live Commander.
+next_phase_hint: |
+  Replace scope.modify with your real slice (new + modify paths), set context.read/forbid
+  to real siblings, and split worker vs regression gates (narrow worker, wide regression).
+timeout_min: 60

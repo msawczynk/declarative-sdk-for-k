@@ -137,7 +137,7 @@ extension).
 | **Multi-step worker phases** | YAML spec + gates + commit/JOURNAL drafts; **not** a second harness inside this tree | `bash ~/.cursor-daybook-sync/scripts/phase_runner.sh /path/to/phase-spec.yaml` (see section above) |
 | **Sprint memos, Codex prompt bodies, per-session runbooks, daybook excerpts** | Operator coordination; **forbidden** under `docs/` here (see scope-fence) | `~/.cursor-daybook-sync/docs/orchestration/dsk/` |
 | **Style / cost / daybook loop** | Preamble, caveman, token-economy, boot scripts | `~/.cursor-daybook-sync/scripts/`, `~/.cursor/skills/AGENT_PREAMBLE.md` (paths in your rules stack) |
-| **Merge / release checks (this repo has no in-tree `phase0_gates.sh`)** | Maintainer-run | `ruff check .` · `ruff format --check .` · `mypy keeper_sdk` · `pytest` · (optional) `python -m build` + `twine check dist/*` |
+| **Merge / release checks (this repo has no in-tree `phase0_gates.sh`)** | Maintainer-run | **`bash scripts/phase_harness/run_local_gates.sh`** (ruff+format+mypy+pytest) or the same commands by hand; optional: `python -m build` + `twine check dist/*` |
 
 If an older doc or chat refers to `docs/ORCHESTRATION_*.md` **inside this repo**, that tree was **removed on purpose** (discipline: delivery repo vs orchestrator repo). Follow the table above instead of recreating those paths (CI will fail on new `docs/ORCHESTRATION_*` adds — `.github/workflows/scope-fence.yml`).
 
