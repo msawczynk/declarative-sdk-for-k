@@ -57,12 +57,11 @@ jobs:
       - run: pip install -e ".[dev]"
       # Coverage ratchet: baseline at 86% (commit 2026-04-26 post-Sprint-7h-5
       # cov slices for redact/schema/normalize landing at 100%, 315 tests).
-      # Floor 84% currently (Sprint 7h-41: total exact 84.75%, displayed 85%).
-      # Bump to 85 deferred to post-V6b sibling-diff merge — V6b adds ~36 tests
-      # for sharing.v1 sibling block diffs, expected to lift exact cov above
-      # 85.0%. WORKTREES.md §8 then closes. Raise the floor when adding
+      # Floor raised 84 -> 85 in Sprint 7h-41 V6c after V6b sibling-diff
+      # landing lifted exact cov to 85.47% (663+1 tests, 5583 stmts, 811
+      # missing). WORKTREES.md §8 closes. Raise the floor when adding
       # net-new tested surface; never lower it without rationale in JOURNAL.md.
-      - run: pytest -q --cov=keeper_sdk --cov-report=term-missing --cov-fail-under=84
+      - run: pytest -q --cov=keeper_sdk --cov-report=term-missing --cov-fail-under=85
         env:
           # Offline-only; live-smoke against a real tenant runs via
           # scripts/smoke/smoke.py in a separate, credential-bearing
