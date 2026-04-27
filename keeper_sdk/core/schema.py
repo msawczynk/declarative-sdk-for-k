@@ -19,6 +19,7 @@ from typing import Any
 from keeper_sdk.core.errors import SchemaError
 
 PAM_FAMILY = "pam-environment.v1"
+SHARING_FAMILY = "keeper-vault-sharing.v1"
 PAM_SCHEMA_FILENAME = "pam-environment.v1.schema.json"
 
 # Canonical registry: manifest ``schema:`` const -> path under keeper_sdk.core.schemas
@@ -37,7 +38,7 @@ SCHEMA_RESOURCE_BY_FAMILY: dict[str, str] = {
     "keeper-security-posture.v1": (
         "keeper-security-posture/keeper-security-posture.v1.schema.json"
     ),
-    "keeper-vault-sharing.v1": "keeper-vault-sharing/keeper-vault-sharing.v1.schema.json",
+    SHARING_FAMILY: "keeper-vault-sharing/keeper-vault-sharing.v1.schema.json",
     "keeper-vault.v1": "keeper-vault/keeper-vault.v1.schema.json",
 }
 
