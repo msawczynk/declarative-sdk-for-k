@@ -5,9 +5,11 @@
   "description": "Offline schema body for Keeper Vault folder and sharing ACL rows. Live tenant proof is still pending.",
   "x-keeper-live-proof": {
     "status": "scaffold-only",
-    "evidence": "docs/live-proof/README.md",
+    "evidence": [
+      "docs/live-proof/keeper-vault-sharing.v1.535e03f.folderlifecycle.sanitized.json"
+    ],
     "since_pin": "89047920a0df857e01fb59adcb0bfb9fa6db70bf",
-    "notes": "Offline diff support now covers folders plus sibling blocks: shared_folders, share_records, and share_folders. Live proof gate unchanged; evidence path is operator runbook until sanitized transcript is committed per docs/live-proof/README.md."
+    "notes": "V9a folder lifecycle landed; awaiting V9b record share lifecycle for status flip."
   },
   "type": "object",
   "required": ["schema"],

@@ -1,0 +1,184 @@
+{
+  "family": "keeper-vault-sharing.v1",
+  "scenario": "folderlifecycle",
+  "manifest_path": "/tmp/sharing-v9a-manifest-20260427080445.yaml",
+  "empty_manifest_path": "/tmp/sharing-v9a-empty-20260427080445.yaml",
+  "folder_uid": "<folder_uid>",
+  "grantee_email": "<email_sha256:a6534264>",
+  "grantee_email_sha256_8": "a6534264",
+  "events": [
+    {
+      "name": "validate",
+      "command": [
+        "/usr/local/bin/python3",
+        "-m",
+        "keeper_sdk.cli",
+        "--provider",
+        "commander",
+        "--folder-uid",
+        "<folder_uid>",
+        "validate",
+        "/tmp/sharing-v9a-manifest-20260427080445.yaml"
+      ],
+      "started_at": "2026-04-27T08:05:19.440002Z",
+      "finished_at": "2026-04-27T08:05:19.868674Z",
+      "exit_code": 0,
+      "stdout": "ok: keeper-vault-sharing.v1 (3 uid_refs); uid_ref graph + online stages skipped.\n",
+      "stderr": ""
+    },
+    {
+      "name": "plan_create",
+      "command": [
+        "/usr/local/bin/python3",
+        "-m",
+        "keeper_sdk.cli",
+        "--provider",
+        "commander",
+        "--folder-uid",
+        "<folder_uid>",
+        "plan",
+        "--json",
+        "/tmp/sharing-v9a-manifest-20260427080445.yaml"
+      ],
+      "started_at": "2026-04-27T08:05:19.869080Z",
+      "finished_at": "2026-04-27T08:05:35.071371Z",
+      "exit_code": 2,
+      "stdout": "\n\u280b Syncing...\n\u2819 Syncing...\n\u2839 Syncing...\n\u2838 Syncing...\n\u283c Syncing...\n\u2834 Syncing...\n\u2826 Syncing...\n\u2827 Syncing...\n\u2807 Syncing...\n            \n{\n  \"manifest_name\": \"sharing-v9a-manifest-20260427080445\",\n  \"summary\": {\n    \"create\": 3,\n    \"update\": 0,\n    \"delete\": 0,\n    \"conflict\": 0,\n    \"noop\": 0\n  },\n  \"order\": [\n    \"folder.v9a\",\n    \"sf.v9a\",\n    \"sf.v9a.grantee\"\n  ],\n  \"changes\": [\n    {\n      \"kind\": \"create\",\n      \"uid_ref\": \"folder.v9a\",\n      \"resource_type\": \"sharing_folder\",\n      \"title\": \"/dsk-v9a-20260427080445-user-folder\",\n      \"keeper_uid\": null,\n      \"before\": {},\n      \"after\": {\n        \"uid_ref\": \"folder.v9a\",\n        \"path\": \"/dsk-v9a-20260427080445-user-folder\",\n        \"color\": \"blue\",\n        \"marker\": {\n          \"manager\": \"keeper-pam-declarative\",\n          \"version\": \"1\",\n          \"uid_ref\": \"folder.v9a\",\n          \"manifest\": \"vault-sharing\",\n          \"resource_type\": \"sharing_folder\",\n          \"parent_uid_ref\": null,\n          \"first_applied_at\": \"2026-04-27T08:05:34Z\",\n          \"last_applied_at\": \"2026-04-27T08:05:34Z\",\n          \"applied_by\": \"commander/unknown\"\n        }\n      },\n      \"reason\": null\n    },\n    {\n      \"kind\": \"create\",\n      \"uid_ref\": \"sf.v9a\",\n      \"resource_type\": \"sharing_shared_folder\",\n      \"title\": \"/dsk-v9a-20260427080445-shared-folder\",\n      \"keeper_uid\": null,\n      \"before\": {},\n      \"after\": {\n        \"uid_ref\": \"sf.v9a\",\n        \"path\": \"/dsk-v9a-20260427080445-shared-folder\",\n        \"defaults\": {\n          \"manage_users\": false,\n          \"manage_records\": true,\n          \"can_edit\": true,\n          \"can_share\": false\n        },\n        \"name\": \"/dsk-v9a-20260427080445-shared-folder\",\n        \"default_manage_records\": true,\n        \"default_manage_users\": false,\n        \"default_can_edit\": true,\n        \"default_can_share\": false,\n        \"marker\": {\n          \"manager\": \"keeper-pam-declarative\",\n          \"version\": \"1\",\n          \"uid_ref\": \"sf.v9a\",\n          \"manifest\": \"vault-sharing\",\n          \"resource_type\": \"sharing_shared_folder\",\n          \"parent_uid_ref\": null,\n          \"first_applied_at\": \"2026-04-27T08:05:34Z\",\n          \"last_applied_at\": \"2026-04-27T08:05:34Z\",\n          \"applied_by\": \"commander/unknown\"\n        }\n      },\n      \"reason\": null\n    },\n    {\n      \"kind\": \"create\",\n      \"uid_ref\": \"sf.v9a.grantee\",\n      \"resource_type\": \"sharing_share_folder\",\n      \"title\": \"keeper-vault-sharing:shared_folders:sf.v9a:grantee:<email_sha256:a6534264>\",\n      \"keeper_uid\": null,\n      \"before\": {},\n      \"after\": {\n        \"kind\": \"grantee\",\n        \"uid_ref\": \"sf.v9a.grantee\",\n        \"shared_folder_uid_ref\": \"keeper-vault-sharing:shared_folders:sf.v9a\",\n        \"grantee\": {\n          \"kind\": \"user\",\n          \"user_email\": \"<email_sha256:a6534264>\"\n        },\n        \"permissions\": {\n          \"manage_records\": true,\n          \"manage_users\": false\n        },\n        \"manage_records\": true,\n        \"manage_users\": false,\n        \"user_email\": \"<email_sha256:a6534264>\",\n        \"marker\": {\n          \"manager\": \"keeper-pam-declarative\",\n          \"version\": \"1\",\n          \"uid_ref\": \"sf.v9a.grantee\",\n          \"manifest\": \"vault-sharing\",\n          \"resource_type\": \"sharing_share_folder\",\n          \"parent_uid_ref\": \"keeper-vault-sharing:shared_folders:sf.v9a\",\n          \"first_applied_at\": \"2026-04-27T08:05:34Z\",\n          \"last_applied_at\": \"2026-04-27T08:05:34Z\",\n          \"applied_by\": \"commander/unknown\"\n        }\n      },\n      \"reason\": null\n    }\n  ]\n}\n",
+      "stderr": "09:05:20 INFO deploy_watcher: Logging in as <admin_email> (device_token=True) ...\n09:05:20 INFO deploy_watcher: Waiting 12s for fresh TOTP window...\n09:05:32 INFO root: Logging in to Keeper as <admin_email>\nSuccessfully authenticated with Persistent Login\n09:05:34 INFO deploy_watcher: Logged in. Records: 59\n"
+    },
+    {
+      "name": "apply_create",
+      "command": [
+        "/usr/local/bin/python3",
+        "-m",
+        "keeper_sdk.cli",
+        "--provider",
+        "commander",
+        "--folder-uid",
+        "<folder_uid>",
+        "apply",
+        "--auto-approve",
+        "/tmp/sharing-v9a-manifest-20260427080445.yaml"
+      ],
+      "started_at": "2026-04-27T08:05:35.071794Z",
+      "finished_at": "2026-04-27T08:06:09.026260Z",
+      "exit_code": 0,
+      "stdout": "\n\u280b Syncing...\n\u2819 Syncing...\n\u2839 Syncing...\n\u2838 Syncing...\n\u283c Syncing...\n\u2834 Syncing...\n\u2826 Syncing...\n\u2827 Syncing...\n\u2807 Syncing...\n            \n                   Plan: sharing-v9a-manifest-20260427080445                    \n\u250f\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2533\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2533\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2533\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2533\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2533\u2501\u2501\u2501\u2501\u2501\u2501\u2513\n\u2503 Action \u2503 Type           \u2503 uid_ref        \u2503 Title         \u2503 Keeper UID \u2503 Note \u2503\n\u2521\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2547\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2547\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2547\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2547\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2547\u2501\u2501\u2501\u2501\u2501\u2501\u2529\n\u2502 create \u2502 sharing_folder \u2502 folder.v9a     \u2502 /dsk-v9a-202\u2026 \u2502 -          \u2502      \u2502\n\u2502 create \u2502 sharing_share\u2026 \u2502 sf.v9a         \u2502 /dsk-v9a-202\u2026 \u2502 -          \u2502      \u2502\n\u2502 create \u2502 sharing_share\u2026 \u2502 sf.v9a.grantee \u2502 keeper-vault\u2026 \u2502 -          \u2502      \u2502\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n+3 create, ~0 update, -0 delete, !0 conflict, \u00b70 noop\n\n                                 Apply results                                  \n\u250f\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2533\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2533\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2533\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2513\n\u2503 Action \u2503 uid_ref        \u2503 Keeper UID              \u2503 Details                  \u2503\n\u2521\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2547\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2547\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2547\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2529\n\u2502 create \u2502 folder.v9a     \u2502 <uid>  \u2502 marker_sidecar_written=\u2026 \u2502\n\u2502 create \u2502 sf.v9a         \u2502 <uid>  \u2502 marker_sidecar_written=\u2026 \u2502\n\u2502 create \u2502 sf.v9a.grantee \u2502 keeper-vault-sharing:s\u2026 \u2502 marker_sidecar_written=\u2026 \u2502\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n\n",
+      "stderr": "09:05:35 INFO deploy_watcher: Logging in as <admin_email> (device_token=True) ...\n09:05:35 INFO root: Logging in to Keeper as <admin_email>\nSuccessfully authenticated with Persistent Login\n09:05:37 INFO deploy_watcher: Logged in. Records: 59\n"
+    },
+    {
+      "name": "rediscover_replan",
+      "command": [
+        "/usr/local/bin/python3",
+        "-m",
+        "keeper_sdk.cli",
+        "--provider",
+        "commander",
+        "--folder-uid",
+        "<folder_uid>",
+        "plan",
+        "--json",
+        "/tmp/sharing-v9a-manifest-20260427080445.yaml"
+      ],
+      "started_at": "2026-04-27T08:06:09.026648Z",
+      "finished_at": "2026-04-27T08:06:17.175479Z",
+      "exit_code": 0,
+      "stdout": "\n\u280b Syncing...\n\u2819 Syncing...\n\u2839 Syncing...\n\u2838 Syncing...\n\u283c Syncing...\n\u2834 Syncing...\n\u2826 Syncing...\n\u2827 Syncing...\n            \n{\n  \"manifest_name\": \"sharing-v9a-manifest-20260427080445\",\n  \"summary\": {\n    \"create\": 0,\n    \"update\": 0,\n    \"delete\": 0,\n    \"conflict\": 0,\n    \"noop\": 0\n  },\n  \"order\": [\n    \"folder.v9a\",\n    \"sf.v9a\",\n    \"sf.v9a.grantee\"\n  ],\n  \"changes\": []\n}\n",
+      "stderr": "09:06:09 INFO deploy_watcher: Logging in as <admin_email> (device_token=True) ...\n09:06:09 INFO root: Logging in to Keeper as <admin_email>\nSuccessfully authenticated with Persistent Login\n09:06:11 INFO deploy_watcher: Logged in. Records: 62\n"
+    },
+    {
+      "name": "rediff",
+      "command": [
+        "/usr/local/bin/python3",
+        "-m",
+        "keeper_sdk.cli",
+        "--provider",
+        "commander",
+        "--folder-uid",
+        "<folder_uid>",
+        "diff",
+        "/tmp/sharing-v9a-manifest-20260427080445.yaml"
+      ],
+      "started_at": "2026-04-27T08:06:17.175885Z",
+      "finished_at": "2026-04-27T08:06:38.793023Z",
+      "exit_code": 0,
+      "stdout": "\n\u280b Syncing...\n\u2819 Syncing...\n\u2839 Syncing...\n\u2838 Syncing...\n\u283c Syncing...\n\u2834 Syncing...\n\u2826 Syncing...\n\u2827 Syncing...\n            \nDiff for sharing-v9a-manifest-20260427080445\n\n",
+      "stderr": "09:06:17 INFO deploy_watcher: Logging in as <admin_email> (device_token=True) ...\n09:06:17 INFO deploy_watcher: Waiting 15s for fresh TOTP window...\n09:06:32 INFO root: Logging in to Keeper as <admin_email>\nSuccessfully authenticated with Persistent Login\n09:06:34 INFO deploy_watcher: Logged in. Records: 62\n"
+    },
+    {
+      "name": "plan_delete",
+      "command": [
+        "/usr/local/bin/python3",
+        "-m",
+        "keeper_sdk.cli",
+        "--provider",
+        "commander",
+        "--folder-uid",
+        "<folder_uid>",
+        "plan",
+        "--allow-delete",
+        "--json",
+        "/tmp/sharing-v9a-empty-20260427080445.yaml"
+      ],
+      "started_at": "2026-04-27T08:06:38.793399Z",
+      "finished_at": "2026-04-27T08:06:46.546183Z",
+      "exit_code": 2,
+      "stdout": "\n\u280b Syncing...\n\u2819 Syncing...\n\u2839 Syncing...\n\u2838 Syncing...\n\u283c Syncing...\n\u2834 Syncing...\n\u2826 Syncing...\n\u2827 Syncing...\n\u2807 Syncing...\n            \n{\n  \"manifest_name\": \"sharing-v9a-empty-20260427080445\",\n  \"summary\": {\n    \"create\": 0,\n    \"update\": 0,\n    \"delete\": 3,\n    \"conflict\": 0,\n    \"noop\": 0\n  },\n  \"order\": [],\n  \"changes\": [\n    {\n      \"kind\": \"delete\",\n      \"uid_ref\": \"folder.v9a\",\n      \"resource_type\": \"sharing_folder\",\n      \"title\": \"/dsk-v9a-20260427080445-user-folder\",\n      \"keeper_uid\": \"<uid>\",\n      \"before\": {\n        \"color\": \"blue\",\n        \"keeper_uid\": \"<uid>\",\n        \"path\": \"/dsk-v9a-20260427080445-user-folder\",\n        \"uid_ref\": \"folder.v9a\",\n        \"resource_type\": \"sharing_folder\",\n        \"_sidecar_uid\": \"<uid>\"\n      },\n      \"after\": {},\n      \"reason\": null\n    },\n    {\n      \"kind\": \"delete\",\n      \"uid_ref\": \"sf.v9a\",\n      \"resource_type\": \"sharing_shared_folder\",\n      \"title\": \"/dsk-v9a-20260427080445-shared-folder\",\n      \"keeper_uid\": \"<uid>\",\n      \"before\": {\n        \"default_can_edit\": true,\n        \"default_can_share\": false,\n        \"default_manage_records\": true,\n        \"default_manage_users\": false,\n        \"defaults\": {\n          \"can_edit\": true,\n          \"can_share\": false,\n          \"manage_records\": true,\n          \"manage_users\": false\n        },\n        \"keeper_uid\": \"<uid>\",\n        \"name\": \"/dsk-v9a-20260427080445-shared-folder\",\n        \"path\": \"/dsk-v9a-20260427080445-shared-folder\",\n        \"uid_ref\": \"sf.v9a\",\n        \"resource_type\": \"sharing_shared_folder\",\n        \"_sidecar_uid\": \"<uid>\"\n      },\n      \"after\": {},\n      \"reason\": null\n    },\n    {\n      \"kind\": \"delete\",\n      \"uid_ref\": \"sf.v9a.grantee\",\n      \"resource_type\": \"sharing_share_folder\",\n      \"title\": \"keeper-vault-sharing:shared_folders:sf.v9a:grantee:<email_sha256:a6534264>\",\n      \"keeper_uid\": \"keeper-vault-sharing:shared_folders:sf.v9a:sf.v9a.grantee\",\n      \"before\": {\n        \"grantee\": {\n          \"kind\": \"user\",\n          \"user_email\": \"<email_sha256:a6534264>\"\n        },\n        \"keeper_uid\": \"keeper-vault-sharing:shared_folders:sf.v9a:sf.v9a.grantee\",\n        \"kind\": \"grantee\",\n        \"manage_records\": true,\n        \"manage_users\": false,\n        \"permissions\": {\n          \"manage_records\": true,\n          \"manage_users\": false\n        },\n        \"shared_folder_uid\": \"<uid>\",\n        \"shared_folder_uid_ref\": \"keeper-vault-sharing:shared_folders:sf.v9a\",\n        \"uid_ref\": \"sf.v9a.grantee\",\n        \"user_email\": \"<email_sha256:a6534264>\",\n        \"resource_type\": \"sharing_share_folder\",\n        \"_sidecar_uid\": \"<uid>\"\n      },\n      \"after\": {},\n      \"reason\": null\n    }\n  ]\n}\n",
+      "stderr": "09:06:39 INFO deploy_watcher: Logging in as <admin_email> (device_token=True) ...\n09:06:39 INFO root: Logging in to Keeper as <admin_email>\nSuccessfully authenticated with Persistent Login\n09:06:41 INFO deploy_watcher: Logged in. Records: 62\n"
+    },
+    {
+      "name": "apply_delete",
+      "command": [
+        "/usr/local/bin/python3",
+        "-m",
+        "keeper_sdk.cli",
+        "--provider",
+        "commander",
+        "--folder-uid",
+        "<folder_uid>",
+        "apply",
+        "--allow-delete",
+        "--auto-approve",
+        "/tmp/sharing-v9a-empty-20260427080445.yaml"
+      ],
+      "started_at": "2026-04-27T08:06:46.546728Z",
+      "finished_at": "2026-04-27T08:08:08.095835Z",
+      "exit_code": 0,
+      "stdout": "\n\u280b Syncing...\n\u2819 Syncing...\n\u2839 Syncing...\n\u2838 Syncing...\n\u283c Syncing...\n\u2834 Syncing...\n\u2826 Syncing...\n\u2827 Syncing...\n\u2807 Syncing...\n\u280f Syncing...\n            \n                     Plan: sharing-v9a-empty-20260427080445                     \n\u250f\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2533\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2533\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2533\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2533\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2533\u2501\u2501\u2501\u2501\u2501\u2501\u2513\n\u2503 Action \u2503 Type          \u2503 uid_ref       \u2503 Title        \u2503 Keeper UID    \u2503 Note \u2503\n\u2521\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2547\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2547\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2547\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2547\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2547\u2501\u2501\u2501\u2501\u2501\u2501\u2529\n\u2502 delete \u2502 sharing_shar\u2026 \u2502 sf.v9a        \u2502 /dsk-v9a-20\u2026 \u2502 OGGdd24Bze_y\u2026 \u2502      \u2502\n\u2502 delete \u2502 sharing_fold\u2026 \u2502 folder.v9a    \u2502 /dsk-v9a-20\u2026 \u2502 dKffpdkYcnRa\u2026 \u2502      \u2502\n\u2502 delete \u2502 sharing_shar\u2026 \u2502 sf.v9a.grant\u2026 \u2502 keeper-vaul\u2026 \u2502 keeper-vault\u2026 \u2502      \u2502\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n+0 create, ~0 update, -3 delete, !0 conflict, \u00b70 noop\n\n                                 Apply results                                  \n\u250f\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2533\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2533\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2533\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2513\n\u2503 Action \u2503 uid_ref        \u2503 Keeper UID                          \u2503 Details      \u2503\n\u2521\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2547\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2547\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2547\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2529\n\u2502 delete \u2502 folder.v9a     \u2502 <uid>              \u2502 removed=True \u2502\n\u2502 delete \u2502 sf.v9a         \u2502 <uid>              \u2502 removed=True \u2502\n\u2502 delete \u2502 sf.v9a.grantee \u2502 keeper-vault-sharing:shared_folder\u2026 \u2502 removed=True \u2502\n\u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2534\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518\n\n",
+      "stderr": "09:06:47 INFO deploy_watcher: Logging in as <admin_email> (device_token=True) ...\n09:06:47 INFO deploy_watcher: Waiting 15s for fresh TOTP window...\n09:07:02 INFO root: Logging in to Keeper as <admin_email>\nSuccessfully authenticated with Persistent Login\n09:07:04 INFO deploy_watcher: Logged in. Records: 62\n"
+    },
+    {
+      "name": "rediscover_empty_replan",
+      "command": [
+        "/usr/local/bin/python3",
+        "-m",
+        "keeper_sdk.cli",
+        "--provider",
+        "commander",
+        "--folder-uid",
+        "<folder_uid>",
+        "plan",
+        "--allow-delete",
+        "--json",
+        "/tmp/sharing-v9a-empty-20260427080445.yaml"
+      ],
+      "started_at": "2026-04-27T08:08:08.096246Z",
+      "finished_at": "2026-04-27T08:08:11.177131Z",
+      "exit_code": 0,
+      "stdout": "\n\u280b Syncing...\n\u2819 Syncing...\n\u2839 Syncing...\n\u2838 Syncing...\n\u283c Syncing...\n\u2834 Syncing...\n\u2826 Syncing...\n\u2827 Syncing...\n            \n{\n  \"manifest_name\": \"sharing-v9a-empty-20260427080445\",\n  \"summary\": {\n    \"create\": 0,\n    \"update\": 0,\n    \"delete\": 0,\n    \"conflict\": 0,\n    \"noop\": 0\n  },\n  \"order\": [],\n  \"changes\": []\n}\n",
+      "stderr": "09:08:08 INFO deploy_watcher: Logging in as <admin_email> (device_token=True) ...\n09:08:08 INFO root: Logging in to Keeper as <admin_email>\nSuccessfully authenticated with Persistent Login\n09:08:10 INFO deploy_watcher: Logged in. Records: 59\n"
+    }
+  ],
+  "notes": [
+    "pre-clean removed 0 managed marker records from sandbox scope",
+    "Self-fix during V9a live proof: CommanderCliProvider._manifest_name was a bound method and made sharing marker JSON non-serializable; provider now stores _manifest_name as a value.",
+    "Self-fix during V9a live proof: Commander share-folder argv requires options before trailing folder positional; sharing helpers now put the shared-folder UID last and use -f for non-interactive grants/removes.",
+    "Self-fix during V9a cleanup: stale ACL sidecar deletion now tolerates Commander missing-folder errors after the parent shared folder is already gone.",
+    "V9a folder lifecycle landed; awaiting V9b record share lifecycle for status flip."
+  ],
+  "sanitization": {
+    "emails": "sha256 last 8 hex",
+    "uids": "Keeper UID-like tokens replaced",
+    "local_paths": "redacted"
+  }
+}

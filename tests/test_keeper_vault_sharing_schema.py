@@ -20,6 +20,9 @@ _SCHEMA_PATH = (
     / "keeper-vault-sharing"
     / "keeper-vault-sharing.v1.schema.json"
 )
+_V9A_EVIDENCE = (
+    "docs/live-proof/keeper-vault-sharing.v1.535e03f.folderlifecycle.sanitized.json"
+)
 
 _MINIMAL_MANIFEST = """\
 {
@@ -269,3 +272,21 @@ def test_keeper_vault_sharing_schema_rejects_uid_ref_collisions() -> None:
 
     assert "duplicate uid_ref" in exc.value.reason
     assert "sf.prod" in exc.value.reason
+
+
+def test_keeper_vault_sharing_live_proof_evidence_points_to_v9a_transcript() -> None:
+    live_proof = _schema()["x-keeper-live-proof"]
+
+    assert live_proof["status"] == "scaffold-only"
+    assert live_proof["evidence"] == [_V9A_EVIDENCE]
+    assert "awaiting V9b record share lifecycle" in live_proof["notes"]
+
+
+def test_keeper_vault_sharing_v9a_evidence_file_is_committed_json() -> None:
+    evidence_path = Path(__file__).resolve().parents[1] / _V9A_EVIDENCE
+
+    payload = json.loads(evidence_path.read_text(encoding="utf-8"))
+
+    assert payload["family"] == "keeper-vault-sharing.v1"
+    assert payload["scenario"] == "folderlifecycle"
+    assert [event["exit_code"] for event in payload["events"]] == [0, 2, 0, 0, 0, 2, 0, 0]

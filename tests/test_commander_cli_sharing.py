@@ -26,6 +26,11 @@ def _provider(
         return stdout
 
     monkeypatch.setattr(CommanderCliProvider, "_run_cmd", recorder)
+    monkeypatch.setattr(
+        CommanderCliProvider,
+        "_resolve_folder_uid_by_path",
+        lambda self, path: f"uid:{path}",
+    )
     return CommanderCliProvider(folder_uid="folder-uid"), calls
 
 
@@ -125,6 +130,7 @@ def test_share_record_to_user_grants_permissions_and_expiration(
             "grant",
             "-e",
             "user@example.com",
+            "-f",
             "-w",
             "-s",
             "--expire-at",
@@ -146,7 +152,7 @@ def test_share_record_to_user_omits_false_permission_flags(
         can_share=False,
     )
 
-    assert calls == [["share-record", "-a", "grant", "-e", "user@example.com", "REC_UID"]]
+    assert calls == [["share-record", "-a", "grant", "-e", "user@example.com", "-f", "REC_UID"]]
 
 
 def test_revoke_record_share_from_user_uses_revoke_action(
@@ -173,15 +179,16 @@ def test_share_folder_to_user_grantee_sets_manage_flags(monkeypatch: pytest.Monk
     assert calls == [
         [
             "share-folder",
-            "SF_UID",
             "-a",
             "grant",
             "-e",
             "user@example.com",
+            "-f",
             "-p",
             "on",
             "-o",
             "off",
+            "SF_UID",
         ]
     ]
 
@@ -202,15 +209,16 @@ def test_share_folder_to_team_grantee_uses_email_parser_slot(
     assert calls == [
         [
             "share-folder",
-            "SF_UID",
             "-a",
             "grant",
             "-e",
             "TEAM_UID",
+            "-f",
             "-p",
             "off",
             "-o",
             "on",
+            "SF_UID",
         ]
     ]
 
@@ -227,7 +235,9 @@ def test_share_folder_to_default_grantee_uses_star_account(
         manage_users=True,
     )
 
-    assert calls == [["share-folder", "SF_UID", "-a", "grant", "-e", "*", "-p", "on", "-o", "on"]]
+    assert calls == [
+        ["share-folder", "-a", "grant", "-e", "*", "-f", "-p", "on", "-o", "on", "SF_UID"]
+    ]
 
 
 def test_share_folder_to_grantee_rejects_contradictory_inputs(
@@ -273,8 +283,8 @@ def test_revoke_folder_grantee_uses_remove_action(monkeypatch: pytest.MonkeyPatc
     provider._revoke_folder_grantee(shared_folder_uid="SF_UID", grantee_kind="default")
 
     assert calls == [
-        ["share-folder", "SF_UID", "-a", "remove", "-e", "user@example.com"],
-        ["share-folder", "SF_UID", "-a", "remove", "-e", "*"],
+        ["share-folder", "-a", "remove", "-e", "user@example.com", "-f", "SF_UID"],
+        ["share-folder", "-a", "remove", "-e", "*", "-f", "SF_UID"],
     ]
 
 
@@ -291,7 +301,7 @@ def test_share_record_to_shared_folder_sets_record_permissions(
     )
 
     assert calls == [
-        ["share-folder", "SF_UID", "-a", "grant", "-r", "REC_UID", "-d", "on", "-s", "off"]
+        ["share-folder", "-a", "grant", "-r", "REC_UID", "-f", "-d", "on", "-s", "off", "SF_UID"]
     ]
 
 
@@ -306,7 +316,9 @@ def test_set_shared_folder_default_record_share_uses_star_record(
         can_share=True,
     )
 
-    assert calls == [["share-folder", "SF_UID", "-a", "grant", "-r", "*", "-d", "off", "-s", "on"]]
+    assert calls == [
+        ["share-folder", "-a", "grant", "-r", "*", "-f", "-d", "off", "-s", "on", "SF_UID"]
+    ]
 
 
 def test_discover_shared_folder_acl_normalizes_get_json(
