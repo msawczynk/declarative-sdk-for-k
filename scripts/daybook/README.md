@@ -19,6 +19,7 @@ vendoring the harness.
 | After Cursor subagent workers return | `bash scripts/daybook/harness.sh harvest` |
 | JOURNAL bloat / distill gate (boot may nag) | `bash scripts/daybook/harness.sh distill-check` |
 | End-of-session auto-review digest | `bash scripts/daybook/harness.sh review-loop` |
+| Cursor + Codex changelog diff (token-economy triage) | `bash scripts/daybook/harness.sh changelog` |
 | Print `export` lines for `~/Downloads` + `DAYBOOK_REPO` | `bash scripts/daybook/harness.sh print-env` |
 
 Help: `bash scripts/daybook/harness.sh help`

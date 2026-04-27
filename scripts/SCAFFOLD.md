@@ -2,7 +2,7 @@
 
 | Path | Role | Local SCAFFOLD |
 |---|---|---|
-| `daybook/` | Forwards to `~/.cursor-daybook-sync` scripts; **no** JOURNAL/LESSONS in the SDK repo. | [README](daybook/README.md) |
+| `daybook/` | Forwards to `~/.cursor-daybook-sync` scripts; **no** JOURNAL/LESSONS in the SDK repo. | [README](daybook/README.md), [SCAFFOLD](daybook/SCAFFOLD.md) |
 | `smoke/` | Live-smoke harness. Identity → sandbox → scenario → verify → destroy. Logs under `.smoke-runs/` (gitignored). | [`smoke/SCAFFOLD.md`](./smoke/SCAFFOLD.md) |
 | `phase_harness/` | In-repo `ruff`/`mypy`/`pytest` + example `phase_runner` spec. | [README](phase_harness/README.md) |
 | `sync_upstream.py` | Regenerates `docs/capability-snapshot.json`; `--check` mode used by CI `drift-check`. | – |

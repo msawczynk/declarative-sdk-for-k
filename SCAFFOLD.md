@@ -16,6 +16,7 @@ Agent-first Python SDK + CLI (`dsk`) for deterministic `validate -> plan -> appl
 | `tests/` | [`tests/SCAFFOLD.md`](./tests/SCAFFOLD.md) | Per-test-file inventory + where to land new tests |
 | `docs/` | [`docs/SCAFFOLD.md`](./docs/SCAFFOLD.md) | Doc inventory + audience + ownership |
 | `scripts/` | [`scripts/SCAFFOLD.md`](./scripts/SCAFFOLD.md) | Smoke, daybook harness (forwarder), phase_harness, sync — top-level map |
+| `scripts/daybook/` | [`scripts/daybook/SCAFFOLD.md`](./scripts/daybook/SCAFFOLD.md) | `harness.sh` → `~/.cursor-daybook-sync`; tests in `tests/test_daybook_harness.py` |
 | `scripts/smoke/` | [`scripts/smoke/SCAFFOLD.md`](./scripts/smoke/SCAFFOLD.md) | Live-smoke harness + scenario registry |
 | `examples/` | [`examples/SCAFFOLD.md`](./examples/SCAFFOLD.md) | Canonical minimal manifests + CI contract |
 | `.github/` | [`.github/SCAFFOLD.md`](./.github/SCAFFOLD.md) | Workflows + issue templates |

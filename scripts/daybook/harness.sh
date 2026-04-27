@@ -3,13 +3,6 @@
 # Does NOT vendor the harness; does NOT keep JOURNAL/LESSONS in this repo.
 set -euo pipefail
 
-ROOT="${DAYBOOK_SYNC_ROOT:-${HOME}/.cursor-daybook-sync}/scripts"
-if [[ ! -d "$ROOT" ]]; then
-  echo "daybook harness: missing directory: $ROOT" >&2
-  echo "Set DAYBOOK_SYNC_ROOT to your cursor-daybook-sync clone, or install scripts there." >&2
-  exit 1
-fi
-
 print_help() {
   cat <<'EOF'
 dsk daybook harness — forwards to ~/.cursor-daybook-sync/scripts (or DAYBOOK_SYNC_ROOT).
@@ -23,6 +16,7 @@ Canonical JOURNAL/LESSONS: ~/Downloads/JOURNAL.md and ~/Downloads/LESSONS.md (no
   bash scripts/daybook/harness.sh harvest          # subagent_harvest (after workers)
   bash scripts/daybook/harness.sh distill-check     # JOURNAL bloat / stale sprint check
   bash scripts/daybook/harness.sh review-loop       # write hooks-log review digest
+  bash scripts/daybook/harness.sh changelog         # cursor + codex release diff (token-economy)
   bash scripts/daybook/harness.sh print-env         # print export lines (Downloads JOURNAL)
   bash scripts/daybook/harness.sh append JOURNAL '…one line…'
   bash scripts/daybook/harness.sh append LESSONS '…one line…'
@@ -33,13 +27,13 @@ EOF
 }
 
 print_env() {
-  # Matches agent_session_boot: default JOURNAL/LESSONS under $HOME/Downloads.
   printf 'export JOURNAL_PATH="${JOURNAL_PATH:-%s/Downloads/JOURNAL.md}"\n' "$HOME"
   printf 'export LESSONS_PATH="${LESSONS_PATH:-%s/Downloads/LESSONS.md}"\n' "$HOME"
   printf 'export DAYBOOK_REPO="${DAYBOOK_REPO:-%s/.cursor-daybook-sync}"\n' "$HOME"
   echo "# source these before: append, sync, daybook_append"
 }
 
+# help / print-env must work even when the daybook clone is missing (e.g. CI, fresh machine).
 case "${1:-}" in
   "" | help | --help | -h)
     print_help
@@ -51,7 +45,14 @@ case "${1:-}" in
     ;;
 esac
 
-cmd="$1"
+ROOT="${DAYBOOK_SYNC_ROOT:-${HOME}/.cursor-daybook-sync}/scripts"
+if [[ ! -d "$ROOT" ]]; then
+  echo "daybook harness: missing directory: $ROOT" >&2
+  echo "Set DAYBOOK_SYNC_ROOT to your cursor-daybook-sync clone, or install scripts there." >&2
+  exit 1
+fi
+
+cmd="${1:-}"
 shift
 
 case "$cmd" in
@@ -63,6 +64,7 @@ case "$cmd" in
   harvest) exec bash "$ROOT/subagent_harvest.sh" "$@" ;;
   distill-check) exec bash "$ROOT/agent_distill_check.sh" "$@" ;;
   review-loop) exec bash "$ROOT/agent_review_loop.sh" "$@" ;;
+  changelog) exec bash "$ROOT/changelog_watch.sh" "$@" ;;
   append)
     kind="${1:-}"
     shift || true

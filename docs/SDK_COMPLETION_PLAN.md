@@ -13,7 +13,7 @@ Main branch as of 2026-04-27:
 - `v1.0.0` GitHub release exists.
 - **Distribution is GitHub only** (no PyPI): `publish.yml` attaches `dist/*` to
   each GitHub Release; install via git URL or downloaded wheel per `docs/RELEASING.md`.
-- Local/core checks: **947 passed** on current `main` (re-run
+- Local/core checks: **950 passed** on current `main` (re-run
   with `python3 -m pytest -q && python3 -m ruff check . && python3 -m ruff format --check . && python3 -m mypy keeper_sdk && python3 -m build && python3 -m twine check dist/*`),
   ruff, format, mypy, build/twine clean. CI is green across lint, mypy,
   py3.11/3.12/3.13 tests, examples, drift-check, and build.

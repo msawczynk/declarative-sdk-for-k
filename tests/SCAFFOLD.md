@@ -1,7 +1,9 @@
 # `tests/` — offline coverage
 
-All offline. No real Keeper, no real subprocess. `_run_cmd` + `shutil.which`
-mocked in provider tests. Live coverage lives in `scripts/smoke/`.
+All offline. No real Keeper, no real subprocess for product code. `_run_cmd` +
+`shutil.which` mocked in provider tests. **Exception:** `test_daybook_harness.py`
+runs `bash scripts/daybook/harness.sh` (no `~/.cursor-daybook-sync` required for
+`help` / `print-env`). Live coverage lives in `scripts/smoke/`.
 
 `pytest -q` → currently ~110+ tests green. CI matrix: 3.11 / 3.12 / 3.13.
 
@@ -31,6 +33,7 @@ mocked in provider tests. Live coverage lives in `scripts/smoke/`.
 | `test_h_series_gaps.py` | 360 | H1–H6 regression: `_run_cmd` exit, silent-fail detector, post-apply `CollisionError`, exit-4 conflict gate, marker version error, env-var/path failure modes, plan==apply CONFLICT parity (C3). |
 | `test_stage_5_bindings.py` | 360 | `validate --online` stage 5 — pam_configuration presence, shared-folder reachability, KSM app binding, gateway pairing cross-check. |
 | `test_smoke_args.py` | 129 | Smoke-runner CLI arg surface (offline). |
+| `test_daybook_harness.py` | – | `harness.sh` help + print-env (no daybook clone); boot fails with missing dir. Unix-only. |
 | `test_smoke_scenarios.py` | 297 | Each registered scenario's manifest fragment validates + plans clean offline. |
 | `test_dor_scenarios.py` | 147 | DOR `TEST_PLAN.md` scenario mapping. Includes Commander partial-apply + floor-gate (`test_apply_partial_failure_records_outcomes_then_raises`, `test_apply_rejects_keepercommander_below_minimum`). |
 | `test_auth_helper.py` | 197 | `EnvLoginHelper` + Commander `LoginUi` contract. No network. |
