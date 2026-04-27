@@ -16,7 +16,7 @@ from keeper_sdk.core.models import Manifest
 class ChangeKind(StrEnum):
     """Classification of a single planned change.
 
-    * ``CREATE`` — manifest describes a resource that does not exist in
+    * ``CREATE`` / ``ADD`` — manifest describes a resource that does not exist in
       the vault yet.
     * ``ADD`` — backwards-compatible alias for ``CREATE`` used by newer
       sibling-block diff helpers.
@@ -29,7 +29,9 @@ class ChangeKind(StrEnum):
       ``allow_delete=True`` on ``compute_diff``.
     * ``NOOP`` — manifest and vault agree; no action required.
     * ``SKIP`` — a non-actionable observed object is intentionally left
-      untouched, usually because it is unmanaged by this SDK.
+      untouched, usually because it is unmanaged by this SDK or because
+      a managed live object is missing from the manifest without
+      ``allow_delete``.
     * ``CONFLICT`` — a situation the planner cannot resolve automatically
       (name collision, ambiguous marker, incompatible type). Operator
       must resolve before re-running.
