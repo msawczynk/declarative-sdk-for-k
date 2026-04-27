@@ -16,7 +16,7 @@ from keeper_sdk.core.models import Manifest
 class ChangeKind(StrEnum):
     """Classification of a single planned change.
 
-    * ``CREATE`` — manifest describes a resource that does not exist in
+    * ``CREATE`` / ``ADD`` — manifest describes a resource that does not exist in
       the vault yet.
     * ``UPDATE`` — manifest and vault both carry the resource but their
       fields drift. Only raised when drift is detected on declarative
@@ -29,13 +29,17 @@ class ChangeKind(StrEnum):
     * ``CONFLICT`` — a situation the planner cannot resolve automatically
       (name collision, ambiguous marker, incompatible type). Operator
       must resolve before re-running.
+    * ``SKIP`` — live object is intentionally ignored because it is not
+      managed by this declarative manifest.
     """
 
     CREATE = "create"
+    ADD = "create"
     UPDATE = "update"
     DELETE = "delete"
     NOOP = "noop"
     CONFLICT = "conflict"
+    SKIP = "skip"
 
 
 @dataclass
