@@ -105,6 +105,26 @@ def test_load_msp_manifest_wraps_validation_error() -> None:
     assert isinstance(exc.value.__cause__, ValidationError)
 
 
+def test_load_msp_manifest_rejects_case_insensitive_duplicate_mc_names() -> None:
+    with pytest.raises(SchemaError) as exc:
+        load_msp_manifest(
+            {
+                "schema": "msp-environment.v1",
+                "name": "x",
+                "managed_companies": [
+                    {"name": "Acme", "plan": "business", "seats": 1},
+                    {"name": "acme", "plan": "enterprise", "seats": 2},
+                ],
+            }
+        )
+
+    assert "duplicate name case-insensitively" in exc.value.reason
+    assert (
+        exc.value.next_action
+        == "rename one managed_company; names must be unique case-insensitively"
+    )
+
+
 def test_load_msp_manifest_via_load_declarative_manifest(tmp_path) -> None:
     p = tmp_path / "m.yaml"
     p.write_text(

@@ -63,7 +63,7 @@ from keeper_sdk.core import (
     redact,
     vault_record_apply_order,
 )
-from keeper_sdk.core.interfaces import LiveRecord
+from keeper_sdk.core.interfaces import ApplyOutcome, LiveRecord
 from keeper_sdk.core.manifest import read_manifest_document
 from keeper_sdk.core.planner import Plan
 from keeper_sdk.core.preview import assert_preview_keys_allowed
@@ -85,13 +85,115 @@ EXIT_SCHEMA = 2
 EXIT_REF = 3
 EXIT_CONFLICT = 4
 EXIT_CAPABILITY = 5
-_MSP_IMPORT_DEFERRED = (
-    "MSP adoption deferred to P7+; requires compute_msp_diff(adopt=True) "
-    "which is not implemented"
-)
+_MSP_COMMANDER_UNSUPPORTED_REASON = "MSP family unsupported on commander provider; planned for P7"
+_MSP_MANAGED_COMPANY_RESOURCE = "managed_company"
 _MSP_ONLINE_COMMANDER_NEXT_ACTION = (
     "MSP --online unsupported on commander provider; planned for P7"
 )
+
+
+def _mock_adopt_managed_companies(self: MockProvider, plan: Plan) -> list[ApplyOutcome]:
+    offenders = sorted(
+        str(change.uid_ref or change.title or "<unknown>")
+        for change in plan.changes
+        if change.resource_type != _MSP_MANAGED_COMPANY_RESOURCE
+    )
+    if offenders:
+        joined = ", ".join(offenders)
+        raise ValueError(
+            "MSP mock adoption only accepts managed_company rows; "
+            f"offending uid_refs: {joined}; "
+            "next_action: build an MSP-only adoption plan"
+        )
+
+    current = {
+        str(row["name"]).casefold(): dict(row)
+        for row in self.discover_managed_companies()
+    }
+    outcomes: list[ApplyOutcome] = []
+    changed = False
+    for change in _msp_plan_changes(plan):
+        name = _msp_change_name(change)
+        existing = current.get(name.casefold())
+
+        if change.kind is ChangeKind.UPDATE:
+            if existing is None:
+                outcomes.append(
+                    ApplyOutcome(
+                        uid_ref=name,
+                        keeper_uid=change.keeper_uid or "",
+                        action="update",
+                        details={"skipped": "record_missing"},
+                    )
+                )
+                continue
+            payload = {**existing, **change.after}
+            payload["manager"] = str(change.after.get("manager") or plan.manifest_name)
+            current[name.casefold()] = payload
+            changed = True
+            outcomes.append(
+                ApplyOutcome(
+                    uid_ref=name,
+                    keeper_uid=str(payload.get("mc_enterprise_id") or change.keeper_uid or ""),
+                    action="update",
+                    details={"marker_written": True},
+                )
+            )
+            continue
+
+        if change.kind is ChangeKind.CONFLICT:
+            outcomes.append(
+                ApplyOutcome(
+                    uid_ref=name,
+                    keeper_uid=change.keeper_uid or "",
+                    action="conflict",
+                    details={"reason": change.reason or "blocked"},
+                )
+            )
+            continue
+
+        details: dict[str, Any] = {}
+        if change.reason is not None:
+            details["reason"] = change.reason
+        outcomes.append(
+            ApplyOutcome(
+                uid_ref=name,
+                keeper_uid=change.keeper_uid or "",
+                action="noop",
+                details=details,
+            )
+        )
+
+    if changed:
+        self.seed_managed_companies(list(current.values()))
+    return outcomes
+
+
+def _commander_adopt_managed_companies(
+    self: CommanderCliProvider,
+    plan: Plan,
+) -> list[ApplyOutcome]:
+    raise CapabilityError(_MSP_COMMANDER_UNSUPPORTED_REASON)
+
+
+def _msp_change_name(change: Change) -> str:
+    for payload in (change.after, change.before):
+        value = payload.get("name")
+        if value is not None:
+            return str(value)
+    return str(change.uid_ref or change.title)
+
+
+def _msp_plan_changes(plan: Plan) -> list[Change]:
+    ordered = plan.ordered()
+    seen = {id(change) for change in ordered}
+    return ordered + [change for change in plan.changes if id(change) not in seen]
+
+
+if not hasattr(MockProvider, "adopt_managed_companies"):
+    setattr(MockProvider, "adopt_managed_companies", _mock_adopt_managed_companies)
+if not hasattr(CommanderCliProvider, "adopt_managed_companies"):
+    setattr(CommanderCliProvider, "adopt_managed_companies", _commander_adopt_managed_companies)
 
 
 @dataclass
@@ -311,8 +413,15 @@ def validate(
             return
 
         if family == MSP_FAMILY:
-            msp_manifest = load_msp_manifest(document)
-            order = msp_apply_order(msp_manifest)
+            try:
+                msp_manifest = load_msp_manifest(document)
+                order = msp_apply_order(msp_manifest)
+            except SchemaError as exc:
+                click.echo(f"validation failed: {exc}", err=True)
+                sys.exit(EXIT_SCHEMA)
+            except RefError as exc:
+                click.echo(f"reference error: {exc}", err=True)
+                sys.exit(EXIT_REF)
 
             live_msp: list[dict[str, Any]] | None = None
             online_suffix = ""
@@ -770,17 +879,46 @@ def import_(
         sys.exit(EXIT_GENERIC)
     if fam != PAM_FAMILY:
         if fam == MSP_FAMILY:
-            click.echo(f"capability error: {_MSP_IMPORT_DEFERRED}", err=True)
-            sys.exit(EXIT_CAPABILITY)
+            if ctx.obj.get("provider") == "commander":
+                click.echo(f"provider error: {_MSP_COMMANDER_UNSUPPORTED_REASON}", err=True)
+                sys.exit(EXIT_CAPABILITY)
+            bundle = _load_plan_context(ctx, manifest_path)
+            msp_manifest = bundle.msp
+            assert msp_manifest is not None
+            changes = compute_msp_diff(msp_manifest, bundle.live_msp, adopt=True)
+            adopt_changes = [
+                change
+                for change in changes
+                if change.kind is ChangeKind.UPDATE and "adoption" in (change.reason or "")
+            ]
+            plan_obj = build_plan(bundle.manifest_name, adopt_changes, bundle.order)
+
+            click.echo(ctx.obj["renderer"].render_plan(plan_obj))
+            if plan_obj.is_clean:
+                click.echo("no records to adopt.")
+                sys.exit(EXIT_OK)
+            if dry_run:
+                sys.exit(EXIT_OK)
+            if not auto_approve:
+                click.confirm("Proceed?", abort=True)
+
+            try:
+                outcomes = bundle.provider.adopt_managed_companies(plan_obj)
+            except CapabilityError as exc:
+                click.echo(f"provider error: {exc}", err=True)
+                sys.exit(EXIT_CAPABILITY)
+
+            click.echo(ctx.obj["renderer"].render_outcomes(outcomes))
+            sys.exit(EXIT_OK)
         click.echo("capability error: dsk import applies to pam-environment.v1 only.", err=True)
         sys.exit(EXIT_CAPABILITY)
 
     bundle = _load_plan_context(ctx, manifest_path)
-    manifest = bundle.pam
-    assert manifest is not None
+    pam_manifest = bundle.pam
+    assert pam_manifest is not None
     order, live = bundle.order, bundle.live
     try:
-        changes = compute_diff(manifest, live, adopt=True)
+        changes = compute_diff(pam_manifest, live, adopt=True)
     except OwnershipError as exc:
         click.echo(f"ownership error: {exc}", err=True)
         sys.exit(EXIT_CAPABILITY)
@@ -790,7 +928,7 @@ def import_(
         for change in changes
         if change.kind is ChangeKind.UPDATE and "adoption" in (change.reason or "")
     ]
-    plan_obj = build_plan(manifest.name, adopt_changes, order)
+    plan_obj = build_plan(pam_manifest.name, adopt_changes, order)
 
     click.echo(ctx.obj["renderer"].render_plan(plan_obj))
     if plan_obj.is_clean:

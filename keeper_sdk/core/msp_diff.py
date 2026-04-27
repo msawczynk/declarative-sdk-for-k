@@ -39,10 +39,12 @@ def compute_msp_diff(
     live_mcs: list[dict[str, Any]],
     *,
     allow_delete: bool = False,
+    adopt: bool = False,
 ) -> list[Change]:
     """Classify desired managed-company state against raw live MSP rows."""
     desired_by_key = _desired_managed_companies(manifest)
     live_by_key, duplicate_live = _index_live_managed_companies(live_mcs)
+    manifest_manager = _manifest_manager(manifest)
 
     changes: list[Change] = []
 
@@ -60,6 +62,55 @@ def compute_msp_diff(
                     title=desired["name"],
                     before={},
                     after=desired,
+                )
+            )
+            continue
+
+        live_manager = _live_manager(live)
+        if live_manager is not None:
+            if live_manager != manifest_manager:
+                changes.append(
+                    Change(
+                        kind=ChangeKind.CONFLICT,
+                        uid_ref=desired["name"],
+                        resource_type=_MANAGED_COMPANY_RESOURCE,
+                        title=desired["name"],
+                        keeper_uid=_live_keeper_uid(live),
+                        before=live,
+                        after=desired,
+                        reason=(
+                            "managed by other manager "
+                            f"{live_manager!r}; expected {manifest_manager!r}"
+                        ),
+                    )
+                )
+                continue
+            if adopt:
+                changes.append(
+                    Change(
+                        kind=ChangeKind.NOOP,
+                        uid_ref=desired["name"],
+                        resource_type=_MANAGED_COMPANY_RESOURCE,
+                        title=desired["name"],
+                        keeper_uid=_live_keeper_uid(live),
+                        before=live,
+                        after=desired,
+                        reason="already managed by manifest manager",
+                    )
+                )
+                continue
+
+        if adopt:
+            changes.append(
+                Change(
+                    kind=ChangeKind.UPDATE,
+                    uid_ref=desired["name"],
+                    resource_type=_MANAGED_COMPANY_RESOURCE,
+                    title=desired["name"],
+                    keeper_uid=_live_keeper_uid(live),
+                    before=live,
+                    after=_adoption_after(desired, manifest_manager),
+                    reason="adoption: write ownership marker",
                 )
             )
             continue
@@ -165,6 +216,8 @@ def _normalise_managed_company(
     }
     if include_live_id and row.get("mc_enterprise_id") is not None:
         out["mc_enterprise_id"] = row["mc_enterprise_id"]
+    if include_live_id and _live_manager(row) is not None:
+        out["manager"] = _live_manager(row)
     return out
 
 
@@ -199,6 +252,25 @@ def _diff_fields(live: dict[str, Any], desired: dict[str, Any]) -> list[str]:
 
 def _name_key(name: Any) -> str:
     return str(name).casefold()
+
+
+def _manifest_manager(manifest: MspManifestV1) -> str:
+    manager = manifest.manager.strip() if isinstance(manifest.manager, str) else ""
+    return manager or manifest.name
+
+
+def _live_manager(row: dict[str, Any]) -> str | None:
+    value = row.get("manager")
+    if value is None:
+        return None
+    manager = str(value).strip()
+    return manager or None
+
+
+def _adoption_after(desired: dict[str, Any], manager: str) -> dict[str, Any]:
+    out = dict(desired)
+    out["manager"] = manager
+    return out
 
 
 def _live_keeper_uid(live: dict[str, Any]) -> str | None:

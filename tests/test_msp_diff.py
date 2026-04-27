@@ -9,14 +9,18 @@ from keeper_sdk.core.msp_diff import compute_msp_diff
 from keeper_sdk.core.msp_models import MspManifestV1, load_msp_manifest
 
 
-def _manifest(*managed_companies: dict[str, Any]) -> MspManifestV1:
-    return load_msp_manifest(
-        {
-            "schema": "msp-environment.v1",
-            "name": "msp-diff-test",
-            "managed_companies": list(managed_companies),
-        }
-    )
+def _manifest(
+    *managed_companies: dict[str, Any],
+    manager: str | None = None,
+) -> MspManifestV1:
+    document: dict[str, Any] = {
+        "schema": "msp-environment.v1",
+        "name": "msp-diff-test",
+        "managed_companies": list(managed_companies),
+    }
+    if manager is not None:
+        document["manager"] = manager
+    return load_msp_manifest(document)
 
 
 def _mc(
@@ -161,6 +165,54 @@ def test_case_insensitive_name_match_preserves_manifest_casing() -> None:
     assert row.title == "Acme"
     assert row.before["name"] == "acme"
     assert row.after["name"] == "Acme"
+
+
+def test_adopt_unmanaged_name_match_emits_update_marker_change() -> None:
+    row = _only(
+        compute_msp_diff(
+            _manifest(_mc("Acme"), manager="keeper-msp-declarative"),
+            [_mc("acme")],
+            adopt=True,
+        )
+    )
+
+    assert row.kind is ChangeKind.UPDATE
+    assert row.title == "Acme"
+    assert row.before["name"] == "acme"
+    assert row.after["manager"] == "keeper-msp-declarative"
+    assert "adoption" in (row.reason or "")
+
+
+def test_adopt_skips_live_row_already_marked_by_manifest_manager() -> None:
+    live = _mc("Acme", seats=1)
+    live["manager"] = "keeper-msp-declarative"
+
+    row = _only(
+        compute_msp_diff(
+            _manifest(_mc("Acme", seats=9), manager="keeper-msp-declarative"),
+            [live],
+            adopt=True,
+        )
+    )
+
+    assert row.kind is ChangeKind.NOOP
+    assert "adoption" not in (row.reason or "")
+
+
+def test_foreign_live_manager_conflicts() -> None:
+    live = _mc("Acme")
+    live["manager"] = "other-manager"
+
+    row = _only(
+        compute_msp_diff(
+            _manifest(_mc("Acme"), manager="keeper-msp-declarative"),
+            [live],
+            adopt=True,
+        )
+    )
+
+    assert row.kind is ChangeKind.CONFLICT
+    assert "managed by other" in (row.reason or "")
 
 
 def test_conflict_on_duplicate_live_names() -> None:

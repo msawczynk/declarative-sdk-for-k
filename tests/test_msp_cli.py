@@ -11,37 +11,39 @@ import pytest
 from click.testing import CliRunner, Result
 
 from keeper_sdk.cli import main
-from keeper_sdk.cli.main import EXIT_CAPABILITY, EXIT_CHANGES, EXIT_OK
+from keeper_sdk.cli.main import EXIT_CAPABILITY, EXIT_CHANGES, EXIT_OK, EXIT_SCHEMA
 from keeper_sdk.providers import MockProvider
 
 cli_main_module = importlib.import_module("keeper_sdk.cli.main")
-
-MSP_IMPORT_DEFERRED = (
-    "MSP adoption deferred to P7+; requires compute_msp_diff(adopt=True) "
-    "which is not implemented"
-)
 
 
 def _run(args: list[str]) -> Result:
     return CliRunner().invoke(main, args, catch_exceptions=False)
 
 
-def _write_manifest(tmp_path: Path, *, seats: int = 5) -> Path:
-    path = tmp_path / "msp.yaml"
-    path.write_text(
-        "\n".join(
-            [
-                "schema: msp-environment.v1",
-                "name: msp-cli-test",
-                "managed_companies:",
-                "  - name: Acme",
-                "    plan: business",
-                f"    seats: {seats}",
-                "",
-            ]
-        ),
-        encoding="utf-8",
+def _write_manifest(
+    tmp_path: Path,
+    *,
+    seats: int = 5,
+    manager: str | None = None,
+) -> Path:
+    lines = [
+        "schema: msp-environment.v1",
+        "name: msp-cli-test",
+    ]
+    if manager is not None:
+        lines.append(f"manager: {manager}")
+    lines.extend(
+        [
+            "managed_companies:",
+            "  - name: Acme",
+            "    plan: business",
+            f"    seats: {seats}",
+            "",
+        ]
     )
+    path = tmp_path / "msp.yaml"
+    path.write_text("\n".join(lines), encoding="utf-8")
     return path
 
 
@@ -113,13 +115,91 @@ def test_plan_diff_apply_mock_round_trip(
     assert clean_payload["summary"]["noop"] == 1
 
 
-def test_import_msp_manifest_reports_deferred_capability(tmp_path: Path) -> None:
-    path = _write_manifest(tmp_path)
+def test_import_msp_manifest_adopts_unmanaged_mock_row(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = _write_manifest(tmp_path, manager="keeper-msp-declarative")
+    provider = MockProvider("msp-cli-test")
+    provider.seed_managed_companies([{"name": "acme", "plan": "business", "seats": 5}])
+
+    def provider_factory(manifest_name: str | None = None) -> MockProvider:
+        return provider
+
+    monkeypatch.setattr(cli_main_module, "MockProvider", provider_factory)
+
+    result = _run(["import", str(path), "--auto-approve"])
+
+    assert result.exit_code == EXIT_OK, result.output
+    assert "marker_written=True" in result.output
+    assert provider.discover_managed_companies()[0]["manager"] == "keeper-msp-declarative"
+
+
+def test_import_msp_manifest_clean_plan_exits_zero(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    path = _write_manifest(tmp_path, manager="keeper-msp-declarative")
+    provider = MockProvider("msp-cli-test")
+    provider.seed_managed_companies(
+        [
+            {
+                "name": "Acme",
+                "plan": "business",
+                "seats": 5,
+                "manager": "keeper-msp-declarative",
+            }
+        ]
+    )
+
+    def provider_factory(manifest_name: str | None = None) -> MockProvider:
+        return provider
+
+    monkeypatch.setattr(cli_main_module, "MockProvider", provider_factory)
 
     result = _run(["import", str(path)])
 
+    assert result.exit_code == EXIT_OK, result.output
+    assert "no records to adopt." in result.output
+
+
+def test_import_msp_manifest_commander_remains_capability_error(tmp_path: Path) -> None:
+    path = _write_manifest(tmp_path)
+
+    result = _run(["--provider", "commander", "import", str(path)])
+
     assert result.exit_code == EXIT_CAPABILITY, result.output
-    assert MSP_IMPORT_DEFERRED in (result.output + result.stderr)
+    assert "MSP family unsupported on commander provider; planned for P7" in (
+        result.output + result.stderr
+    )
+
+
+def test_validate_msp_rejects_case_insensitive_duplicate_mc_names(tmp_path: Path) -> None:
+    path = tmp_path / "dup.yaml"
+    path.write_text(
+        "\n".join(
+            [
+                "schema: msp-environment.v1",
+                "name: msp-cli-test",
+                "managed_companies:",
+                "  - name: Acme",
+                "    plan: business",
+                "    seats: 1",
+                "  - name: acme",
+                "    plan: enterprise",
+                "    seats: 2",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = _run(["validate", str(path)])
+
+    assert result.exit_code == EXIT_SCHEMA, result.output
+    assert "rename one managed_company; names must be unique case-insensitively" in (
+        result.output + result.stderr
+    )
 
 
 def test_plan_json_envelope_shape_remains_family_agnostic(tmp_path: Path) -> None:

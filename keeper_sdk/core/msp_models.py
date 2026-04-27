@@ -17,6 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from keeper_sdk.core.errors import SchemaError
 
 MSP_FAMILY: Literal["msp-environment.v1"] = "msp-environment.v1"
+_DUPLICATE_MC_NAME_NEXT_ACTION = "rename one managed_company; names must be unique case-insensitively"
 
 
 class _MspModel(BaseModel):
@@ -57,6 +58,9 @@ def load_msp_manifest(document: dict[str, Any]) -> MspManifestV1:
 
     from keeper_sdk.core.schema import validate_manifest
 
+    if document.get("schema") == MSP_FAMILY:
+        _reject_duplicate_managed_company_names(document)
+
     family = validate_manifest(document)
     if family != MSP_FAMILY:
         raise SchemaError(
@@ -75,6 +79,26 @@ def load_msp_manifest(document: dict[str, Any]) -> MspManifestV1:
             reason=str(exc),
             next_action="fix fields to match docs/MSP_FAMILY_DESIGN.md and the packaged msp schema",
         ) from exc
+
+
+def _reject_duplicate_managed_company_names(document: dict[str, Any]) -> None:
+    seen: dict[str, str] = {}
+    for row in document.get("managed_companies") or []:
+        if not isinstance(row, dict):
+            continue
+        name = row.get("name")
+        if not isinstance(name, str):
+            continue
+        key = name.casefold()
+        if key in seen:
+            raise SchemaError(
+                reason=(
+                    "managed_companies has duplicate name case-insensitively: "
+                    f"{seen[key]!r} and {name!r}"
+                ),
+                next_action=_DUPLICATE_MC_NAME_NEXT_ACTION,
+            )
+        seen[key] = name
 
 
 __all__ = [

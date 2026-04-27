@@ -31,6 +31,9 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 - **Docs** — [`AGENTS.md`](AGENTS.md): playbook **§E** — programmatic `load_manifest` vs `load_declarative_manifest` for vault L1. [`docs/SCAFFOLD.md`](docs/SCAFFOLD.md): “Where to land” row cites §E.
 
 ### Added
+- **MSP P7a** — mock-only `dsk import` adoption for `msp-environment.v1`
+  managed companies, plus case-insensitive duplicate-name rejection for MSP
+  manifests.
 - **MSP P0** — `msp-environment.v1` schema family (registry + scaffold-only schema; no plan/apply path yet — see `docs/MSP_FAMILY_DESIGN.md`).
 - **V8 prep** — [`docs/live-proof/keeper-vault.v1.sanitized.template.json`](docs/live-proof/keeper-vault.v1.sanitized.template.json)
   (`template: true`, shape-only) plus README section. CI `schema-validate` also runs `python -m json.tool` on
