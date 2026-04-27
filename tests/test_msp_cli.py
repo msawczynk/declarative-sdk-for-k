@@ -13,6 +13,7 @@ from click.testing import CliRunner, Result
 from keeper_sdk.cli import main
 from keeper_sdk.cli.main import EXIT_CAPABILITY, EXIT_CHANGES, EXIT_OK, EXIT_SCHEMA
 from keeper_sdk.providers import MockProvider
+from keeper_sdk.providers.commander_cli import CommanderCliProvider
 
 cli_main_module = importlib.import_module("keeper_sdk.cli.main")
 
@@ -72,15 +73,24 @@ def test_validate_msp_online_mock_runs_discover_and_diff(tmp_path: Path) -> None
     assert payload["stage5_summary"]["create"] == 1
 
 
-def test_validate_msp_online_commander_reports_p7_capability(tmp_path: Path) -> None:
+def test_validate_msp_online_commander_runs_discover(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     path = _write_manifest(tmp_path)
 
-    result = _run(["--provider", "commander", "validate", str(path), "--online"])
+    def _fake_discover(self: CommanderCliProvider) -> list[dict[str, Any]]:
+        del self  # patched on class; no live Commander session in CI
+        return []
 
-    assert result.exit_code == EXIT_CAPABILITY, result.output
-    assert "next_action: MSP --online unsupported on commander provider; planned for P7" in (
-        result.output + result.stderr
-    )
+    monkeypatch.setattr(CommanderCliProvider, "discover_managed_companies", _fake_discover)
+
+    result = _run(["--provider", "commander", "validate", str(path), "--online", "--json"])
+
+    assert result.exit_code == EXIT_OK, result.output
+    payload = json.loads(result.output)
+    assert payload["mode"] == "msp_online"
+    assert payload["live_managed_company_count"] == 0
 
 
 def test_plan_diff_apply_mock_round_trip(
@@ -169,9 +179,8 @@ def test_import_msp_manifest_commander_remains_capability_error(tmp_path: Path) 
     result = _run(["--provider", "commander", "import", str(path)])
 
     assert result.exit_code == EXIT_CAPABILITY, result.output
-    assert "MSP family unsupported on commander provider; planned for P7" in (
-        result.output + result.stderr
-    )
+    combined = result.output + result.stderr
+    assert "MSP import and adoption are not implemented on commander provider" in combined
 
 
 def test_validate_msp_rejects_case_insensitive_duplicate_mc_names(tmp_path: Path) -> None:

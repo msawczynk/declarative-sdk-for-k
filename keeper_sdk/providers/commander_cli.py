@@ -109,7 +109,78 @@ _ROTATION_APPLY_ENV_VAR = "DSK_EXPERIMENTAL_ROTATION_APPLY"
 _TRUTHY_ENV_VALUES = {"1", "true", "yes", "on"}
 # In-process PAM import / marker writes require a floor documented in docs/COMMANDER.md.
 _MIN_KEEPERCOMMANDER_VERSION = (17, 2, 13)
-_MSP_UNSUPPORTED_REASON = "MSP family unsupported on commander provider; planned for P7"
+_MSP_APPLY_UNSUPPORTED_REASON = (
+    "MSP managed-company apply is not implemented on CommanderCliProvider "
+    "(Commander: `msp-add` / `msp-update` / `msp-remove`; see docs/COMMANDER.md)"
+)
+
+
+def _msp_plan_slug_from_product_id(product_id: Any) -> str:
+    """Map Commander ``product_id`` (int slug id or string slug) to MSP plan code."""
+    try:
+        from keepercommander import constants  # type: ignore
+    except ImportError:
+        return str(product_id) if product_id is not None else ""
+    if product_id is None:
+        return ""
+    if isinstance(product_id, str):
+        s = product_id.strip()
+        for row in constants.MSP_PLANS:
+            if row[1] == s or row[1].lower() == s.lower():
+                return str(row[1])
+        return s
+    if isinstance(product_id, int):
+        for row in constants.MSP_PLANS:
+            if row[0] == product_id:
+                return str(row[1])
+    return str(product_id)
+
+
+def _msp_file_plan_display(file_plan_type: Any) -> str | None:
+    if file_plan_type is None or file_plan_type == "":
+        return None
+    try:
+        from keepercommander import constants  # type: ignore
+    except ImportError:
+        return str(file_plan_type)
+    fpt = str(file_plan_type)
+    for row in constants.MSP_FILE_PLANS:
+        if row[1] == fpt:
+            return str(row[2])
+    return fpt
+
+
+def _commander_mc_dict_to_sdk_row(mc: Mapping[str, Any]) -> dict[str, Any]:
+    """Normalise one ``params.enterprise['managed_companies']`` row for MSP diff."""
+    name = str(mc.get("mc_enterprise_name") or "").strip()
+    if not name:
+        raise ValueError("managed company missing mc_enterprise_name")
+    plan = _msp_plan_slug_from_product_id(mc.get("product_id"))
+    if not plan:
+        plan = "business"
+    seats_raw = int(mc.get("number_of_seats") or 0)
+    if seats_raw > 2147483646 or seats_raw < 0:
+        seats_raw = -1
+    addons_out: list[dict[str, Any]] = []
+    for addon in mc.get("add_ons") or []:
+        if not isinstance(addon, dict) or addon.get("name") is None:
+            continue
+        a_seats = int(addon.get("seats") or 0)
+        if a_seats > 2147483646 or a_seats < 0:
+            a_seats = -1
+        addons_out.append({"name": str(addon["name"]), "seats": a_seats})
+    addons_out.sort(key=lambda x: str(x["name"]).casefold())
+    out: dict[str, Any] = {
+        "name": name,
+        "plan": plan,
+        "seats": seats_raw,
+        "file_plan": _msp_file_plan_display(mc.get("file_plan_type")),
+        "addons": addons_out,
+    }
+    eid = mc.get("mc_enterprise_id")
+    if eid is not None:
+        out["mc_enterprise_id"] = eid
+    return out
 
 
 def _semver_tuple_at_least(installed: tuple[int, ...], minimum: tuple[int, ...]) -> bool:
@@ -323,7 +394,42 @@ class CommanderCliProvider(Provider):
         return records
 
     def discover_managed_companies(self) -> list[dict[str, Any]]:
-        raise CapabilityError(_MSP_UNSUPPORTED_REASON)
+        """Load managed companies via in-process ``api.query_enterprise`` (MSP admin)."""
+        try:
+            from keepercommander import api  # type: ignore
+        except ImportError as exc:
+            raise CapabilityError(
+                reason=f"MSP discover requires keepercommander: {exc}",
+                next_action="pip install 'keepercommander>=17.2.13,<18'",
+            ) from exc
+
+        def _run_discover() -> list[dict[str, Any]]:
+            params = self._get_keeper_params()
+            api.query_enterprise(params)
+            ent = getattr(params, "enterprise", None) or {}
+            raw = ent.get("managed_companies")
+            if not isinstance(raw, list):
+                return []
+            rows: list[dict[str, Any]] = []
+            for mc in raw:
+                if not isinstance(mc, dict):
+                    continue
+                try:
+                    rows.append(_commander_mc_dict_to_sdk_row(mc))
+                except (KeyError, TypeError, ValueError):
+                    continue
+            rows.sort(key=lambda r: str(r["name"]).casefold())
+            return rows
+
+        try:
+            return self._with_keeper_session_refresh(_run_discover)
+        except CapabilityError:
+            raise
+        except Exception as exc:
+            raise CapabilityError(
+                reason=f"MSP managed-company discover failed: {type(exc).__name__}: {exc}",
+                next_action="ensure MSP admin session; run `keeper msp-down` then retry",
+            ) from exc
 
     def _resolve_pam_configuration_keeper_uid(
         self, live: LiveRecord, records: list[LiveRecord]
@@ -850,7 +956,7 @@ class CommanderCliProvider(Provider):
         return outcomes
 
     def apply_msp_plan(self, plan: Plan, *, dry_run: bool = False) -> list[ApplyOutcome]:
-        raise CapabilityError(_MSP_UNSUPPORTED_REASON)
+        raise CapabilityError(_MSP_APPLY_UNSUPPORTED_REASON)
 
     def _apply_vault_plan(self, plan: Plan, *, dry_run: bool = False) -> list[ApplyOutcome]:
         """Apply ``keeper-vault.v1`` slice-1 (``login``) via record-add + marker + ``rm``."""

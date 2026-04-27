@@ -85,11 +85,11 @@ EXIT_SCHEMA = 2
 EXIT_REF = 3
 EXIT_CONFLICT = 4
 EXIT_CAPABILITY = 5
-_MSP_COMMANDER_UNSUPPORTED_REASON = "MSP family unsupported on commander provider; planned for P7"
-_MSP_MANAGED_COMPANY_RESOURCE = "managed_company"
-_MSP_ONLINE_COMMANDER_NEXT_ACTION = (
-    "MSP --online unsupported on commander provider; planned for P7"
+_MSP_COMMANDER_UNSUPPORTED_REASON = (
+    "MSP import and adoption are not implemented on commander provider "
+    "(no declarative ownership marker writer for managed companies; see docs/MSP_FAMILY_DESIGN.md)"
 )
+_MSP_MANAGED_COMPANY_RESOURCE = "managed_company"
 
 
 def _mock_adopt_managed_companies(self: MockProvider, plan: Plan) -> list[ApplyOutcome]:
@@ -429,12 +429,6 @@ def validate(
             noop_count = skip_count = 0
 
             if online:
-                if ctx.obj.get("provider") == "commander":
-                    click.echo(
-                        f"next_action: {_MSP_ONLINE_COMMANDER_NEXT_ACTION}",
-                        err=True,
-                    )
-                    sys.exit(EXIT_CAPABILITY)
                 provider = _make_provider(ctx, manifest_path, msp=msp_manifest)
                 try:
                     live_msp = provider.discover_managed_companies()

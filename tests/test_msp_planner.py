@@ -19,7 +19,10 @@ from keeper_sdk.providers.commander_cli import CommanderCliProvider
 
 cli_main_module = importlib.import_module("keeper_sdk.cli.main")
 
-MSP_UNSUPPORTED = "MSP family unsupported on commander provider; planned for P7"
+MSP_APPLY_UNSUPPORTED = (
+    "MSP managed-company apply is not implemented on CommanderCliProvider "
+    "(Commander: `msp-add` / `msp-update` / `msp-remove`; see docs/COMMANDER.md)"
+)
 
 
 def _run(args: list[str]):
@@ -127,13 +130,8 @@ def test_apply_then_plan_msp_mock_is_noop(
     assert plan["changes"][0]["kind"] == "noop"
 
 
-def test_commander_msp_entry_points_raise_exact_capability_error() -> None:
+def test_commander_msp_apply_raises_capability_error() -> None:
     provider = CommanderCliProvider.__new__(CommanderCliProvider)
-
-    with pytest.raises(CapabilityError) as discover_exc:
-        provider.discover_managed_companies()
     with pytest.raises(CapabilityError) as apply_exc:
         provider.apply_msp_plan(Plan("msp-plan-test", [], []))
-
-    assert discover_exc.value.reason == MSP_UNSUPPORTED
-    assert apply_exc.value.reason == MSP_UNSUPPORTED
+    assert apply_exc.value.reason == MSP_APPLY_UNSUPPORTED
