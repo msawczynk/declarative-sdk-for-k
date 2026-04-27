@@ -2,12 +2,12 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/msawczynk/declarative-sdk-for-k/schemas/keeper-vault/v1.json",
   "title": "keeper-vault.v1",
-  "description": "Schema body for Keeper Vault records, custom record types, attachments, and KeeperFill settings. Slice-1 login record lifecycle has a sanitized live tenant proof; broader vault surfaces remain governed by provider capability gates.",
+  "description": "Vault declarative manifest v1 for Keeper Vault records, custom record types, attachments, and KeeperFill settings. Supported record lifecycle coverage has sanitized live-proof transcripts under docs/live-proof/; broader vault surfaces remain governed by provider capability gates.",
   "x-keeper-live-proof": {
     "status": "supported",
     "evidence": "docs/live-proof/keeper-vault.v1.91119c4.sanitized.json",
     "since_pin": "91119c4e4f08139eec810ea6550abf92f8e79240",
-    "notes": "Sprint 7h-38 L1: vaultOneLogin smoke matrix passed live via EnvLoginHelper against keepersecurity.com; sanitized transcript records create, clean re-plan, destroy, and empty re-discover."
+    "notes": "vaultOneLogin smoke matrix passed live via EnvLoginHelper against keepersecurity.com; sanitized transcript records create, clean re-plan, destroy, and empty re-discover."
   },
   "type": "object",
   "additionalProperties": false,
