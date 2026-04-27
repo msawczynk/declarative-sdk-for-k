@@ -20,9 +20,7 @@ _SCHEMA_PATH = (
     / "keeper-vault-sharing"
     / "keeper-vault-sharing.v1.schema.json"
 )
-_V9A_EVIDENCE = (
-    "docs/live-proof/keeper-vault-sharing.v1.535e03f.folderlifecycle.sanitized.json"
-)
+_V9A_EVIDENCE = "docs/live-proof/keeper-vault-sharing.v1.535e03f.folderlifecycle.sanitized.json"
 
 _MINIMAL_MANIFEST = """\
 {

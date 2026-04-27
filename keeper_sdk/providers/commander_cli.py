@@ -991,7 +991,9 @@ class CommanderCliProvider(Provider):
             "sharing_shared_folder": 2,
             "sharing_folder": 3,
         }
-        return sorted(changes, key=lambda change: (rank.get(change.resource_type, 99), change.title))
+        return sorted(
+            changes, key=lambda change: (rank.get(change.resource_type, 99), change.title)
+        )
 
     def _apply_sharing_plan(self, plan: Plan, *, dry_run: bool = False) -> list[ApplyOutcome]:
         """Apply ``keeper-vault-sharing.v1`` folder + ACL rows.
@@ -1290,7 +1292,9 @@ class CommanderCliProvider(Provider):
             user_email=user_email,
             can_edit=self._payload_bool(payload, "can_edit", False),
             can_share=self._payload_bool(payload, "can_share", False),
-            expiration_iso=payload.get("expires_at") if isinstance(payload.get("expires_at"), str) else None,
+            expiration_iso=payload.get("expires_at")
+            if isinstance(payload.get("expires_at"), str)
+            else None,
         )
 
     def _sharing_revoke_record_share(self, payload: dict[str, Any], *, change: Change) -> None:
@@ -1461,7 +1465,9 @@ class CommanderCliProvider(Provider):
         payload = self._run_cmd(["ls", self._folder_uid, "--format", "json"])
         entries = _load_json(payload, command="ls --format json")
         if not isinstance(entries, list):
-            raise CapabilityError(reason="Commander returned non-array JSON from `ls --format json`")
+            raise CapabilityError(
+                reason="Commander returned non-array JSON from `ls --format json`"
+            )
         records: list[LiveRecord] = []
         for entry in entries:
             if not isinstance(entry, dict) or entry.get("type") != "record":
