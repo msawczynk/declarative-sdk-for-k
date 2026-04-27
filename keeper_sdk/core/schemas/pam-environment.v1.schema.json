@@ -5,7 +5,10 @@
   "description": "Declarative manifest for KeeperPAM. Superset-compatible with the `pam project import` JSON shipped by Commander; see Commander/keepercommander/commands/pam_import/README.md for the authoritative field list.",
   "x-keeper-live-proof": {
     "status": "supported",
-    "evidence": "scripts/smoke/scenarios.py",
+    "evidence": [
+      "scripts/smoke/scenarios.py",
+      "docs/live-proof/keeper-pam-environment.v1.89047920.machine.sanitized.json"
+    ],
     "since_pin": "89047920a0df857e01fb59adcb0bfb9fa6db70bf",
     "notes": "PAM lifecycle live-proven via the smoke matrix: pamMachine, pamDatabase, pamDirectory all run plan -> apply -> clean re-plan -> destroy through Commander. pamRemoteBrowser and pamUserNestedRotation remain experimental (preview-gated; see scripts/smoke/README.md and docs/SDK_DA_COMPLETION_PLAN.md Phase 2/3). Block added 7h-36 to satisfy CONVENTIONS.md mandatory annotation; previously the only family schema without the block."
   },
