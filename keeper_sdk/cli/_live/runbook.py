@@ -12,6 +12,7 @@ truncated stderr summary.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import subprocess
 import time
@@ -56,18 +57,37 @@ def phase_bootstrap(
     ksm_record_uid: str,
     ksm_config_path: Path | None = None,
     workdir: Path,
+    app_name: str | None = None,
+    login_helper: str | None = None,
 ) -> Phase:
     """Run `dsk bootstrap-ksm`. Records app UID fingerprint."""
     started = time.monotonic()
-    cmd = ["dsk", "bootstrap-ksm", "--record-uid", ksm_record_uid]
-    if ksm_config_path is not None:
-        cmd.extend(["--ksm-config", str(ksm_config_path)])
-    rc, stdout, stderr = _run(cmd, cwd=workdir)
+    out = (ksm_config_path or (workdir / "ksm.config")).resolve()
+    # Unique app name per workdir so parallel test tmp dirs never collide on KSM app title.
+    name = (
+        app_name
+        or ("dsk-live-" + hashlib.sha256(str(workdir).encode("utf-8")).hexdigest()[:20])[:64]
+    )
+    helper = login_helper or os.environ.get("KEEPER_LIVE_BOOTSTRAP_LOGIN_HELPER") or "commander"
+    cmd = [
+        "dsk",
+        "bootstrap-ksm",
+        "--app-name",
+        name,
+        "--admin-record-uid",
+        ksm_record_uid,
+        "--config-out",
+        str(out),
+        "--overwrite",
+        "--login-helper",
+        helper,
+    ]
+    rc, stdout, stderr = _run(cmd, cwd=workdir, timeout=300)
     elapsed = int((time.monotonic() - started) * 1000)
     phase = Phase(name="bootstrap", elapsed_ms=elapsed)
     if rc != 0:
         phase.status = "failed"
-        phase.error = stderr
+        phase.error = (stderr or "") + (stdout or "")
         return phase
     phase.status = "ok"
     phase.details = {"stdout_len": len(stdout)}

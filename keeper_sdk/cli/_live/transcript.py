@@ -173,10 +173,13 @@ class Transcript:
         }
 
     def to_dict(self) -> dict[str, Any]:
+        pin = (self.commander_pin or "").strip()
+        if len(pin) > 12:
+            pin = pin[:8] + "..."
         return {
             "schema_family": self.schema_family,
             "schema_version": self.schema_version,
-            "commander_pin": self.commander_pin,
+            "commander_pin": pin,
             "started_at": self.started_at,
             "finished_at": self.finished_at,
             "phases": [p.to_dict() for p in self.phases],
