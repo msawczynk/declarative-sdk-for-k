@@ -385,7 +385,10 @@ def _redeem_one_time_token(
         config_path.unlink()
 
     try:
-        _quiet_call(SecretsManager, token=token, config=FileKeyValueStorage(str(config_path)))
+        client = _quiet_call(
+            SecretsManager, token=token, config=FileKeyValueStorage(str(config_path))
+        )
+        _quiet_call(client.get_secrets)
     except Exception as exc:
         raise _bootstrap_error(
             "redeeming KSM client token failed",

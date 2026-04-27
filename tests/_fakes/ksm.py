@@ -68,11 +68,13 @@ class FakeSecretsManager:
         if token is not None and getattr(config, "path", None):
             Path(config.path).write_text('{"fake":"ksm-config"}', encoding="utf-8")
 
-    def get_secrets(self, uids: list[str]) -> list[FakeRecord]:
+    def get_secrets(self, uids: list[str] | None = None) -> list[FakeRecord]:
         cls = self.__class__
         cls.get_secrets_calls += 1
         if cls.get_secrets_calls <= cls.visibility_delay:
             return []
+        if uids is None:
+            return list(self.records.values())
         return [self.records[uid] for uid in uids if uid in self.records]
 
 

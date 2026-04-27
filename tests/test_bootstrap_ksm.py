@@ -562,6 +562,26 @@ def test_redeem_one_time_token_requires_ksm_core(
     assert "keeper_secrets_manager_core is required" in exc_info.value.reason
 
 
+def test_redeem_one_time_token_fetches_once_to_bind_config(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    fake_ksm = install_fake_ksm_core(monkeypatch, {})
+    config_out = tmp_path / "bound-config.json"
+
+    bootstrap_module._redeem_one_time_token(
+        token="fake-token",
+        config_path=config_out,
+        overwrite=False,
+        partial={"app_uid": "APP000000001"},
+    )
+
+    assert config_out.is_file()
+    assert len(fake_ksm.init_calls) == 1
+    assert fake_ksm.init_calls[0]["token_supplied"] is True
+    assert fake_ksm.get_secrets_calls == 1
+
+
 def test_redeem_one_time_token_overwrite_unlinks_then_wraps_failure(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
