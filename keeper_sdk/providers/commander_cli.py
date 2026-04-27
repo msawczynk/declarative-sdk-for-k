@@ -109,6 +109,7 @@ _ROTATION_APPLY_ENV_VAR = "DSK_EXPERIMENTAL_ROTATION_APPLY"
 _TRUTHY_ENV_VALUES = {"1", "true", "yes", "on"}
 # In-process PAM import / marker writes require a floor documented in docs/COMMANDER.md.
 _MIN_KEEPERCOMMANDER_VERSION = (17, 2, 13)
+_MSP_UNSUPPORTED_REASON = "MSP family unsupported on commander provider; planned for P7"
 
 
 def _semver_tuple_at_least(installed: tuple[int, ...], minimum: tuple[int, ...]) -> bool:
@@ -320,6 +321,9 @@ class CommanderCliProvider(Provider):
         if self._keeper_params is not None:
             self._enrich_pam_remote_browser_dag_options(records)
         return records
+
+    def discover_managed_companies(self) -> list[dict[str, Any]]:
+        raise CapabilityError(_MSP_UNSUPPORTED_REASON)
 
     def _resolve_pam_configuration_keeper_uid(
         self, live: LiveRecord, records: list[LiveRecord]
@@ -844,6 +848,9 @@ class CommanderCliProvider(Provider):
                 )
             )
         return outcomes
+
+    def apply_msp_plan(self, plan: Plan, *, dry_run: bool = False) -> list[ApplyOutcome]:
+        raise CapabilityError(_MSP_UNSUPPORTED_REASON)
 
     def _apply_vault_plan(self, plan: Plan, *, dry_run: bool = False) -> list[ApplyOutcome]:
         """Apply ``keeper-vault.v1`` slice-1 (``login``) via record-add + marker + ``rm``."""

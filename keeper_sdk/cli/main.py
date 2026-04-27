@@ -41,6 +41,7 @@ from keeper_sdk.core import (
     ChangeKind,
     Manifest,
     ManifestError,
+    MspManifestV1,
     OwnershipError,
     RefError,
     SchemaError,
@@ -49,12 +50,14 @@ from keeper_sdk.core import (
     build_plan,
     build_vault_graph,
     compute_diff,
+    compute_msp_diff,
     compute_sharing_diff,
     compute_vault_diff,
     dump_manifest,
     execution_order,
     from_pam_import_json,
     load_declarative_manifest,
+    msp_apply_order,
     redact,
     vault_record_apply_order,
 )
@@ -84,14 +87,16 @@ EXIT_CAPABILITY = 5
 
 @dataclass
 class PlanLoadBundle:
-    """Result of loading a manifest for plan/diff/apply (PAM, vault L1, or sharing L1)."""
+    """Result of loading a manifest for plan/diff/apply."""
 
     pam: Manifest | None
     vault: VaultManifestV1 | None
     sharing: SharingManifestV1 | None
+    msp: MspManifestV1 | None
     manifest_name: str
     order: list[str]
     live: list[LiveRecord]
+    live_msp: list[dict[str, Any]]
     live_record_type_defs: list[dict[str, Any]]
     provider: Any
 
@@ -753,7 +758,10 @@ def apply(
     bundle = ctx.obj["_plan_bundle"]
     provider = bundle.provider
     try:
-        outcomes = provider.apply_plan(plan_obj, dry_run=dry_run)
+        if bundle.msp is not None:
+            outcomes = provider.apply_msp_plan(plan_obj, dry_run=dry_run)
+        else:
+            outcomes = provider.apply_plan(plan_obj, dry_run=dry_run)
     except CapabilityError as exc:
         click.echo(f"provider error: {exc}", err=True)
         if exc.context:
@@ -771,7 +779,7 @@ def apply(
 def _build_plan(ctx: click.Context, manifest_path: Path, *, allow_delete: bool) -> Plan:
     bundle = _load_plan_context(ctx, manifest_path)
     ctx.obj["_plan_bundle"] = bundle
-    capability_subject: Manifest | VaultManifestV1 | SharingManifestV1
+    capability_subject: Manifest | VaultManifestV1 | SharingManifestV1 | MspManifestV1
     try:
         if bundle.pam is not None:
             changes = compute_diff(
@@ -790,6 +798,13 @@ def _build_plan(ctx: click.Context, manifest_path: Path, *, allow_delete: bool) 
                 live_record_type_defs=bundle.live_record_type_defs,
             )
             capability_subject = bundle.vault
+        elif bundle.msp is not None:
+            changes = compute_msp_diff(
+                bundle.msp,
+                bundle.live_msp,
+                allow_delete=allow_delete,
+            )
+            capability_subject = bundle.msp
         else:
             assert bundle.sharing is not None
             changes = _build_sharing_changes(
@@ -855,7 +870,13 @@ def _load_plan_context(ctx: click.Context, manifest_path: Path) -> PlanLoadBundl
     pam: Manifest | None = typed if isinstance(typed, Manifest) else None
     vault: VaultManifestV1 | None = typed if isinstance(typed, VaultManifestV1) else None
     sharing: SharingManifestV1 | None = typed if isinstance(typed, SharingManifestV1) else None
-    manifest_name = pam.name if pam is not None else manifest_path.stem
+    msp: MspManifestV1 | None = typed if isinstance(typed, MspManifestV1) else None
+    if pam is not None:
+        manifest_name = pam.name
+    elif msp is not None:
+        manifest_name = msp.name
+    else:
+        manifest_name = manifest_path.stem
 
     try:
         if pam is not None:
@@ -864,6 +885,8 @@ def _load_plan_context(ctx: click.Context, manifest_path: Path) -> PlanLoadBundl
         elif vault is not None:
             assert vault is not None
             order = vault_record_apply_order(vault)
+        elif msp is not None:
+            order = msp_apply_order(msp)
         else:
             assert sharing is not None
             order = _sharing_apply_order(sharing)
@@ -871,9 +894,17 @@ def _load_plan_context(ctx: click.Context, manifest_path: Path) -> PlanLoadBundl
         click.echo(f"reference error: {exc}", err=True)
         sys.exit(EXIT_REF)
 
-    provider = _make_provider(ctx, manifest_path, pam=pam, vault=vault, sharing=sharing)
+    provider = _make_provider(ctx, manifest_path, pam=pam, vault=vault, sharing=sharing, msp=msp)
     live_record_type_defs: list[dict[str, Any]] = []
-    if sharing is None:
+    live: list[LiveRecord] = []
+    live_msp: list[dict[str, Any]] = []
+    if msp is not None:
+        try:
+            live_msp = provider.discover_managed_companies()
+        except CapabilityError as exc:
+            click.echo(f"discovery failed: {exc}", err=True)
+            sys.exit(EXIT_CAPABILITY)
+    elif sharing is None:
         try:
             live = provider.discover()
         except CapabilityError as exc:
@@ -881,16 +912,16 @@ def _load_plan_context(ctx: click.Context, manifest_path: Path) -> PlanLoadBundl
             sys.exit(EXIT_CAPABILITY)
         if vault is not None:
             live, live_record_type_defs = _vault_live_inputs(live)
-    else:
-        live = []
 
     return PlanLoadBundle(
         pam=pam,
         vault=vault,
         sharing=sharing,
+        msp=msp,
         manifest_name=manifest_name,
         order=order,
         live=live,
+        live_msp=live_msp,
         live_record_type_defs=live_record_type_defs,
         provider=provider,
     )
@@ -972,10 +1003,16 @@ def _make_provider(
     pam: Manifest | None = None,
     vault: VaultManifestV1 | None = None,
     sharing: SharingManifestV1 | None = None,
+    msp: MspManifestV1 | None = None,
 ):
     provider_name = ctx.obj.get("provider", "mock")
     folder_uid = ctx.obj.get("folder_uid")
-    manifest_name = pam.name if pam is not None else manifest_path.stem
+    if pam is not None:
+        manifest_name = pam.name
+    elif msp is not None:
+        manifest_name = msp.name
+    else:
+        manifest_name = manifest_path.stem
     if provider_name == "mock":
         return ctx.obj.setdefault("_provider_instance", MockProvider(manifest_name))
     if provider_name == "commander":
@@ -986,6 +1023,8 @@ def _make_provider(
             manifest_source = vault.model_dump(mode="python", exclude_none=True, by_alias=True)
         elif sharing is not None:
             manifest_source = sharing.model_dump(mode="python", exclude_none=True, by_alias=True)
+        elif msp is not None:
+            manifest_source = msp.model_dump(mode="python", exclude_none=True, by_alias=True)
         return CommanderCliProvider(
             folder_uid=folder_uid or os.environ.get("KEEPER_DECLARATIVE_FOLDER"),
             manifest_source=manifest_source,

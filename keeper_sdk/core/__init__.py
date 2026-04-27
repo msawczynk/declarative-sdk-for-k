@@ -12,6 +12,9 @@ Stable public surface:
     - compute_vault_diff (core.vault_diff) — vault PR-V3
     - SharingManifestV1, load_sharing_manifest (core.sharing_models) — sharing typed slice
     - compute_sharing_diff (core.sharing_diff) — sharing folders diff slice
+    - MspManifestV1, load_msp_manifest (core.msp_models) — MSP slice 1
+    - build_msp_graph, msp_apply_order (core.msp_graph) — MSP slice 1
+    - compute_msp_diff (core.msp_diff) — MSP slice 1
     - build_graph, execution_order (core.graph)
     - compute_diff, Change (core.diff)
     - build_plan, Plan (core.planner)
@@ -55,6 +58,15 @@ from keeper_sdk.core.models import (
     Project,
     SharedFolderBlock,
     SharedFoldersBlock,
+)
+from keeper_sdk.core.msp_diff import compute_msp_diff
+from keeper_sdk.core.msp_graph import build_msp_graph, msp_apply_order
+from keeper_sdk.core.msp_models import (
+    MSP_FAMILY,
+    Addon,
+    ManagedCompany,
+    MspManifestV1,
+    load_msp_manifest,
 )
 from keeper_sdk.core.normalize import from_pam_import_json, to_pam_import_json
 from keeper_sdk.core.planner import Plan, build_plan
@@ -115,6 +127,11 @@ __all__ = [
     "Project",
     "SharedFolderBlock",
     "SharedFoldersBlock",
+    "MSP_FAMILY",
+    "MspManifestV1",
+    "ManagedCompany",
+    "Addon",
+    "load_msp_manifest",
     "load_manifest",
     "load_declarative_manifest",
     "dump_manifest",
@@ -131,6 +148,7 @@ __all__ = [
     "Change",
     "ChangeKind",
     "compute_diff",
+    "compute_msp_diff",
     "compute_vault_diff",
     "compute_sharing_diff",
     "Plan",
@@ -150,6 +168,8 @@ __all__ = [
     "VAULT_MANIFEST_FAMILY",
     "build_vault_graph",
     "vault_record_apply_order",
+    "build_msp_graph",
+    "msp_apply_order",
     "SharingManifestV1",
     "SharingFolder",
     "SharingSharedFolder",
