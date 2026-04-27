@@ -466,3 +466,202 @@ def vault_names() -> list[str]:
 def all_vault_scenarios() -> list[VaultScenarioSpec]:
     """Return every registered vault scenario in name order."""
     return [_VAULT_SCENARIOS[name] for name in vault_names()]
+
+
+@dataclass(frozen=True)
+class SharingScenarioSpec:
+    """One keeper-vault-sharing.v1 live-smoke scenario.
+
+    V8b wires this into the harness; keep it out of the PAM/vault registries here.
+    """
+
+    name: str
+    family: str
+    resources_factory: Callable[[str, str], list[dict[str, Any]]]
+    verifier: Callable[[Sequence[Any]], None]
+    description: str = ""
+
+
+def _sharing_lifecycle_context(primary: str, secondary: str | None) -> tuple[str, str]:
+    default_grantee = "smoke@example.invalid"
+    if secondary is None:
+        return primary, default_grantee
+    if "@" in primary and "@" not in secondary:
+        return secondary, primary
+    if "@" in secondary:
+        return primary, secondary
+    if secondary.startswith("sdk-smoke") and not primary.startswith("sdk-smoke"):
+        return secondary, default_grantee
+    return primary, default_grantee
+
+
+def _sharing_lifecycle_resources(
+    primary: str, secondary: str | None = None
+) -> list[dict[str, Any]]:
+    title_prefix, grantee_email = _sharing_lifecycle_context(primary, secondary)
+    folder_uid_ref = f"{title_prefix}-sharing-folder"
+    shared_folder_uid_ref = f"{title_prefix}-sharing-shared-folder"
+    record_uid_ref = f"{title_prefix}-sharing-record"
+
+    return [
+        {
+            "resource_type": "sharing_folder",
+            "uid_ref": folder_uid_ref,
+            "path": f"/{title_prefix}/sharing-user-folder",
+            "color": "blue",
+        },
+        {
+            "resource_type": "sharing_shared_folder",
+            "uid_ref": shared_folder_uid_ref,
+            "path": f"/{title_prefix}/sharing-shared-folder",
+            "defaults": {
+                "manage_users": False,
+                "manage_records": True,
+                "can_edit": True,
+                "can_share": False,
+            },
+        },
+        {
+            "resource_type": "login",
+            "uid_ref": record_uid_ref,
+            "type": "login",
+            "title": f"{title_prefix}-sharing-login",
+            "folder_ref": f"keeper-vault-sharing:folders:{folder_uid_ref}",
+            "fields": [
+                {"type": "login", "label": "Login", "value": ["sharing@example.invalid"]},
+                {
+                    "type": "password",
+                    "label": "Password",
+                    "value": [_generate_throwaway_password()],
+                },
+            ],
+        },
+        {
+            "resource_type": "sharing_record_share",
+            "uid_ref": f"{title_prefix}-sharing-record-share",
+            "record_uid_ref": f"keeper-vault:records:{record_uid_ref}",
+            "user_email": grantee_email,
+            "permissions": {"can_edit": False, "can_share": False},
+        },
+        {
+            "resource_type": "sharing_share_folder",
+            "kind": "default",
+            "uid_ref": f"{title_prefix}-sharing-default-share",
+            "shared_folder_uid_ref": (
+                f"keeper-vault-sharing:shared_folders:{shared_folder_uid_ref}"
+            ),
+            "target": "grantee",
+            "permissions": {"manage_records": True, "manage_users": False},
+        },
+    ]
+
+
+def _sharing_payload(record: Any) -> dict[str, Any]:
+    raw_payload = (
+        record.get("payload") if isinstance(record, dict) else getattr(record, "payload", None)
+    )
+    if isinstance(raw_payload, dict):
+        return raw_payload
+    if isinstance(record, dict):
+        return record
+    return {}
+
+
+def _sharing_marker(record: Any, payload: dict[str, Any]) -> dict[str, Any] | None:
+    from keeper_sdk.core.metadata import MARKER_FIELD_LABEL, decode_marker
+
+    raw_marker = (
+        record.get("marker") if isinstance(record, dict) else getattr(record, "marker", None)
+    )
+    if isinstance(raw_marker, dict):
+        return raw_marker
+    if isinstance(raw_marker, str):
+        return decode_marker(raw_marker)
+
+    custom_fields = payload.get("custom_fields") or payload.get("custom") or {}
+    if isinstance(custom_fields, dict):
+        raw_marker = custom_fields.get(MARKER_FIELD_LABEL)
+        if isinstance(raw_marker, dict):
+            return raw_marker
+        if isinstance(raw_marker, str):
+            return decode_marker(raw_marker)
+    return None
+
+
+def _sharing_value(
+    record: Any, payload: dict[str, Any], marker: dict[str, Any] | None, key: str
+) -> Any:
+    if isinstance(record, dict) and key in record:
+        return record[key]
+    value = getattr(record, key, None)
+    if value is not None:
+        return value
+    if key in payload:
+        return payload[key]
+    return (marker or {}).get(key)
+
+
+def _sharing_grantee_identifier(payload: dict[str, Any]) -> str | None:
+    for key in ("user_email", "team_uid_ref", "grantee_identifier", "identifier"):
+        value = payload.get(key)
+        if isinstance(value, str) and value:
+            return value
+    grantee = payload.get("grantee")
+    if isinstance(grantee, dict):
+        for key in ("user_email", "team_uid_ref"):
+            value = grantee.get(key)
+            if isinstance(value, str) and value:
+                return value
+    return None
+
+
+def _verify_sharing_lifecycle(records: Sequence[Any]) -> None:
+    folder_marker_seen = False
+    shared_folder_seen = False
+    record_share_grantee_seen = False
+    share_folder_seen = False
+
+    for record in records:
+        payload = _sharing_payload(record)
+        marker = _sharing_marker(record, payload)
+        resource_type = _sharing_value(record, payload, marker, "resource_type")
+
+        if resource_type == "sharing_folder" and marker:
+            marker_manager = marker.get("manager")
+            if marker_manager in (None, MANAGER_NAME):
+                folder_marker_seen = True
+        elif resource_type == "sharing_shared_folder":
+            shared_folder_seen = True
+        elif resource_type == "sharing_record_share":
+            record_uid_ref = payload.get("record_uid_ref")
+            if record_uid_ref and _sharing_grantee_identifier(payload):
+                record_share_grantee_seen = True
+        elif resource_type == "sharing_share_folder":
+            kind = payload.get("kind")
+            if kind in (None, "default") or payload.get("target") == "grantee":
+                share_folder_seen = True
+
+    missing: list[str] = []
+    if not folder_marker_seen:
+        missing.append("sharing_folder marker")
+    if not shared_folder_seen:
+        missing.append("sharing_shared_folder")
+    if not record_share_grantee_seen:
+        missing.append("sharing_record_share grantee")
+    if not share_folder_seen:
+        missing.append("sharing_share_folder")
+    if missing:
+        raise AssertionError(f"vaultSharingLifecycle verifier missing: {', '.join(missing)}")
+
+
+VAULT_SHARING_LIFECYCLE = SharingScenarioSpec(
+    name="vaultSharingLifecycle",
+    family="keeper-vault-sharing.v1",
+    resources_factory=_sharing_lifecycle_resources,
+    verifier=_verify_sharing_lifecycle,
+    description=(
+        "Sharing lifecycle fixture with one user folder, one shared folder, "
+        "one vault login record, one direct record share, and one default "
+        "shared-folder share row."
+    ),
+)
