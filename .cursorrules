@@ -8,6 +8,7 @@ misled agents toward removed modules. Use these repo-local sources instead:
 - `docs/SDK_COMPLETION_PLAN.md` — roadmap and live-proof gates.
 - `docs/SDK_DA_COMPLETION_PLAN.md` — devil's-advocate completion contract; classifies every modeled capability as `supported` / `preview-gated` / `upstream-gap`.
 - `docs/VALIDATION_STAGES.md` — validation stages and exit-code contract.
+- `~/.cursor-daybook-sync/scripts/phase_runner.sh` — workspace-global phase-runner harness; **default** for any multi-step delegated worker task in this repo (≥2 file edits, gate run, or commit draft). Spec template: `~/.cursor-daybook-sync/scripts/templates/phase_spec.example.yaml`. See `AGENTS.md` § "Phase runner harness".
 
 Current architecture:
 

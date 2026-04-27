@@ -96,6 +96,37 @@ Live tenant access is granted via the project's standing operator policy; use
 the committed live-smoke harness (`scripts/smoke/smoke.py`) and do not echo
 secrets in any output.
 
+## Phase runner harness (workspace-global, default for multi-step phases)
+
+Any multi-step phase work in this repo (≥2 file edits, OR a gate run, OR a
+commit-message draft — i.e. most sprints, including every MSP P0/P1/P2 commit)
+routes through the workspace-global harness rather than hand-written Codex
+prompts:
+
+```bash
+bash ~/.cursor-daybook-sync/scripts/phase_runner.sh /path/to/phase-spec.yaml [--auto-commit]
+```
+
+Spec template (with a worked MSP P2 example):
+`~/.cursor-daybook-sync/scripts/templates/phase_spec.example.yaml`
+
+Usage doc + spec field reference + exit codes:
+`~/.cursor-daybook-sync/scripts/templates/phase_runner.README.md`
+
+The harness owns prompt rendering, preflight (scope sanity, git clean), Codex
+launch, marker polling, regression gates, commit-message draft, JOURNAL-entry
+draft, and optional `--auto-commit` + push. Output is a `PHASE_RUNNER_RESULT`
+block with `OVERALL=green|amber|red` plus `VERIFIER_RECOMMENDED=yes|no`.
+
+**Do not** invent an SDK-local copy of the harness — it lives workspace-global
+so the same discipline binds across `declarative-sdk-for-k`,
+`keeper-vault-rbi-pam-testenv`, and any sibling repo. Hand-written ad-hoc
+Codex prompts for multi-step phases are a discipline drift event surfaced by
+the workspace-level `token-economy.mdc` audit checklist (#16). Exempt cases:
+single one-shot probes, harness-self-modification, and tasks whose spec format
+genuinely cannot be captured (escalate the last; the spec format may need
+extension).
+
 ## Agent playbook
 
 ### A. "Apply this manifest"
