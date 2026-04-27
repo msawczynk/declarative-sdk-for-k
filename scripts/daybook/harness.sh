@@ -47,8 +47,12 @@ case "${1:-}" in
     ;;
 esac
 
-ROOT="${DAYBOOK_SYNC_ROOT:-${HOME}/.cursor-daybook-sync}/scripts"
+SYNC_BASE="${DAYBOOK_SYNC_ROOT:-${HOME}/.cursor-daybook-sync}"
+ROOT="${SYNC_BASE}/scripts"
 if [[ ! -d "$ROOT" ]]; then
+  if [[ -f "${SYNC_BASE}/agent_session_boot.sh" ]]; then
+    echo "daybook harness: DAYBOOK_SYNC_ROOT is the scripts/ directory; set it to the clone root (parent of scripts/)." >&2
+  fi
   echo "daybook harness: missing directory: $ROOT" >&2
   echo "Set DAYBOOK_SYNC_ROOT to your cursor-daybook-sync clone, or install scripts there." >&2
   exit 1

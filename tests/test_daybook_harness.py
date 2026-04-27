@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -49,3 +50,22 @@ def test_harness_boot_fails_cleanly_without_daybook_sync() -> None:
     p = _run_harness("boot")
     assert p.returncode == 1
     assert "missing directory" in p.stderr or "missing directory" in p.stdout
+
+
+def test_harness_boot_hints_when_sync_root_is_scripts_dir() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        scripts = Path(tmp) / "scripts"
+        scripts.mkdir()
+        (scripts / "agent_session_boot.sh").write_text("# stub\n", encoding="utf-8")
+        env = {**os.environ, "DAYBOOK_SYNC_ROOT": str(scripts)}
+        p = subprocess.run(
+            ["bash", str(_HARNESS), "boot"],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+    assert p.returncode == 1
+    err = p.stderr + p.stdout
+    assert "clone root" in err
+    assert "scripts/" in err
