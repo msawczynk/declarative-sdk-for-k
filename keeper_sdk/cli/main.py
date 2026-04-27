@@ -106,10 +106,7 @@ def _mock_adopt_managed_companies(self: MockProvider, plan: Plan) -> list[ApplyO
             "next_action: build an MSP-only adoption plan"
         )
 
-    current = {
-        str(row["name"]).casefold(): dict(row)
-        for row in self.discover_managed_companies()
-    }
+    current = {str(row["name"]).casefold(): dict(row) for row in self.discover_managed_companies()}
     outcomes: list[ApplyOutcome] = []
     changed = False
     for change in _msp_plan_changes(plan):
@@ -494,9 +491,7 @@ def validate(
                     )
                 click.echo(json.dumps(mpayload, indent=2))
             else:
-                click.echo(
-                    f"ok: {MSP_FAMILY} ({len(order)} managed_companies){online_suffix}"
-                )
+                click.echo(f"ok: {MSP_FAMILY} ({len(order)} managed_companies){online_suffix}")
             return
 
         if family == SHARING_FAMILY:

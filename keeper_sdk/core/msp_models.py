@@ -17,7 +17,9 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from keeper_sdk.core.errors import SchemaError
 
 MSP_FAMILY: Literal["msp-environment.v1"] = "msp-environment.v1"
-_DUPLICATE_MC_NAME_NEXT_ACTION = "rename one managed_company; names must be unique case-insensitively"
+_DUPLICATE_MC_NAME_NEXT_ACTION = (
+    "rename one managed_company; names must be unique case-insensitively"
+)
 
 
 class _MspModel(BaseModel):
