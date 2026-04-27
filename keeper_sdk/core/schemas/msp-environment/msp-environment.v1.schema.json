@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/msawczynk/declarative-sdk-for-k/schemas/msp-environment/v1.json",
+  "title": "msp-environment.v1",
+  "description": "MSP parent manifest: managed companies slice 1. P0 registry + scaffold; plan/apply deferred. See docs/MSP_FAMILY_DESIGN.md.",
+  "x-keeper-live-proof": {
+    "status": "scaffold-only",
+    "notes": "P0 registry-only; no diff/apply paths wired. Sprint 7h-57. See docs/MSP_FAMILY_DESIGN.md."
+  },
+  "type": "object",
+  "required": ["schema", "name", "managed_companies"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "msp-environment.v1"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "manager": {
+      "type": "string"
+    },
+    "managed_companies": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/managed_company"
+      }
+    },
+    "policies": {
+      "type": "object",
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "addon": {
+      "type": "object",
+      "required": ["name", "seats"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "seats": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "managed_company": {
+      "type": "object",
+      "required": ["name", "plan", "seats"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "plan": {
+          "type": "string",
+          "minLength": 1
+        },
+        "seats": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "file_plan": {
+          "type": ["string", "null"]
+        },
+        "addons": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/addon"
+          }
+        }
+      }
+    }
+  }
+}

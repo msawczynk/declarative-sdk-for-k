@@ -40,6 +40,7 @@ SCHEMA_RESOURCE_BY_FAMILY: dict[str, str] = {
     ),
     SHARING_FAMILY: "keeper-vault-sharing/keeper-vault-sharing.v1.schema.json",
     "keeper-vault.v1": "keeper-vault/keeper-vault.v1.schema.json",
+    "msp-environment.v1": "msp-environment/msp-environment.v1.schema.json",
 }
 
 # Backward-compat alias used by older imports / docs.
