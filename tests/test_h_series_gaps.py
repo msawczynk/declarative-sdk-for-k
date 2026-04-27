@@ -47,6 +47,13 @@ def _make_provider(monkeypatch: pytest.MonkeyPatch, **extra: Any) -> CommanderCl
         "keeper_sdk.providers.commander_cli.shutil.which",
         lambda _bin: "/usr/local/bin/keeper",
     )
+    for var in (
+        "KEEPER_SDK_LOGIN_HELPER",
+        "KEEPER_EMAIL",
+        "KEEPER_PASSWORD",
+        "KEEPER_TOTP_SECRET",
+    ):
+        monkeypatch.delenv(var, raising=False)
     kwargs: dict[str, Any] = {"manifest_source": {"version": "1", "name": "t"}}
     kwargs.update(extra)
     return CommanderCliProvider(**kwargs)

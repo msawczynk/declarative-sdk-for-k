@@ -142,3 +142,34 @@ def test_cleanup_deduplicates_candidate_folder_uids() -> None:
     assert smoke._candidate_cleanup_folder_uids(
         {"managed_folder_uid": "same-folder", "sf_uid": "same-folder"}
     ) == ["same-folder"]
+
+
+def test_sandbox_teardown_records_forces_marker_guarded_delete(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+
+    monkeypatch.setattr(
+        smoke.sandbox,
+        "_list_folder_entries",
+        lambda _params, _folder_uid: [{"type": "record", "uid": "REC1"}],
+    )
+    monkeypatch.setattr(
+        smoke.sandbox,
+        "_record_marker",
+        lambda _params, _record_uid: {"manager": smoke.MANAGER_NAME},
+    )
+    monkeypatch.setattr(
+        smoke.sandbox,
+        "_do",
+        lambda _params, command: calls.append(command) or "",
+    )
+
+    removed = smoke.sandbox.teardown_records(
+        object(),
+        "folder-uid",
+        manager=smoke.MANAGER_NAME,
+    )
+
+    assert removed == ["REC1"]
+    assert calls == ["rm --force REC1"]

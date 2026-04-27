@@ -129,7 +129,7 @@ def teardown_records(
         if not isinstance(marker, dict) or marker.get("manager") != manager:
             continue
         log.info("Removing managed sandbox record %s", record_uid)
-        _do(admin_params, f"rm {record_uid}")
+        _do(admin_params, f"rm --force {record_uid}")
         removed.append(record_uid)
     return removed
 

@@ -155,16 +155,26 @@ def test_smoke_family_dispatch_writes_vault_manifests() -> None:
         assert smoke._set_active_scenario("vaultOneLogin") == "keeper-vault.v1"
         manifest_path = smoke._write_manifest("sf-offline")
         empty_path = smoke._write_empty_manifest("sf-offline")
+        same_stem_empty_path = smoke._write_empty_manifest(
+            "sf-offline",
+            stem=manifest_path.stem,
+        )
         try:
             manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
             empty = yaml.safe_load(empty_path.read_text(encoding="utf-8"))
+            same_stem_empty = yaml.safe_load(
+                same_stem_empty_path.read_text(encoding="utf-8")
+            )
         finally:
             manifest_path.unlink(missing_ok=True)
             empty_path.unlink(missing_ok=True)
+            same_stem_empty_path.unlink(missing_ok=True)
 
         assert manifest["schema"] == "keeper-vault.v1"
         assert len(manifest["records"]) == 1
         assert empty == {"schema": "keeper-vault.v1", "records": []}
+        assert same_stem_empty == empty
+        assert same_stem_empty_path.stem == manifest_path.stem
     finally:
         smoke._ACTIVE_SCENARIO_FAMILY = previous_family
         smoke._ACTIVE_SCENARIO = previous_pam
