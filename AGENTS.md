@@ -231,6 +231,7 @@ See `docs/LOGIN.md` for the 30-line helper skeleton.
    `jit_settings`, or `gateway.mode: create` until this SDK implements
    them.** Validation passes; `apply` converts them to CONFLICT rows;
    the tenant state is unchanged but the manifest contains a lie.
+5. **Never add operator-side orchestration narrative under `docs/`.** Sprint memos, codex prompts, sprint-to-sprint orchestration plans, daybook excerpts → daybook repo (`~/.cursor-daybook-sync/docs/orchestration/dsk/`), not this repo. Public SDK `docs/` is for end-user docs only. Scope-fence catches the obvious cases; this rule catches what regex misses.
 
 ## Operator tooling
 

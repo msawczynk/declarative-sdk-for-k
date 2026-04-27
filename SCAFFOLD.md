@@ -139,6 +139,8 @@ Reconciliation against `V1_GA_CHECKLIST.md` + `docs/SDK_DA_COMPLETION_PLAN.md` +
 
 ## Where to land new work
 
+- **Orchestration narrative / sprint memos / codex prompts:** daybook (`~/.cursor-daybook-sync/docs/orchestration/dsk/`), NOT this repo's `docs/`. Sprint 7h-47 closeout migrated 6 docs + entire `sprint-memos/` tree out; do not re-land them here.
+
 | Change | Land here | Copy this sibling first |
 |---|---|---|
 | New resource type | `keeper_sdk/core/models.py` + `keeper_sdk/core/normalize.py` + `scripts/smoke/scenarios.py` | `pamRemoteBrowser` in the same files |
