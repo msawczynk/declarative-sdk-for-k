@@ -29,11 +29,17 @@ fragment passes schema + planner without a live tenant.
 
 from __future__ import annotations
 
+import secrets
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
+from keeper_sdk.core.diff import ChangeKind
+from keeper_sdk.core.metadata import MANAGER_NAME
+from keeper_sdk.core.vault_diff import compute_vault_diff
+
 ExpectedRecord = tuple[str, str]
+ExpectedVaultRecord = dict[str, str]
 
 
 @dataclass(frozen=True)
@@ -326,6 +332,100 @@ _SCENARIOS: dict[str, ScenarioSpec] = {
 }
 
 
+@dataclass(frozen=True)
+class VaultScenarioSpec:
+    name: str
+    family: str  # always "keeper-vault.v1" for this class
+    build_manifest: Callable[[str, str], dict[str, Any]]
+    expected_records: Callable[[str], list[ExpectedVaultRecord]]
+    verify: Callable[[Any, Sequence[Any], str], None]
+    description: str = ""
+
+
+def _generate_throwaway_password() -> str:
+    return secrets.token_urlsafe(16)
+
+
+def _vault_one_login_manifest(title_prefix: str, sf_uid: str) -> dict[str, Any]:
+    del sf_uid
+    return {
+        "schema": "keeper-vault.v1",
+        "records": [
+            {
+                "uid_ref": f"{title_prefix}-vault-one",
+                "type": "login",
+                "title": f"{title_prefix}-vault-one",
+                "fields": [
+                    {"type": "login", "label": "Login", "value": ["smoke@example.invalid"]},
+                    {
+                        "type": "password",
+                        "label": "Password",
+                        "value": [_generate_throwaway_password()],
+                    },
+                ],
+            }
+        ],
+    }
+
+
+def _vault_one_login_expected_records(title_prefix: str) -> list[ExpectedVaultRecord]:
+    return [
+        {
+            "resource_type": "login",
+            "title": f"{title_prefix}-vault-one",
+            "uid_ref": f"{title_prefix}-vault-one",
+        }
+    ]
+
+
+def _verify_vault_one_login(manifest: Any, live_records: Sequence[Any], title_prefix: str) -> None:
+    expected_title = f"{title_prefix}-vault-one"
+    owned = [
+        record
+        for record in live_records
+        if (getattr(record, "marker", None) or {}).get("manager") == MANAGER_NAME
+    ]
+    if len(owned) != 1:
+        raise AssertionError(f"expected exactly 1 SDK-owned vault record, found {len(owned)}")
+
+    record = owned[0]
+    got_pair = (getattr(record, "resource_type", None), getattr(record, "title", None))
+    if got_pair != ("login", expected_title):
+        raise AssertionError(f"expected managed login {expected_title!r}, found {got_pair!r}")
+
+    marker = getattr(record, "marker", None) or {}
+    if marker.get("resource_type") != "login":
+        raise AssertionError(
+            f"vault marker resource_type is not login: {marker.get('resource_type')!r}"
+        )
+
+    changes = compute_vault_diff(
+        manifest,
+        list(live_records),
+        manifest_name=f"{title_prefix}-vaultOneLogin",
+    )
+    blocking = [
+        change
+        for change in changes
+        if change.kind in (ChangeKind.CREATE, ChangeKind.UPDATE, ChangeKind.CONFLICT)
+    ]
+    if blocking:
+        summary = [(change.kind.value, change.title, change.reason) for change in blocking]
+        raise AssertionError(f"vaultOneLogin verifier found drift/conflict rows: {summary}")
+
+
+_VAULT_SCENARIOS: dict[str, VaultScenarioSpec] = {
+    "vaultOneLogin": VaultScenarioSpec(
+        name="vaultOneLogin",
+        family="keeper-vault.v1",
+        build_manifest=_vault_one_login_manifest,
+        expected_records=_vault_one_login_expected_records,
+        verify=_verify_vault_one_login,
+        description="Single keeper-vault.v1 login record with Login + Password scalar fields.",
+    )
+}
+
+
 def get(name: str) -> ScenarioSpec:
     """Look up a scenario by name; raise :class:`KeyError` if absent.
 
@@ -347,3 +447,22 @@ def names() -> list[str]:
 def all_scenarios() -> list[ScenarioSpec]:
     """Return every registered scenario in name order."""
     return [_SCENARIOS[name] for name in names()]
+
+
+def vault_get(name: str) -> VaultScenarioSpec:
+    """Look up a vault scenario by name; raise :class:`KeyError` if absent."""
+    try:
+        return _VAULT_SCENARIOS[name]
+    except KeyError as exc:
+        available = ", ".join(sorted(_VAULT_SCENARIOS))
+        raise KeyError(f"unknown vault smoke scenario {name!r}; available: {available}") from exc
+
+
+def vault_names() -> list[str]:
+    """Return all registered vault scenario names, sorted alphabetically."""
+    return sorted(_VAULT_SCENARIOS)
+
+
+def all_vault_scenarios() -> list[VaultScenarioSpec]:
+    """Return every registered vault scenario in name order."""
+    return [_VAULT_SCENARIOS[name] for name in vault_names()]
