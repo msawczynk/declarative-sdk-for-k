@@ -1,0 +1,99 @@
+schema: keeper-vault.v1
+
+# Five validate-clean vault records. The current CLI validator typed-loads
+# keeper-vault.v1 through the L1 login lifecycle, so these stay type: login
+# while demonstrating field payloads commonly needed for login, credit-card,
+# database-credential, server-credential, and custom record examples.
+#
+# Run:
+#   dsk validate examples/vault-records.yaml
+#   dsk plan     examples/vault-records.yaml --provider mock --json
+
+records:
+  - uid_ref: rec.login.web-admin
+    type: login
+    title: "Example Web Admin"
+    fields:
+      - type: login
+        label: Login
+        value: ["web-admin@example.invalid"]
+      - type: password
+        label: Password
+        value: ["example-password"]
+      - type: url
+        label: URL
+        value: ["https://admin.example.invalid"]
+
+  - uid_ref: rec.credit-card.ops
+    type: login
+    title: "Example Credit Card"
+    fields:
+      - type: paymentCard
+        label: Payment Card
+        value:
+          - cardNumber: "test-card-number"
+            cardExpirationDate: "01/2030"
+            cardSecurityCode: "000"
+    custom:
+      - type: text
+        label: Cost Center
+        value: ["operations"]
+
+  - uid_ref: rec.database.credentials
+    type: login
+    title: "Example Database Credentials"
+    fields:
+      - type: login
+        label: Username
+        value: ["orders_app"]
+      - type: password
+        label: Password
+        value: ["example-db-password"]
+      - type: host
+        label: Host
+        value:
+          - hostName: db.example.invalid
+            port: 5432
+    custom:
+      - type: text
+        label: Database
+        value: ["orders"]
+
+  - uid_ref: rec.server.credentials
+    type: login
+    title: "Example Server Credentials"
+    fields:
+      - type: login
+        label: Username
+        value: ["svc-deploy"]
+      - type: host
+        label: Host
+        value:
+          - hostName: app.example.invalid
+            port: "22"
+      - type: keyPair
+        label: SSH Key
+        value:
+          - publicKey: "ssh-ed25519 example-public-key"
+            privateKey: "example-private-key"
+
+  - uid_ref: rec.custom.asset
+    type: login
+    title: "Example Custom Asset"
+    notes: "Custom metadata-only example with typed custom fields."
+    fields:
+      - type: text
+        label: Asset Tag
+        value: ["asset-12345"]
+    custom:
+      - type: name
+        label: Owner
+        value:
+          - first: Example
+            last: Owner
+      - type: phone
+        label: Support Phone
+        value:
+          - region: US
+            number: "5550100"
+            type: Work

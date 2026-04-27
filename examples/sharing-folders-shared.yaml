@@ -1,0 +1,38 @@
+schema: keeper-vault-sharing.v1
+
+# Folder topology with three private folders and two shared folders.
+#
+# Run:
+#   dsk validate examples/sharing-folders-shared.yaml
+#   dsk plan     examples/sharing-folders-shared.yaml --provider mock --json
+
+folders:
+  - uid_ref: folder.engineering
+    path: /Engineering
+    color: blue
+
+  - uid_ref: folder.engineering.platform
+    path: /Engineering/Platform
+    parent_folder_uid_ref: keeper-vault-sharing:folders:folder.engineering
+    color: green
+
+  - uid_ref: folder.operations
+    path: /Operations
+    color: orange
+
+shared_folders:
+  - uid_ref: sf.engineering
+    path: /Shared/Engineering
+    defaults:
+      manage_users: false
+      manage_records: true
+      can_edit: true
+      can_share: false
+
+  - uid_ref: sf.operations
+    path: /Shared/Operations
+    defaults:
+      manage_users: true
+      manage_records: true
+      can_edit: false
+      can_share: false

@@ -1,0 +1,97 @@
+version: "1"
+name: example-pam-machine-multi
+
+# Three pamMachine resources sharing one local PAM configuration. The ports
+# intentionally mix string and integer values, and the first host opts into RBI
+# connection settings that are schema-valid without DSK_PREVIEW=1.
+#
+# Run:
+#   dsk validate examples/pam-machine-multi.yaml
+#   dsk plan     examples/pam-machine-multi.yaml --provider mock --json
+
+shared_folders:
+  resources:
+    uid_ref: example-sf-resources
+    manage_users: true
+    manage_records: true
+    can_edit: true
+    can_share: true
+
+gateways:
+  - uid_ref: example-gw
+    name: "Example Gateway"
+    mode: reference_existing
+
+pam_configurations:
+  - uid_ref: example-cfg
+    environment: local
+    title: "Example Local PAM Configuration"
+    gateway_uid_ref: example-gw
+    options:
+      connections: "on"
+      tunneling: "on"
+      remote_browser_isolation: "on"
+      graphical_session_recording: "on"
+    network_id: example-net
+    network_cidr: 10.16.10.0/28
+
+resources:
+  - uid_ref: example-linux-ssh
+    type: pamMachine
+    title: "example-linux-ssh"
+    pam_configuration_uid_ref: example-cfg
+    shared_folder: resources
+    host: 10.16.10.10
+    port: "22"
+    ssl_verification: true
+    operating_system: Linux
+    pam_settings:
+      options:
+        connections: "on"
+        tunneling: "on"
+        remote_browser_isolation: "on"
+        graphical_session_recording: "on"
+      allow_supply_host: false
+      connection:
+        protocol: ssh
+        port: "22"
+        allow_supply_user: true
+
+  - uid_ref: example-windows-rdp
+    type: pamMachine
+    title: "example-windows-rdp"
+    pam_configuration_uid_ref: example-cfg
+    shared_folder: resources
+    host: 10.16.10.11
+    port: 3389
+    ssl_verification: true
+    operating_system: Windows
+    pam_settings:
+      options:
+        connections: "on"
+        tunneling: "on"
+      allow_supply_host: false
+      connection:
+        protocol: rdp
+        port: 3389
+        security: nla
+        allow_supply_user: true
+
+  - uid_ref: example-macos-vnc
+    type: pamMachine
+    title: "example-macos-vnc"
+    pam_configuration_uid_ref: example-cfg
+    shared_folder: resources
+    host: 10.16.10.12
+    port: "5900"
+    ssl_verification: false
+    operating_system: macOS
+    pam_settings:
+      options:
+        connections: "on"
+        tunneling: "on"
+      allow_supply_host: true
+      connection:
+        protocol: vnc
+        port: "5900"
+        allow_supply_user: true

@@ -1,0 +1,72 @@
+version: "1"
+name: example-pam-database-cluster
+
+# Two pamDatabase resources sharing one PAM configuration, modeling a primary
+# and replica endpoint without preview rotation or JIT keys.
+#
+# Run:
+#   dsk validate examples/pam-database-cluster.yaml
+#   dsk plan     examples/pam-database-cluster.yaml --provider mock --json
+
+shared_folders:
+  resources:
+    uid_ref: example-sf-resources
+    manage_users: true
+    manage_records: true
+    can_edit: true
+    can_share: true
+
+gateways:
+  - uid_ref: example-gw
+    name: "Example Gateway"
+    mode: reference_existing
+
+pam_configurations:
+  - uid_ref: example-cfg
+    environment: local
+    title: "Example Local PAM Configuration"
+    gateway_uid_ref: example-gw
+    options:
+      connections: "on"
+      tunneling: "on"
+    network_id: example-net
+    network_cidr: 10.16.11.0/28
+
+resources:
+  - uid_ref: example-db-primary
+    type: pamDatabase
+    title: "example-db-primary"
+    pam_configuration_uid_ref: example-cfg
+    shared_folder: resources
+    database_type: postgresql
+    database_id: example-orders-primary
+    host: db-primary.example.invalid
+    port: 5432
+    use_ssl: true
+    pam_settings:
+      options:
+        connections: "on"
+        tunneling: "on"
+      connection:
+        protocol: postgresql
+        port: 5432
+        default_database: orders
+
+  - uid_ref: example-db-replica
+    type: pamDatabase
+    title: "example-db-replica"
+    pam_configuration_uid_ref: example-cfg
+    shared_folder: resources
+    database_type: postgresql
+    database_id: example-orders-replica
+    host: db-replica.example.invalid
+    port: "5433"
+    use_ssl: true
+    pam_settings:
+      options:
+        connections: "on"
+        tunneling: "on"
+      connection:
+        protocol: postgresql
+        port: "5433"
+        default_database: orders
