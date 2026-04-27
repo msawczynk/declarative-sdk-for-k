@@ -24,9 +24,10 @@ vendoring the harness.
 
 Help: `bash scripts/daybook/harness.sh help`
 
-Implementation: scripts under `~/.cursor-daybook-sync/scripts/` (override with
-`DAYBOOK_SYNC_ROOT` for the **scripts** directory; the clone is also `DAYBOOK_REPO`
-for `daybook_append`).
+Implementation: scripts under `~/.cursor-daybook-sync/scripts/`. Set
+`DAYBOOK_SYNC_ROOT` to the **clone root** (directory that contains `scripts/`), not
+to `.../scripts`. The same path is used as `DAYBOOK_REPO` by `daybook_append` when
+you set it alongside `JOURNAL_PATH` / `LESSONS_PATH`.
 
 `daybook_append.sh` defaults `JOURNAL_PATH` / `LESSONS_PATH` to files inside
 `~/.cursor-daybook-sync/`. If your **canonical** files live under `~/Downloads/`

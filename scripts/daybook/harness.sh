@@ -22,7 +22,9 @@ Canonical JOURNAL/LESSONS: ~/Downloads/JOURNAL.md and ~/Downloads/LESSONS.md (no
   bash scripts/daybook/harness.sh append LESSONS '…one line…'
 
 Run daybook steps in a separate step from dsk product commits (no mixed batches).
-Environment: DAYBOOK_SYNC_ROOT — daybook script repo (default: ~/.cursor-daybook-sync).
+Environment: DAYBOOK_SYNC_ROOT — path to the cursor-daybook-sync **clone root**
+(must contain a `scripts/` directory; default: ~/.cursor-daybook-sync). Do not
+point this at `.../scripts` itself.
 EOF
 }
 
