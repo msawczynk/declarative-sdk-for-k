@@ -66,6 +66,22 @@ Three concrete deltas that the SDK has to work around:
 | `keepercommander.record_management.update_record` | write the `keeper_declarative_manager` custom field |
 | `keepercommander.vault.KeeperRecord.load` | hydrate typed record for the marker write |
 | `keepercommander.vault.TypedField.new_field` | build the custom-field entry |
+| `keepercommander.api.query_enterprise` | MSP slice: refresh `params.enterprise` (including `managed_companies[]`) for `CommanderCliProvider.discover_managed_companies()` |
+
+### MSP managed companies (`msp-environment.v1`)
+
+The SDK **does not** shell out to `keeper msp-down` for MSP discover. The
+Commander provider calls **`api.query_enterprise(params)`** in-process (same
+data the `msp-info` table is built from) and maps each `managed_companies[]`
+row to the manifest diff shape (`name`, `plan`, `seats`, `file_plan`, `addons`,
+`mc_enterprise_id`). Operators can still run **`keeper msp-down`** manually
+before `dsk` if their local `KeeperParams` cache is stale.
+
+| Area | Commander surface | SDK status |
+|------|-------------------|------------|
+| Discover / `validate --online` | `api.query_enterprise` → enterprise payload | **Supported** on `commander` provider (requires MSP admin login). |
+| Plan / diff (live rows) | same discover path | **Supported** when discover succeeds. |
+| `apply` / `dsk import` (mutate MC or write declarative ownership marker) | `msp-add`, `msp-update`, `msp-remove`, enterprise MSP APIs | **Not implemented** in `CommanderCliProvider` — `apply_msp_plan` and MSP `import` stay `CapabilityError` until a committed marker/write contract exists (`docs/MSP_FAMILY_DESIGN.md`). |
 
 ### Post-import connection / RBI tuning field map
 
