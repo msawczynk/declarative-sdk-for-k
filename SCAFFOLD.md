@@ -25,7 +25,7 @@ Reconciliation against `V1_GA_CHECKLIST.md` + `docs/SDK_DA_COMPLETION_PLAN.md` +
 
 ## Tree
 
-Snapshot @ `f8fb9d0` (refresh when layout shifts). Deeper per-area maps: `keeper_sdk/SCAFFOLD.md`, `docs/SCAFFOLD.md`, `tests/SCAFFOLD.md`. Full file list: `git ls-files`.
+Tree snapshot: refresh when layout shifts; exact commit: `git rev-parse HEAD`. Deeper per-area maps: `keeper_sdk/SCAFFOLD.md`, `docs/SCAFFOLD.md`, `tests/SCAFFOLD.md`. Full file list: `git ls-files`.
 
 ```text
 .
