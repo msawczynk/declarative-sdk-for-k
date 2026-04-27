@@ -35,7 +35,7 @@ python3 scripts/smoke/smoke.py --scenario pamDirectory  # OpenLDAP cycle
 python3 scripts/smoke/smoke.py --scenario pamRemoteBrowser
 python3 scripts/smoke/smoke.py --scenario pamUserNested # machine + nested users[]
 python3 scripts/smoke/smoke.py --login-helper env --scenario pamMachine
-python3 scripts/smoke/smoke.py --login-helper env --scenario pamRemoteBrowser # Issue #5 proof; currently expected to expose RBI readback gap
+python3 scripts/smoke/smoke.py --login-helper env --scenario pamRemoteBrowser # #5; see `docs/COMMANDER.md` P3.1
 DSK_PREVIEW=1 DSK_EXPERIMENTAL_ROTATION_APPLY=1 python3 scripts/smoke/smoke.py --login-helper env --scenario pamUserNestedRotation
 ```
 

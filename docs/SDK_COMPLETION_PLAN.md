@@ -277,9 +277,11 @@ Latest live evidence:
   real record/config/resource UIDs after Users-folder discover and unique-title
   matching fixes.
 - After routing rotation edit through the in-process Commander session, apply
-  and marker verification pass. End-to-end support is still not proven because
-  the post-apply re-plan reports updates for the nested `pamUser` and containing
-  `pamMachine`; readback/drift semantics need to be designed before gate lift.
+  and marker verification pass. **2026-04-28 Acme-lab** `pamUserNestedRotation`
+  smoke: same outcome — re-plan `exit 2` with `update` rows (e.g. `pam_settings`
+  on the parent `pamMachine`, `managed` on the nested `pamUser`). End-to-end
+  support is still not proven; readback/drift semantics for rotation stay open
+  (issue **#4**).
 
 ### P2.3 Rotation Gate Lift
 

@@ -22,7 +22,7 @@ implementation is at the wheel.
 | Focus | What “done” needs | Next command / doc |
 |-------|-------------------|-------------------|
 | **P3 — `pamRemoteBrowser` / RBI** | Evidence + **COMMANDER P3.1** + **DA §Phase 3** text on `main`. **Next:** close/update GitHub **#5** (maintainer) | [`COMMANDER` § Post-import / RBI](COMMANDER.md#post-import-connection--rbi-tuning-field-map) |
-| **P2.1 — nested `pamUser` rotation** | Clean re-plan + destroy on parent-run live smoke | `scripts/smoke/README.md` (`pamUserNestedRotation` / preview flags) |
+| **P2.1 — nested `pamUser` rotation** | **2026-04-28 Acme-lab run:** apply + marker verify OK; **re-plan not clean** (drift on parent machine + nested `pamUser` `managed` — same class as issue **#4**). | `DSK_PREVIEW=1` + `DSK_EXPERIMENTAL_ROTATION_APPLY=1`, `scripts/smoke/README.md` |
 | **KSM** — bootstrap + `KsmLoginHelper` live | End-to-end live loop in DA table | `pytest` live tests in [`docs/LIVE_TEST_RUNBOOK.md`](./LIVE_TEST_RUNBOOK.md); `tests/live/` |
 | **Vault L1, MSP, etc.** | Per DA classification — separate matrix | `SDK_DA` rows; not PAM-bar unless stated |
 
