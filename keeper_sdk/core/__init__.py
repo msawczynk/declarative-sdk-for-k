@@ -10,6 +10,8 @@ Stable public surface:
     - VaultManifestV1, load_vault_manifest (core.vault_models) — keeper-vault.v1 slice 1
     - build_vault_graph, vault_record_apply_order (core.vault_graph) — vault PR-V2
     - compute_vault_diff (core.vault_diff) — vault PR-V3
+    - SharingManifestV1, load_sharing_manifest (core.sharing_models) — sharing typed slice
+    - compute_sharing_diff (core.sharing_diff) — sharing folders diff slice
     - build_graph, execution_order (core.graph)
     - compute_diff, Change (core.diff)
     - build_plan, Plan (core.planner)
@@ -58,11 +60,27 @@ from keeper_sdk.core.planner import Plan, build_plan
 from keeper_sdk.core.redact import redact
 from keeper_sdk.core.schema import (
     PAM_FAMILY,
+    SHARING_FAMILY,
     load_schema,
     load_schema_for_family,
     packaged_schema_families,
     resolve_manifest_family,
     validate_manifest,
+)
+from keeper_sdk.core.sharing_diff import compute_sharing_diff
+from keeper_sdk.core.sharing_models import (
+    SHARING_FAMILY as SHARING_MANIFEST_FAMILY,
+)
+from keeper_sdk.core.sharing_models import (
+    FolderGranteePermissions,
+    Grantee,
+    RecordPermissions,
+    SharingFolder,
+    SharingManifestV1,
+    SharingRecordShare,
+    SharingSharedFolder,
+    SharingShareFolder,
+    load_sharing_manifest,
 )
 from keeper_sdk.core.vault_diff import compute_vault_diff
 from keeper_sdk.core.vault_graph import build_vault_graph, vault_record_apply_order
@@ -100,6 +118,7 @@ __all__ = [
     "dump_manifest",
     "read_manifest_document",
     "PAM_FAMILY",
+    "SHARING_FAMILY",
     "load_schema",
     "load_schema_for_family",
     "packaged_schema_families",
@@ -111,6 +130,7 @@ __all__ = [
     "ChangeKind",
     "compute_diff",
     "compute_vault_diff",
+    "compute_sharing_diff",
     "Plan",
     "build_plan",
     "Provider",
@@ -128,4 +148,14 @@ __all__ = [
     "VAULT_MANIFEST_FAMILY",
     "build_vault_graph",
     "vault_record_apply_order",
+    "SharingManifestV1",
+    "SharingFolder",
+    "SharingSharedFolder",
+    "SharingRecordShare",
+    "SharingShareFolder",
+    "Grantee",
+    "RecordPermissions",
+    "FolderGranteePermissions",
+    "load_sharing_manifest",
+    "SHARING_MANIFEST_FAMILY",
 ]
