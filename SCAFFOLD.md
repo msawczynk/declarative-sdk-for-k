@@ -131,7 +131,7 @@ Tree snapshot: refresh when layout shifts; exact commit: `git rev-parse HEAD`. D
 
 ## Where to land new work
 
-- **Orchestration narrative / sprint memos / codex prompts:** daybook (`~/.cursor-daybook-sync/docs/orchestration/dsk/`), NOT this repo's `docs/`. Sprint 7h-47 closeout migrated 6 docs + entire `sprint-memos/` tree out; do not re-land them here.
+- **Orchestration narrative / sprint memos / codex prompts:** daybook (`~/.cursor-daybook-sync/docs/orchestration/dsk/`), NOT this repo's `docs/`. **Index + merge gate row:** root [`AGENTS.md`](./AGENTS.md) § “Where orchestration lives”. Do not add `docs/ORCHESTRATION_*` (CI scope-fence).
 
 | Change | Land here | Copy this sibling first |
 |---|---|---|

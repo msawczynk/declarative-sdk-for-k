@@ -3,7 +3,7 @@
 **Status:** `DRAFT` — technical body **complete** for implementation (PR-V1+).
 Remove the `DRAFT` label and fill **§7** after integrator + reviewer sign-off.
 
-**Links:** [ORCHESTRATION_PAM_PARITY.md](./ORCHESTRATION_PAM_PARITY.md) §3 PR train ·
+**Links:** (multi-session PR-train / orchestration prose: outside this repo — see root [`AGENTS.md`](../AGENTS.md) § “Where orchestration lives”.)
 [PAM_PARITY_PROGRAM.md](./PAM_PARITY_PROGRAM.md) ·
 [CONVENTIONS.md](../keeper_sdk/core/schemas/CONVENTIONS.md) ·
 [`keeper-vault.v1.schema.json`](../keeper_sdk/core/schemas/keeper-vault/keeper-vault.v1.schema.json)
