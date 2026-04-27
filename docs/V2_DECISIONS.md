@@ -141,9 +141,12 @@ transcript review against expected JSON.
 
 **Decision:**
 
-- **MSP** → **dropped-design (watch-only).** Un-drop trigger: parent
-  acquires an MSP tenant for testing AND a customer asks for declarative
-  MSP. Until both, sync_upstream tracks MSP commands but no schema work.
+- **MSP** → ~~**dropped-design (watch-only).**~~ **In-scope as of 2026-04-27 (Sprint 7h-56).** Un-drop trigger fired:
+  - (a) Parent MSP tenant acquired — master admin `msawczyn+msplab@acme-demo.com`, KSM record UID `gu9SvWBHRlPsmRhtjvRX9A`, captured 2026-04-27 in workspace JOURNAL "MSP tenant identity reference (canonical)". Read-only smoke harness `keeper-vault-rbi-pam-testenv/scripts/msp_smoke.py` hardened in Sprint 7h-55 (typed `NotMspLicensed` sub-status, FD-based KSM creds handoff, `tenant_is_msp_licensed` envelope flag, 10/10 unit tests).
+  - (b) Customer demand for declarative MSP confirmed by maintainer.
+  - First-slice target: **`msp-add-mc`** (add managed company) full lifecycle — validate / plan / diff / apply — under a new schema family **`msp-environment.v1`**. Mirrors `pam-environment.v1`'s first slice scope (one canonical write verb wired end-to-end through the Commander provider) rather than vault.v1's read-many-write-few shape.
+  - Design memo: `docs/MSP_FAMILY_DESIGN.md` (Sprint 7h-56 deliverable; drafts schema, manifest examples, diff semantics, `msp-add-mc`/`msp-update-mc`/`msp-remove-mc` provider hooks, live-proof plan).
+  - Original un-drop was: "parent acquires an MSP tenant for testing AND a customer asks for declarative MSP. Until both, sync_upstream tracks MSP commands but no schema work."
 - **EPM (PEDM)** → **scope kept; P16 stays in the roadmap.** Triggers
   for actual implementation: (a) `pedm_admin.py` source audit lands a
   capability snapshot, (b) at least one EPM customer of DSK exists, (c)
