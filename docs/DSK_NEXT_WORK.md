@@ -22,7 +22,7 @@ implementation is at the wheel.
 | Focus | What “done” needs | Next command / doc |
 |-------|-------------------|-------------------|
 | **P3 — `pamRemoteBrowser` / RBI** | Evidence + **COMMANDER P3.1** + **DA §Phase 3** text on `main`. **Next:** close/update GitHub **#5** (maintainer) | [`COMMANDER` § Post-import / RBI](COMMANDER.md#post-import-connection--rbi-tuning-field-map) |
-| **P2.1 — nested `pamUser` rotation** | **2026-04-28 Acme-lab run:** apply + marker verify OK; **re-plan not clean** (drift on parent machine + nested `pamUser` `managed` — same class as issue **#4**). | `DSK_PREVIEW=1` + `DSK_EXPERIMENTAL_ROTATION_APPLY=1`, `scripts/smoke/README.md` |
+| **P2.1 — nested `pamUser` rotation** | **Offline (2026-04-28):** `diff` now treats parent `pam_settings` as overlay + normalizes `pamUser.managed` (see `CHANGELOG` [Unreleased] / `tests/test_diff.py`). **Live:** re-run `pamUserNestedRotation` smoke — need **re-plan exit 0** to narrow preview gates. | `DSK_PREVIEW=1` + `DSK_EXPERIMENTAL_ROTATION_APPLY=1`, `scripts/smoke/README.md` |
 | **KSM** — bootstrap + `KsmLoginHelper` live | **2026-04-28:** `pytest tests/live/test_ksm_bootstrap_smoke.py` **green** (lab KSM + `KEEPER_LIVE_TENANT=1`). Wider PAM+KSM loop = smoke + runbook. | `docs/LIVE_TEST_RUNBOOK.md`, `tests/live/test_ksm_bootstrap_smoke.py` |
 | **Vault L1, MSP, etc.** | Per DA classification — separate matrix | `SDK_DA` rows; not PAM-bar unless stated |
 

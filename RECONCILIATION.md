@@ -1,6 +1,6 @@
 # RECONCILIATION — design vs tree
 
-Written: 2026-04-26 (agent scaffold pass; refreshed 2026-04-28 for KSM live + rotation/RBI doc queue).
+Written: 2026-04-26 (agent scaffold pass; refreshed 2026-04-28 for KSM live + rotation/RBI + P2.1 `diff` queue).
 Source of truth: `main` at time of last doc edit (exact SHA: `git rev-parse HEAD`).
 Cross-checks against `V1_GA_CHECKLIST.md`, `docs/SDK_DA_COMPLETION_PLAN.md`,
 `AUDIT.md`, `REVIEW.md`, and DOR pointers in `keeper-pam-declarative/`.
@@ -12,7 +12,7 @@ This is for human + agent review. Per-folder maps live in `<dir>/SCAFFOLD.md`.
 ## TL;DR
 
 - **Zero remaining v1.0.0 GA blockers.** Tag policy decided: annotated only — distribution is GitHub-only (no PyPI, no `git verify-tag` consumer flow); GPG/SSH signing not required. Upgrade path if supply-chain requirements change → sigstore/cosign `dist/*` in `publish.yml` (OIDC, no maintainer key).
-- **Open clean-re-plan work** (not GA blockers): nested-`pamUser` rotation (P2.1 / issue #4) — apply + rotation edit OK, re-plan still drifts. **P3** `pamRemoteBrowser` E2E smoke is **green** (2026-04-28); per-field *supported* still tracks **#5** + DA. Apply paths shipped; P2.1 readback is the main lift.
+- **Open clean-re-plan work** (not GA blockers): nested-`pamUser` rotation (P2.1 / issue #4) — apply + rotation edit OK; **offline** `diff` now handles parent `pam_settings` overlay + `managed` bool skew (`CHANGELOG` [Unreleased]) — **live re-plan exit 0** must be re-proven on Acme-lab. **P3** `pamRemoteBrowser` E2E smoke is **green** (2026-04-28); per-field *supported* still tracks **#5** + DA.
 - **Three v1.1 deferrals tracked + accepted:** adoption smoke against unmanaged records, field-drift→UPDATE smoke, two-writer ownership-marker race smoke.
 - **One v2 deferral:** module rename `keeper_sdk` → `declarative_sdk_k` (will ship compat shim).
 - **Nothing has been silently dropped.** Every preview-gated key fails loud at apply via `_detect_unsupported_capabilities` + plan-surface CONFLICT rows (C3 fix; H6 regression test).
