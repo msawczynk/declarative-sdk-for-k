@@ -26,3 +26,5 @@ fi
 git bundle create "$OUT" origin/main..main
 echo "Created $AHEAD commit(s) in: $OUT"
 git bundle verify "$OUT"
+echo "On a clone whose origin/main matches this machine at bundle time:"
+echo "  git pull $OUT main && git push origin main"
