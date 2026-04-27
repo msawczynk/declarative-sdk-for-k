@@ -35,6 +35,7 @@ import click
 from keeper_sdk.auth import KsmLoginHelper, LoginHelper, load_helper_from_path
 from keeper_sdk.cli.renderer import RichRenderer
 from keeper_sdk.core import (
+    MSP_FAMILY,
     VAULT_MANIFEST_FAMILY,
     CapabilityError,
     Change,
@@ -57,6 +58,7 @@ from keeper_sdk.core import (
     execution_order,
     from_pam_import_json,
     load_declarative_manifest,
+    load_msp_manifest,
     msp_apply_order,
     redact,
     vault_record_apply_order,
@@ -83,6 +85,13 @@ EXIT_SCHEMA = 2
 EXIT_REF = 3
 EXIT_CONFLICT = 4
 EXIT_CAPABILITY = 5
+_MSP_IMPORT_DEFERRED = (
+    "MSP adoption deferred to P7+; requires compute_msp_diff(adopt=True) "
+    "which is not implemented"
+)
+_MSP_ONLINE_COMMANDER_NEXT_ACTION = (
+    "MSP --online unsupported on commander provider; planned for P7"
+)
 
 
 @dataclass
@@ -129,7 +138,7 @@ def main(ctx: click.Context, provider: str, folder_uid: str | None) -> None:
 @click.option(
     "--online",
     is_flag=True,
-    help="Tenant checks: PAM discover+diff; keeper-vault.v1 discover+diff (Commander only)",
+    help="Tenant checks: PAM discover+diff; keeper-vault.v1 discover+diff; MSP mock discover+diff",
 )
 @click.pass_context
 def validate(
@@ -139,7 +148,7 @@ def validate(
     as_json: bool,
     online: bool,
 ) -> None:
-    """Validate JSON Schema for any packaged family; vault graph (+ optional online); PAM graph + online."""
+    """Validate JSON Schema for any packaged family; typed graph / online checks where wired."""
     try:
         document = read_manifest_document(manifest_path)
         family = validate_manifest(document)
@@ -160,9 +169,10 @@ def validate(
         sys.exit(EXIT_GENERIC)
 
     if family != PAM_FAMILY:
-        if online and family != VAULT_MANIFEST_FAMILY:
+        if online and family not in (VAULT_MANIFEST_FAMILY, MSP_FAMILY):
             click.echo(
-                "`--online` is supported for pam-environment.v1 and keeper-vault.v1 only.",
+                "`--online` is supported for pam-environment.v1, keeper-vault.v1, "
+                "and msp-environment.v1 only.",
                 err=True,
             )
             sys.exit(EXIT_CAPABILITY)
@@ -298,6 +308,92 @@ def validate(
                 if online_suffix:
                     msg += online_suffix
                 click.echo(msg)
+            return
+
+        if family == MSP_FAMILY:
+            msp_manifest = load_msp_manifest(document)
+            order = msp_apply_order(msp_manifest)
+
+            live_msp: list[dict[str, Any]] | None = None
+            online_suffix = ""
+            create_count = update_count = delete_count = conflict_count = 0
+            noop_count = skip_count = 0
+
+            if online:
+                if ctx.obj.get("provider") == "commander":
+                    click.echo(
+                        f"next_action: {_MSP_ONLINE_COMMANDER_NEXT_ACTION}",
+                        err=True,
+                    )
+                    sys.exit(EXIT_CAPABILITY)
+                provider = _make_provider(ctx, manifest_path, msp=msp_manifest)
+                try:
+                    live_msp = provider.discover_managed_companies()
+                except CapabilityError as exc:
+                    click.echo(f"discovery failed: {exc}", err=True)
+                    sys.exit(EXIT_CAPABILITY)
+
+                changes = compute_msp_diff(msp_manifest, live_msp)
+                create_count = sum(1 for c in changes if c.kind.value == "create")
+                update_count = sum(1 for c in changes if c.kind.value == "update")
+                delete_count = sum(1 for c in changes if c.kind.value == "delete")
+                conflict_count = sum(1 for c in changes if c.kind.value == "conflict")
+                noop_count = sum(1 for c in changes if c.kind.value == "noop")
+                skip_count = sum(1 for c in changes if c.kind.value == "skip")
+                if not as_json:
+                    click.echo(
+                        "stage 5: "
+                        f"{create_count} create, "
+                        f"{update_count} update, "
+                        f"{delete_count} delete-candidates, "
+                        f"{conflict_count} conflicts, "
+                        f"{noop_count} noop, "
+                        f"{skip_count} skip"
+                    )
+                online_suffix = f"; online: {len(live_msp)} live managed_companies"
+
+            if emit_canonical and not as_json:
+                import yaml
+
+                click.echo(yaml.safe_dump(document, sort_keys=False, allow_unicode=True))
+            if as_json:
+                mpayload: dict[str, Any] = {
+                    "ok": True,
+                    "family": family,
+                    "mode": "msp_online" if online else "msp_offline",
+                    "manifest_name": msp_manifest.name,
+                    "manifest_path": str(manifest_path.resolve()),
+                    "stages_completed": [
+                        "json_schema",
+                        "semantic_rules",
+                        "typed_model",
+                        "managed_company_graph",
+                    ],
+                    "managed_company_count": len(order),
+                    "online": online,
+                }
+                if online and live_msp is not None:
+                    mpayload["stages_completed"].append("diff_smoke")
+                    mpayload["live_managed_company_count"] = len(live_msp)
+                    mpayload["stage5_summary"] = {
+                        "create": create_count,
+                        "update": update_count,
+                        "delete": delete_count,
+                        "conflict": conflict_count,
+                        "noop": noop_count,
+                        "skip": skip_count,
+                    }
+                if emit_canonical:
+                    import yaml
+
+                    mpayload["canonical_yaml"] = yaml.safe_dump(
+                        document, sort_keys=False, allow_unicode=True
+                    )
+                click.echo(json.dumps(mpayload, indent=2))
+            else:
+                click.echo(
+                    f"ok: {MSP_FAMILY} ({len(order)} managed_companies){online_suffix}"
+                )
             return
 
         if family == SHARING_FAMILY:
@@ -673,6 +769,9 @@ def import_(
         click.echo(f"manifest error: {exc}", err=True)
         sys.exit(EXIT_GENERIC)
     if fam != PAM_FAMILY:
+        if fam == MSP_FAMILY:
+            click.echo(f"capability error: {_MSP_IMPORT_DEFERRED}", err=True)
+            sys.exit(EXIT_CAPABILITY)
         click.echo("capability error: dsk import applies to pam-environment.v1 only.", err=True)
         sys.exit(EXIT_CAPABILITY)
 
