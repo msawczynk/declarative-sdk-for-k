@@ -1,0 +1,230 @@
+Reading additional input from stdin...
+OpenAI Codex v0.125.0-alpha.3 (research preview)
+--------
+workdir: /Users/martin/Downloads/Cursor tests/worktrees/cursor-m1-memo-compact
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k/.git/worktrees/cursor-m1-memo-compact, /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k/.git, /Users/martin/.codex/memories] (network access enabled)
+reasoning effort: none
+reasoning summaries: none
+session id: 019dcde8-3b2f-74a2-8ee2-ff1e8f9adcc9
+--------
+user
+# Wave2 M1 — sprint-memo compaction
+
+Worktree: `/Users/martin/Downloads/Cursor tests/worktrees/cursor-m1-memo-compact`, branch `cursor/m1-memo-compact`, base 535e03f.
+
+Goal: shrink `docs/sprint-memos/` retained codex log size. Wave1 archive added 9.8MB of raw logs (12 logs averaging 800KB). Trim to <2MB total per sprint while preserving all DONE-line evidence + last 200 lines of each codex run.
+
+# Required reading
+1. `docs/sprint-memos/SCAFFOLD.md` (if exists; else `docs/sprint-memos/`).
+2. `docs/sprint-memos/7h-43-44-45-wave1/` directory (22 artifacts).
+3. LESSON `[orchestration][archive-codex-artifacts]` 7h-39.
+
+# Hard requirements
+1. For each `codex-*.log` in `docs/sprint-memos/7h-43-44-45-wave1/`:
+   - Extract first 30 lines (codex preamble) + last 200 lines (final output + DONE line).
+   - Replace `<original.log>` with `<original.log.compact>` (or rename in-place to `.log` after deleting raw).
+   - Preserve unchanged: all `*.prompt.md` files (they're already small).
+2. Add `docs/sprint-memos/7h-43-44-45-wave1/INDEX.md` listing each artifact with: codex slug, marker state, DONE/FAIL line, original log size → compact size.
+
+exec
+/bin/zsh -lc 'git push -u origin cursor/m1-memo-compact' in /Users/martin/Downloads/Cursor tests/worktrees/cursor-m1-memo-compact
+diff --git a/docs/sprint-memos/7h-43-44-45-wave1/INDEX.md b/docs/sprint-memos/7h-43-44-45-wave1/INDEX.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..12c7f188b81515523d8c39f9977213f22c257cbe
+--- /dev/null
++++ b/docs/sprint-memos/7h-43-44-45-wave1/INDEX.md
+@@ -0,0 +1,20 @@
++# Sprint 7h-43/44/45 Wave1 Codex Archive
++
++Compaction method: each `codex-*.log` raw archive was replaced by a
++`.log.compact` file containing the first 30 lines plus the last 200 lines.
++All prompt files in this directory are unchanged.
++
++| Artifact | Codex slug | Marker state | DONE/FAIL line | Size |
++|---|---|---|---|---|
++| `codex-live-w2-ksm.log.compact` | `cursor/ksm-l1` | no live marker found; DONE line present | `DONE: cursor/ksm-l1 4df566d2c05e2f1ece4420b55ce6ff93c180291a` | 572,326 B -> 9,907 B |
++| `codex-offline-20260427-074035-55545.log.compact` | `cursor/cov-cli-tests-A` | DONE, EXIT_CODE=0 | `DONE: cursor/cov-cli-tests-A 9683c0058e796b5a612d4c2f65ab6fc05117799c` | 1,101,003 B -> 9,117 B |
++| `codex-offline-20260427-074035-55560.log.compact` | `cursor/cov-cli-tests-B` | DONE, EXIT_CODE=0 | `DONE: cursor/cov-cli-tests-B 866d90990b3acf94688d77733586d26fe89e60f2` | 1,137,758 B -> 9,640 B |
++| `codex-offline-20260427-074035-55576.log.compact` | `cursor/cov-cli-tests-C` | DONE, EXIT_CODE=0 | `DONE: cursor/cov-cli-tests-C 5f647b0` | 847,821 B -> 9,697 B |
++| `codex-offline-20260427-074035-55594.log.compact` | `cursor/mypy-strict` | DONE, EXIT_CODE=0 | `DONE: cursor/mypy-strict f7cc3a8` | 685,904 B -> 8,845 B |
++| `codex-offline-20260427-074035-55610.log.compact` | `cursor/examples-expand` | DONE, EXIT_CODE=0 | `DONE: cursor/examples-expand a5151a5` | 1,117,085 B -> 7,441 B |
++| `codex-offline-20260427-074047-56099.log.compact` | `cursor/sharing-scenario` | DONE, EXIT_CODE=0 | `DONE: cursor/sharing-scenario 2650ae3` | 1,458,253 B -> 9,304 B |
++| `codex-offline-20260427-074047-56115.log.compact` | `cursor/sharing-harness` | DONE, EXIT_CODE=0 | `DONE: cursor/sharing-harness 7ed7590d63a189fbac677f5c277827171e135eed` | 1,617,764 B -> 8,957 B |
++| `codex-offline-20260427-074047-56131.log.compact` | `cursor/sharing-tests` | DONE, EXIT_CODE=0 | `DONE: cursor/sharing-tests b63a96416c6602dd6709a01c12d71a4663e3adc6` | 758,485 B -> 9,678 B |
++| `codex-offline-20260427-074047-56147.log.compact` | `subagent-telemetry-codex-aware` | DONE, EXIT_CODE=0 | no DONE/FAIL line; final evidence: `MEMO: subagent-telemetry-codex-aware READY` | 121,873 B -> 11,688 B |
++| `codex-offline-v8c-fix.log.compact` | `V8c-fix` | DONE, EXIT_CODE=0 | `DONE: V8c-fix 08eeaf8231239520a9b4217c1f79d2e3660c6494` | 807,583 B -> 9,786 B |
++
+diff --git a/docs/sprint-memos/SCAFFOLD.md b/docs/sprint-memos/SCAFFOLD.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..c1b8948301f605dde7952f616f975f62c46374ae
+--- /dev/null
++++ b/docs/sprint-memos/SCAFFOLD.md
+@@ -0,0 +1,10 @@
++# Sprint Memo Scaffold
++
++Use this policy when archiving Codex sprint artifacts.
++
++- Preserve every `*.prompt.md` file byte-for-byte.
++- Do not commit large raw Codex logs. Raw logs <=200 lines + DONE line; full logs available in `/tmp/` for ~7 days post-sprint.
++- For larger `codex-*.log` files, archive a `.log.compact` file containing the first 30 lines of Codex preamble plus the last 200 lines of final output.
++- Add an `INDEX.md` in the sprint directory listing each artifact, codex slug, marker state, DONE/FAIL evidence, and original-to-compact size.
++- Keep each sprint memo directory under 2 MB unless an operator explicitly approves a larger archive.
++
+
+ succeeded in 917ms:
+remote: 
+remote: Create a pull request for 'cursor/m1-memo-compact' on GitHub by visiting:        
+remote:      https://github.com/msawczynk/declarative-sdk-for-k/pull/new/cursor/m1-memo-compact        
+remote: 
+To https://github.com/msawczynk/declarative-sdk-for-k.git
+ * [new branch]      cursor/m1-memo-compact -> cursor/m1-memo-compact
+branch 'cursor/m1-memo-compact' set up to track 'origin/cursor/m1-memo-compact'.
+
+  ✓ Read required sprint memo context and lesson
+  ✓ Compact Wave1 codex logs without changing prompts
+  ✓ Create Wave1 INDEX and update SCAFFOLD policy
+  ✓ Verify size, tests, type/lint gates
+  ✓ Commit and push branch
+diff --git a/docs/sprint-memos/7h-43-44-45-wave1/INDEX.md b/docs/sprint-memos/7h-43-44-45-wave1/INDEX.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..12c7f188b81515523d8c39f9977213f22c257cbe
+--- /dev/null
++++ b/docs/sprint-memos/7h-43-44-45-wave1/INDEX.md
+@@ -0,0 +1,20 @@
++# Sprint 7h-43/44/45 Wave1 Codex Archive
++
++Compaction method: each `codex-*.log` raw archive was replaced by a
++`.log.compact` file containing the first 30 lines plus the last 200 lines.
++All prompt files in this directory are unchanged.
++
++| Artifact | Codex slug | Marker state | DONE/FAIL line | Size |
++|---|---|---|---|---|
++| `codex-live-w2-ksm.log.compact` | `cursor/ksm-l1` | no live marker found; DONE line present | `DONE: cursor/ksm-l1 4df566d2c05e2f1ece4420b55ce6ff93c180291a` | 572,326 B -> 9,907 B |
++| `codex-offline-20260427-074035-55545.log.compact` | `cursor/cov-cli-tests-A` | DONE, EXIT_CODE=0 | `DONE: cursor/cov-cli-tests-A 9683c0058e796b5a612d4c2f65ab6fc05117799c` | 1,101,003 B -> 9,117 B |
++| `codex-offline-20260427-074035-55560.log.compact` | `cursor/cov-cli-tests-B` | DONE, EXIT_CODE=0 | `DONE: cursor/cov-cli-tests-B 866d90990b3acf94688d77733586d26fe89e60f2` | 1,137,758 B -> 9,640 B |
++| `codex-offline-20260427-074035-55576.log.compact` | `cursor/cov-cli-tests-C` | DONE, EXIT_CODE=0 | `DONE: cursor/cov-cli-tests-C 5f647b0` | 847,821 B -> 9,697 B |
++| `codex-offline-20260427-074035-55594.log.compact` | `cursor/mypy-strict` | DONE, EXIT_CODE=0 | `DONE: cursor/mypy-strict f7cc3a8` | 685,904 B -> 8,845 B |
++| `codex-offline-20260427-074035-55610.log.compact` | `cursor/examples-expand` | DONE, EXIT_CODE=0 | `DONE: cursor/examples-expand a5151a5` | 1,117,085 B -> 7,441 B |
++| `codex-offline-20260427-074047-56099.log.compact` | `cursor/sharing-scenario` | DONE, EXIT_CODE=0 | `DONE: cursor/sharing-scenario 2650ae3` | 1,458,253 B -> 9,304 B |
++| `codex-offline-20260427-074047-56115.log.compact` | `cursor/sharing-harness` | DONE, EXIT_CODE=0 | `DONE: cursor/sharing-harness 7ed7590d63a189fbac677f5c277827171e135eed` | 1,617,764 B -> 8,957 B |
++| `codex-offline-20260427-074047-56131.log.compact` | `cursor/sharing-tests` | DONE, EXIT_CODE=0 | `DONE: cursor/sharing-tests b63a96416c6602dd6709a01c12d71a4663e3adc6` | 758,485 B -> 9,678 B |
++| `codex-offline-20260427-074047-56147.log.compact` | `subagent-telemetry-codex-aware` | DONE, EXIT_CODE=0 | no DONE/FAIL line; final evidence: `MEMO: subagent-telemetry-codex-aware READY` | 121,873 B -> 11,688 B |
++| `codex-offline-v8c-fix.log.compact` | `V8c-fix` | DONE, EXIT_CODE=0 | `DONE: V8c-fix 08eeaf8231239520a9b4217c1f79d2e3660c6494` | 807,583 B -> 9,786 B |
++
+diff --git a/docs/sprint-memos/SCAFFOLD.md b/docs/sprint-memos/SCAFFOLD.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..c1b8948301f605dde7952f616f975f62c46374ae
+--- /dev/null
++++ b/docs/sprint-memos/SCAFFOLD.md
+@@ -0,0 +1,10 @@
++# Sprint Memo Scaffold
++
++Use this policy when archiving Codex sprint artifacts.
++
++- Preserve every `*.prompt.md` file byte-for-byte.
++- Do not commit large raw Codex logs. Raw logs <=200 lines + DONE line; full logs available in `/tmp/` for ~7 days post-sprint.
++- For larger `codex-*.log` files, archive a `.log.compact` file containing the first 30 lines of Codex preamble plus the last 200 lines of final output.
++- Add an `INDEX.md` in the sprint directory listing each artifact, codex slug, marker state, DONE/FAIL evidence, and original-to-compact size.
++- Keep each sprint memo directory under 2 MB unless an operator explicitly approves a larger archive.
++
+
+exec
+/bin/zsh -lc 'git rev-parse HEAD' in /Users/martin/Downloads/Cursor tests/worktrees/cursor-m1-memo-compact
+ succeeded in 0ms:
+7d0664d5c7129970ade0ec26edba5b528f97fca1
+
+diff --git a/docs/sprint-memos/7h-43-44-45-wave1/INDEX.md b/docs/sprint-memos/7h-43-44-45-wave1/INDEX.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..12c7f188b81515523d8c39f9977213f22c257cbe
+--- /dev/null
++++ b/docs/sprint-memos/7h-43-44-45-wave1/INDEX.md
+@@ -0,0 +1,20 @@
++# Sprint 7h-43/44/45 Wave1 Codex Archive
++
++Compaction method: each `codex-*.log` raw archive was replaced by a
++`.log.compact` file containing the first 30 lines plus the last 200 lines.
++All prompt files in this directory are unchanged.
++
++| Artifact | Codex slug | Marker state | DONE/FAIL line | Size |
++|---|---|---|---|---|
++| `codex-live-w2-ksm.log.compact` | `cursor/ksm-l1` | no live marker found; DONE line present | `DONE: cursor/ksm-l1 4df566d2c05e2f1ece4420b55ce6ff93c180291a` | 572,326 B -> 9,907 B |
++| `codex-offline-20260427-074035-55545.log.compact` | `cursor/cov-cli-tests-A` | DONE, EXIT_CODE=0 | `DONE: cursor/cov-cli-tests-A 9683c0058e796b5a612d4c2f65ab6fc05117799c` | 1,101,003 B -> 9,117 B |
++| `codex-offline-20260427-074035-55560.log.compact` | `cursor/cov-cli-tests-B` | DONE, EXIT_CODE=0 | `DONE: cursor/cov-cli-tests-B 866d90990b3acf94688d77733586d26fe89e60f2` | 1,137,758 B -> 9,640 B |
++| `codex-offline-20260427-074035-55576.log.compact` | `cursor/cov-cli-tests-C` | DONE, EXIT_CODE=0 | `DONE: cursor/cov-cli-tests-C 5f647b0` | 847,821 B -> 9,697 B |
++| `codex-offline-20260427-074035-55594.log.compact` | `cursor/mypy-strict` | DONE, EXIT_CODE=0 | `DONE: cursor/mypy-strict f7cc3a8` | 685,904 B -> 8,845 B |
++| `codex-offline-20260427-074035-55610.log.compact` | `cursor/examples-expand` | DONE, EXIT_CODE=0 | `DONE: cursor/examples-expand a5151a5` | 1,117,085 B -> 7,441 B |
++| `codex-offline-20260427-074047-56099.log.compact` | `cursor/sharing-scenario` | DONE, EXIT_CODE=0 | `DONE: cursor/sharing-scenario 2650ae3` | 1,458,253 B -> 9,304 B |
++| `codex-offline-20260427-074047-56115.log.compact` | `cursor/sharing-harness` | DONE, EXIT_CODE=0 | `DONE: cursor/sharing-harness 7ed7590d63a189fbac677f5c277827171e135eed` | 1,617,764 B -> 8,957 B |
++| `codex-offline-20260427-074047-56131.log.compact` | `cursor/sharing-tests` | DONE, EXIT_CODE=0 | `DONE: cursor/sharing-tests b63a96416c6602dd6709a01c12d71a4663e3adc6` | 758,485 B -> 9,678 B |
++| `codex-offline-20260427-074047-56147.log.compact` | `subagent-telemetry-codex-aware` | DONE, EXIT_CODE=0 | no DONE/FAIL line; final evidence: `MEMO: subagent-telemetry-codex-aware READY` | 121,873 B -> 11,688 B |
++| `codex-offline-v8c-fix.log.compact` | `V8c-fix` | DONE, EXIT_CODE=0 | `DONE: V8c-fix 08eeaf8231239520a9b4217c1f79d2e3660c6494` | 807,583 B -> 9,786 B |
++
+diff --git a/docs/sprint-memos/SCAFFOLD.md b/docs/sprint-memos/SCAFFOLD.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..c1b8948301f605dde7952f616f975f62c46374ae
+--- /dev/null
++++ b/docs/sprint-memos/SCAFFOLD.md
+@@ -0,0 +1,10 @@
++# Sprint Memo Scaffold
++
++Use this policy when archiving Codex sprint artifacts.
++
++- Preserve every `*.prompt.md` file byte-for-byte.
++- Do not commit large raw Codex logs. Raw logs <=200 lines + DONE line; full logs available in `/tmp/` for ~7 days post-sprint.
++- For larger `codex-*.log` files, archive a `.log.compact` file containing the first 30 lines of Codex preamble plus the last 200 lines of final output.
++- Add an `INDEX.md` in the sprint directory listing each artifact, codex slug, marker state, DONE/FAIL evidence, and original-to-compact size.
++- Keep each sprint memo directory under 2 MB unless an operator explicitly approves a larger archive.
++
+
+codex
+DONE: cursor/m1-memo-compact 7d0664d5c7129970ade0ec26edba5b528f97fca1
+diff --git a/docs/sprint-memos/7h-43-44-45-wave1/INDEX.md b/docs/sprint-memos/7h-43-44-45-wave1/INDEX.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..12c7f188b81515523d8c39f9977213f22c257cbe
+--- /dev/null
++++ b/docs/sprint-memos/7h-43-44-45-wave1/INDEX.md
+@@ -0,0 +1,20 @@
++# Sprint 7h-43/44/45 Wave1 Codex Archive
++
++Compaction method: each `codex-*.log` raw archive was replaced by a
++`.log.compact` file containing the first 30 lines plus the last 200 lines.
++All prompt files in this directory are unchanged.
++
++| Artifact | Codex slug | Marker state | DONE/FAIL line | Size |
++|---|---|---|---|---|
++| `codex-live-w2-ksm.log.compact` | `cursor/ksm-l1` | no live marker found; DONE line present | `DONE: cursor/ksm-l1 4df566d2c05e2f1ece4420b55ce6ff93c180291a` | 572,326 B -> 9,907 B |
++| `codex-offline-20260427-074035-55545.log.compact` | `cursor/cov-cli-tests-A` | DONE, EXIT_CODE=0 | `DONE: cursor/cov-cli-tests-A 9683c0058e796b5a612d4c2f65ab6fc05117799c` | 1,101,003 B -> 9,117 B |
++| `codex-offline-20260427-074035-55560.log.compact` | `cursor/cov-cli-tests-B` | DONE, EXIT_CODE=0 | `DONE: cursor/cov-cli-tests-B 866d90990b3acf94688d77733586d26fe89e60f2` | 1,137,758 B -> 9,640 B |
++| `codex-offline-20260427-074035-55576.log.compact` | `cursor/cov-cli-tests-C` | DONE, EXIT_CODE=0 | `DONE: cursor/cov-cli-tests-C 5f647b0` | 847,821 B -> 9,697 B |
++| `codex-offline-20260427-074035-55594.log.compact` | `cursor/mypy-strict` | DONE, EXIT_CODE=0 | `DONE: cursor/mypy-strict f7cc3a8` | 685,904 B -> 8,845 B |
++| `codex-offline-20260427-074035-55610.log.compact` | `cursor/examples-expand` | DONE, EXIT_CODE=0 | `DONE: cursor/examples-expand a5151a5` | 1,117,085 B -> 7,441 B |
++| `codex-offline-20260427-074047-56099.log.compact` | `cursor/sharing-scenario` | DONE, EXIT_CODE=0 | `DONE: cursor/sharing-scenario 2650ae3` | 1,458,253 B -> 9,304 B |
++| `codex-offline-20260427-074047-56115.log.compact` | `cursor/sharing-harness` | DONE, EXIT_CODE=0 | `DONE: cursor/sharing-harness 7ed7590d63a189fbac677f5c277827171e135eed` | 1,617,764 B -> 8,957 B |
++| `codex-offline-20260427-074047-56131.log.compact` | `cursor/sharing-tests` | DONE, EXIT_CODE=0 | `DONE: cursor/sharing-tests b63a96416c6602dd6709a01c12d71a4663e3adc6` | 758,485 B -> 9,678 B |
++| `codex-offline-20260427-074047-56147.log.compact` | `subagent-telemetry-codex-aware` | DONE, EXIT_CODE=0 | no DONE/FAIL line; final evidence: `MEMO: subagent-telemetry-codex-aware READY` | 121,873 B -> 11,688 B |
++| `codex-offline-v8c-fix.log.compact` | `V8c-fix` | DONE, EXIT_CODE=0 | `DONE: V8c-fix 08eeaf8231239520a9b4217c1f79d2e3660c6494` | 807,583 B -> 9,786 B |
++
+diff --git a/docs/sprint-memos/SCAFFOLD.md b/docs/sprint-memos/SCAFFOLD.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..c1b8948301f605dde7952f616f975f62c46374ae
+--- /dev/null
++++ b/docs/sprint-memos/SCAFFOLD.md
+@@ -0,0 +1,10 @@
++# Sprint Memo Scaffold
++
++Use this policy when archiving Codex sprint artifacts.
++
++- Preserve every `*.prompt.md` file byte-for-byte.
++- Do not commit large raw Codex logs. Raw logs <=200 lines + DONE line; full logs available in `/tmp/` for ~7 days post-sprint.
++- For larger `codex-*.log` files, archive a `.log.compact` file containing the first 30 lines of Codex preamble plus the last 200 lines of final output.
++- Add an `INDEX.md` in the sprint directory listing each artifact, codex slug, marker state, DONE/FAIL evidence, and original-to-compact size.
++- Keep each sprint memo directory under 2 MB unless an operator explicitly approves a larger archive.
++
+
+2026-04-27T07:52:12.855730Z ERROR codex_core::session: failed to record rollout items: thread 019dcde8-3b2f-74a2-8ee2-ff1e8f9adcc9 not found
+tokens used
+92,935
+DONE: cursor/m1-memo-compact 7d0664d5c7129970ade0ec26edba5b528f97fca1

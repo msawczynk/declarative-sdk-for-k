@@ -1,0 +1,330 @@
+Reading additional input from stdin...
+OpenAI Codex v0.125.0-alpha.3 (research preview)
+--------
+workdir: /Users/martin/Downloads/Cursor tests/worktrees/cursor-l1a-pam-machine
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, /Users/martin/.keeper, /Users/martin/Downloads/Cursor tests/keeper-vault-rbi-pam-testenv, /Users/martin/.codex/memories] (network access enabled)
+reasoning effort: none
+reasoning summaries: none
+session id: 019dcde8-6aaa-74b2-8f09-50018b04ceb9
+--------
+user
+# Wave2 L1a — pamMachine live transcript
+
+You are a codex **live** worker. Lab tenant grant in scope.
+
+Worktree: `/Users/martin/Downloads/Cursor tests/worktrees/cursor-l1a-pam-machine`, branch `cursor/l1a-pam-machine`, base 535e03f.
+
+Goal: live PAM `pamMachine` round-trip (validate → plan → apply → re-discover → re-diff = 0). Sanitized transcript. Append evidence to `keeper-pam-environment.v1.schema.json` `x-keeper-live-proof.evidence[]` (DO NOT replace; this is family already `supported`).
+
+# Required reading
+1. `examples/pam-machine.yaml` (existing scenario yaml).
+2. `keeper_sdk/cli/main.py` validate/plan/apply commands.
+3. `scripts/smoke/smoke.py` `--scenario pamMachine --provider commander_cli` flow.
+4. `docs/live-proof/README.md` (sanitization, naming).
+5. `docs/live-proof/keeper-vault.v1.91119c4.sanitized.json` (template shape).
+6. `docs/live-proof/keeper-vault.v1.sanitized.template.json` (canonical events[] shape).
+7. `keeper_sdk/core/schemas/keeper-pam-environment/keeper-pam-environment.v1.schema.json` (find `x-keeper-live-proof.evidence[]` array).
+8. LESSON `[orchestration][live-write-bg-via-nohup]` 7h-38.
++        project_name = self._manifest_name
+         if project_name:
+             self._maybe_resolve_project_resources_folder(project_name)
+ 
+@@ -1229,7 +1753,7 @@
+     def _synthetic_reference_configuration_record(self) -> LiveRecord | None:
+         if not _uses_reference_existing(self._manifest_source):
+             return None
+-        project_name = self._manifest_name()
++        project_name = self._manifest_name
+         if not project_name:
+             return None
+         if not self.last_resolved_folder_uid and not self._maybe_resolve_project_resources_folder(
+@@ -1314,12 +1838,13 @@
+         path: str,
+         parent_uid: str | None = None,
+         color: str | None = None,
+-    ) -> None:
++    ) -> str:
+         _ = parent_uid
+         args = ["mkdir", "-uf", path]
+         if color is not None:
+             args.extend(["--color", color])
+         self._run_cmd(args)
++        return self._resolve_folder_uid_by_path(path)
+ 
+     def _create_shared_folder(
+         self,
+@@ -1329,7 +1854,7 @@
+         manage_users: bool = True,
+         can_edit: bool = True,
+         can_share: bool = True,
+-    ) -> None:
++    ) -> str:
+         args = ["mkdir", "-sf"]
+         if manage_records:
+             args.append("--manage-records")
+@@ -1341,6 +1866,7 @@
+             args.append("--can-share")
+         args.append(path)
+         self._run_cmd(args)
++        return self._resolve_folder_uid_by_path(path)
+ 
+     def _move_folder(self, *, source: str, destination: str, is_shared: bool = False) -> None:
+         folder_flag = "--shared-folder" if is_shared else "--user-folder"
+@@ -1349,6 +1875,30 @@
+     def _delete_folder(self, *, path_or_uid: str) -> None:
+         self._run_cmd(["rmdir", "-f", path_or_uid])
+ 
++    def _resolve_folder_uid_by_path(self, path: str) -> str:
++        def resolve_once() -> str | None:
++            from keepercommander import api  # type: ignore[import-not-found]
++            from keepercommander.subfolder import get_folder_uids  # type: ignore[import-not-found]
++
++            params = self._get_keeper_params()
++            api.sync_down(params)
++            uids = sorted(uid for uid in get_folder_uids(params, path) if uid)
++            return str(uids[0]) if uids else None
++
++        try:
++            uid = self._with_keeper_session_refresh(resolve_once)
++        except Exception as exc:
++            raise CapabilityError(
++                reason=f"could not resolve folder path {path!r}: {type(exc).__name__}: {exc}",
++                next_action="inspect the Commander folder tree and retry",
++            ) from exc
++        if uid:
++            return uid
++        raise CapabilityError(
++            reason=f"Commander did not return folder UID for {path!r} after create",
++            next_action="inspect `keeper ls -f --format json` and retry",
++        )
++
+     def _ensure_shared_folder_exists(self, path: str) -> None:
+         try:
+             self._run_cmd(["ls", "--format", "json", path])
+@@ -1374,7 +1924,7 @@
+         can_share: bool,
+         expiration_iso: str | None = None,
+     ) -> None:
+-        args = ["share-record", "-a", "grant", "-e", user_email]
++        args = ["share-record", "-a", "grant", "-e", user_email, "-f"]
+         if can_edit:
+             args.append("-w")
+         if can_share:
+@@ -1403,15 +1953,16 @@
+         self._run_cmd(
+             [
+                 "share-folder",
+-                shared_folder_uid,
+                 "-a",
+                 "grant",
+                 "-e",
+                 grantee,
++                "-f",
+                 "-p",
+                 _commander_on_off(manage_records),
+                 "-o",
+                 _commander_on_off(manage_users),
++                shared_folder_uid,
+             ]
+         )
+ 
+@@ -1426,7 +1977,7 @@
+             grantee_kind=grantee_kind,
+             identifier=identifier,
+         )
+-        self._run_cmd(["share-folder", shared_folder_uid, "-a", "remove", "-e", grantee])
++        self._run_cmd(["share-folder", "-a", "remove", "-e", grantee, "-f", shared_folder_uid])
+ 
+     def _share_record_to_shared_folder(
+         self,
+@@ -1439,15 +1990,16 @@
+         self._run_cmd(
+             [
+                 "share-folder",
+-                shared_folder_uid,
+                 "-a",
+                 "grant",
+                 "-r",
+                 record_uid,
++                "-f",
+                 "-d",
+                 _commander_on_off(can_edit),
+                 "-s",
+                 _commander_on_off(can_share),
++                shared_folder_uid,
+             ]
+         )
+ 
+@@ -1461,15 +2013,16 @@
+         self._run_cmd(
+             [
+                 "share-folder",
+-                shared_folder_uid,
+                 "-a",
+                 "grant",
+                 "-r",
+                 "*",
++                "-f",
+                 "-d",
+                 _commander_on_off(can_edit),
+                 "-s",
+                 _commander_on_off(can_share),
++                shared_folder_uid,
+             ]
+         )
+ 
+diff --git a/tests/test_commander_cli_sharing.py b/tests/test_commander_cli_sharing.py
+index 8d69dcdf933c593b1d773a2b13cffab6aecfdf2b..3266963ea45636d3606fb99b62fb9aa54919b944
+--- a/tests/test_commander_cli_sharing.py
++++ b/tests/test_commander_cli_sharing.py
+@@ -26,6 +26,11 @@
+         return stdout
+ 
+     monkeypatch.setattr(CommanderCliProvider, "_run_cmd", recorder)
++    monkeypatch.setattr(
++        CommanderCliProvider,
++        "_resolve_folder_uid_by_path",
++        lambda self, path: f"uid:{path}",
++    )
+     return CommanderCliProvider(folder_uid="folder-uid"), calls
+ 
+ 
+@@ -125,6 +130,7 @@
+             "grant",
+             "-e",
+             "user@example.com",
++            "-f",
+             "-w",
+             "-s",
+             "--expire-at",
+@@ -146,7 +152,7 @@
+         can_share=False,
+     )
+ 
+-    assert calls == [["share-record", "-a", "grant", "-e", "user@example.com", "REC_UID"]]
++    assert calls == [["share-record", "-a", "grant", "-e", "user@example.com", "-f", "REC_UID"]]
+ 
+ 
+ def test_revoke_record_share_from_user_uses_revoke_action(
+@@ -173,15 +179,16 @@
+     assert calls == [
+         [
+             "share-folder",
+-            "SF_UID",
+             "-a",
+             "grant",
+             "-e",
+             "user@example.com",
++            "-f",
+             "-p",
+             "on",
+             "-o",
+             "off",
++            "SF_UID",
+         ]
+     ]
+ 
+@@ -202,15 +209,16 @@
+     assert calls == [
+         [
+             "share-folder",
+-            "SF_UID",
+             "-a",
+             "grant",
+             "-e",
+             "TEAM_UID",
++            "-f",
+             "-p",
+             "off",
+             "-o",
+             "on",
++            "SF_UID",
+         ]
+     ]
+ 
+@@ -227,7 +235,9 @@
+         manage_users=True,
+     )
+ 
+-    assert calls == [["share-folder", "SF_UID", "-a", "grant", "-e", "*", "-p", "on", "-o", "on"]]
++    assert calls == [
++        ["share-folder", "-a", "grant", "-e", "*", "-f", "-p", "on", "-o", "on", "SF_UID"]
++    ]
+ 
+ 
+ def test_share_folder_to_grantee_rejects_contradictory_inputs(
+@@ -273,8 +283,8 @@
+     provider._revoke_folder_grantee(shared_folder_uid="SF_UID", grantee_kind="default")
+ 
+     assert calls == [
+-        ["share-folder", "SF_UID", "-a", "remove", "-e", "user@example.com"],
+-        ["share-folder", "SF_UID", "-a", "remove", "-e", "*"],
++        ["share-folder", "-a", "remove", "-e", "user@example.com", "-f", "SF_UID"],
++        ["share-folder", "-a", "remove", "-e", "*", "-f", "SF_UID"],
+     ]
+ 
+ 
+@@ -291,7 +301,7 @@
+     )
+ 
+     assert calls == [
+-        ["share-folder", "SF_UID", "-a", "grant", "-r", "REC_UID", "-d", "on", "-s", "off"]
++        ["share-folder", "-a", "grant", "-r", "REC_UID", "-f", "-d", "on", "-s", "off", "SF_UID"]
+     ]
+ 
+ 
+@@ -306,7 +316,9 @@
+         can_share=True,
+     )
+ 
+-    assert calls == [["share-folder", "SF_UID", "-a", "grant", "-r", "*", "-d", "off", "-s", "on"]]
++    assert calls == [
++        ["share-folder", "-a", "grant", "-r", "*", "-f", "-d", "off", "-s", "on", "SF_UID"]
++    ]
+ 
+ 
+ def test_discover_shared_folder_acl_normalizes_get_json(
+diff --git a/tests/test_keeper_vault_sharing_schema.py b/tests/test_keeper_vault_sharing_schema.py
+index 5c7fc3d1099f242a20c72c968c2bfee3d0154ac0..29db9afd2df838d15aaa20b5193f40e562ec2764
+--- a/tests/test_keeper_vault_sharing_schema.py
++++ b/tests/test_keeper_vault_sharing_schema.py
+@@ -20,6 +20,9 @@
+     / "keeper-vault-sharing"
+     / "keeper-vault-sharing.v1.schema.json"
+ )
++_V9A_EVIDENCE = (
++    "docs/live-proof/keeper-vault-sharing.v1.535e03f.folderlifecycle.sanitized.json"
++)
+ 
+ _MINIMAL_MANIFEST = """\
+ {
+@@ -269,3 +272,21 @@
+ 
+     assert "duplicate uid_ref" in exc.value.reason
+     assert "sf.prod" in exc.value.reason
++
++
++def test_keeper_vault_sharing_live_proof_evidence_points_to_v9a_transcript() -> None:
++    live_proof = _schema()["x-keeper-live-proof"]
++
++    assert live_proof["status"] == "scaffold-only"
++    assert live_proof["evidence"] == [_V9A_EVIDENCE]
++    assert "awaiting V9b record share lifecycle" in live_proof["notes"]
++
++
++def test_keeper_vault_sharing_v9a_evidence_file_is_committed_json() -> None:
++    evidence_path = Path(__file__).resolve().parents[1] / _V9A_EVIDENCE
++
++    payload = json.loads(evidence_path.read_text(encoding="utf-8"))
++
++    assert payload["family"] == "keeper-vault-sharing.v1"
++    assert payload["scenario"] == "folderlifecycle"
++    assert [event["exit_code"] for event in payload["events"]] == [0, 2, 0, 0, 0, 2, 0, 0]
+
+2026-04-27T08:13:25.224356Z ERROR codex_core::session: failed to record rollout items: thread 019dcde8-6aaa-7bf1-b73e-3642081d8b59 not found
+tokens used
+353,213
+DONE: cursor/v9a-sharing-folder-lifecycle 506e58e

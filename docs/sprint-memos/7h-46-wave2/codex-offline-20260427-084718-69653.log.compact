@@ -1,0 +1,230 @@
+Reading additional input from stdin...
+OpenAI Codex v0.125.0-alpha.3 (research preview)
+--------
+workdir: /Users/martin/.cursor-daybook-sync
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, /Users/martin/.codex/memories] (network access enabled)
+reasoning effort: none
+reasoning summaries: none
+session id: 019dcde8-43e0-76b0-976e-5388734aaf2b
+--------
+user
+# Wave2 M2 — agent_review_loop.py codex-aware impl
+
+Operates on `~/.cursor-daybook-sync/` (NOT the SDK repo). No SDK worktree.
+
+Goal: implement R1's memo recommendation — extend `~/.cursor-daybook-sync/scripts/agent_review_loop.py` to count codex worker markers (`/tmp/codex-{offline,live}-*.marker`) as `codex_workers_session` metric (separate from `subagent_transcripts`).
+
+# Required reading
+1. `~/.cursor-daybook-sync/scripts/agent_review_loop.py` full read.
+2. `~/.cursor-daybook-sync/scripts/codex_offline_bg.sh` (marker emission: `STATE=DONE|RUNNING|LAUNCHED`, format).
+3. `~/.cursor-daybook-sync/scripts/codex_live.sh` (note: as of Wave1 it does NOT emit markers — future work).
+4. `~/.cursor-daybook-sync/scripts/test_pending_count.py` (existing test pattern).
+5. R1 memo at `docs/sprint-memos/7h-43-44-45-wave1/codex-offline-20260427-074047-56147.log` (SDK repo) — find Section 3 patch sketch + Section 4 test cases.
+6. LESSON `[daybook][telemetry-codex-aware]` (R1's proposed lesson — already in LESSONS.md? if not, add it).
+
+# Hard requirements
+1. Add `_codex_worker_counts(boot_time: float, marker_dir: Path = Path("/tmp")) -> dict[str, int]` to `agent_review_loop.py`:
+   - Glob `/tmp/codex-offline-*.marker` and `/tmp/codex-live-*.marker`.
+diff --git a/LESSONS.md b/LESSONS.md
+index af5ead49274886b18a0ed60bac41a55d2e032a2d..dfa4e304acb9fd40b33d4214aa7a58435390b041
+--- a/LESSONS.md
++++ b/LESSONS.md
+@@ -2,6 +2,8 @@
+ 
+ - 2026-04-27 [orchestration][live-codex-self-fixes-bootstrap-bugs] **Live codex workers in extreme-pipeline mode self-fix offline bugs they hit during live runs without parent intervention — reinforcing 7h-38 LESSON `[smoke][in-run-self-fix-during-live-proof]`.** W2 KSM L1 live-proof hit `_verify_redeemed_config` `TypeError: NoneType + str` on partial config in `keeper_sdk/secrets/bootstrap.py:135 → 462`; codex worker isolated traceback, patched the wrapper code, added offline test, captured the in-run fix in transcript `notes`, and continued to flip the schema to `supported`. Result: 1 live codex closed both the live-proof acceptance row AND a real bootstrap bug in one branch. General pattern: live-codex slices that include "self-fix on offline-bug discovery" instruction in their prompt produce 2-for-1 outcomes; parent's role shrinks to verifying transcript `notes` field cites all in-run fixes.
+ 
++- 2026-04-27 [daybook][telemetry-codex-aware] **Review-loop orchestration metrics must count Codex worker marker files separately from Cursor Task transcripts; otherwise codex-heavy sessions look undelegated and trigger false "0 subagents" recommendations.**
++
+ # LESSONS — Downloads workspace
+ 
+ One line per lesson. Short. Tagged. Dated. Append-only below the
+diff --git a/scripts/agent_review_loop.py b/scripts/agent_review_loop.py
+index 4ef41dec7b8a38765bfeef51f901e418a2a897e4..00cdda4311024a50f112ac9f07832c5d5d42157a
+--- a/scripts/agent_review_loop.py
++++ b/scripts/agent_review_loop.py
+@@ -43,6 +43,8 @@
+ WORKTREES = Path(os.environ.get("WORKTREES", str(DOWNLOADS / "Cursor tests" / "WORKTREES.md")))
+ HOOK_LOG_DIR = Path(os.environ.get("HOOK_LOG_DIR", HOME / ".cursor/hooks-log"))
+ PROJECTS_DIR = HOME / ".cursor/projects"
++CODEX_MARKER_PATTERNS = ("codex-offline-*.marker", "codex-live-*.marker")
++BOOT_HEADER_RE = re.compile(r"AGENT SESSION BOOT \(([^)]+)\)")
+ 
+ # thresholds (env-overridable)
+ PROSE_DENSITY_WARN = float(os.environ.get("PROSE_DENSITY_WARN", "8"))   # %
+@@ -84,6 +86,59 @@
+     return sum(1 for _ in sub_dir.glob("*.jsonl"))
+ 
+ 
++def _latest_session_boot_time() -> float | None:
++    """Return the latest session boot timestamp, preferring the log header."""
++    logs = sorted(HOOK_LOG_DIR.glob("session-boot-*.log")) if HOOK_LOG_DIR.exists() else []
++    if not logs:
++        return None
++    boot = logs[-1]
++    try:
++        first = boot.read_text(encoding="utf-8", errors="replace").splitlines()[0]
++        m = BOOT_HEADER_RE.search(first)
++        if m:
++            return datetime.fromisoformat(m.group(1).replace("Z", "+00:00")).timestamp()
++    except (OSError, IndexError, ValueError):
++        pass
++    try:
++        return boot.stat().st_mtime
++    except OSError:
++        return None
++
++
++def _marker_state(marker: Path) -> str:
++    try:
++        for line in marker.read_text(encoding="utf-8", errors="replace").splitlines():
++            key, sep, value = line.partition("=")
++            if sep and key == "STATE":
++                return value.strip().split()[0] if value.strip() else "UNKNOWN"
++    except OSError:
++        pass
++    return "UNKNOWN"
++
++
++def _codex_worker_counts(boot_time: float, marker_dir: Path = Path("/tmp")) -> dict[str, int]:
++    """Count Codex worker marker files touched during this session."""
++    counts = {
++        "codex_workers_session": 0,
++        "codex_workers_done": 0,
++        "codex_workers_launched": 0,
++    }
++    for pattern in CODEX_MARKER_PATTERNS:
++        for marker in marker_dir.glob(pattern):
++            try:
++                if marker.stat().st_mtime < boot_time:
++                    continue
++            except OSError:
++                continue
++            state = _marker_state(marker)
++            counts["codex_workers_session"] += 1
++            if state == "DONE":
++                counts["codex_workers_done"] += 1
++            elif state in {"LAUNCHED", "RUNNING"}:
++                counts["codex_workers_launched"] += 1
++    return counts
++
++
+ def _read_transcript(transcript: Path, max_messages: int = 1000):
+     """Yield (role, text) tuples from the transcript."""
+     if not transcript.exists():
+@@ -245,21 +300,31 @@
+ 
+ def audit_orchestration(transcript: Path | None) -> dict:
+     out: dict = {"transcript": str(transcript) if transcript else None}
+-    if not transcript:
+-        return out
++    boot_time = _latest_session_boot_time()
++    codex_counts = (
++        _codex_worker_counts(boot_time)
++        if boot_time is not None
++        else {
++            "codex_workers_session": 0,
++            "codex_workers_done": 0,
++            "codex_workers_launched": 0,
++        }
++    )
+ 
+     delegation_mentions = 0
+     assistant_chars = 0
+-    for role, text in _read_transcript(transcript):
+-        if role != "assistant":
+-            continue
+-        assistant_chars += len(text)
+-        delegation_mentions += len(DELEGATION_KEYWORDS.findall(text))
++    if transcript:
++        for role, text in _read_transcript(transcript):
++            if role != "assistant":
++                continue
++            assistant_chars += len(text)
++            delegation_mentions += len(DELEGATION_KEYWORDS.findall(text))
+ 
+-    sub_count = _subagent_count(transcript)
++    sub_count = _subagent_count(transcript) if transcript else 0
+ 
+     out.update({
+         "subagent_transcripts": sub_count,
++        **codex_counts,
+         "delegation_keyword_mentions": delegation_mentions,
+         "delegation_ratio": round(delegation_mentions / max(assistant_chars / 1000, 1), 2),
+         "assistant_chars": assistant_chars,
+@@ -349,8 +414,9 @@
+ 
+     sub = orch.get("subagent_transcripts", 0)
+     dr = orch.get("delegation_ratio", 0)
+-    if sub == 0 and ac > 30000:
+-        recs.append("ORCHESTRATION: 0 subagents but >30k assistant chars. Delegation rule violated — next substantive task: launch a Task subagent or codex run.")
++    codex_workers = orch.get("codex_workers_session", 0)
++    if sub + codex_workers == 0 and ac > 30000:
++        recs.append("ORCHESTRATION: 0 subagents/codex workers but >30k assistant chars. Delegation rule violated — next substantive task: launch a Task subagent or codex run.")
+     elif dr < WORKER_RATIO_WARN and ac > 50000:
+         recs.append(f"orchestration: low delegation signal ({dr}/k chars). Pre-plan delegation budget for next sprint.")
+ 
+@@ -407,6 +473,13 @@
+     lines.append("")
+ 
+     lines.append("## orchestration")
++    if "codex_workers_session" in orch:
++        lines.append(
++            "- codex_workers: "
++            f"session={orch.get('codex_workers_session', 0)} "
++            f"done={orch.get('codex_workers_done', 0)} "
++            f"launched={orch.get('codex_workers_launched', 0)}"
++        )
+     for k in ("subagent_transcripts", "delegation_keyword_mentions", "delegation_ratio"):
+         if k in orch:
+             lines.append(f"- {k}: {orch[k]}")
+diff --git a/scripts/test_codex_worker_counts.py b/scripts/test_codex_worker_counts.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..86bb035ae862b559473063679ba692fb85736957
+--- /dev/null
++++ b/scripts/test_codex_worker_counts.py
+@@ -0,0 +1,37 @@
++#!/usr/bin/env python3
++"""Offline tests for Codex marker telemetry in agent_review_loop.py."""
++import importlib.util
++import os
++import tempfile
++from pathlib import Path
++
++script = Path(__file__).resolve().parent / "agent_review_loop.py"
++spec = importlib.util.spec_from_file_location("agent_review_loop", script)
++mod = importlib.util.module_from_spec(spec)
++spec.loader.exec_module(mod)
++
++
++def write_marker(root: Path, name: str, text: str, mtime: float) -> Path:
++    marker = root / name
++    marker.write_text(text, encoding="utf-8")
++    os.utime(marker, (mtime, mtime))
++    return marker
++
++
++with tempfile.TemporaryDirectory() as td:
++    root = Path(td)
++    boot = 1000.0
++
++    write_marker(root, "codex-offline-old.marker", "STATE=DONE\nEXIT_CODE=0\n", 900.0)
++    write_marker(root, "codex-offline-done.marker", "STATE=DONE EXIT_CODE=0\n", 1001.0)
++    write_marker(root, "codex-offline-launched.marker", "STATE=LAUNCHED\n", 1002.0)
++    write_marker(root, "codex-live-running.marker", "STATE=RUNNING\n", 1003.0)
++    write_marker(root, "codex-offline-malformed.marker", "TS=20260427-010101\n", 1004.0)
++
++    counts = mod._codex_worker_counts(boot_time=boot, marker_dir=root)
++
++assert counts["codex_workers_session"] == 4, "new offline/live/malformed markers count as session workers; old marker does not"
++assert counts["codex_workers_done"] == 1, "new DONE marker counts as done; old DONE marker does not"
++assert counts["codex_workers_launched"] == 2, "new LAUNCHED/RUNNING markers count as launched"
++
++print("OK: _codex_worker_counts all 5 cases pass")
+
+2026-04-27T07:52:38.217485Z ERROR codex_core::session: failed to record rollout items: thread 019dcde8-43e0-76b0-976e-5388734aaf2b not found
+tokens used
+113,002
+DONE: daybook/m2-review-loop-codex-aware 6bfa02d1cbf104345dcc759b2dcd2a1a19dca843
