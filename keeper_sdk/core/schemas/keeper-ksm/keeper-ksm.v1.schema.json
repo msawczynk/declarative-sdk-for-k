@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/msawczynk/declarative-sdk-for-k/schemas/keeper-ksm/v1.json",
-  "title": "keeper-ksm.v1 (scaffold)",
-  "description": "Scaffold-only schema for the keeper-ksm family (P13 in docs/V2_DECISIONS.md). No body yet \u2014 landing as part of P13 work. Validators MUST reject any manifest that declares this schema with a non-empty body until x-keeper-live-proof.status leaves 'scaffold-only'.",
+  "title": "keeper-ksm.v1",
+  "description": "L1-supported schema marker for the keeper-ksm family (P13 in docs/V2_DECISIONS.md). Declarative KSM body fields remain closed until ksm_apps, ksm_clients, and ksm_shares are modeled.",
   "x-keeper-live-proof": {
-    "status": "scaffold-only",
-    "evidence": "pending",
+    "status": "supported",
+    "evidence": "docs/live-proof/keeper-ksm.v1.89047920.sanitized.json",
     "since_pin": "89047920a0df857e01fb59adcb0bfb9fa6db70bf",
-    "notes": "Top-level keys planned: ksm_apps, ksm_clients, ksm_shares. See docs/V2_DECISIONS.md Q1."
+    "notes": "Sprint 7h-43 W2 L1: KsmLoginHelper authenticated Commander, bootstrapped/redeemed KSM config, and proved KSM fetch-write-fetch restore on the editable bus record."
   },
   "type": "object",
   "required": [
