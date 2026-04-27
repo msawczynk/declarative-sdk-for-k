@@ -24,9 +24,7 @@ from failure without a human in the loop.
 **If you are an agent or LLM**: start at [`AGENTS.md`](AGENTS.md) for the
 command table, exit-code contract, and JSON shapes. Scoped completion
 contracts live in [`docs/SDK_DA_COMPLETION_PLAN.md`](docs/SDK_DA_COMPLETION_PLAN.md)
-and [`docs/SDK_COMPLETION_PLAN.md`](docs/SDK_COMPLETION_PLAN.md). Cursor /
-Codex / daybook orchestration is operator-side infrastructure and lives
-in the maintainer's private daybook, not this repo.
+and [`docs/SDK_COMPLETION_PLAN.md`](docs/SDK_COMPLETION_PLAN.md).
 
 ## Capability scope
 
@@ -91,7 +89,7 @@ until **G6** (sanitized live transcript + matrix) and **§7** sign-off on
 - **Secrets in JSON:** `--json` can echo titles, UIDs, and folder scope; pipe
   and log discipline still matter (`docs/live-proof/README.md`).
 
-Orchestration checklist: [`docs/ORCHESTRATION_UNTIL_COMPLETE.md`](docs/ORCHESTRATION_UNTIL_COMPLETE.md).
+See [`AGENTS.md`](AGENTS.md) for the agent operating manual.
 Integrator detail: [`docs/VAULT_L1_DESIGN.md`](docs/VAULT_L1_DESIGN.md) §4 (semantic diff, races, UPDATE).
 
 ## Keeper Security Platform: what DSK does not cover (by design)
@@ -134,12 +132,8 @@ tests/                               # run `pytest` — ~518 tests collected; CI
 examples/
   SCAFFOLD.md                        # PAM root YAMLs + scaffold_only; CI validate vs mock-plan split
 docs/
-  ORCHESTRATION_PAM_PARITY.md        # merge train, workers, CI ladder (vault L1 + gates)
-  EXECUTION_PLAN_HEAVY_ORCHESTRATION.md  # phased checklist A–E + metrics + sprint close
-  ORCHESTRATION_UNTIL_COMPLETE.md       # tiers A/B/C, family ledger, waves to program exit
   VAULT_L1_DESIGN.md                 # vault L1 scope / §4 caveats; §7 sign-off pending (G2 ◐)
   PAM_PARITY_PROGRAM.md              # Definition of Done + phases to full support (not scaffold)
-  NEXT_SPRINT_PARALLEL_ORCHESTRATION.md  # wave mechanics, R/F packages, tenant rules
   V2_DECISIONS.md                    # schema families, runtime scope, MSP/EPM, explicit non-goals
   CAPABILITY_MATRIX.md               # Commander roots vs DSK buckets (synced from scripts/sync_upstream.py)
   COMMANDER.md                       # pinned Commander version + capability matrix
@@ -231,8 +225,8 @@ Core + mock: complete. Commander provider: discover, plan, apply
 capability check. **`keeper-vault.v1` L1** adds Commander discover/apply
 (including **login UPDATE** on v3 JSON), **`dsk validate --online`** for
 vault, and semantic vault diff for scalar logins — still **not** “PAM-bar
-GA” until live proof + design §7 close the ledger
-([`docs/ORCHESTRATION_UNTIL_COMPLETE.md`](docs/ORCHESTRATION_UNTIL_COMPLETE.md)).
+GA” until live proof and the readiness gates in
+[`docs/PAM_PARITY_PROGRAM.md`](docs/PAM_PARITY_PROGRAM.md) are complete.
 Capability gaps (rotation, JIT, gateway `mode: create`)
 surface as plan-time CONFLICT rows rather than silent drops, so the CLI's
 `plan` and `apply --dry-run` agree before any mutation runs.
@@ -240,8 +234,8 @@ KSM is now a first-class SDK feature: `dsk bootstrap-ksm` provisions an
 app + share + client token + `ksm-config.json` end-to-end, and
 `KsmLoginHelper` reads Commander credentials back out of that vault — so
 the SDK can authenticate without any plaintext env vars on the host.
-Current local suite: **~518 tests** collected; line coverage
-is CI-ratcheted (see `pyproject.toml` / workflows); core modules
+Current local suite: **491 passed / 1 skipped**; line coverage is
+CI-ratcheted (see `pyproject.toml` / workflows); core modules
 `redact`, `schema`, `normalize` at 100%.
 Live `EnvLoginHelper` smoke proved full apply for `pamMachine`; Issue #5
 RBI readback and Issue #4 nested-user rotation remain preview-gated until
@@ -310,4 +304,3 @@ CLI smokes exercise `validate`, `export`, `plan` exit codes (`0`/`2`/`4`),
 `apply --dry-run` equivalence to `plan`, and JSON output. Live-smoke
 variants live under `scripts/smoke/` and can be selected with
 `--scenario` plus `--login-helper deploy_watcher|env`.
-

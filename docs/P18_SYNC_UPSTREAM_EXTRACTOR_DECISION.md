@@ -2,7 +2,7 @@
 
 **Status:** **P18a + P18b landed** in `scripts/sync_upstream.py` (enterprise +
 vault/integrations registry + matrix sections). **P18c** (optional JSON
-allowlist helper) remains open. **Authority:** `docs/V2_DECISIONS.md` (P18), `docs/NEXT_SPRINT_PARALLEL_ORCHESTRATION.md` §15.1–15.2.
+allowlist helper) remains open. **Authority:** `docs/V2_DECISIONS.md` (P18).
 
 ## 1. Current state (fact)
 
@@ -61,7 +61,7 @@ labels, e.g. `enterprise user` — document naming in matrix header comment.
 - Keep `commander_sha` aligned with `.commander-pin` (40-char in schema
   annotations; short in matrix title per existing script).
 - Continue stripping environment-dependent fields from `--check` comparison if
-  CI adds noise (see daybook LESSON on `commander_branch` drift).
+  CI adds noise.
 
 ### D4 — CI / checkout
 
@@ -98,4 +98,3 @@ Stop between phases if `--check` diff becomes unreviewable.
 
 - `scripts/sync_upstream.py` — `_GROUPS`, `_COMMAND_CLASSES`, `build_snapshot`
 - `.commander-pin`
-- `docs/NEXT_SPRINT_PARALLEL_ORCHESTRATION.md` §15.2 track **B**

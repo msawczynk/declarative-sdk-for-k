@@ -5,7 +5,7 @@ misled agents toward removed modules. Use these repo-local sources instead:
 
 - `AGENTS.md` — agent operating manual, command table, exit codes, guardrails.
 - `SCAFFOLD.md` — current folder map, where to land work, design reconciliation.
-- `docs/SDK_COMPLETION_PLAN.md` — roadmap, parent / worker split, live-proof gates.
+- `docs/SDK_COMPLETION_PLAN.md` — roadmap and live-proof gates.
 - `docs/SDK_DA_COMPLETION_PLAN.md` — devil's-advocate completion contract; classifies every modeled capability as `supported` / `preview-gated` / `upstream-gap`.
 - `docs/VALIDATION_STAGES.md` — validation stages and exit-code contract.
 
@@ -21,12 +21,6 @@ Hard rules:
 
 - Prefer long autonomous completion passes over step-by-step status narration;
   only surface outcomes when blocked, scope shifts, or the user asks.
-- Preserve preview/provider gates until parent-reviewed live proof passes.
+- Preserve preview/provider gates until reviewed live proof passes.
 - Do not write direct Keeper DAG state from SDK or lab scripts; route live mutation through Commander surfaces.
 - Keep tests focused to the touched area first; run broad checks only when risk or release scope requires it.
-
-Agent orchestration (Codex CLI scripts, parent / Codex split, Phase-0 gates,
-parallel slice prompts, GitHub-Codex Action / issue template) is **operator-side
-infrastructure**, not part of this product. It lives canonically in the
-maintainer's private daybook (`msawczynk/cursor-daybook`:
-`docs/orchestration/` + `templates/`). This repo does not ship those files.

@@ -17,37 +17,26 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   [`AGENTS.md`](AGENTS.md) (vault paragraph after `validate` pointer);
   [`docs/live-proof/README.md`](docs/live-proof/README.md) (caveat links);
   [`README.md`](README.md) (readiness + honest limits + layout tree).
-- **Docs — indexes + orchestration** — [`docs/SCAFFOLD.md`](docs/SCAFFOLD.md);
+- **Docs — product indexes** — [`docs/SCAFFOLD.md`](docs/SCAFFOLD.md);
   [`keeper_sdk/providers/SCAFFOLD.md`](keeper_sdk/providers/SCAFFOLD.md);
-  [`docs/ORCHESTRATION_PAM_PARITY.md`](docs/ORCHESTRATION_PAM_PARITY.md) (§1 G2–G6 + §3 status pointer + V6 train row);
-  [`docs/ORCHESTRATION_UNTIL_COMPLETE.md`](docs/ORCHESTRATION_UNTIL_COMPLETE.md) (§7 checklist, §10, revision log).
-- **Docs — parity program + execution plan** — [`docs/PAM_PARITY_PROGRAM.md`](docs/PAM_PARITY_PROGRAM.md)
-  (inventory, Phase 0 `validate`, Phase 1a JSON modes);
-  [`docs/EXECUTION_PLAN_HEAVY_ORCHESTRATION.md`](docs/EXECUTION_PLAN_HEAVY_ORCHESTRATION.md) (Phase D V6 / L1 vs V8 exit criteria; Phase A pointer when V0–V6 merged).
+  [`docs/PAM_PARITY_PROGRAM.md`](docs/PAM_PARITY_PROGRAM.md)
+  (inventory, `validate`, JSON modes, and readiness gates).
 - **Docs — v1.0.0 GA checklist** — [`V1_GA_CHECKLIST.md`](V1_GA_CHECKLIST.md): `keeper-vault.v1` `validate --online` note under §5 (not a v1.0.0 blocker; PAM-bar / Tier A docs apply).
-- **Docs — examples index** — [`examples/SCAFFOLD.md`](examples/SCAFFOLD.md): CI validate vs mock-plan split; `vaultOneLogin.yaml`; reconciliation note. [`docs/NEXT_SPRINT_PARALLEL_ORCHESTRATION.md`](docs/NEXT_SPRINT_PARALLEL_ORCHESTRATION.md): §7 checklist pointer on hub link.
-- **Docs — CI ladder** — [`docs/ORCHESTRATION_PAM_PARITY.md`](docs/ORCHESTRATION_PAM_PARITY.md) §7: `examples` job vs pytest for vault; optional scaffold `plan` row. [`README.md`](README.md): layout tree includes `examples/SCAFFOLD.md`. [`docs/SCAFFOLD.md`](docs/SCAFFOLD.md): “Where to land” row → §7 + `examples/SCAFFOLD.md`.
+- **Docs — examples index** — [`examples/SCAFFOLD.md`](examples/SCAFFOLD.md): CI validate vs mock-plan split; `vaultOneLogin.yaml`; reconciliation note.
+- **Docs — CI ladder** — [`README.md`](README.md): layout tree includes `examples/SCAFFOLD.md`. [`docs/SCAFFOLD.md`](docs/SCAFFOLD.md): “Where to land” row points to `examples/SCAFFOLD.md`.
 - **Docs — parity Phase 1 + CLI scaffold** — [`docs/PAM_PARITY_PROGRAM.md`](docs/PAM_PARITY_PROGRAM.md): vault L1 shipped vs sharing open; “still open” excludes vault L1 partial row. [`keeper_sdk/cli/SCAFFOLD.md`](keeper_sdk/cli/SCAFFOLD.md): `validate` modes + `--online`; reconciliation vault note; `main.py` LOC band.
-- **Docs — PAM parity train** — [`docs/ORCHESTRATION_PAM_PARITY.md`](docs/ORCHESTRATION_PAM_PARITY.md) §3: blockquote skim rule before PR table; **V2** touches → `vault_graph.py`; footnote on **V1** “Delivers” staleness.
 - **Core** — [`keeper_sdk/core/manifest.py`](keeper_sdk/core/manifest.py) module docstring: `load_manifest` (PAM-only) vs `load_declarative_manifest` (PAM + `keeper-vault.v1`).
-- **Docs** — [`README.md`](README.md) programmatic use: vault import path + `load_manifest` PAM-only note. [`docs/EXECUTION_PLAN_HEAVY_ORCHESTRATION.md`](docs/EXECUTION_PLAN_HEAVY_ORCHESTRATION.md) Phase C precondition/V4 row uses `load_declarative_manifest`. [`keeper_sdk/core/SCAFFOLD.md`](keeper_sdk/core/SCAFFOLD.md): `manifest.py` LOC + loader note.
+- **Docs** — [`README.md`](README.md) programmatic use: vault import path + `load_manifest` PAM-only note. [`keeper_sdk/core/SCAFFOLD.md`](keeper_sdk/core/SCAFFOLD.md): `manifest.py` LOC + loader note.
 - **Core** — [`keeper_sdk/core/vault_models.py`](keeper_sdk/core/vault_models.py) module docstring: loader + CLI pointer (stale “PR-V3+” removed).
 - **Docs** — [`AGENTS.md`](AGENTS.md): playbook **§E** — programmatic `load_manifest` vs `load_declarative_manifest` for vault L1. [`docs/SCAFFOLD.md`](docs/SCAFFOLD.md): “Where to land” row cites §E.
 
 ### Added
 - **V8 prep** — [`docs/live-proof/keeper-vault.v1.sanitized.template.json`](docs/live-proof/keeper-vault.v1.sanitized.template.json)
-  (`template: true`, shape-only) plus README section; **§2 ledger** in
-  [`docs/ORCHESTRATION_UNTIL_COMPLETE.md`](docs/ORCHESTRATION_UNTIL_COMPLETE.md)
-  marks `keeper-vault.v1` **G3–G5** complete (G2 still **◐** until §7 sign-off;
-  **G6** open). CI `schema-validate` also runs `python -m json.tool` on
+  (`template: true`, shape-only) plus README section. CI `schema-validate` also runs `python -m json.tool` on
   `docs/live-proof/*.json`. `docs/SCAFFOLD.md` indexes `live-proof/`; regression
   tests in `tests/test_live_proof_artifacts.py`. Sample L1 manifest
   [`examples/scaffold_only/vaultOneLogin.yaml`](examples/scaffold_only/vaultOneLogin.yaml)
-  linked from `docs/live-proof/README.md` and **V8** row in `ORCHESTRATION_PAM_PARITY.md`.
-- **Master orchestration** — [`docs/ORCHESTRATION_UNTIL_COMPLETE.md`](docs/ORCHESTRATION_UNTIL_COMPLETE.md):
-  exit **tiers A/B/C**, per-family **completion ledger** (G0–G6), repeating
-  **waves** W.1–W.6, parallelism do/don’t, metrics dashboard, §7 vault +
-  program checklist through Tier B.
+  linked from `docs/live-proof/README.md`.
 - **Vault L1** — `docs/VAULT_L1_DESIGN.md` (slice 1 design; sign-off §7 still
   pending) plus **`keeper_sdk/core/vault_models.py`**: `VaultManifestV1`,
   `VaultRecord`, `load_vault_manifest()` with L1 **`login`-only** record rule;
@@ -78,21 +67,6 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   `record_uid` (and related) key values stay as returned by Commander
   unless **`--quiet`** is also set (which fingerprints those UID
   fields). See `AGENTS.md` command table.
-- **Orchestration** — `docs/NEXT_SPRINT_PARALLEL_ORCHESTRATION.md` adds
-  **§12 large-sprint mode** (WIP limits, program board, trains, roles) and
-  **§13** sprint-size cheat sheet. **Live access:** docs + `AGENTS.md` now
-  state that **granted code** (workers, CI, agents) may run L1 / live-proof
-  under the same harness rules as humans; serialization is **per tenant**, not
-  parent-only. **§14** plans through this file; **§15** closes capability gaps
-  then defines **maintenance mode** (Commander pin / drift, operator-optional);
-  **§16** mandates a **daybook review + optimization** after every sprint.
-  **Policy:** orchestrator + **Codex CLI** may run live L1/smoke; **pin** never
-  ambiguous (resolve with live test + drift-check); **support prose** for
-  Commander defers to **upstream** repos; **daybook** = private GitHub +
-  `sync_daybook.sh`.   **Orchestrator** explicitly **owns** prerequisite health +
-  daybook sync (`AGENTS.md`, `docs/live-proof/README.md`, orchestration header).
-  **§0** autonomous cold start: new sessions use repo + daybook, not repeated
-  chat prompts.
 - **P18b** — `sync_upstream` adds **integrations** groups (`ScimCommand`,
   `AutomatorCommand`) + **trash** `GroupCommand`; vault-related **Command** rows
   (`get`, `search`, `record-add`, `record-update`, `list-sf`, `ls`). Matrix
@@ -157,8 +131,7 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
     bootstrap → login → apply loop is the next gate).
 - **Scope-fence CI workflow** (`.github/workflows/scope-fence.yml`) —
   structural denylist that fails on newly-ADDED paths matching the
-  orchestration / daybook / per-session globs (union of LESSONS
-  `[scope][drift][prevention]` and historical pruning branches).
+  orchestration and per-session globs.
   `git diff --diff-filter=A` so only ADDS trip the fence;
   modifications to pre-existing tracked files don't fire. Activated
   alongside the regular `lint / typecheck / test / examples /
@@ -216,31 +189,19 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   the docs index. New "Quick start (KSM bootstrap)" subsection.
 
 ### Removed
-- In-tree orchestration / Codex CLI stack: `docs/CODEX_CLI.md`,
-  `docs/CODEX_GITHUB.md`, `docs/ORCHESTRATION_PHASE0_PARALLEL.md`,
-  `scripts/agent/` (the whole tree: `_codex_resolve.sh`,
-  `codex_offline_slice.sh`, `codex_live_smoke.sh`, `phase0_gates.sh`,
-  `run_parallel_codex.sh`, `run_smoke_matrix.sh`, `prompts/*.prompt.md`,
-  READMEs and SCAFFOLD), `.github/codex/prompts/scoped-task.md`,
-  `.github/ISSUE_TEMPLATE/codex_task.yml`, and
-  `.github/workflows/codex-task.yml`. Cursor / Codex / daybook
-  orchestration is now operator-side infrastructure only — maintained
-  canonically in the maintainer's private daybook
-  (`msawczynk/cursor-daybook`: `docs/orchestration/` + `templates/`).
-  Adopters who want the same parent / worker workflow copy templates
-  from there with `# adapt:` markers; this repo no longer ships any of
-  those files.
+- In-tree non-product automation files under `scripts/agent/`, `.github/`,
+  and documentation. Operator-side tooling is not part of this SDK and is not
+  documented here.
 
 ### Changed
 - `AGENTS.md`, `README.md`, `SCAFFOLD.md`, `.cursorrules`,
   `V1_GA_CHECKLIST.md`, `RECONCILIATION.md`, `AUDIT.md`,
   `docs/SCAFFOLD.md`, `scripts/SCAFFOLD.md`, `scripts/smoke/SCAFFOLD.md`,
   `scripts/smoke/README.md`, `.github/SCAFFOLD.md`,
-  `docs/SDK_DA_COMPLETION_PLAN.md`,
-  `docs/SDK_COMPLETION_PLAN.md`, and
-  `docs/SDK_ORCHESTRATED_FEATURE_COMPLETE.md` reconciled against the
+  `docs/SDK_DA_COMPLETION_PLAN.md`, and
+  `docs/SDK_COMPLETION_PLAN.md` reconciled against the
   removal — every link to a deleted path replaced with a thin pointer
-  to the operator-side daybook or with the equivalent direct command
+  to the equivalent direct command
   (`pytest`, `ruff`, `mypy`, `python3 scripts/smoke/smoke.py …`).
 - `.gitignore` drops `.codex-runs/` (no longer applicable); `.smoke-runs/`
   retained for ad-hoc local logs.
@@ -269,9 +230,6 @@ is the cheap upgrade path if supply-chain requirements change.
 - `scripts/agent/run_smoke_matrix.sh` — sequential live run of every smoke
   scenario with `python3 -u` and per-scenario logs under `.smoke-runs/`
   (gitignored); optional `SMOKE_LOGIN_HELPER` / `--login-helper`.
-- `docs/SDK_ORCHESTRATED_FEATURE_COMPLETE.md` — orchestration index: SDK_DA
-  phases mapped to `phase0_gates.sh`, Codex scripts, live smoke commands, and
-  gate-lift stop conditions.
 
 ### Fixed
 - `scripts/smoke/smoke.py` — post-destroy folder sweep + manifest-empty
@@ -323,9 +281,8 @@ is the cheap upgrade path if supply-chain requirements change.
 
 ### Added
 - Offline P2.1 diff anchor: `test_diff_nested_pam_user_rotation_drift_surfaces_rotation_settings_key` — proves nested `pamUser` rotation readback drift keys `rotation_settings` in plan tails.
-- `scripts/agent/_codex_resolve.sh` — auto-pick Codex from `CODEX_BIN`, `PATH`, or newest Cursor `openai.chatgpt-*` extension bundle.
-- `scripts/agent/run_parallel_codex.sh` + `scripts/agent/prompts/*.prompt.md` — disjoint Codex CLI slices with logs under `.codex-runs/` (gitignored).
-- `docs/ORCHESTRATION_PHASE0_PARALLEL.md` + `scripts/agent/phase0_gates.sh` — parent vs Codex split, Phase 0 / merge gates scripted (referenced from global Cursor rules + daybook drift-guard).
+- In-tree automation helpers for local development runs. These were later
+  removed from the SDK public surface.
 - `pamUserNested` smoke scenario — proves nested `resources[].users[]`
   through schema, typed model, planner, and Commander normalization
   without claiming standalone top-level `pamUser` live support.

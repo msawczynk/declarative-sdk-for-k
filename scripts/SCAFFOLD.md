@@ -10,11 +10,7 @@
 - All scripts are committed. Logs are NOT (`.smoke-runs/` gitignored).
 - Live tenant mutation routes ONLY through `scripts/smoke/smoke.py`. No
   ad-hoc CLI sessions.
-- Cursor / Codex / daybook orchestration is operator-side infrastructure
-  in the maintainer's private daybook (`msawczynk/cursor-daybook`); not
-  shipped from this repo.
 
 ## Reconciliation
 
-`docs/SDK_ORCHESTRATED_FEATURE_COMPLETE.md` Step table maps every gate to
-a script in this folder. All shipped.
+Operator-side tooling is not part of this SDK and is not documented here.

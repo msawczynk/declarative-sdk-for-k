@@ -3,9 +3,6 @@
 Derived from the 2026-04-24 devil's-advocate audit (see `AUDIT.md`).
 Items are **blocking** unless marked `[hardening]`. Check them off in
 PRs that close them so the next agent can tell at a glance what's left.
-Cursor / Codex / daybook orchestration is operator-side infrastructure
-in the maintainer's private daybook (`msawczynk/cursor-daybook`); it is
-not shipped from this repo.
 
 ## Shipping gates
 
@@ -85,8 +82,7 @@ not shipped from this repo.
 `validate --online` exit-code ladder for **stages 4–5** (Commander `discover`,
 `compute_vault_diff`, `check_tenant_bindings` — vault L1 hook is a **no-op** today).
 It does **not** gate the annotated `v1.0.0` checklist above; README / PAM-bar
-honesty for vault follows [`docs/PAM_PARITY_PROGRAM.md`](./docs/PAM_PARITY_PROGRAM.md)
-and [`docs/ORCHESTRATION_UNTIL_COMPLETE.md`](./docs/ORCHESTRATION_UNTIL_COMPLETE.md) §2.
+honesty for vault follows [`docs/PAM_PARITY_PROGRAM.md`](./docs/PAM_PARITY_PROGRAM.md).
 
 ### 6. Live-smoke coverage
 - [x] `pamMachine` create → verify → delete cycle.
@@ -146,18 +142,16 @@ and `tests/test_smoke_scenarios.py`.
       Phase B inter-agent bus directory provisioned but client sealed
       (`secrets/bus.py` raises `NotImplementedError`). 264 unit tests;
       docs at `docs/KSM_BOOTSTRAP.md` + `docs/KSM_INTEGRATION.md`. Was
-      a v1.x roadmap row; delivered in 2026-04-26 Sprint 7h-6
-      (PRs #13/#14). End-to-end live bootstrap → login → apply loop is
+      a v1.x roadmap row; delivered in PRs #13/#14. End-to-end live bootstrap → login → apply loop is
       the next proof gate (offline tests are green).
 - [x] **Coverage ratchet floor 83 → 84** with new baseline 86.32% across
       315 tests after redact / schema / normalize 100%-coverage slices
       (PRs #17/#18/#19) and ratchet bump (PR #20). `ci.yml` comment
       updated for the new baseline + test count.
 - [x] **Scope-fence CI workflow** (`.github/workflows/scope-fence.yml`)
-      — structural denylist for orchestration / daybook / per-session
+      — structural denylist for orchestration / per-session
       path globs; only ADDS trip the fence (`--diff-filter=A`).
-      Prevents the recurring orchestration-leak bug class.
-      Delivered 2026-04-26 Sprint 7h-6 (PR #16).
+      Prevents the recurring orchestration-leak bug class. Delivered in PR #16.
 - [ ] Module rename from `keeper_sdk` → `declarative_sdk_k` (breaking, v2.0.0;
       will ship a shim module so `import keeper_sdk` keeps working for
       one minor cycle).
