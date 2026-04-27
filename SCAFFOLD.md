@@ -15,7 +15,7 @@ Agent-first Python SDK + CLI (`dsk`) for deterministic `validate -> plan -> appl
 | `keeper_sdk/secrets/` | [`keeper_sdk/secrets/SCAFFOLD.md`](./keeper_sdk/secrets/SCAFFOLD.md) | KSM bootstrap + `ksm` reader + bus skeleton |
 | `tests/` | [`tests/SCAFFOLD.md`](./tests/SCAFFOLD.md) | Per-test-file inventory + where to land new tests |
 | `docs/` | [`docs/SCAFFOLD.md`](./docs/SCAFFOLD.md) | Doc inventory + audience + ownership |
-| `scripts/` | [`scripts/SCAFFOLD.md`](./scripts/SCAFFOLD.md) | Smoke + sync top-level map |
+| `scripts/` | [`scripts/SCAFFOLD.md`](./scripts/SCAFFOLD.md) | Smoke, daybook harness (forwarder), phase_harness, sync — top-level map |
 | `scripts/smoke/` | [`scripts/smoke/SCAFFOLD.md`](./scripts/smoke/SCAFFOLD.md) | Live-smoke harness + scenario registry |
 | `examples/` | [`examples/SCAFFOLD.md`](./examples/SCAFFOLD.md) | Canonical minimal manifests + CI contract |
 | `.github/` | [`.github/SCAFFOLD.md`](./.github/SCAFFOLD.md) | Workflows + issue templates |
@@ -104,6 +104,8 @@ Tree snapshot: refresh when layout shifts; exact commit: `git rev-parse HEAD`. D
 │       └── mock.py                         # Offline mock provider used by tests/examples CI.
 ├── pyproject.toml                          # Packaging, deps, scripts, lint/type/test config.
 ├── scripts/                                # Maintenance and live-smoke tooling.
+│   ├── daybook/                            # `harness.sh` forwards to ~/.cursor-daybook-sync; no JOURNAL in-tree.
+│   ├── phase_harness/                      # Local ruff/mypy/pytest + example phase_runner YAML.
 │   ├── smoke/                              # Live-smoke harness and scenario registry.
 │   │   ├── .commander-config-testuser2.json# Local smoke helper config fixture.
 │   │   ├── .gitignore                      # Keeps local smoke secrets/config out of git.

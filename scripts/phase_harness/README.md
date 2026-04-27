@@ -6,6 +6,10 @@ See root [`AGENTS.md`](../../AGENTS.md) **§ Where orchestration lives** and
 **§ Phase runner harness** — this folder only provides **in-repo** gates + an example
 spec for copy-paste.
 
+**Daybook session loop (boot, sync, append) from a clone** — use
+[`../daybook/README.md`](../daybook/README.md); keep daybook work **separate** from
+product `git` commits in this tree.
+
 | Artifact | Role |
 |----------|------|
 | [`run_local_gates.sh`](./run_local_gates.sh) | Single command: `ruff check` + `ruff format --check` + `mypy keeper_sdk` + `pytest` (use when not delegating a multi-step `phase_runner` phase). |

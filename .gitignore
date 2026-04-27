@@ -37,6 +37,9 @@ evidence/
 # prompts; ignoring them by default makes scope leaks self-healing.
 WORKTREES.md
 scripts/agent/
+# If copied to repo root by mistake (canonical: ~/Downloads + daybook sync).
+/JOURNAL.md
+/LESSONS.md
 
 # Testing
 .pytest_cache/
