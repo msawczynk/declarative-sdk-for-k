@@ -18,6 +18,8 @@ class ChangeKind(StrEnum):
 
     * ``CREATE`` — manifest describes a resource that does not exist in
       the vault yet.
+    * ``ADD`` — backwards-compatible alias for ``CREATE`` used by newer
+      sibling-block diff helpers.
     * ``UPDATE`` — manifest and vault both carry the resource but their
       fields drift. Only raised when drift is detected on declarative
       (manifest-owned) fields — SDK-internal placement metadata is
@@ -26,15 +28,19 @@ class ChangeKind(StrEnum):
       ``uid_ref`` is absent from the manifest. Requires
       ``allow_delete=True`` on ``compute_diff``.
     * ``NOOP`` — manifest and vault agree; no action required.
+    * ``SKIP`` — a non-actionable observed object is intentionally left
+      untouched, usually because it is unmanaged by this SDK.
     * ``CONFLICT`` — a situation the planner cannot resolve automatically
       (name collision, ambiguous marker, incompatible type). Operator
       must resolve before re-running.
     """
 
     CREATE = "create"
+    ADD = "create"
     UPDATE = "update"
     DELETE = "delete"
     NOOP = "noop"
+    SKIP = "skip"
     CONFLICT = "conflict"
 
 
