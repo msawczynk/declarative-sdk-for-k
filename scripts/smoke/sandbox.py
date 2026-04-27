@@ -21,7 +21,7 @@ log = logging.getLogger("sdk_smoke.sandbox")
 
 SANDBOX_SF_TITLE = "SDK Test (ephemeral)"
 SANDBOX_KSM_APP_NAME = "SDK Test KSM"
-GATEWAY_NAME = "Lab GW Rocky"
+GATEWAY_NAME = "<gateway-name>"
 
 
 @dataclass(frozen=True)
@@ -40,12 +40,17 @@ DEFAULT_SANDBOX_CONFIG = SandboxConfig(
 
 def config_for_profile(profile: Any) -> SandboxConfig:
     profile_id = str(getattr(profile, "id", "default"))
+    gateway_name = str(getattr(profile, "gateway_name", GATEWAY_NAME))
     if profile_id == "default":
-        return DEFAULT_SANDBOX_CONFIG
+        return SandboxConfig(
+            sf_title=SANDBOX_SF_TITLE,
+            ksm_app_name=SANDBOX_KSM_APP_NAME,
+            gateway_name=gateway_name,
+        )
     return SandboxConfig(
         sf_title=f"SDK Test (ephemeral) {profile_id}",
         ksm_app_name=f"SDK Test KSM {profile_id}",
-        gateway_name=GATEWAY_NAME,
+        gateway_name=gateway_name,
     )
 
 

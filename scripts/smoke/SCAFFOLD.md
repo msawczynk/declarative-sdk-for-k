@@ -43,11 +43,9 @@ tenant. The only sanctioned path for live mutation. No ad-hoc CLI.
 - **No secrets in stdout/stderr/log artifacts.** Honour redaction patterns; `SMOKE_NO_CLEANUP=1` for failure-case inspection only.
 - **Cleanup is destroy-by-marker.** Never delete records the SDK doesn't own.
 - **One scenario per `--scenario` invocation.** Operator-side matrix
-  runners (sequential / parallel) live in the maintainer's private
-  daybook (`msawczynk/cursor-daybook`: `templates/agent/`); they are not
-  shipped from this repo.
-- Login helper defaults to `deploy_watcher`; `env` is the GA login proof
-  via the in-tree `EnvLoginHelper`. Override via `--login-helper`.
+  runners (sequential / parallel) live outside this public SDK repo.
+- Login helper defaults to `profile`; `env` is the GA login proof via
+  the in-tree `EnvLoginHelper`. Override via `--login-helper`.
 
 ## Reconciliation vs design
 

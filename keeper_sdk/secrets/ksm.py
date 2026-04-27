@@ -26,9 +26,8 @@ The store accepts an explicit ``config_path``; otherwise it walks the
 following list (first usable wins):
 
 1. ``$KEEPER_SDK_KSM_CONFIG``
-2. ``$KSM_CONFIG`` (kept for parity with operator-side daybook scripts)
-3. ``~/.keeper/caravan-ksm-config.json``
-4. ``~/.keeper/ksm-config.json``
+2. ``$KSM_CONFIG`` (common Keeper tooling override)
+3. ``~/.keeper/ksm-config.json``
 
 Different KSM applications see different shared-folder grants; the
 caller is expected to know which application owns the records they want
@@ -74,8 +73,8 @@ KSM_CONFIG_ENV = "KEEPER_SDK_KSM_CONFIG"
 """Primary env var an operator sets to point the SDK at a KSM app config.
 
 Independent from ``KSM_CONFIG`` so SDK consumers can co-exist with the
-daybook ``ksm_lib.py`` operator-side helper without fighting over a
-shared variable. If both are unset the auto-discovery probes fire.
+other Keeper tooling without fighting over a shared variable. If both are
+unset the auto-discovery probes fire.
 """
 
 KSM_TOTP_ENV_PARSE_FALLBACK = "KEEPER_SDK_KSM_ALLOW_OTPAUTH_PASSTHROUGH"
@@ -85,17 +84,13 @@ themselves. Default behaviour (env unset / ``"0"``) extracts the
 ``secret`` query param so the value drops straight into ``pyotp.TOTP``.
 """
 
-DEFAULT_CONFIG_PROBES: tuple[Path, ...] = (
-    Path.home() / ".keeper" / "caravan-ksm-config.json",
-    Path.home() / ".keeper" / "ksm-config.json",
-)
+DEFAULT_CONFIG_PROBES: tuple[Path, ...] = (Path.home() / ".keeper" / "ksm-config.json",)
 """Standard locations checked when no explicit ``config_path`` is given.
 
-The lab tenant's ``ksm-config.json`` lives in a sibling repo and is NOT
-included here on purpose — production adopters should drop their KSM
-client config under ``~/.keeper/`` (the same convention Commander uses)
-rather than relying on a path the SDK guesses. Override via
-``KEEPER_SDK_KSM_CONFIG`` for ad-hoc runs.
+Production adopters should drop their KSM client config under
+``~/.keeper/`` (the same convention Commander uses) rather than relying on
+a path the SDK guesses. Override via ``KEEPER_SDK_KSM_CONFIG`` for
+ad-hoc runs.
 """
 
 

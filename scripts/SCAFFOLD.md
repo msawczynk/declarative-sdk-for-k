@@ -11,8 +11,7 @@
 - Live tenant mutation routes ONLY through `scripts/smoke/smoke.py`. No
   ad-hoc CLI sessions.
 - Cursor / Codex / daybook orchestration is operator-side infrastructure
-  in the maintainer's private daybook (`msawczynk/cursor-daybook`); not
-  shipped from this repo.
+  outside this public SDK repo.
 
 ## Reconciliation
 

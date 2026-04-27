@@ -1,6 +1,6 @@
 # SDK Live Smoke
 
-This smoke is an autonomous, no-human-input harness for proving the SDK against a live Keeper tenant through Commander CLI 17.x, while honoring the current "no DAG writes" moratorium by routing all tenant mutations through Commander rather than direct `keeper_dag` writes. Both the `deploy_watcher` helper path and the public `EnvLoginHelper` path are wired into the same plan -> apply -> verify -> destroy harness; Issue #3 is live-proven for the full `pamMachine` cycle.
+This smoke is an autonomous, no-human-input harness for proving the SDK against a live Keeper tenant through Commander CLI 17.x, while honoring the current "no DAG writes" moratorium by routing all tenant mutations through Commander rather than direct `keeper_dag` writes. Profile-backed KSM/helper auth and the public `EnvLoginHelper` path are wired into the same plan -> apply -> verify -> destroy harness.
 
 The `pamRemoteBrowser` and `pamUserNestedRotation` scenarios are proof harnesses, not support claims for Issues #5 and #4. A 2026-04-25 `pamRemoteBrowser` live run created records and cleanup passed, but verification failed because Commander `pam rbi edit --remote-browser-isolation` writes DAG `allowedSettings.connections`, which current `discover()` does not read back as manifest-shaped `pam_settings.options.remote_browser_isolation`. Nested rotation now reaches apply and marker verification after `pam rotation edit`, but the follow-up plan still reports updates for the nested user and parent machine; keep the preview/experimental gates until readback/drift semantics are clean. **Pre-merge contract:** `docs/SDK_DA_COMPLETION_PLAN.md` § Phase 0 — do not lift preview gates without parent-reviewed live proof per that plan.
 
@@ -8,17 +8,17 @@ The `pamRemoteBrowser` and `pamUserNestedRotation` scenarios are proof harnesses
 
 - Keeper Commander >= 17.2.13 on PATH (`keeper --version`)
 - `pip` packages installed: `keepercommander`, `pyotp`, `keeper_secrets_manager_core`, `pyyaml`
-- Admin KSM config at `../keeper-vault-rbi-pam-testenv/ksm-config.json`
-- Admin commander config at `../keeper-vault-rbi-pam-testenv/commander-config.json` with a valid `device_token` (persistent login)
-- Admin has already stored admin-KSM record `MyiZN4cw-wtEIpY1jHlhLw` ("Admin Creds for Lab Scripts" or similar) containing the admin login, password, and `oneTimeCode`
-- Tenant contains the gateway `Lab GW Rocky` bound to PAM configuration `Lab Rocky PAM Configuration`
-- `testuser2` (`msawczyn+testuser2@acme-demo.com`) exists and is active
+- External profile JSON at `~/.config/dsk/profiles/default.json` or the path named by `DSK_SMOKE_PROFILE`
+- Admin KSM config and Commander config paths populated in the external profile
+- Admin KSM record referenced by `default_admin_record_uid` containing the admin login, password, and `oneTimeCode`
+- Tenant contains the gateway named by `gateway_name` bound to the PAM configuration named by `pam_config_title`
+- Target user named by `target_email` exists and is active
 
 ## Files
 
 | file | purpose | public functions |
 |------|---------|------------------|
-| `identity.py` | Bootstraps the live identities: admin login via KSM-backed lab helpers, plus idempotent `testuser2` TOTP provisioning and Commander config reuse. | `admin_login()`, `ensure_sdktest_identity()`, `sdktest_keeper_args()`, `main()` |
+| `identity.py` | Bootstraps the live identities: admin login via env/profile helper/KSM, plus idempotent target-user TOTP provisioning and Commander config reuse. | `admin_login()`, `ensure_sdktest_identity()`, `sdktest_keeper_args()`, `main()` |
 | `sandbox.py` | Ensures the reusable shared-folder sandbox and KSM app exist, are shared correctly, and can tear down only SDK-managed records. | `ensure_sandbox()`, `record_count()`, `teardown_records()`, `teardown_sandbox()`, `main()` |
 | `scenarios.py` | Registry of resource shapes the smoke can exercise. Each `ScenarioSpec` supplies a manifest fragment builder and a post-apply verifier; the runner is resource-type-agnostic. | `get()`, `names()`, `all_scenarios()` |
 | `smoke.py` | Orchestrates the live end-to-end smoke: pre-clean, manifest generation, validate/plan/apply, live verification, destroy, and failure cleanup. Scenario-aware via `--scenario`. | `run_smoke()`, `main()` |
@@ -38,9 +38,8 @@ python3 scripts/smoke/smoke.py --login-helper env --scenario pamRemoteBrowser # 
 DSK_PREVIEW=1 DSK_EXPERIMENTAL_ROTATION_APPLY=1 python3 scripts/smoke/smoke.py --login-helper env --scenario pamUserNestedRotation
 ```
 
-Operator-side sequential or parallel matrix runners live in the
-maintainer's private daybook (`msawczynk/cursor-daybook`:
-`templates/agent/`); this repo only ships the per-scenario CLI.
+Operator-side sequential or parallel matrix runners live outside this public
+SDK repo; this repo only ships the per-scenario CLI.
 
 Registered scenarios live in `scripts/smoke/scenarios.py`. Every scenario
 is unit-tested offline (`tests/test_smoke_scenarios.py`) — schema,
@@ -59,13 +58,12 @@ round-trip.
 
 Not-supported-yet smoke coverage belongs in `docs/SDK_DA_COMPLETION_PLAN.md` § Phase 0 until it is registered in `scripts/smoke/scenarios.py` and live-proofed.
 
-`--login-helper deploy_watcher` is the default and preserves the current
-lab-helper path. `--login-helper env` unsets `KEEPER_SDK_LOGIN_HELPER`
-for SDK subprocesses and instead exports `KEEPER_EMAIL`,
-`KEEPER_PASSWORD`, and `KEEPER_TOTP_SECRET` so the provider falls back
-to the public `EnvLoginHelper` contract. The smoke log and failure
-post-mortem explicitly name which auth path ran: `deploy_watcher`
-helper vs public `EnvLoginHelper` env path.
+`--login-helper profile` is the default and uses either the profile's explicit
+helper path or the in-tree KSM helper with `default_admin_record_uid`.
+`--login-helper env` unsets `KEEPER_SDK_LOGIN_HELPER` for SDK subprocesses and
+instead exports `KEEPER_EMAIL`, `KEEPER_PASSWORD`, and `KEEPER_TOTP_SECRET` so
+the provider falls back to the public `EnvLoginHelper` contract. The smoke log
+and failure post-mortem explicitly name which auth path ran.
 
 Exit codes come from `smoke.py::main()`:
 
@@ -79,8 +77,8 @@ Exit codes come from `smoke.py::main()`:
 ## What the smoke exercises
 
 - Logs in as the tenant admin with `identity.admin_login()`
-- Ensures the `testuser2` smoke identity exists and is usable with `identity.ensure_sdktest_identity()`
-- Ensures the reusable sandbox exists with `sandbox.ensure_sandbox()`: shared folder `SDK Test (ephemeral)`, KSM app `SDK Test KSM`, gateway visibility, app binding, and share to `testuser2`
+- Ensures the target smoke identity exists and is usable with `identity.ensure_sdktest_identity()`
+- Ensures the reusable sandbox exists with `sandbox.ensure_sandbox()`: shared folder `SDK Test (ephemeral)`, KSM app `SDK Test KSM`, gateway visibility, app binding, and share to the target user
 - Pre-cleans the sandbox with `sandbox.teardown_records(..., manager=MANAGER_NAME)` to remove orphaned SDK-managed records from prior runs
 - Writes a scenario-specific smoke manifest and an empty destroy manifest
 - Runs SDK `validate` against the generated manifest
@@ -106,11 +104,11 @@ Exit codes come from `smoke.py::main()`:
 
 | symptom | next action |
 |---------|-------------|
-| `two_factor_code_invalid` | `identity.py` retries on the next TOTP window, once per window, up to 3 attempts; if it persists, re-run with `--force` to reprovision `testuser2` TOTP state |
+| `two_factor_code_invalid` | `identity.py` retries on the next TOTP window, once per window, up to 3 attempts; if it persists, re-run with `--force` to reprovision target-user TOTP state |
 | `keeper CLI not found on PATH` | Install `keepercommander` via `pip` so the `keeper` executable is available |
-| `Required gateway 'Lab GW Rocky' is not visible` | The admin session cannot see the gateway; ensure the admin `commander-config.json` belongs to a user with access, then re-run |
+| `Required gateway '<gateway-name>' is not visible` | The admin session cannot see the gateway; ensure the admin `commander-config.json` belongs to a user with access, then re-run |
 | `Commander returned non-JSON` from `ls` on an empty folder | Already handled internally in `sandbox._loads_json()`: empty output is treated as `[]` |
-| Keeper subprocess commands hang | They should not hang after `--batch-mode` plus `KEEPER_PASSWORD`; if they do, check that the `testuser2` Commander config still has a valid `device_token` and `clone_code` |
+| Keeper subprocess commands hang | They should not hang after `--batch-mode` plus `KEEPER_PASSWORD`; if they do, check that the target-user Commander config still has a valid `device_token` and `clone_code` |
 | SDK command failure | The post-mortem includes the full SDK command, exit code, stdout tail, and stderr tail so the parent/live runner can see Commander/provider details without rerunning blind |
 
 ## Non-negotiable constraints
@@ -121,15 +119,16 @@ No `keeper_dag` imports are allowed in this workflow, all tenant-side mutations 
 
 - The shared folder `SDK Test (ephemeral)` remains in place for reuse
 - The KSM application `SDK Test KSM` remains in place and bound to the sandbox shared folder
-- The share from the sandbox shared folder to `testuser2` remains in place
+- The share from the sandbox shared folder to the target user remains in place
 - All SDK-managed records created inside the sandbox shared folder during the smoke are deleted by the destroy phase
 
 ## Profiles
 
 `--profile <id>` lets multiple smoke identities use disjoint shared folders,
 KSM apps, Commander configs, PAM project names, record-title prefixes, and TOTP
-channel names. The default profile is built in and preserves the historical
-one-command behavior:
+channel names. Profiles are loaded from `DSK_SMOKE_PROFILE`, or from
+`~/.config/dsk/profiles/<id>.json` when the env var is unset. The built-in
+default profile is only a placeholder contract:
 
 ```bash
 python3 scripts/smoke/smoke.py --scenario pamMachine
@@ -137,30 +136,34 @@ python3 scripts/smoke/smoke.py --profile p1 --scenario pamMachine
 python3 scripts/smoke/identity.py --profile p1
 ```
 
-Non-default profiles are read from `scripts/smoke/profiles/<id>.json`. Real
-profile JSON files are gitignored; commit only `default.example.json`.
+Copy `scripts/smoke/profiles/default.example.json` to
+`~/.config/dsk/profiles/default.json` and fill in tenant values. Never commit a
+filled-in profile.
 
 ```json
 {
-  "id": "p1",
-  "target_email": "msawczyn+sdk-p1@acme-demo.com",
-  "ksm_config": "/path/to/ksm-config.json",
-  "admin_commander_config": "/path/to/commander-config.json",
-  "sdktest_commander_config": "scripts/smoke/.commander-config-sdk-p1.json",
+  "_README": "Copy this file to ~/.config/dsk/profiles/default.json and fill in your tenant's values. Never commit a filled-in copy.",
+  "id": "default",
+  "admin_email": "admin@example.com",
+  "target_email": "target@example.com",
+  "ksm_config": "~/.config/dsk/profiles/default/ksm-config.json",
+  "admin_commander_config": "~/.config/dsk/profiles/default/commander-config.json",
+  "sdktest_commander_config": "~/.config/dsk/profiles/default/target-commander-config.json",
   "keeper_server": "keepersecurity.com",
-  "channel_name": "sdk-declarative-p1",
-  "password": "profile-test-user-password",
-  "default_admin_record_uid": "ADMIN_CREDS_RECORD_UID",
-  "sdk_test_login_record_title": "SDK Test — sdk-p1 Login"
+  "channel_name": "sdk-declarative",
+  "default_admin_record_uid": "<ADMIN_RECORD_UID>",
+  "sdk_test_login_record_title": "<target-login-record-title>",
+  "gateway_name": "<gateway-name>",
+  "pam_config_title": "<pam-config-name>"
 }
 ```
 
-Each profile needs its own active test user and Commander config path.
+Each profile needs its own active target user and Commander config path.
 `identity.ensure_sdktest_identity()` is profile-aware and writes the configured
 test-user Commander config after TOTP enrollment or reuse. `sandbox.config_for_profile()`
 keeps the default shared folder/app names unchanged, while non-default profiles
-use `SDK Test (ephemeral) <id>` and `SDK Test KSM <id>`; the gateway remains
-`Lab GW Rocky`.
+use `SDK Test (ephemeral) <id>` and `SDK Test KSM <id>`; the gateway comes from
+the loaded profile.
 
 `--node <node_uid>` is accepted as smoke-side metadata for future tenant/node
 partitioning, but the runner does not pass it to `dsk plan` or `dsk apply`

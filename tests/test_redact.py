@@ -84,7 +84,7 @@ def test_redact_string_patterns(value: str, expected: str) -> None:
 @pytest.mark.parametrize(
     "value",
     [
-        "Record UID MyiZN4cw-wtEIpY1jHlhLw is shareable",
+        "Record UID ABC123def456GHI789jkl0 is shareable",
         "Authorization: Basic abcdefghijklmnop",
         "bearer",
         "token=abcd1234567890",

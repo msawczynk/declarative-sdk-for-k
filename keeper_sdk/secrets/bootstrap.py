@@ -405,8 +405,9 @@ The vault-side ``add_app_share`` write and the KSM-side client fetch hit
 two different services with independent caches; in practice the new KSM
 client's first ``get_secrets`` call can race the share propagation. We
 poll with exponential-ish backoff until the admin record's typed fields
-become visible or this budget elapses. Default 20s is enough for the lab
-tenant; raise via env for slower deployments.
+become visible or this budget elapses. Default 20s suits typical
+Commander tenants; override ``KEEPER_SDK_KSM_BOOTSTRAP_VERIFY_TIMEOUT``
+for slower deployments.
 """
 
 

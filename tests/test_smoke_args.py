@@ -14,7 +14,7 @@ import smoke  # noqa: E402
 
 def test_parse_args_login_helper_default() -> None:
     args = smoke._parse_args([])
-    assert args.login_helper == "deploy_watcher"
+    assert args.login_helper == "profile"
     assert args.profile == "default"
     assert args.node_uid is None
 
@@ -39,12 +39,19 @@ def test_auth_path_message_names_public_env_helper() -> None:
     assert "KEEPER_TOTP_SECRET" in message
 
 
-def test_auth_path_message_names_deploy_watcher_helper() -> None:
-    message = smoke._auth_path_message("deploy_watcher", helper_path="/tmp/deploy_watcher.py")
+def test_auth_path_message_names_profile_helper() -> None:
+    message = smoke._auth_path_message("profile", helper_path="/tmp/profile-helper.py")
 
-    assert "deploy_watcher helper path" in message
+    assert "profile helper path" in message
     assert "KEEPER_SDK_LOGIN_HELPER" in message
-    assert "/tmp/deploy_watcher.py" in message
+    assert "/tmp/profile-helper.py" in message
+
+
+def test_auth_path_message_names_profile_ksm() -> None:
+    message = smoke._auth_path_message("profile")
+
+    assert "profile KSM record" in message
+    assert "KEEPER_SDK_LOGIN_HELPER=ksm" in message
 
 
 def test_sdk_error_preserves_command_exit_and_output_tails(monkeypatch: pytest.MonkeyPatch) -> None:
