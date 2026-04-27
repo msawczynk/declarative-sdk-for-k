@@ -152,7 +152,7 @@ site. DRY at the schema level.
 
 ---
 
-## `uid_ref` semantic uniqueness (Sprint 7h-14 LESSON)
+## `uid_ref` semantic uniqueness
 
 JSON Schema CANNOT enforce cross-array `uid_ref` uniqueness within a
 single manifest (e.g. `records[].uid_ref` colliding with
@@ -196,7 +196,7 @@ def test_<family>_<block>_rejects_missing_required(missing_field):
 
 ---
 
-## File-formatting protocol (Sprint 7h-15 LESSON)
+## File-formatting protocol
 
 **Do NOT run `ruff format` over the schemas directory.** It introduces
 JSONC trailing commas that break strict JSON parsers. The CI workflow
@@ -225,7 +225,7 @@ use a `$comment` field on the relevant `$defs` entry):
 ```json
 "$defs": {
   "node_stub": {
-    "$comment": "TODO Sprint 7h-N: populate per memo §X (parent_node_uid_ref, name, type enum, restrict_visibility flag).",
+    "$comment": "TODO: populate the scaffolded node fields before promoting this block (parent_node_uid_ref, name, type enum, restrict_visibility flag).",
     "type": "object",
     "additionalProperties": false
   }

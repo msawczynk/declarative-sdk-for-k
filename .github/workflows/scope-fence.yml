@@ -14,11 +14,11 @@ on:
 #   SDK. Multi-session orchestration prose (Codex prompts, parallel runners,
 #   phase-0 gates, daybook journals/lessons, worktree registries) is private
 #   to the maintainer's working environment and lives in a separate repo
-#   (cursor-daybook). Mixing the two has happened across multiple sessions
-#   (see LESSONS [scope][drift] 2026-04-26): worker prompts that list
-#   "deliverables" implicitly allow "supporting scaffolding" in the worker's
-#   mental model. Hand-pruning has been the workaround. This workflow makes
-#   the rule structural — paths matching the patterns below cause CI fail.
+#   (cursor-daybook). Auto-prune operator-side orchestration coordination from
+#   this product repo: WORKTREES.md, scripts/agent/*, .codex-runs/,
+#   docs/ORCHESTRATION_*, docs/CODEX_*, .github/codex/**, and
+#   .github/workflows/codex-*. This workflow makes the rule structural: paths
+#   matching the patterns below cause CI fail.
 #
 # The intent is delivery hygiene, not enforcement against contributors. PRs
 # that legitimately need to discuss orchestration should keep that discussion
@@ -85,7 +85,7 @@ jobs:
             echo "If the worker prompted you to add them, reject the prompt and move them to:" >&2
             echo "  - daybook mirror (\`~/.cursor-daybook-sync/\`) for shared scripts / scaffolds" >&2
             echo "  - workspace SCAFFOLD.md / WORKTREES.md (outside any delivery repo)" >&2
-            echo "Reference: cursor-daybook LESSONS [scope][drift][prevention] 2026-04-26." >&2
+            echo "Reference: keep operator-side orchestration coordination outside this delivery repo." >&2
             exit 1
           fi
           echo "scope-fence: ok (no forbidden paths added)"

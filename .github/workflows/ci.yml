@@ -4,11 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
-    # Trigger on PRs targeting `main` AND PRs targeting any `cursor/**`
-    # or `codex/**` branch so stacked PRs (child PRs whose base is a
-    # parent PR's branch instead of `main`) receive CI signal before
-    # they're rebased onto `main`. Lesson `[pr-merge][stacked-base-retarget]`
-    # 2026-04-26 traced a CI-blind merge to this gap.
+    # Trigger on PRs targeting `main` and on stacking branch namespaces so
+    # child PRs receive CI signal before they are rebased onto `main`.
     branches: [main, 'cursor/**', 'codex/**']
 
 permissions:
@@ -55,12 +52,10 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - run: pip install -e ".[dev]"
-      # Coverage ratchet: baseline at 86% (commit 2026-04-26 post-Sprint-7h-5
-      # cov slices for redact/schema/normalize landing at 100%, 315 tests).
-      # Floor raised 84 -> 85 in Sprint 7h-41 V6c after V6b sibling-diff
-      # landing lifted exact cov to 85.47% (663+1 tests, 5583 stmts, 811
-      # missing). WORKTREES.md §8 closes. Raise the floor when adding
-      # net-new tested surface; never lower it without rationale in JOURNAL.md.
+      # Coverage floor: 85%. Baseline established when SDK reached
+      # feature-complete coverage on the keeper-vault schema family. Raise
+      # the floor when adding net-new tested surface; never lower it without
+      # an explicit public rationale in the PR.
       - run: pytest -q --cov=keeper_sdk --cov-report=term-missing --cov-fail-under=85
         env:
           # Offline-only; live-smoke against a real tenant runs via
@@ -123,10 +118,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      # Plain stdlib json.tool — RFC 8259 strict (no trailing commas, no
-      # comments). Sprint 7h-15 LESSON [worker][format-on-rebase-jsonc-trap]:
-      # ruff format over the schemas dir introduces JSONC trailing commas
-      # that pytest tolerates but external schema validators reject.
+      # Plain stdlib json.tool: RFC 8259 strict (no trailing commas, no
+      # comments). Do not run ruff format over the schemas dir; it can
+      # introduce JSONC trailing commas that pytest tolerates but external
+      # schema validators reject.
       - name: Validate every schema file is RFC 8259-compliant JSON
         run: |
           set -e
