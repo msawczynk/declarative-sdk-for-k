@@ -1,9 +1,7 @@
 # PAM parity program — when a family is “ready”, not scaffolded
 
-**Heavy orchestration (merge train, workers, CI ladder):** see
-[`docs/ORCHESTRATION_PAM_PARITY.md`](./ORCHESTRATION_PAM_PARITY.md) — use it with
-[`docs/NEXT_SPRINT_PARALLEL_ORCHESTRATION.md`](./NEXT_SPRINT_PARALLEL_ORCHESTRATION.md)
-for wave mechanics and tenant serialization.
+PAM parity acceptance criteria are tracked alongside this document;
+operator-side delivery cadence is not part of the public SDK.
 
 This document defines what **“supported like PAM”** means in *this* repo, why the
 README must **not** claim universal GA until those gates pass, and the phased
@@ -32,7 +30,7 @@ following are true:
 6. **Tests** — Offline tests cover validate → plan → apply (mock) and
    contract tests for Commander payloads; no family ships on schema CI alone.
 7. **Live proof** — Sanitized transcript under `docs/live-proof/` referenced
-   from the schema’s `x-keeper-live-proof.evidence`, with parent smoke on a
+   from the schema’s `x-keeper-live-proof.evidence`, with live smoke on a
    lab tenant (per `docs/V2_DECISIONS.md` Q4).
 8. **Matrix** — `docs/CAPABILITY_MATRIX.md` / snapshot row shows **F** as
    supported, not “scaffold-only”.
@@ -97,11 +95,10 @@ agents.
   (`login` filter) + apply (create, **v3** `RecordEditCommand` UPDATE + `return_result`
   guard, marker, `rm`), `dsk validate --online`, semantic scalar `login` diff — see
   [`VAULT_L1_DESIGN.md`](./VAULT_L1_DESIGN.md) §4. **PAM-bar closure** still needs
-  **G6/V8** live proof + matrix + `VAULT_L1_DESIGN` §7 per
-  [`ORCHESTRATION_UNTIL_COMPLETE.md`](./ORCHESTRATION_UNTIL_COMPLETE.md) §7 and
+  live proof + matrix + `VAULT_L1_DESIGN` §7 and
   [`docs/live-proof/README.md`](./live-proof/README.md).
 - **`keeper-vault-sharing.v1`:** typed models + graph + mock + Commander + live
-  proof (reuse vault patterns — [`ORCHESTRATION_PAM_PARITY.md`](./ORCHESTRATION_PAM_PARITY.md) **V7**).
+  proof (reuse vault patterns).
 
 ### Phase 2 — Enterprise + integrations
 
@@ -142,7 +139,7 @@ clear per-family table.
 
 ## Owners
 
-- **Product / parent** — live tenant, pin bumps, customer priority, which family
+- **Product** — live tenant, pin bumps, customer priority, which family
   is next after vault L1.
 - **Implementers** — registry + per-family provider slices + tests + proof
   transcripts.
