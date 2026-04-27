@@ -443,6 +443,54 @@ def test_diff_pam_machine_pam_settings_live_extra_options_is_noop(
     assert machine_change.kind is ChangeKind.NOOP
 
 
+def test_diff_pam_machine_pam_settings_nested_options_live_extra_inner_keys_is_noop(
+    minimal_manifest_path: Path,
+) -> None:
+    """Nested dicts under ``options``/``port_forward`` allow live-only inner keys (overlay)."""
+    manifest0 = load_manifest(minimal_manifest_path)
+    data = manifest0.model_dump(mode="python", exclude_none=True)
+    machine0 = next(r for r in data["resources"] if r["uid_ref"] == "acme-lab-linux1")
+    ps0 = machine0.get("pam_settings") or {}
+    options0 = dict(ps0.get("options") or {})
+    # Arbitrary nested block (PAM model allows extra keys) — only ``k1``/``k2`` are "owned".
+    options0["nested"] = {"k1": 1, "k2": 2}
+    machine_d = {**machine0, "pam_settings": {**ps0, "options": options0}}
+    new_resources = []
+    for r in data["resources"]:
+        if r["uid_ref"] == "acme-lab-linux1":
+            new_resources.append(machine_d)
+        else:
+            new_resources.append(deepcopy(r))
+    manifest = Manifest.model_validate({**data, "resources": new_resources})
+    m_dump = next(
+        r
+        for r in manifest.model_dump(mode="python", exclude_none=True)["resources"]
+        if r["uid_ref"] == "acme-lab-linux1"
+    )
+    live_settings = deepcopy(m_dump["pam_settings"])
+    assert isinstance(live_settings, dict)
+    n = {**((live_settings.get("options") or {}).get("nested") or {}), "k3": "live-only"}
+    opt_live = {**(live_settings.get("options") or {}), "nested": n}
+    live_settings = {**live_settings, "options": opt_live}
+    live_machine = {**deepcopy(m_dump), "pam_settings": live_settings}
+    live = [
+        LiveRecord(
+            keeper_uid="LIVE_MACHINE",
+            title="lab-linux-1",
+            resource_type="pamMachine",
+            payload=live_machine,
+            marker=encode_marker(
+                uid_ref="acme-lab-linux1",
+                manifest=manifest.name,
+                resource_type="pamMachine",
+            ),
+        )
+    ]
+    changes = compute_diff(manifest, live_records=live)
+    machine_change = next(c for c in changes if c.uid_ref == "acme-lab-linux1")
+    assert machine_change.kind is ChangeKind.NOOP
+
+
 def test_diff_pam_database_pam_settings_live_extra_options_is_noop(
     pam_db_overlay_manifest_path: Path,
 ) -> None:
