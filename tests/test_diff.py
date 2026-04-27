@@ -364,6 +364,85 @@ def test_diff_pam_user_rotation_missing_readback_updates_without_matching_sdk_ma
     assert "rotation_settings" in user_change.after
 
 
+def test_diff_pam_user_managed_string_skew_is_noop(
+    minimal_manifest_path: Path,
+) -> None:
+    """P2.1: nested ``pamUser.managed`` — Commander can return stringy flags vs manifest bools."""
+    manifest = load_manifest(minimal_manifest_path)
+    data = manifest.model_dump(mode="python", exclude_none=True)
+    machine = next(r for r in data["resources"] if r["uid_ref"] == "acme-lab-linux1")
+    user_desired = next(u for u in machine["users"] if u["uid_ref"] == "acme-lab-linux1-root")
+    user_desired = {**user_desired, "managed": True}
+    new_resources: list[dict[str, Any]] = []
+    for r in data["resources"]:
+        if r["uid_ref"] == "acme-lab-linux1":
+            new_resources.append({**deepcopy(r), "users": [user_desired]})
+        else:
+            new_resources.append(deepcopy(r))
+    manifest2 = Manifest.model_validate({**data, "resources": new_resources})
+    live_user = {**user_desired, "managed": "on"}
+    live = [
+        LiveRecord(
+            keeper_uid="LIVE_MACHINE",
+            title="lab-linux-1",
+            resource_type="pamMachine",
+            payload=next(r for r in new_resources if r["uid_ref"] == "acme-lab-linux1"),
+            marker=encode_marker(
+                uid_ref="acme-lab-linux1",
+                manifest=manifest2.name,
+                resource_type="pamMachine",
+            ),
+        ),
+        LiveRecord(
+            keeper_uid="LIVE_USER",
+            title="lab-linux-1-root",
+            resource_type="pamUser",
+            payload=live_user,
+            marker=encode_marker(
+                uid_ref="acme-lab-linux1-root",
+                manifest=manifest2.name,
+                resource_type="pamUser",
+            ),
+        ),
+    ]
+    changes = compute_diff(manifest2, live_records=live)
+    user_change = next(c for c in changes if c.uid_ref == "acme-lab-linux1-root")
+    assert user_change.kind is ChangeKind.NOOP
+
+
+def test_diff_pam_machine_pam_settings_live_extra_options_is_noop(
+    minimal_manifest_path: Path,
+) -> None:
+    """P2.1: parent ``pamMachine`` re-plan must not UPDATE when Commander only adds tri-states."""
+    manifest = load_manifest(minimal_manifest_path)
+    data = manifest.model_dump(mode="python", exclude_none=True)
+    machine = next(r for r in data["resources"] if r["uid_ref"] == "acme-lab-linux1")
+    live_settings = deepcopy(machine["pam_settings"])
+    assert isinstance(live_settings, dict)
+    options = live_settings.get("options")
+    assert isinstance(options, dict)
+    # Simulate TunnelDAG/Commander backfill the parent machine would see post-apply.
+    options = {**options, "remote_browser_isolation": "off", "graphical_session_recording": "off"}
+    live_settings["options"] = options
+    live_machine = {**deepcopy(machine), "pam_settings": live_settings}
+    live = [
+        LiveRecord(
+            keeper_uid="LIVE_MACHINE",
+            title="lab-linux-1",
+            resource_type="pamMachine",
+            payload=live_machine,
+            marker=encode_marker(
+                uid_ref="acme-lab-linux1",
+                manifest=manifest.name,
+                resource_type="pamMachine",
+            ),
+        )
+    ]
+    changes = compute_diff(manifest, live_records=live)
+    machine_change = next(c for c in changes if c.uid_ref == "acme-lab-linux1")
+    assert machine_change.kind is ChangeKind.NOOP
+
+
 def test_diff_pam_user_rotation_same_cron_extra_schedule_keys_is_noop(
     minimal_manifest_path: Path,
 ) -> None:

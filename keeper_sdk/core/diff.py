@@ -179,6 +179,52 @@ def _index_live(
     return by_uid_ref, by_title
 
 
+def _dict_overlay_matches(live: dict[str, Any], desired: dict[str, Any]) -> bool:
+    """True when *live* has the same value as *desired* for every non-``None`` *desired* entry.
+
+    Nested dicts on *desired* are compared recursively. *Live* may contain extra
+    keys (Commander / DAG / tunnel merge noise).
+    """
+    for k, want in desired.items():
+        if want is None:
+            continue
+        got = live.get(k)
+        if isinstance(want, dict):
+            if not isinstance(got, dict):
+                return False
+            if not _dict_overlay_matches(got, want):
+                return False
+        elif got != want:
+            return False
+    return True
+
+
+def _pam_resource_settings_equivalent(live_ps: Any, desired_ps: Any) -> bool:
+    """``pam_settings`` for ``pamMachine`` / ``pamDatabase`` / ``pamDirectory`` — overlay match.
+
+    Commander and TunnelDAG can add tri-states and extra keys under ``options`` / ``connection``;
+    matching must require only manifest-owned keys, else post-apply re-plan spuriously updates
+    the parent resource (P2.1 / issue #4).
+    """
+    if not isinstance(desired_ps, dict):
+        return live_ps == desired_ps
+    live_ps = live_ps if isinstance(live_ps, dict) else {}
+    for section in ("options", "connection", "port_forward"):
+        desired_sec = desired_ps.get(section)
+        if not isinstance(desired_sec, dict):
+            continue
+        live_sec = live_ps.get(section)
+        live_sec = live_sec if isinstance(live_sec, dict) else {}
+        if not _dict_overlay_matches(live_sec, desired_sec):
+            return False
+    for scalar_key in ("allow_supply_host",):
+        if desired_ps.get(scalar_key) is not None and live_ps.get(scalar_key) != desired_ps.get(
+            scalar_key
+        ):
+            return False
+    return True
+
+
 def _pam_remote_browser_settings_equivalent(live_ps: Any, desired_ps: Any) -> bool:
     """True when every ``pam_settings`` option/connection key set on *desired* matches *live*."""
     if not isinstance(desired_ps, dict):
@@ -278,6 +324,26 @@ def _trust_missing_rotation_settings_readback(
     )
 
 
+def _pam_user_managed_flag_equivalent(live: Any, desired: Any) -> bool:
+    """``pamUser.managed`` — compare normalized booleans (Commander readback can skew)."""
+
+    def norm(v: Any) -> bool:
+        if v in (None, False, 0, ""):
+            return False
+        if v in (True, 1, "1"):
+            return True
+        if isinstance(v, (int, float)) and v == 0.0:
+            return False
+        s = str(v).strip().lower()
+        if s in ("0", "false", "off", "no", "f", "n"):
+            return False
+        if s in ("1", "true", "on", "yes", "t", "y"):
+            return True
+        return bool(v)
+
+    return norm(live) == norm(desired)
+
+
 def _field_diff_pam_user(
     live: dict[str, Any],
     desired: dict[str, Any],
@@ -302,6 +368,9 @@ def _field_diff_pam_user(
                 continue
             if not _rotation_settings_equivalent(live.get(key), desired.get(key)):
                 changed.append(key)
+        elif key == "managed":
+            if not _pam_user_managed_flag_equivalent(live.get(key), desired.get(key)):
+                changed.append(key)
         elif live.get(key) != desired.get(key):
             changed.append(key)
     return sorted(changed)
@@ -318,6 +387,23 @@ def _field_diff_pam_remote_browser(live: dict[str, Any], desired: dict[str, Any]
             continue
         if key == "pam_settings":
             if not _pam_remote_browser_settings_equivalent(live.get(key), desired.get(key)):
+                changed.append(key)
+        elif live.get(key) != desired.get(key):
+            changed.append(key)
+    return sorted(changed)
+
+
+def _field_diff_pam_settings_resource(live: dict[str, Any], desired: dict[str, Any]) -> list[str]:
+    """Field diff for PAM resource records whose ``pam_settings`` allows live-side extras."""
+    keys: set[str] = set(live) | set(desired)
+    changed: list[str] = []
+    for key in keys:
+        if key in _DIFF_IGNORED_FIELDS:
+            continue
+        if key not in desired:
+            continue
+        if key == "pam_settings":
+            if not _pam_resource_settings_equivalent(live.get(key), desired.get(key)):
                 changed.append(key)
         elif live.get(key) != desired.get(key):
             changed.append(key)
@@ -494,6 +580,8 @@ def _classify_desired(
         diff_fields = _field_diff_vault_login(live.payload, payload)
     elif resource_type == "pamRemoteBrowser":
         diff_fields = _field_diff_pam_remote_browser(live.payload, payload)
+    elif resource_type in ("pamMachine", "pamDatabase", "pamDirectory"):
+        diff_fields = _field_diff_pam_settings_resource(live.payload, payload)
     elif resource_type == "pamUser":
         diff_fields = _field_diff_pam_user(
             live.payload,

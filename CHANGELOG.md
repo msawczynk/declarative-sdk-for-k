@@ -7,6 +7,10 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Fixed
+- **PAM plan/diff (P2.1 / issue #4)** — `pamMachine` / `pamDatabase` / `pamDirectory` now treat
+  `pam_settings` as a **partial overlay** (manifest keys must match; Commander/DAG may add extra
+  `options` / `connection` / `port_forward` keys). `pamUser.managed` compares normalized booleans
+  so string/bool readback skew does not force endless UPDATE rows. See `tests/test_diff.py`.
 - **Vault Commander UPDATE** — after `RecordEditCommand`, require `return_result["update_record_v3"]`
   when the merged v3 JSON still differs from cache data (Commander otherwise logs and returns
   without raising); skip the call when patch yields no net change.
