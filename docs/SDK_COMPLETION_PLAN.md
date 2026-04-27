@@ -278,10 +278,13 @@ Latest live evidence:
   matching fixes.
 - After routing rotation edit through the in-process Commander session, apply
   and marker verification pass. **2026-04-28 Acme-lab** `pamUserNestedRotation`
-  smoke: same outcome — re-plan `exit 2` with `update` rows (e.g. `pam_settings`
-  on the parent `pamMachine`, `managed` on the nested `pamUser`). End-to-end
-  support is still not proven; readback/drift semantics for rotation stay open
-  (issue **#4**).
+  smoke: re-plan was `exit 2` with `update` rows (e.g. `pam_settings` on the
+  parent `pamMachine`, `managed` on the nested `pamUser`) — **offline follow-up
+  (same day):** `compute_diff` overlay for parent `pam_settings` + `managed`
+  normalization (`keeper_sdk/core/diff.py`); re-run live smoke to see whether
+  re-plan is clean or drift is now **rotation readback** / `rotation_settings`
+  only. End-to-end support is still not proven until live re-plan is clean; issue
+  **#4** remains the tracker.
 
 ### P2.3 Rotation Gate Lift
 
