@@ -1,0 +1,59 @@
+# Minimal PAM env for `tests/test_diff.py` — single `pamDirectory` + `pam_settings` overlay.
+version: "1"
+name: acme-pamdir-overlay
+
+projects:
+  - uid_ref: acme-p2
+    project: "P2"
+
+shared_folders:
+  users:
+    uid_ref: acme2-sf-users
+    manage_users: true
+    manage_records: true
+    can_edit: true
+    can_share: true
+  resources:
+    uid_ref: acme2-sf-resources
+    manage_users: true
+    manage_records: true
+    can_edit: true
+    can_share: true
+
+gateways:
+  - uid_ref: acme2-gw
+    name: "G2"
+    mode: reference_existing
+
+pam_configurations:
+  - uid_ref: acme2-cfg
+    environment: local
+    title: "Cfg2"
+    gateway_uid_ref: acme2-gw
+    options:
+      connections: "on"
+      rotation: "on"
+    network_id: n2
+    network_cidr: 10.0.0.0/24
+
+resources:
+  - uid_ref: acme-ad-1
+    type: pamDirectory
+    title: "ad-1"
+    pam_configuration_uid_ref: acme2-cfg
+    shared_folder: resources
+    directory_type: active_directory
+    host: 10.0.0.2
+    port: "636"
+    use_ssl: true
+    domain_name: ex.local
+    pam_settings:
+      options:
+        rotation: "on"
+        connections: "on"
+        tunneling: "on"
+      allow_supply_host: false
+      connection:
+        protocol: ldaps
+        port: "636"
+    users: []
