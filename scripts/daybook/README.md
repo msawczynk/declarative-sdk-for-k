@@ -6,6 +6,15 @@ files are on the operator machine (default: `~/Downloads/JOURNAL.md` and
 only a **stable entrypoint** so agents run the same scripts from a dsk clone without
 vendoring the harness.
 
+**Not a substitute for product live validation.** The SDK’s telling proof against a
+real tenant is **live smoke / live pytest** (`scripts/smoke/smoke.py`, `tests/live/`,
+env `KEEPER_LIVE_TENANT=1`, evidence + sanitizer). See
+[`docs/LIVE_TEST_RUNBOOK.md`](../../docs/LIVE_TEST_RUNBOOK.md) and
+[`docs/SDK_DA_COMPLETION_PLAN.md`](../../docs/SDK_DA_COMPLETION_PLAN.md) live-proof
+rows. The daybook harness is **agent continuity and merge discipline**; run it in a
+separate step from dsk work, and still run live tests when you change provider,
+planner, or anything that touches real Commander behavior.
+
 ## Commands (from repository root)
 
 | Action | Command |
