@@ -18,6 +18,7 @@ Canonical JOURNAL/LESSONS: ~/Downloads/JOURNAL.md and ~/Downloads/LESSONS.md (no
   bash scripts/daybook/harness.sh review-loop       # write hooks-log review digest
   bash scripts/daybook/harness.sh changelog         # cursor + codex release diff (token-economy)
   bash scripts/daybook/harness.sh print-env         # print export lines (Downloads JOURNAL)
+  bash scripts/daybook/harness.sh doctor            # print clone path status (no scripts required)
   bash scripts/daybook/harness.sh append JOURNAL '…one line…'
   bash scripts/daybook/harness.sh append LESSONS '…one line…'
 
@@ -35,6 +36,20 @@ print_env() {
   echo "# source these before: append, sync, daybook_append"
 }
 
+print_doctor() {
+  local base="${DAYBOOK_SYNC_ROOT:-${HOME}/.cursor-daybook-sync}"
+  local r="${base}/scripts"
+  echo "effective DAYBOOK_SYNC_ROOT: ${base}"
+  echo "expected scripts directory: ${r}"
+  if [[ -d "$r" ]]; then
+    echo "status: ok (scripts/ present; other subcommands can run)"
+  elif [[ -f "${base}/agent_session_boot.sh" ]]; then
+    echo "status: misconfigured — DAYBOOK_SYNC_ROOT points at scripts/; set it to the clone root (parent of scripts/)."
+  else
+    echo "status: missing — clone or scripts/ not found; install cursor-daybook-sync or fix DAYBOOK_SYNC_ROOT"
+  fi
+}
+
 # help / print-env must work even when the daybook clone is missing (e.g. CI, fresh machine).
 case "${1:-}" in
   "" | help | --help | -h)
@@ -43,6 +58,10 @@ case "${1:-}" in
     ;;
   print-env)
     print_env
+    exit 0
+    ;;
+  doctor)
+    print_doctor
     exit 0
     ;;
 esac

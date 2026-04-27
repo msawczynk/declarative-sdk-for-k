@@ -21,6 +21,7 @@ vendoring the harness.
 | End-of-session auto-review digest | `bash scripts/daybook/harness.sh review-loop` |
 | Cursor + Codex changelog diff (token-economy triage) | `bash scripts/daybook/harness.sh changelog` |
 | Print `export` lines for `~/Downloads` + `DAYBOOK_REPO` | `bash scripts/daybook/harness.sh print-env` |
+| Check `DAYBOOK_SYNC_ROOT` (clone present vs wrong `scripts/` path) | `bash scripts/daybook/harness.sh doctor` |
 
 Help: `bash scripts/daybook/harness.sh help`
 
@@ -41,6 +42,14 @@ bash scripts/daybook/harness.sh print-env
 ```
 
 Then run `harness.sh append` / `harness.sh sync` in the same shell.
+
+## Troubleshooting
+
+- **`missing directory: .../scripts/scripts` or hint about “clone root”:** you set
+  `DAYBOOK_SYNC_ROOT` to the `scripts/` folder. It must be the **parent** of
+  `scripts/`. Run `harness.sh doctor` after adjusting `export DAYBOOK_SYNC_ROOT=…`.
+- **`daybook_append` wrong file:** set `JOURNAL_PATH` / `LESSONS_PATH` / `DAYBOOK_REPO`
+  (see `print-env` above) so append targets `~/Downloads` if that is canonical.
 
 ## Discipline: do not mix with dsk product work
 

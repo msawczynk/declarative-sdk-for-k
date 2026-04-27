@@ -11,7 +11,7 @@ misled agents toward removed modules. Use these repo-local sources instead:
 - `~/.cursor-daybook-sync/scripts/phase_runner.sh` — workspace-global phase-runner harness; **default** for any multi-step delegated worker task in this repo (≥2 file edits, gate run, or commit draft). Spec template: `~/.cursor-daybook-sync/scripts/templates/phase_spec.example.yaml`. See `AGENTS.md` § "Phase runner harness".
 - `~/.cursor-daybook-sync/docs/orchestration/dsk/` — **multi-session orchestration** (sprint memos, Codex prompts, coordination). **Not** copied into this repo; `AGENTS.md` § "Where orchestration lives" is the index. `docs/ORCHESTRATION_*` in-tree is **blocked** by `scope-fence` CI.
 - `scripts/phase_harness/` — in-repo **merge gate** (`run_local_gates.sh`) + **example** `phase-spec.dsk.example.yaml` for the workspace `phase_runner.sh` (harness still lives in daybook; see `scripts/phase_harness/README.md`).
-- `scripts/daybook/` — **forwards** to `~/.cursor-daybook-sync` (boot, sync, append). JOURNAL/LESSONS do **not** live in this repo; do not mix with product commits. See `scripts/daybook/README.md`.
+- `scripts/daybook/` — **forwards** to `~/.cursor-daybook-sync` (boot, `doctor` path check, sync, append). JOURNAL/LESSONS do **not** live in this repo; do not mix with product commits. See `scripts/daybook/README.md`.
 
 Current architecture:
 

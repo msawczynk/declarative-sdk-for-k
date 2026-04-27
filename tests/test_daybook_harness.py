@@ -36,6 +36,7 @@ def test_harness_help_exits_zero_without_daybook_sync() -> None:
     assert p.returncode == 0, p.stderr
     assert "dsk daybook harness" in p.stdout
     assert "boot" in p.stdout
+    assert "doctor" in p.stdout
 
 
 def test_harness_print_env_exits_zero_without_daybook_sync() -> None:
@@ -69,3 +70,47 @@ def test_harness_boot_hints_when_sync_root_is_scripts_dir() -> None:
     err = p.stderr + p.stdout
     assert "clone root" in err
     assert "scripts/" in err
+
+
+def test_harness_doctor_exits_zero_reports_missing() -> None:
+    p = _run_harness("doctor")
+    assert p.returncode == 0, p.stderr
+    out = p.stdout + p.stderr
+    assert "status: missing" in out
+
+
+def test_harness_doctor_ok_when_clone_root_has_scripts() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        base = Path(tmp) / "fake-clone"
+        sdir = base / "scripts"
+        sdir.mkdir(parents=True)
+        (sdir / "agent_session_boot.sh").write_text("#\n", encoding="utf-8")
+        env = {**os.environ, "DAYBOOK_SYNC_ROOT": str(base)}
+        p = subprocess.run(
+            ["bash", str(_HARNESS), "doctor"],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+    assert p.returncode == 0
+    out = p.stdout + p.stderr
+    assert "status: ok" in out
+
+
+def test_harness_doctor_misconfigured_when_root_is_scripts_dir() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        scripts = Path(tmp) / "scripts"
+        scripts.mkdir()
+        (scripts / "agent_session_boot.sh").write_text("#\n", encoding="utf-8")
+        env = {**os.environ, "DAYBOOK_SYNC_ROOT": str(scripts)}
+        p = subprocess.run(
+            ["bash", str(_HARNESS), "doctor"],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+    assert p.returncode == 0
+    out = p.stdout + p.stderr
+    assert "status: misconfigured" in out
