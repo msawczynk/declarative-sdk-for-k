@@ -881,6 +881,8 @@ class CommanderCliProvider(Provider):
                         )
                     )
                     continue
+                if change.resource_type == "record_type":
+                    self._vault_apply_record_type_reject()
                 if _is_keeper_fill_change(change):
                     keeper_uid = self._vault_apply_keeper_fill_create(change.after or {})
                     outcomes.append(
@@ -930,6 +932,8 @@ class CommanderCliProvider(Provider):
                         )
                     )
                     continue
+                if change.resource_type == "record_type":
+                    self._vault_apply_record_type_reject()
                 patch = dict(change.after or {})
                 if _is_keeper_fill_change(change):
                     self._vault_apply_keeper_fill_update(keeper_uid, patch)
@@ -1633,6 +1637,20 @@ class CommanderCliProvider(Provider):
                 "remove the keeper_fill block from the manifest, or wait for upstream "
                 "support; schema status is `scaffold-only`."
             ),
+        )
+
+    def _vault_apply_record_type_reject(self) -> None:
+        """Reject record_type create/update: no Commander writer for type definitions (W3-AB)."""
+        raise CapabilityError(
+            reason=(
+                "no Commander writer for record_type definitions in the pinned upstream "
+                "(17.2.x); plan can surface `record_types[]` but apply cannot land them in-vault."
+            ),
+            next_action=(
+                "treat `record_types` as preview-gated (schema status `preview-gated`); use "
+                "plan/mock/discovery only until an upstream record-type apply verb exists."
+            ),
+            resource_type="record_type",
         )
 
     def _vault_apply_login_body_update(self, keeper_uid: str, patch: dict[str, Any]) -> None:

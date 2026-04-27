@@ -11,6 +11,8 @@ from keeper_sdk.cli.main import EXIT_CAPABILITY, EXIT_CHANGES
 from keeper_sdk.cli.main import main as cli
 from keeper_sdk.core.diff import Change, ChangeKind
 from keeper_sdk.core.errors import CapabilityError, ManifestError, UnsupportedFamilyError
+from keeper_sdk.core.planner import build_plan
+from keeper_sdk.providers import commander_cli as commander_cli_mod
 from keeper_sdk.providers.commander_cli import CommanderCliProvider, _is_keeper_fill_change
 
 # Mirrors tests/test_vault_diff_record_types.py::_record_type with uid_ref rt.svc-login.
@@ -76,6 +78,33 @@ def test_keeper_fill_update_raises_capability_error() -> None:
     with pytest.raises(CapabilityError) as excinfo:
         provider._vault_apply_keeper_fill_update("uid-fake", {"settings": []})
     assert "keeper_fill" in str(excinfo.value)
+
+
+def test_record_type_apply_raises_capability_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Commander apply must not fall through to login path for W3-AB record_types rows."""
+    monkeypatch.setattr(
+        commander_cli_mod,
+        "_ensure_keepercommander_version_for_apply",
+        lambda: None,
+    )
+    plan = build_plan(
+        "vault.yaml",
+        [
+            Change(
+                kind=ChangeKind.CREATE,
+                uid_ref="rt.svc-login",
+                resource_type="record_type",
+                title="t",
+                after={},
+            )
+        ],
+        ["rt.svc-login"],
+    )
+    p = CommanderCliProvider.__new__(CommanderCliProvider)
+    p._folder_uid = "FOLDER"
+    p._manifest_source = {"schema": "keeper-vault.v1"}
+    with pytest.raises(CapabilityError, match="record_type"):
+        p._apply_vault_plan(plan, dry_run=False)  # noqa: SLF001
 
 
 def test_is_keeper_fill_change_detection() -> None:
