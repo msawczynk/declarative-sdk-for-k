@@ -12,7 +12,7 @@ Agent-first Python SDK + CLI (`dsk`) for deterministic `validate -> plan -> appl
 | `keeper_sdk/cli/` | [`keeper_sdk/cli/SCAFFOLD.md`](./keeper_sdk/cli/SCAFFOLD.md) | `dsk` Click entrypoint + Rich renderer + exit codes |
 | `keeper_sdk/providers/` | [`keeper_sdk/providers/SCAFFOLD.md`](./keeper_sdk/providers/SCAFFOLD.md) | Mock + Commander provider; capability gates |
 | `keeper_sdk/auth/` | [`keeper_sdk/auth/SCAFFOLD.md`](./keeper_sdk/auth/SCAFFOLD.md) | `EnvLoginHelper` + helper-protocol contract |
-| `keeper_sdk/secrets/` | (see `docs/KSM_BOOTSTRAP.md`, `docs/KSM_INTEGRATION.md`) | KSM bootstrap + `ksm` reader + bus skeleton (`keeper_sdk/secrets/`) |
+| `keeper_sdk/secrets/` | [`keeper_sdk/secrets/SCAFFOLD.md`](./keeper_sdk/secrets/SCAFFOLD.md) | KSM bootstrap + `ksm` reader + bus skeleton |
 | `tests/` | [`tests/SCAFFOLD.md`](./tests/SCAFFOLD.md) | Per-test-file inventory + where to land new tests |
 | `docs/` | [`docs/SCAFFOLD.md`](./docs/SCAFFOLD.md) | Doc inventory + audience + ownership |
 | `scripts/` | [`scripts/SCAFFOLD.md`](./scripts/SCAFFOLD.md) | Smoke + sync top-level map |
@@ -25,7 +25,7 @@ Reconciliation against `V1_GA_CHECKLIST.md` + `docs/SDK_DA_COMPLETION_PLAN.md` +
 
 ## Tree
 
-Snapshot @ `54b5b7c` (refresh when layout shifts). Deeper per-area maps: `keeper_sdk/SCAFFOLD.md`, `docs/SCAFFOLD.md`, `tests/SCAFFOLD.md`. Full file list: `git ls-files`.
+Snapshot @ `1d10e12` (refresh when layout shifts). Deeper per-area maps: `keeper_sdk/SCAFFOLD.md`, `docs/SCAFFOLD.md`, `tests/SCAFFOLD.md`. Full file list: `git ls-files`.
 
 ```text
 .

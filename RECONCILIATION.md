@@ -1,7 +1,7 @@
 # RECONCILIATION — design vs tree
 
-Written: 2026-04-26 (agent scaffold pass; refreshed 2026-04-26 for the KSM-as-feature delivery).
-Source of truth: this repo @ HEAD `54b5b7c` (refresh scaffold + MSP/vault/sharing tree; run `git rev-parse HEAD` before large edits).
+Written: 2026-04-26 (agent scaffold pass; refreshed 2026-04-27 for tree + `secrets` scaffold).
+Source of truth: this repo @ HEAD `1d10e12` (run `git rev-parse HEAD` before large edits).
 Cross-checks against `V1_GA_CHECKLIST.md`, `docs/SDK_DA_COMPLETION_PLAN.md`,
 `AUDIT.md`, `REVIEW.md`, and DOR pointers in `keeper-pam-declarative/`.
 
