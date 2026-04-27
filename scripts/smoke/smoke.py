@@ -28,10 +28,13 @@ import scenarios as smoke_scenarios
 
 from keeper_sdk.core.diff import compute_diff
 from keeper_sdk.core.graph import build_graph, execution_order
-from keeper_sdk.core.manifest import load_manifest
+from keeper_sdk.core.manifest import load_declarative_manifest, load_manifest
 from keeper_sdk.core.metadata import MANAGER_NAME, MARKER_FIELD_LABEL
 from keeper_sdk.core.planner import build_plan
-from keeper_sdk.core.schema import validate_manifest
+from keeper_sdk.core.schema import PAM_FAMILY, validate_manifest
+from keeper_sdk.core.vault_diff import compute_vault_diff
+from keeper_sdk.core.vault_graph import vault_record_apply_order
+from keeper_sdk.core.vault_models import VAULT_FAMILY, VaultManifestV1
 from keeper_sdk.providers.commander_cli import CommanderCliProvider
 
 log = logging.getLogger("sdk_smoke.smoke")
@@ -49,9 +52,13 @@ SDK_OUTPUT_TAIL_LINES = 40
 # legacy one-command invocation (``python3 scripts/smoke/smoke.py``)
 # continues to exercise the baseline two-host cycle unchanged.
 _ACTIVE_SCENARIO: smoke_scenarios.ScenarioSpec = smoke_scenarios.get(DEFAULT_SCENARIO_NAME)
+_ACTIVE_VAULT_SCENARIO: smoke_scenarios.VaultScenarioSpec | None = None
+_ACTIVE_SCENARIO_FAMILY = PAM_FAMILY
 
 
 def _active_resources() -> list[dict[str, Any]]:
+    if _ACTIVE_SCENARIO_FAMILY != PAM_FAMILY:
+        raise RuntimeError("active smoke scenario is not a PAM scenario")
     return _ACTIVE_SCENARIO.build_resources(PAM_CONFIG_UID_REF, TITLE_PREFIX)
 
 
@@ -61,6 +68,24 @@ def _active_titles() -> list[str]:
 
 def _active_expected_records() -> set[tuple[str, str]]:
     return set(_ACTIVE_SCENARIO.expected_records(PAM_CONFIG_UID_REF, TITLE_PREFIX))
+
+
+def _active_vault_scenario() -> smoke_scenarios.VaultScenarioSpec:
+    if _ACTIVE_VAULT_SCENARIO is None:
+        raise RuntimeError("active smoke scenario is not a vault scenario")
+    return _ACTIVE_VAULT_SCENARIO
+
+
+def _active_scenario_name() -> str:
+    if _ACTIVE_SCENARIO_FAMILY == VAULT_FAMILY:
+        return _active_vault_scenario().name
+    return _ACTIVE_SCENARIO.name
+
+
+def _active_scenario_description() -> str:
+    if _ACTIVE_SCENARIO_FAMILY == VAULT_FAMILY:
+        return _active_vault_scenario().description
+    return _ACTIVE_SCENARIO.description
 
 
 class SmokeError(Exception):
@@ -73,6 +98,33 @@ class PreflightError(Exception):
 
 class TenantConstraintError(Exception):
     pass
+
+
+def _scenario_choices() -> list[str]:
+    return sorted(set(smoke_scenarios.names()) | set(smoke_scenarios.vault_names()))
+
+
+def _scenario_family(name: str) -> str:
+    if name in smoke_scenarios.names():
+        return PAM_FAMILY
+    if name in smoke_scenarios.vault_names():
+        return VAULT_FAMILY
+    available = ", ".join(_scenario_choices())
+    raise KeyError(f"unknown smoke scenario {name!r}; available: {available}")
+
+
+def _set_active_scenario(name: str) -> str:
+    global _ACTIVE_SCENARIO, _ACTIVE_VAULT_SCENARIO, _ACTIVE_SCENARIO_FAMILY
+
+    family = _scenario_family(name)
+    _ACTIVE_SCENARIO_FAMILY = family
+    if family == VAULT_FAMILY:
+        _ACTIVE_VAULT_SCENARIO = smoke_scenarios.vault_get(name)
+        _ACTIVE_SCENARIO = smoke_scenarios.get(DEFAULT_SCENARIO_NAME)
+    else:
+        _ACTIVE_SCENARIO = smoke_scenarios.get(name)
+        _ACTIVE_VAULT_SCENARIO = None
+    return family
 
 
 class SdkCommandError(Exception):
@@ -200,8 +252,11 @@ def run_smoke(
     _mark(state, auth_path)
     state["keeper_args"] = argv_prefix
     state["admin_config_path"] = admin_config_path
-    _remove_project_tree(argv_prefix, env=env, project_name=SMOKE_PROJECT_NAME)
-    _mark(state, "project tree pre-clean complete")
+    if _ACTIVE_SCENARIO_FAMILY == PAM_FAMILY:
+        _remove_project_tree(argv_prefix, env=env, project_name=SMOKE_PROJECT_NAME)
+        _mark(state, "project tree pre-clean complete")
+    else:
+        _mark(state, "vault folder pre-clean complete")
 
     _sdk(["validate", str(manifest_path)], env=env)
     _mark(state, "sdk validate OK")
@@ -217,46 +272,67 @@ def run_smoke(
     manifest_source = yaml.safe_load(manifest_path.read_text())
     if not isinstance(manifest_source, dict):
         manifest_source = {}
-    prov = CommanderCliProvider(
-        config_file=admin_config_path,
-        keeper_password=admin_password,
-        manifest_source=manifest_source,
-    )
-    resolved_sf_uid = prov._resolve_project_resources_folder(SMOKE_PROJECT_NAME)
-    state["managed_folder_uid"] = resolved_sf_uid
-    _mark(state, f"resources folder resolved ({resolved_sf_uid})")
-    _share_ksm_app_folder(
-        admin_params,
-        app_uid=sb["ksm_app_uid"],
-        folder_uid=resolved_sf_uid,
-    )
-    _mark(state, "resources folder shared to KSM app")
-
-    if prov.last_resolved_folder_uid != resolved_sf_uid:
-        raise SmokeError("provider did not cache the resolved Resources shared-folder UID")
-
-    live = prov.discover()
-    expected_records = _active_expected_records()
-    expected_count = len(expected_records)
-    owned = [
-        record
-        for record in live
-        if (record.resource_type, record.title) in expected_records
-        and record.marker
-        and record.marker.get("manager") == MANAGER_NAME
-    ]
-    if len(owned) != expected_count:
-        found = {(record.resource_type, record.title) for record in owned}
-        missing = sorted(expected_records - found)
-        raise SmokeError(
-            f"expected {expected_count} SDK-managed scenario records, found {len(owned)}; "
-            f"missing={missing}; live={_live_summary(live)}"
+    if _ACTIVE_SCENARIO_FAMILY == VAULT_FAMILY:
+        prov = CommanderCliProvider(
+            config_file=admin_config_path,
+            keeper_password=admin_password,
+            manifest_source=manifest_source,
+            folder_uid=sf_uid,
         )
-    try:
-        _ACTIVE_SCENARIO.verify(owned)
-    except AssertionError as exc:
-        raise SmokeError(f"scenario post-apply verifier failed: {exc}") from exc
-    _mark(state, f"marker verification OK ({_ACTIVE_SCENARIO.name})")
+        resolved_sf_uid = sf_uid
+        state["managed_folder_uid"] = resolved_sf_uid
+        _mark(state, f"vault folder selected ({resolved_sf_uid})")
+
+        live = prov.discover()
+        typed = load_declarative_manifest(manifest_path)
+        if not isinstance(typed, VaultManifestV1):
+            raise SmokeError("vault verifier loaded a non-vault manifest")
+        try:
+            _active_vault_scenario().verify(typed, live, TITLE_PREFIX)
+        except AssertionError as exc:
+            raise SmokeError(f"scenario post-apply verifier failed: {exc}") from exc
+        _mark(state, f"marker verification OK ({_active_vault_scenario().name})")
+    else:
+        prov = CommanderCliProvider(
+            config_file=admin_config_path,
+            keeper_password=admin_password,
+            manifest_source=manifest_source,
+        )
+        resolved_sf_uid = prov._resolve_project_resources_folder(SMOKE_PROJECT_NAME)
+        state["managed_folder_uid"] = resolved_sf_uid
+        _mark(state, f"resources folder resolved ({resolved_sf_uid})")
+        _share_ksm_app_folder(
+            admin_params,
+            app_uid=sb["ksm_app_uid"],
+            folder_uid=resolved_sf_uid,
+        )
+        _mark(state, "resources folder shared to KSM app")
+
+        if prov.last_resolved_folder_uid != resolved_sf_uid:
+            raise SmokeError("provider did not cache the resolved Resources shared-folder UID")
+
+        live = prov.discover()
+        expected_records = _active_expected_records()
+        expected_count = len(expected_records)
+        owned = [
+            record
+            for record in live
+            if (record.resource_type, record.title) in expected_records
+            and record.marker
+            and record.marker.get("manager") == MANAGER_NAME
+        ]
+        if len(owned) != expected_count:
+            found = {(record.resource_type, record.title) for record in owned}
+            missing = sorted(expected_records - found)
+            raise SmokeError(
+                f"expected {expected_count} SDK-managed scenario records, found {len(owned)}; "
+                f"missing={missing}; live={_live_summary(live)}"
+            )
+        try:
+            _ACTIVE_SCENARIO.verify(owned)
+        except AssertionError as exc:
+            raise SmokeError(f"scenario post-apply verifier failed: {exc}") from exc
+        _mark(state, f"marker verification OK ({_ACTIVE_SCENARIO.name})")
 
     rc_plan2 = _sdk_allow([0], ["plan", "--json", str(manifest_path)], env=env)
     if rc_plan2 != 0:
@@ -311,6 +387,7 @@ def run_smoke(
         config_file=admin_config_path,
         keeper_password=admin_password,
         manifest_source=empty_src,
+        folder_uid=sf_uid if _ACTIVE_SCENARIO_FAMILY == VAULT_FAMILY else None,
     )
     live_after = prov_verify.discover()
     still_ours = [
@@ -322,14 +399,22 @@ def run_smoke(
         raise SmokeError(
             f"destroy failed - {len(still_ours)} records still marked SDK-owned: {_live_summary(still_ours)}"
         )
-    _remove_project_tree(argv_prefix, env=env, project_name=SMOKE_PROJECT_NAME)
-    _mark(state, "project tree cleanup OK")
+    if _ACTIVE_SCENARIO_FAMILY == PAM_FAMILY:
+        _remove_project_tree(argv_prefix, env=env, project_name=SMOKE_PROJECT_NAME)
+        _mark(state, "project tree cleanup OK")
+    else:
+        _mark(state, "vault folder cleanup OK")
 
     log.info("SMOKE PASSED: create->verify->destroy cycle clean")
     return 0
 
 
 def _write_manifest(sf_uid: str) -> Path:
+    if _ACTIVE_SCENARIO_FAMILY == VAULT_FAMILY:
+        scenario = _active_vault_scenario()
+        document = scenario.build_manifest(TITLE_PREFIX, sf_uid)
+        _preflight_manifest(document)
+        return _write_temp_manifest(document, suffix=f".smoke-{scenario.name}.yaml")
     document = _base_manifest(sf_uid)
     document["resources"] = _active_resources()
     _preflight_manifest(document)
@@ -337,6 +422,11 @@ def _write_manifest(sf_uid: str) -> Path:
 
 
 def _write_empty_manifest(sf_uid: str) -> Path:
+    if _ACTIVE_SCENARIO_FAMILY == VAULT_FAMILY:
+        del sf_uid
+        document = {"schema": VAULT_FAMILY, "records": []}
+        _preflight_manifest(document)
+        return _write_temp_manifest(document, suffix=".smoke-empty.yaml")
     document = _base_manifest(sf_uid)
     document.pop("shared_folders", None)
     document.pop("gateways", None)
@@ -379,15 +469,30 @@ def _base_manifest(sf_uid: str) -> dict[str, Any]:
 
 
 def _preflight_manifest(document: dict[str, Any]) -> None:
-    validate_manifest(document)
+    family = validate_manifest(document)
     path = _write_temp_manifest(document, suffix=".preflight.yaml")
     try:
-        manifest = load_manifest(path)
-        order = execution_order(build_graph(manifest))
-        changes = compute_diff(manifest, [], allow_delete=True)
-        plan = build_plan(manifest.name, changes, order)
-        if document.get("resources") and len(plan.creates) < 2:
-            raise PreflightError("generated manifest did not produce the expected create plan")
+        if family == VAULT_FAMILY:
+            manifest_typed = load_declarative_manifest(path)
+            if not isinstance(manifest_typed, VaultManifestV1):
+                raise PreflightError("generated vault manifest did not load as VaultManifestV1")
+            order = vault_record_apply_order(manifest_typed)
+            changes = compute_vault_diff(
+                manifest_typed,
+                [],
+                manifest_name=path.stem,
+                allow_delete=True,
+            )
+            plan = build_plan(path.stem, changes, order)
+            if document.get("records") and len(plan.creates) < 1:
+                raise PreflightError("generated vault manifest did not produce a create plan")
+        else:
+            manifest = load_manifest(path)
+            order = execution_order(build_graph(manifest))
+            changes = compute_diff(manifest, [], allow_delete=True)
+            plan = build_plan(manifest.name, changes, order)
+            if document.get("resources") and len(plan.creates) < 2:
+                raise PreflightError("generated manifest did not produce the expected create plan")
     finally:
         path.unlink(missing_ok=True)
 
@@ -691,7 +796,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--scenario",
         default=DEFAULT_SCENARIO_NAME,
-        choices=smoke_scenarios.names(),
+        choices=_scenario_choices(),
         help=(
             "Which resource shape to exercise. Each scenario uses the "
             "same identity+sandbox+destroy flow; only the resources[] "
@@ -717,9 +822,13 @@ def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
     log.setLevel(getattr(logging, args.log_level))
-    global _ACTIVE_SCENARIO
-    _ACTIVE_SCENARIO = smoke_scenarios.get(args.scenario)
-    log.info("smoke scenario: %s — %s", _ACTIVE_SCENARIO.name, _ACTIVE_SCENARIO.description)
+    scenario_family = _set_active_scenario(args.scenario)
+    log.info(
+        "smoke scenario: %s (%s) — %s",
+        _active_scenario_name(),
+        scenario_family,
+        _active_scenario_description(),
+    )
     state: dict[str, Any] = {"passed": []}
     exit_code = 0
     needs_cleanup = False
@@ -766,7 +875,12 @@ def main(argv: list[str] | None = None) -> int:
                     admin_password = _load_admin_password()
                 except Exception:
                     admin_password = None
-            if admin_config_path and admin_password and not os.environ.get("SMOKE_NO_CLEANUP"):
+            if (
+                _ACTIVE_SCENARIO_FAMILY == PAM_FAMILY
+                and admin_config_path
+                and admin_password
+                and not os.environ.get("SMOKE_NO_CLEANUP")
+            ):
                 try:
                     cleanup_env = dict(os.environ)
                     cleanup_env["KEEPER_CONFIG"] = admin_config_path
