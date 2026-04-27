@@ -6,22 +6,6 @@ Devil's-advocate execution gate: use
 [`docs/SDK_DA_COMPLETION_PLAN.md`](./SDK_DA_COMPLETION_PLAN.md) as the
 current completion contract when this roadmap conflicts with live evidence.
 
-**Parent / worker split** (operator-side methodology; not enforced by this
-repo): the orchestrator plays **parent** (adversarial review, gate lifts,
-live proof) vs **worker** (narrow scoped implementer — Codex CLI, cheap
-subagent, single tight Cursor turn). Learning from what the parent catches
-belongs in personal daybook `LESSONS` / `JOURNAL`. The Codex CLI / Phase-0
-gate scripts that previously lived under `scripts/agent/` are now
-operator-side infrastructure in the maintainer's private daybook
-(`msawczynk/cursor-daybook`: `docs/orchestration/` + `templates/`); this
-repo no longer ships them.
-
-This plan still presumes a parent orchestrator plus cheap workers:
-
-- Parent owns live-test design, credential boundaries, GitHub release assets, roadmap decisions, merge safety, and final review.
-- Workers own scoped implementation slices and may run live smoke only when explicitly delegated through a whitelisted harness command.
-- Every worker task returns a branch/patch, test output, caveats, and next steps. Parent verifies before merge.
-
 ## Current Baseline
 
 Main branch as of 2026-04-25:
@@ -40,7 +24,7 @@ Main branch as of 2026-04-25:
   - `pam rotation edit` argv helper plus experimental apply wiring, still preview/experimental gated pending live proof.
   - `pam connection edit` / `pam rbi edit` apply wiring, still preview-gated pending live proof.
   - JIT and gateway-create / `projects[]` decisions captured as boundary/design docs; no gate removed.
-- **`keeper-vault.v1` L1 (2026-04-27):** Commander discover/apply includes login **UPDATE** (record **version 3** JSON), `dsk validate --online`, and semantic scalar-login diff vs flattened live — still **preview / not PAM-bar GA** until **G6** live proof + `VAULT_L1_DESIGN` §7; see [README](../README.md) (Readiness table + **Honest limits — vault L1**) and [`docs/ORCHESTRATION_UNTIL_COMPLETE.md`](./ORCHESTRATION_UNTIL_COMPLETE.md) §7/§10.
+- **`keeper-vault.v1` L1 (2026-04-27):** Commander discover/apply includes login **UPDATE** (record **version 3** JSON), `dsk validate --online`, and semantic scalar-login diff vs flattened live — still **preview / not PAM-bar GA** until live proof + `VAULT_L1_DESIGN` §7; see [README](../README.md) (Readiness table + **Honest limits — vault L1**).
 
 Open GitHub issues:
 
@@ -56,7 +40,7 @@ Closed / classified:
 Latest #5 live proof (updated):
 
 - Code: post-apply smoke builds `CommanderCliProvider(..., manifest_source=<temp yaml>)`; `discover()` best-effort bootstraps in-process params when RBI records exist so TunnelDAG merge can populate `pam_settings.options` (`remote_browser_isolation` / session recording tri-states). Offline partial overlay diff remains in `tests/test_rbi_readback.py`.
-- **Still required for gate lift:** parent-run `python3 scripts/smoke/smoke.py … --scenario pamRemoteBrowser` showing **verify + re-plan exit 0** on a tenant where TunnelDAG is available; if verify fails, capture whether `CapabilityError` masked login or DAG had no graph.
+- **Still required for gate lift:** `python3 scripts/smoke/smoke.py … --scenario pamRemoteBrowser` showing **verify + re-plan exit 0** on a tenant where TunnelDAG is available; if verify fails, capture whether `CapabilityError` masked login or DAG had no graph.
 - Classification: **`preview-gated`** until that live matrix row is green end-to-end.
 
 ## Definition Of Complete
@@ -79,103 +63,35 @@ Hard objections:
 2. **Live tenant proof is not optional for mutating support.** Offline tests prove mapping, not product behavior. No live proof means preview gate or conflict stays.
 3. **Direct DAG writes are a trap.** They can make tests pass while bypassing Commander invariants. Treat direct DAG writes as forbidden unless a later design explicitly approves them.
 4. **"Full Keeper surface" can explode scope.** PAM completion ships first; broader vault/team/enterprise surfaces need capability mirror evidence and separate release phases.
-5. **Codex can overfit fixtures.** Parent must review for silent drops, fake support, broad retries, and tests that assert implementation details instead of behavior.
+5. **Fixture-driven implementation can overfit fixtures.** Review must catch silent drops, fake support, broad retries, and tests that assert implementation details instead of behavior.
 6. **Release packaging is a dependency, not paperwork.** GitHub Release assets
    plus `twine check` in CI catch broken wheels before consumers pin a bad tag.
 7. **Preview gates are product honesty.** Removing them is a user-facing support promise. Gate removal requires docs, tests, live proof, and clean re-plan.
 
 Refined execution rule:
 
-- A worker may add models, pure mappers, docs, and offline tests.
-- A worker may not convert a capability from "preview/unsupported" to "supported" without parent-provided live proof.
-- Parent must close each issue with one of three labels in the issue body: `supported`, `preview-gated`, or `upstream-gap`.
+- Models, pure mappers, docs, and offline tests do not establish mutating support
+  without live proof.
+- A capability cannot move from "preview/unsupported" to "supported" without
+  live proof.
+- Each issue closes with one of three labels in the issue body: `supported`,
+  `preview-gated`, or `upstream-gap`.
 - "Complete" is reached when every discovered capability is in one of those three states and no manifest key is silently ignored.
 
 Risk gates before merge:
 
 | Risk | Required proof |
 |------|----------------|
-| New mutating provider path | unit tests + dry-run behavior + parent live smoke |
+| New mutating provider path | unit tests + dry-run behavior + live smoke |
 | Preview gate removal | live smoke + clean re-plan + docs/examples |
 | New schema key | preview detector + provider conflict + docs |
 | New retry path | bounded retry test + no retry for non-retryable errors |
 | New external source in capability mirror | pinned version + drift-check CI |
 | New secret/output path | redaction test |
 
-## Operating Model
-
-### Cost-Optimized Orchestration And Checks
-
-Cost target: spend cheap worker tokens on exploration/execution, spend parent tokens on review, gates, and decisions.
-
-Worker tiers (operator-side; the wrappers themselves live in the
-maintainer's private daybook `templates/agent/`, not in this repo):
-
-1. **Offline scoped worker** — **default first** for code/docs/tests. Parent supplies a prompt file (task + scope + DONE contract). No network, no live Keeper calls; focused `pytest` / `ruff` only as allowed in the prompt.
-2. **Live smoke worker** — one explicit `scripts/smoke/smoke.py …` line. Network on; one harness command; no secret/env printing; no credential file inspection outside the harness.
-3. **Parent** — runs final diff review, full local checks once per integrated branch, classifies live results, updates issues, and merges/releases.
-
-Check budget:
-
-- Per worker: focused tests for touched area plus `ruff` on touched Python files.
-- Per integration branch: one full `pytest`, `ruff`, `format --check`, `mypy`, build/twine, and drift-check only if capability mirror touched.
-- Per PR: rely on GitHub matrix for py3.11/3.12/3.13 and build duplication; do not rerun full local suite after docs-only amendments unless risk changes.
-- Per live feature: one clean live smoke create -> verify -> clean re-plan -> destroy before claiming `supported`.
-
-Live smoke command rules:
-
-- Use `python3 scripts/smoke/smoke.py ...` or another committed harness, never ad hoc Keeper mutations.
-- Add `DSK_PREVIEW=1` / experimental env vars only when the issue says so.
-- Redact stdout/stderr if a failure includes tokens, passwords, config JSON, or one-time codes.
-- Parent reviews the transcript and closes the issue as `supported`, `preview-gated`, or `upstream-gap`.
-
-### Parent Loop
-
-For each work package:
-
-1. Read issue, code, and latest CI state.
-2. Create/refresh a GitHub issue with acceptance criteria.
-3. Spawn 1-3 scoped offline workers (Codex CLI / cheap subagents / single tight Cursor turns) on isolated branches/worktrees — same DONE contract.
-4. Give each worker one narrow slice; if live proof is needed, give one whitelisted harness command, not credentials.
-5. Review returned diff like a PR: correctness first, then tests/docs.
-6. Run parent checks:
-   - `python3 -m pytest -q`
-   - `python3 -m ruff check .`
-   - `python3 -m ruff format --check .`
-   - `python3 -m mypy keeper_sdk`
-   - `python3 -m build && python3 -m twine check dist/*`
-   - `python3 scripts/sync_upstream.py --check` when capability mirror touched.
-7. Open PR, wait CI, merge only green.
-8. Parent delegates or runs live smoke for tenant-sensitive items, then reviews the transcript.
-9. Update `CHANGELOG.md`, `SCAFFOLD.md`, and issues.
-
-### Worker Rules
-
-Workers must:
-
-- Work on one branch/worktree.
-- Avoid live Keeper calls unless the parent explicitly delegates one whitelisted smoke harness command.
-- Avoid secrets and credential files.
-- Prefer offline unit tests and fixtures.
-- Preserve public API/backward compatibility unless task says otherwise.
-- Keep gates honest: do not remove preview/provider conflicts until apply is proven.
-- Return exact commands run and exact files changed.
-
-Workers must not:
-
-- Change release tags.
-- Push to `main`.
-- Modify GitHub repo settings.
-- Publish to PyPI (distribution is GitHub-only).
-- Touch customer/lab private data unless parent supplies a sanitized fixture.
-- Print env vars, credential JSON, TOTP seeds, passwords, KSM config contents, or raw secret-bearing logs.
-- Convert plan-only helpers into live apply without explicit acceptance tests.
-
 ## Phase 0: Release / Publish Hygiene
 
 ### P0.1 GitHub Release assets (no PyPI)
-
-Owner: parent.
 
 Steps:
 
@@ -190,11 +106,7 @@ Acceptance:
 - `docs/RELEASING.md` matches workflow behavior.
 - Close or ignore historical **#1** (PyPI) as **out of scope** / cancelled.
 
-Codex: no.
-
 ### P0.2 Signed Tag Policy
-
-Owner: parent.
 
 Steps:
 
@@ -206,19 +118,15 @@ Acceptance:
 
 - Future release checklist says annotated vs signed clearly.
 
-Codex: docs-only slice possible after parent decides policy.
-
 ## Phase 1: Make Current PAM Apply Fully Proven
 
 ### P1.1 EnvLoginHelper Full Apply Smoke
-
-Owner: parent for live smoke; Codex for smoke harness improvements.
 
 Issue: #3.
 
 Purpose: prove `--login-helper env` can run full `validate -> plan -> apply -> verify -> destroy`.
 
-Parent live commands:
+Live smoke commands:
 
 ```bash
 python3 scripts/smoke/smoke.py --login-helper env --scenario pamMachine
@@ -227,7 +135,7 @@ python3 scripts/smoke/smoke.py --login-helper env --scenario pamDirectory
 python3 scripts/smoke/smoke.py --login-helper env --scenario pamRemoteBrowser # #5 proof harness; latest live run exposes RBI readback gap
 ```
 
-Codex task: add stronger smoke diagnostics.
+Task: add stronger smoke diagnostics.
 
 Files:
 
@@ -235,25 +143,23 @@ Files:
 - `scripts/smoke/README.md`
 - `tests/test_smoke_args.py`
 
-Acceptance for Codex:
+Smoke diagnostics acceptance:
 
 - Smoke logs show which auth path ran.
 - Failure output preserves SDK stdout/stderr tail.
 - No live calls in tests.
 - `pytest tests/test_smoke_args.py tests/test_smoke_scenarios.py -q`
 
-Parent acceptance:
+Live acceptance:
 
 - At least `pamMachine` full cycle passes with `--login-helper env`.
 - If any scenario fails, failure is classified and issue updated.
 
 ### P1.2 Session Refresh Hardening
 
-Owner: Codex for offline; parent for live.
-
 Current state: one retry on `session_token_expired` landed.
 
-Next Codex task:
+Next task:
 
 - Add tests for "retry once only, then fail with original context."
 - Add test for non-session errors not retried.
@@ -273,8 +179,6 @@ Acceptance:
 
 ### P1.3 Adoption / Field Drift / Two Writer Races
 
-Owner: Codex offline first.
-
 Purpose: close DOR deferred scenarios.
 
 Files:
@@ -286,7 +190,7 @@ Files:
 - `tests/test_commander_cli.py`
 - `V1_GA_CHECKLIST.md`
 
-Codex tasks:
+Tasks:
 
 1. Replace xfail DOR scenario for field drift with passing offline provider test.
 2. Add adoption conflict tests:
@@ -302,7 +206,7 @@ Acceptance:
 - No direct live calls.
 - Plan JSON preserves conflict reason.
 
-Parent live acceptance:
+Live acceptance:
 
 - Run adoption smoke against disposable sandbox after offline tests pass.
 
@@ -317,8 +221,6 @@ Current state:
 - `_build_pam_rotation_edit_args()` maps cron/on-demand basics.
 
 ### P2.1 Rotation Ref Resolution
-
-Owner: Codex.
 
 Purpose: produce exact post-import rotation argv from manifest + live records.
 
@@ -335,27 +237,25 @@ Implementation:
    - output: list of rotation argv entries.
 2. Resolve:
    - `record_uid`: live `pamUser` UID.
-   - `resource_uid`: parent resource UID for nested user.
+   - `resource_uid`: containing resource UID for nested user.
    - `config_uid`: synthetic config UID or resolved live config UID.
-   - `admin_uid`: parent resource admin credential UID when declared.
-3. Reject unsupported top-level user rotation unless explicit parent resource is modeled.
+   - `admin_uid`: containing resource admin credential UID when declared.
+3. Reject unsupported top-level user rotation unless an explicit containing resource is modeled.
 
 Acceptance:
 
 - Unit tests cover nested user happy path.
-- Unit tests cover missing parent, duplicate live match, missing config.
+- Unit tests cover missing containing resource, duplicate live match, missing config.
 - No apply wiring yet.
 
 ### P2.2 Rotation Apply Wiring
-
-Owner: Codex offline, parent live.
 
 Implementation:
 
 1. In `apply_plan`, after import/extend + discover + marker write, run rotation argv pass.
 2. In dry-run, expose would-run rotation argv on the nested `pamUser` outcome without discover/execute.
 3. Add outcome details for executed rotation commands.
-4. Keep preview/provider gate until parent live proof passes.
+4. Keep preview/provider gate until live proof passes.
 
 Acceptance:
 
@@ -363,7 +263,7 @@ Acceptance:
 - Dry-run exposes deterministic argv and does not run it or discover live records.
 - Non-zero Commander error becomes `CapabilityError` with next action.
 
-Parent live proof:
+Live proof:
 
 - Create nested `pamUser` under `pamMachine`.
 - Apply rotation cron/on-demand.
@@ -377,12 +277,10 @@ Latest live evidence:
   matching fixes.
 - After routing rotation edit through the in-process Commander session, apply
   and marker verification pass. End-to-end support is still not proven because
-  the post-apply re-plan reports updates for the nested `pamUser` and parent
+  the post-apply re-plan reports updates for the nested `pamUser` and containing
   `pamMachine`; readback/drift semantics need to be designed before gate lift.
 
 ### P2.3 Rotation Gate Lift
-
-Owner: Codex after parent live proof.
 
 Tasks:
 
@@ -406,8 +304,6 @@ RBI state into DAG `allowedSettings.connections`, which current `discover()`
 does not read back as manifest-shaped drift state.
 
 ### P3.1 Tuning Field Map Audit
-
-Owner: Codex.
 
 Task:
 
@@ -433,8 +329,6 @@ Acceptance:
 
 ### P3.2 Tuning Ref Resolution
 
-Owner: Codex.
-
 Implementation:
 
 - Resolve record UID, config UID, admin/launch/autofill credential refs.
@@ -450,15 +344,13 @@ Tests:
 
 ### P3.3 Tuning Apply Wiring + Live Proof
 
-Owner: Codex offline; parent live.
-
 Implementation:
 
 - Run tuning pass after import/extend and before final re-plan.
 - Add outcome details.
 - Keep dry-run non-mutating.
 
-Parent live proof:
+Live proof:
 
 - `pamRemoteBrowser` with RBI flags.
 - `pamMachine`/`pamDatabase` with connection flags.
@@ -473,11 +365,9 @@ Acceptance:
 
 Issue: #6.
 
-Risk: likely DAG/router-sensitive. Do not let Codex improvise live writer.
+Risk: likely DAG/router-sensitive. Do not improvise a live writer.
 
 ### P4.1 Boundary Research
-
-Owner: Codex read-only.
 
 Task:
 
@@ -495,8 +385,6 @@ Acceptance:
 
 ### P4.2 Offline Mapping Slice
 
-Owner: Codex only if P4.1 finds safe path.
-
 Acceptance:
 
 - Pure helper + tests only.
@@ -504,7 +392,7 @@ Acceptance:
 
 ### P4.3 Apply + Gate Lift
 
-Owner: parent live proof required.
+Live proof required.
 
 Acceptance:
 
@@ -517,8 +405,6 @@ Acceptance:
 Issue: #7.
 
 ### P5.1 Gateway Create Design
-
-Owner: parent decision + Codex design doc.
 
 Decision needed:
 
@@ -537,8 +423,6 @@ Acceptance:
 - Preview gate remains until live proof.
 
 ### P5.2 `projects[]` Semantics
-
-Owner: Codex design; parent approval.
 
 Questions:
 
@@ -559,8 +443,6 @@ This phase makes SDK complete beyond PAM.
 
 ### P6.1 Capability Mirror Expansion
 
-Owner: Codex.
-
 Task:
 
 - Extend `scripts/sync_upstream.py` to mirror:
@@ -575,8 +457,6 @@ Acceptance:
 - No behavior change.
 
 ### P6.2 Generic Vault Records
-
-Owner: Codex.
 
 Scope:
 
@@ -600,8 +480,6 @@ Acceptance:
 
 ### P6.3 Shared Folders Full Lifecycle
 
-Owner: Codex offline, parent live.
-
 Scope:
 
 - create shared folder
@@ -617,8 +495,6 @@ Acceptance:
 
 ### P6.4 KSM Applications
 
-Owner: Codex offline, parent live.
-
 Scope:
 
 - app create/reference
@@ -632,8 +508,6 @@ Acceptance:
 - Deterministic next-action for one-time tokens.
 
 ### P6.5 Teams, Roles, Enterprise Config
-
-Owner: Codex after capability mirror.
 
 Scope:
 
@@ -649,8 +523,6 @@ Acceptance:
 - Separate approval gate for destructive membership changes.
 
 ### P6.6 Compliance / Reporting As Manifest
-
-Owner: design first.
 
 Scope:
 
@@ -697,15 +569,6 @@ Tasks:
 - Keep `CHANGELOG.md` high signal.
 - Keep examples runnable offline.
 
-## Worker Prompt Template
-
-Operator-side: the canonical shape lives in the maintainer's private
-daybook (`msawczynk/cursor-daybook`:
-`templates/github/codex/prompts/scoped-task.md`). Use the DONE-block
-contract there for any worker (Codex CLI, cheap subagent, single tight
-Cursor turn). This repo deliberately does not ship a prompt template;
-forks and consumers should not expect one.
-
 ## PR / Release Cadence
 
 Preferred PR size:
@@ -734,7 +597,7 @@ Release cadence:
 
 ## Stop Conditions
 
-Stop and return to parent when:
+Stop when:
 
 - Live tenant needed.
 - Credential/config needed.
@@ -744,7 +607,7 @@ Stop and return to parent when:
 - Tests require broad fixture rewrite.
 - More than three patch attempts fail.
 
-## Parent Checklist Before Calling SDK Complete
+## Checklist Before Calling SDK Complete
 
 - All open supportable capability issues closed or explicitly deferred with upstream evidence.
 - `DSK_PREVIEW=1` only gates future/unproven keys.

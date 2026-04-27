@@ -24,9 +24,7 @@ from failure without a human in the loop.
 **If you are an agent or LLM**: start at [`AGENTS.md`](AGENTS.md) for the
 command table, exit-code contract, and JSON shapes. Scoped completion
 contracts live in [`docs/SDK_DA_COMPLETION_PLAN.md`](docs/SDK_DA_COMPLETION_PLAN.md)
-and [`docs/SDK_COMPLETION_PLAN.md`](docs/SDK_COMPLETION_PLAN.md). Cursor /
-Codex / daybook orchestration is operator-side infrastructure and lives
-in the maintainer's private daybook, not this repo.
+and [`docs/SDK_COMPLETION_PLAN.md`](docs/SDK_COMPLETION_PLAN.md).
 
 ## Capability scope
 
@@ -310,4 +308,3 @@ CLI smokes exercise `validate`, `export`, `plan` exit codes (`0`/`2`/`4`),
 `apply --dry-run` equivalence to `plan`, and JSON output. Live-smoke
 variants live under `scripts/smoke/` and can be selected with
 `--scenario` plus `--login-helper deploy_watcher|env`.
-

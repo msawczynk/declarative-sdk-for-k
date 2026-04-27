@@ -4,20 +4,12 @@ Date: 2026-04-25
 
 Purpose: finish `declarative-sdk-for-k` without turning unproven Keeper behavior
 into support claims. This plan supersedes optimistic feature-count roadmaps when
-there is a conflict. **Orchestrated execution index (phases × scripts × live
-proofs):** [`docs/SDK_ORCHESTRATED_FEATURE_COMPLETE.md`](./SDK_ORCHESTRATED_FEATURE_COMPLETE.md).
-The SDK is "complete" only when every modeled capability is
+there is a conflict. The SDK is "complete" only when every modeled capability is
 one of:
 
 - `supported`: unit tests + docs + live proof + clean re-plan.
 - `preview-gated`: schema/model surface exists, but support is not claimed.
 - `upstream-gap`: pinned upstream lacks a safe writer/readback path.
-
-**Learning loop (process, not duplicated here):** **child** = narrow implementer
-(Codex / worker); **parent** = adversarial reviewer who runs a devil's-advocate
-checklist before merge or gate-lift; capture durable misses in personal daybook
-`LESSONS.md` and decisions in `JOURNAL.md` (Downloads workspace — section *Parent
-/ child + devil's advocate*).
 
 ## Current Truth
 
@@ -30,21 +22,20 @@ Shipped and proven:
   destroy live proof.
 - Provider capability gaps surface as plan conflicts; `validate --online` now
   fails on provider capability gaps.
-- GitHub/Codex task scaffolding exists, but remains manual and review-gated.
 
 Not yet supported:
 
 - Nested `resources[].users[].rotation_settings`: apply reaches marker
   verification; ``compute_diff`` now treats common Commander readback shape drift
   on ``pamUser.rotation_settings`` (e.g. ``enabled`` bool vs tri-state string,
-  extra ``schedule`` keys with the same CRON) as NOOP. **Parent live re-plan**
-  for ``pamUserNestedRotation`` still required before narrowing preview gates.
+  extra ``schedule`` keys with the same CRON) as NOOP. A live re-plan for
+  ``pamUserNestedRotation`` is still required before narrowing preview gates.
 - Post-import RBI tuning: Commander still persists RBI tri-state primarily on
   the TunnelDAG vertex; the provider **merges** `allowedSettings` into
   manifest-shaped `pam_settings.options` when `discover()` has an in-process
   session **and** `manifest_source` lists `resources` (smoke passes the temp
-  manifest). **Clean re-plan for RBI remains parent live-verified** before any
-  gate lift from `preview-gated` to `supported`.
+  manifest). A clean RBI re-plan remains required before any gate lift from
+  `preview-gated` to `supported`.
 - Standalone top-level `pamUser`.
 - JIT writes.
 - Gateway `mode: create` and top-level `projects[]`.
@@ -60,7 +51,7 @@ No feature may move from `preview-gated` to `supported` unless all gates pass:
 4. Re-discovery sees enough state to produce a clean re-plan.
 5. Destroy/cleanup removes only SDK-owned resources and leaves the tenant clean.
 6. Docs, examples, scaffold, and changelog match the actual support claim.
-7. A parent-reviewed live smoke proves the exact supported path.
+7. A reviewed live smoke proves the exact supported path.
 
 Devil's advocate default: if any gate is ambiguous, keep the feature
 `preview-gated`.
@@ -72,7 +63,6 @@ Goal: make the current dirty tree reviewable before more feature work.
 Tasks:
 
 1. Split review into coherent PR units if needed:
-   - process/GitHub Codex scaffolding,
    - Commander provider rotation/discover fixes,
    - smoke scenario/docs,
    - validation/docs hardening.
@@ -126,12 +116,10 @@ Current blocker: live apply reaches marker verification, but clean re-plan fails
 
 ### P2.1 Diagnose Rotation Drift
 
-Owner: Codex offline first, parent live proof.
-
 Questions:
 
 - Which fields differ on post-apply `pamUser`?
-- Which fields differ on post-apply parent `pamMachine`?
+- Which fields differ on post-apply containing `pamMachine`?
 - Are these actual missing writes, readback-shape gaps, or SDK-only placement
   metadata that should be ignored?
 - Does `pam rotation edit` persist rotation in a Commander-readable surface, or
@@ -140,7 +128,7 @@ Questions:
 Tasks:
 
 1. Add an offline fixture reproducing post-apply live payload shape for nested
-   `pamUser` + parent `pamMachine`.
+   `pamUser` + containing `pamMachine`.
 2. Make drift output structured enough to identify exact field names in live
    smoke failure tails. Offline anchor:
    `tests/test_diff.py::test_diff_nested_pam_user_rotation_drift_surfaces_rotation_settings_key`
@@ -263,7 +251,7 @@ Tasks:
    - build pure mapping helper,
    - keep preview gate,
    - add mocked tests,
-   - require parent live smoke.
+   - require live smoke.
 3. If no safe writer exists:
    - keep `jit_settings` preview-gated,
    - update issue with source refs,
@@ -336,31 +324,6 @@ Acceptance:
 - Every new surface enters with capability mirror evidence.
 - Every mutating surface has mock tests, provider tests, docs, examples, and
   live smoke before support claim.
-
-## Process Plan
-
-Cursor / Codex / daybook orchestration (parent / worker split, Codex CLI
-wrappers, slice prompts, GitHub-Codex Action / issue template, Phase-0
-gate scripts) is **operator-side infrastructure** maintained canonically
-in the maintainer's private daybook (`msawczynk/cursor-daybook`:
-`docs/orchestration/` + `templates/`). It is not shipped from this repo.
-Adopters who want the same parent-orchestrator workflow can copy
-templates from there with `# adapt:` markers.
-
-### Parent Review Loop
-
-For each task:
-
-1. Read latest issue + relevant docs + latest live evidence.
-2. Delegate narrow offline work to Codex.
-3. Review diff before running broad checks.
-4. Run focused tests.
-5. Run one live proof only when the code is locally green.
-6. Classify result: `supported`, `preview-gated`, or `upstream-gap`.
-7. Update docs, scaffold, and changelog.
-
-Stop after three failed attempts on the same live blocker. Write down the exact
-new blocker instead of continuing speculative patches.
 
 ## Definition Of Done For "SDK Complete"
 
