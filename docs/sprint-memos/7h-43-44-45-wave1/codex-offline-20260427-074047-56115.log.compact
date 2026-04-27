@@ -1,0 +1,230 @@
+Reading additional input from stdin...
+OpenAI Codex v0.125.0-alpha.3 (research preview)
+--------
+workdir: /Users/martin/Downloads/Cursor tests/worktrees/cursor-sharing-harness
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k/.git/worktrees/cursor-sharing-harness, /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k/.git, /Users/martin/.codex/memories] (network access enabled)
+reasoning effort: none
+reasoning summaries: none
+session id: 019dcdab-4979-7261-afe6-7abdc9bc3ffd
+--------
+user
+# 7h-45 V8b — smoke harness vaultSharingLifecycle dispatch
+
+Worktree: `/Users/martin/Downloads/Cursor tests/worktrees/cursor-sharing-harness`, branch `cursor/sharing-harness`, base 8044bb8.
+
+Goal: extend `scripts/smoke/smoke.py` to dispatch the `vaultSharingLifecycle` scenario (which V8a authors in parallel). NO new SPEC, NO new tests.
+
+# Required reading
+- `scripts/smoke/smoke.py` full read (~600+ LOC post-7h-37/7h-38 family-dispatch + parallel-guard).
+- LESSON `[smoke][family-dispatch-vs-profile-orthogonality]` 7h-37.
+- LESSON `[orchestration][parallel-write-3way-conflict-pattern]` 7h-39.
+
+# Hard requirements
+1. Find existing `--scenario` argparse choices and `_ACTIVE_SCENARIO_FAMILY` dispatch.
+2. Add `"vaultSharingLifecycle"` to argparse choices.
+3. In the family-dispatch block, route `keeper-vault-sharing.v1` to the appropriate planner. Use `compute_sharing_diff(manifest, live_folders=..., live_shared_folders=..., live_share_records=..., live_share_folders=...)`. Mock provider's `discover()` returns flat LiveRecord list — split by `resource_type` per V7a's design.
+4. Parallel-guard: ensure the scenario acquires a profile lock (existing `parallel_guard` infra from 7h-38 L3).
+5. Do NOT modify `scripts/smoke/scenarios.py` (V8a territory).
+ 
+ 
++def _sharing_manifest_has_rows(document: dict[str, Any]) -> bool:
++    return any(
++        document.get(key) for key in ("folders", "shared_folders", "share_records", "share_folders")
++    )
++
++
++def _sharing_apply_order(manifest: SharingManifestV1) -> list[str]:
++    return [
++        *(folder.uid_ref for folder in manifest.folders),
++        *(folder.uid_ref for folder in manifest.shared_folders),
++        *(share.uid_ref for share in manifest.share_records),
++        *(share.uid_ref for share in manifest.share_folders),
++    ]
++
++
++def _assert_active_declarative_manifest(manifest: Any) -> None:
++    if _ACTIVE_SCENARIO_FAMILY == VAULT_FAMILY:
++        if not isinstance(manifest, VaultManifestV1):
++            raise SmokeError("vault dispatch loaded a non-vault manifest")
++        return
++    if _ACTIVE_SCENARIO_FAMILY == SHARING_FAMILY:
++        if not isinstance(manifest, SharingManifestV1):
++            raise SmokeError("sharing dispatch loaded a non-sharing manifest")
++        return
++    raise SmokeError(f"unsupported declarative smoke family {_ACTIVE_SCENARIO_FAMILY}")
++
++
++def _declarative_apply_order(manifest: Any) -> list[str]:
++    if isinstance(manifest, VaultManifestV1):
++        return vault_record_apply_order(manifest)
++    if isinstance(manifest, SharingManifestV1):
++        return _sharing_apply_order(manifest)
++    raise SmokeError(f"unsupported declarative manifest type {type(manifest).__name__}")
++
++
++def _declarative_changes(
++    manifest: Any,
++    live: list[Any],
++    *,
++    manifest_name: str,
++    allow_delete: bool = False,
++) -> list[Any]:
++    if isinstance(manifest, VaultManifestV1):
++        return compute_vault_diff(
++            manifest,
++            live,
++            manifest_name=manifest_name,
++            allow_delete=allow_delete,
++        )
++    if isinstance(manifest, SharingManifestV1):
++        return _compute_sharing_changes(
++            manifest,
++            live,
++            manifest_name=manifest_name,
++            allow_delete=allow_delete,
++        )
++    raise SmokeError(f"unsupported declarative manifest type {type(manifest).__name__}")
++
++
++def _sharing_live_rows_by_type(live: list[Any]) -> dict[str, list[dict[str, Any]]]:
++    rows: dict[str, list[dict[str, Any]]] = {
++        "sharing_folder": [],
++        "sharing_shared_folder": [],
++        "sharing_record_share": [],
++        "sharing_share_folder": [],
++    }
++    for record in live:
++        resource_type = getattr(record, "resource_type", "")
++        if resource_type not in rows:
++            continue
++        rows[resource_type].append(
++            {
++                "keeper_uid": getattr(record, "keeper_uid", None),
++                "resource_type": resource_type,
++                "title": getattr(record, "title", ""),
++                "payload": dict(getattr(record, "payload", {}) or {}),
++                "marker": dict(getattr(record, "marker", None) or {})
++                if getattr(record, "marker", None)
++                else None,
++            }
++        )
++    return rows
++
++
++def _compute_sharing_changes(
++    manifest: SharingManifestV1,
++    live: list[Any],
++    *,
++    manifest_name: str,
++    allow_delete: bool = False,
++) -> list[Any]:
++    live_by_type = _sharing_live_rows_by_type(live)
++    return compute_sharing_diff(
++        manifest,
++        live_folders=live_by_type["sharing_folder"],
++        live_shared_folders=live_by_type["sharing_shared_folder"],
++        live_share_records=live_by_type["sharing_record_share"],
++        live_share_folders=live_by_type["sharing_share_folder"],
++        manifest_name=manifest_name,
++        allow_delete=allow_delete,
++    )
++
++
++def _verify_sharing_plan_clean(
++    manifest: SharingManifestV1,
++    live: list[Any],
++    *,
++    manifest_name: str,
++) -> None:
++    changes = _compute_sharing_changes(manifest, live, manifest_name=manifest_name)
++    blocking = [
++        change
++        for change in changes
++        if change.kind in (ChangeKind.CREATE, ChangeKind.UPDATE, ChangeKind.CONFLICT)
++    ]
++    if blocking:
++        summary = [(change.kind.value, change.title, change.reason) for change in blocking]
++        raise SmokeError(f"sharing verifier found drift/conflict rows: {summary}")
++
++
+ def _sdk(args: list[str], *, env: dict[str, str]) -> None:
+     _sdk_allow([0], args, env=env)
+ 
+@@ -923,6 +1214,17 @@
+         help="Smoke profile id from scripts/smoke/profiles/<id>.json",
+     )
+     parser.add_argument(
++        "--provider",
++        default="commander",
++        choices=["commander", "mock"],
++        help="Smoke provider. commander runs the live harness; mock requires --offline.",
++    )
++    parser.add_argument(
++        "--offline",
++        action="store_true",
++        help="run the declarative vault smoke cycle in-process against the mock provider",
++    )
++    parser.add_argument(
+         "--parallel-profile",
+         action="store_true",
+         help="enable per-profile parallel writer-lane locks; requires --profile != default",
+@@ -944,7 +1246,12 @@
+             "EnvLoginHelper fallback."
+         ),
+     )
+-    return parser.parse_args(argv)
++    args = parser.parse_args(argv)
++    if args.offline and args.provider != "mock":
++        parser.error("--offline requires --provider mock")
++    if args.provider == "mock" and not args.offline:
++        parser.error("--provider mock requires --offline")
++    return args
+ 
+ 
+ def main(argv: list[str] | None = None) -> int:
+@@ -954,6 +1261,9 @@
+     scenario_family = _set_active_scenario(args.scenario)
+     profile = identity.load_profile(args.profile)
+     context = SmokeRunContext(profile=profile, node_uid=args.node_uid)
++    parallel_profile = args.parallel_profile or (
++        scenario_family == SHARING_FAMILY and not args.offline
++    )
+     log.info(
+         "smoke scenario: %s (%s) — %s",
+         _active_scenario_name(),
+@@ -965,15 +1275,18 @@
+     needs_cleanup = False
+ 
+     try:
+-        exit_code = run_smoke(
+-            keep_sf=True,
+-            teardown_only=args.teardown,
+-            keep_records=args.keep_records,
+-            login_helper=args.login_helper,
+-            parallel_profile=args.parallel_profile,
+-            context=context,
+-            state=state,
+-        )
++        if args.offline:
++            exit_code = run_offline_smoke(context=context, state=state)
++        else:
++            exit_code = run_smoke(
++                keep_sf=True,
++                teardown_only=args.teardown,
++                keep_records=args.keep_records,
++                login_helper=args.login_helper,
++                parallel_profile=parallel_profile,
++                context=context,
++                state=state,
++            )
+         return exit_code
+     except KeyboardInterrupt as exc:  # pragma: no cover - live-only path
+         needs_cleanup = True
+
+2026-04-27T06:49:31.827905Z ERROR codex_core::session: failed to record rollout items: thread 019dcdab-4979-7261-afe6-7abdc9bc3ffd not found
+tokens used
+204,144
+DONE: cursor/sharing-harness 7ed7590d63a189fbac677f5c277827171e135eed

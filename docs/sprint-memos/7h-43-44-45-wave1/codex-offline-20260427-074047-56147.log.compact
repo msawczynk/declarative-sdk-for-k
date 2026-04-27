@@ -1,0 +1,230 @@
+Reading additional input from stdin...
+OpenAI Codex v0.125.0-alpha.3 (research preview)
+--------
+workdir: /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, /Users/martin/.codex/memories] (network access enabled)
+reasoning effort: none
+reasoning summaries: none
+session id: 019dcdab-4a7c-7133-9ccc-18651e7ac7cd
+--------
+user
+# 7h-43 R1 — subagent telemetry codex-aware patch (readonly memo)
+
+You are a codex CLI **readonly** worker producing a decision memo. NO file modifications.
+
+Goal: design patch for `~/.cursor-daybook-sync/scripts/agent_review_loop.py` so `subagent_transcripts` metric counts codex bg workers (currently counts ONLY Cursor Task tool subagents → metric blind to codex usage).
+
+# Required reading
+1. `~/.cursor-daybook-sync/scripts/agent_review_loop.py` full read.
+2. `~/.cursor-daybook-sync/scripts/codex_offline_bg.sh` — note marker file format `/tmp/codex-offline-<TS>-<PID>.marker`.
+3. `~/.cursor-daybook-sync/scripts/codex_live.sh` if present.
+4. LESSON `[orchestration][archive-codex-artifacts]` 7h-39 — markers are the ground truth for codex runs.
+5. LESSON `[orchestration][parallel-codex-fanout]` 7h-36.
+
+# Deliverable: ~80-line memo
+
+## Section 1: Current `subagent_transcripts` source
+- Cite the function/regex in `agent_review_loop.py` that counts subagents.
+
+# reuse same importlib load pattern as test_pending_count.py:7-13
+
+def write_marker(root: Path, name: str, text: str, mtime: float) -> None:
+    p = root / name
+    p.write_text(text, encoding="utf-8")
+    os.utime(p, (mtime, mtime))
+
+with tempfile.TemporaryDirectory() as td:
+    root = Path(td)
+    boot = 1000.0
+
+    write_marker(root, "codex-offline-old.marker", "STATE=DONE\nEXIT_CODE=0\n", 900.0)
+    write_marker(root, "codex-offline-new1.marker", "STATE=LAUNCHED\nTS=20260427-010101\n", 1001.0)
+    write_marker(root, "codex-offline-new2.marker", "STATE=DONE\nEXIT_CODE=0\n", 1002.0)
+    write_marker(root, "codex-live-new.marker", "STATE=DONE\nEXIT_CODE=0\n", 1003.0)
+
+    counts = mod._codex_worker_counts(boot_time=boot, marker_dir=root)
+    assert counts["codex_workers_session"] == 3
+    assert counts["codex_workers_done"] == 2
+    assert counts["codex_workers_launched"] == 1
+```
+
+Add a malformed marker case: `STATE` missing should still count as session worker but not done/launched.
+
+Add a pre-boot marker case: mtime below boot must not count.
+
+Add a live-marker case even though `codex_live.sh` does not emit markers today; it validates future-compatible glob behavior (`codex_live.sh:31-34`, `codex_live.sh:112-115`).
+
+**Section 5: LESSON Candidate**
+
+`2026-04-27 [daybook][telemetry-codex-aware] Review-loop orchestration metrics must count Codex worker marker files separately from Cursor Task transcripts; otherwise codex-heavy sessions look undelegated and trigger false “0 subagents” recommendations.`
+
+MEMO: subagent-telemetry-codex-aware READY
+2026-04-27T06:42:35.009838Z ERROR codex_core::session: failed to record rollout items: thread 019dcdab-4a7c-7133-9ccc-18651e7ac7cd not found
+tokens used
+47,267
+**Section 1: Current `subagent_transcripts` Source**
+
+`subagent_transcripts` is currently sourced only by `_subagent_count(transcript)` in `/Users/martin/.cursor-daybook-sync/scripts/agent_review_loop.py:79-84`.
+
+That function computes `sub_dir = transcript.parent / "subagents"` and counts `*.jsonl` under that directory only; no `/tmp/codex-*` paths are inspected there (`agent_review_loop.py:81-84`).
+
+The top-level transcript discovery also walks only Cursor project transcripts under `PROJECTS_DIR = ~/.cursor/projects` (`agent_review_loop.py:45`) and `agent-transcripts` directories (`agent_review_loop.py:55-76`).
+
+`audit_orchestration()` calls `_subagent_count(transcript)` and writes the result as `"subagent_transcripts"` (`agent_review_loop.py:246-267`).
+
+There is no regex for this count. The nearby regex is only `DELEGATION_KEYWORDS`, used to count mention density, not worker artifacts (`agent_review_loop.py:137-141`, `agent_review_loop.py:253-257`).
+
+The markdown digest renders only `"subagent_transcripts"`, `"delegation_keyword_mentions"`, and `"delegation_ratio"` for orchestration (`agent_review_loop.py:409-412`).
+
+The JSON output includes the whole `orch` dict under `"orchestration"` (`agent_review_loop.py:442-446`).
+
+Current recommendation logic treats `subagent_transcripts == 0` as no delegation even though the warning text says “Task subagent or codex run” (`agent_review_loop.py:350-353`). That is the blind spot.
+
+**Section 2: Codex Marker Discovery**
+
+`codex_offline_bg.sh` documents machine-readable launch output including `MARKER=/tmp/codex-offline-<ts>-<pid>.marker` (`/Users/martin/.cursor-daybook-sync/scripts/codex_offline_bg.sh:14-18`).
+
+It documents marker states as `STATE=LAUNCHED` initially and `STATE=DONE EXIT_CODE=<n>` at completion (`codex_offline_bg.sh:20-23`).
+
+Implementation path is exact: `MARKER="/tmp/codex-offline-${TS}-${LAUNCHER_PID}.marker"` (`codex_offline_bg.sh:75-77`).
+
+Initial marker content includes `STATE=LAUNCHED`, `TS=...`, `CWD=...`, and `PROMPT=...` (`codex_offline_bg.sh:79-83`).
+
+Completion overwrites the marker with `STATE=DONE`, `EXIT_CODE=$rc`, and `FINISHED=<iso>` (`codex_offline_bg.sh:108-110`). Important: `TS/CWD/PROMPT` are absent after DONE because of `>` overwrite.
+
+`codex_live.sh` is present, but currently creates only `LOG="/tmp/codex-live-${TS}.log"` (`/Users/martin/.cursor-daybook-sync/scripts/codex_live.sh:31-34`) and prints/tails that log (`codex_live.sh:112-115`). It does not currently create `/tmp/codex-live-*.marker`.
+
+Recommended discovery patterns:
+`/tmp/codex-offline-*.marker`
+`/tmp/codex-live-*.marker`
+
+The live pattern is harmless now and future-compatible if a live marker wrapper lands.
+
+Session window should use latest session boot time. `agent_session_boot.sh` emits an ISO boot timestamp in the first line (`/Users/martin/.cursor-daybook-sync/scripts/agent_session_boot.sh:30`).
+
+`agent_review_loop.py` already locates latest `session-boot-*.log` under `HOOK_LOG_DIR` and uses its mtime for boot freshness (`agent_review_loop.py:272-275`).
+
+Use `marker.stat().st_mtime >= boot_time` as the primary filter because completed offline markers lose `TS` on overwrite (`codex_offline_bg.sh:108-110`).
+
+LESSON support: markers/logs are the ground truth to preserve codex run evidence; 7h-39 says `/tmp/codex-*.log` artifacts are ephemeral and must be archived eagerly (`/Users/martin/.cursor-daybook-sync/LESSONS.md:433`). 7h-36 established parallel codex offline-bg fanout as high-ROI and notes worker evidence in markers/logs (`LESSONS.md:414`).
+
+**Section 3: Patch Sketch**
+
+Recommendation: keep `subagent_transcripts` as Cursor Task transcript count, add separate `codex_workers_session`, and update the no-delegation rule to use `subagent_transcripts + codex_workers_session`.
+
+```python
+CODEX_MARKER_PATTERNS = ("codex-offline-*.marker", "codex-live-*.marker")
+BOOT_HEADER_RE = re.compile(r"AGENT SESSION BOOT \(([^)]+)\)")
+
+def _latest_session_boot_time() -> float | None:
+    logs = sorted(HOOK_LOG_DIR.glob("session-boot-*.log")) if HOOK_LOG_DIR.exists() else []
+    if not logs:
+        return None
+    boot = logs[-1]
+    try:
+        first = boot.read_text(encoding="utf-8", errors="replace").splitlines()[0]
+        m = BOOT_HEADER_RE.search(first)
+        if m:
+            return datetime.fromisoformat(m.group(1).replace("Z", "+00:00")).timestamp()
+    except (OSError, IndexError, ValueError):
+        pass
+    try:
+        return boot.stat().st_mtime
+    except OSError:
+        return None
+
+def _read_marker_state(marker: Path) -> str:
+    try:
+        data = {}
+        for line in marker.read_text(encoding="utf-8", errors="replace").splitlines():
+            key, sep, value = line.partition("=")
+            if sep:
+                data[key] = value
+        return data.get("STATE", "UNKNOWN")
+    except OSError:
+        return "UNKNOWN"
+
+def _codex_worker_counts(
+    boot_time: float | None = None,
+    marker_dir: Path = Path("/tmp"),
+) -> dict:
+    boot_time = _latest_session_boot_time() if boot_time is None else boot_time
+    counts = {"codex_workers_session": 0, "codex_workers_done": 0, "codex_workers_launched": 0}
+    if boot_time is None:
+        return counts
+    for pattern in CODEX_MARKER_PATTERNS:
+        for marker in marker_dir.glob(pattern):
+            try:
+                if marker.stat().st_mtime < boot_time:
+                    continue
+            except OSError:
+                continue
+            state = _read_marker_state(marker)
+            counts["codex_workers_session"] += 1
+            if state == "DONE":
+                counts["codex_workers_done"] += 1
+            elif state in {"LAUNCHED", "RUNNING"}:
+                counts["codex_workers_launched"] += 1
+    return counts
+```
+
+Wire-in points:
+Add `codex_counts = _codex_worker_counts()` inside `audit_orchestration()` near `sub_count = _subagent_count(transcript)` (`agent_review_loop.py:259`).
+
+Add `**codex_counts` or explicit keys to `out.update(...)` (`agent_review_loop.py:261-266`).
+
+Extend markdown orchestration key list to include `codex_workers_session`, `codex_workers_done`, and `codex_workers_launched` (`agent_review_loop.py:409-412`).
+
+JSON needs no extra top-level change because `orchestration: orch` is already emitted (`agent_review_loop.py:442-446`).
+
+Change recommendation gate from `if sub == 0 and ac > 30000:` to `if sub + orch.get("codex_workers_session", 0) == 0 and ac > 30000:` (`agent_review_loop.py:350-353`).
+
+**Section 4: Test Cases**
+
+Current `test_pending_count.py` is a direct assert script that imports `agent_review_loop.py` by path (`/Users/martin/.cursor-daybook-sync/scripts/test_pending_count.py:7-13`) and uses simple raw asserts (`test_pending_count.py:20-59`).
+
+Either extend that file or create `test_codex_worker_count.py`; I recommend a new file because pending-count tests and codex-marker tests are unrelated.
+
+Test sketch:
+
+```python
+import os
+import tempfile
+from pathlib import Path
+
+# reuse same importlib load pattern as test_pending_count.py:7-13
+
+def write_marker(root: Path, name: str, text: str, mtime: float) -> None:
+    p = root / name
+    p.write_text(text, encoding="utf-8")
+    os.utime(p, (mtime, mtime))
+
+with tempfile.TemporaryDirectory() as td:
+    root = Path(td)
+    boot = 1000.0
+
+    write_marker(root, "codex-offline-old.marker", "STATE=DONE\nEXIT_CODE=0\n", 900.0)
+    write_marker(root, "codex-offline-new1.marker", "STATE=LAUNCHED\nTS=20260427-010101\n", 1001.0)
+    write_marker(root, "codex-offline-new2.marker", "STATE=DONE\nEXIT_CODE=0\n", 1002.0)
+    write_marker(root, "codex-live-new.marker", "STATE=DONE\nEXIT_CODE=0\n", 1003.0)
+
+    counts = mod._codex_worker_counts(boot_time=boot, marker_dir=root)
+    assert counts["codex_workers_session"] == 3
+    assert counts["codex_workers_done"] == 2
+    assert counts["codex_workers_launched"] == 1
+```
+
+Add a malformed marker case: `STATE` missing should still count as session worker but not done/launched.
+
+Add a pre-boot marker case: mtime below boot must not count.
+
+Add a live-marker case even though `codex_live.sh` does not emit markers today; it validates future-compatible glob behavior (`codex_live.sh:31-34`, `codex_live.sh:112-115`).
+
+**Section 5: LESSON Candidate**
+
+`2026-04-27 [daybook][telemetry-codex-aware] Review-loop orchestration metrics must count Codex worker marker files separately from Cursor Task transcripts; otherwise codex-heavy sessions look undelegated and trigger false “0 subagents” recommendations.`
+
+MEMO: subagent-telemetry-codex-aware READY

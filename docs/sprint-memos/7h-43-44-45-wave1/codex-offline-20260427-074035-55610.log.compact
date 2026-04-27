@@ -1,0 +1,230 @@
+Reading additional input from stdin...
+OpenAI Codex v0.125.0-alpha.3 (research preview)
+--------
+workdir: /Users/martin/Downloads/Cursor tests/worktrees/cursor-examples-expand
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k/.git/worktrees/cursor-examples-expand, /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k/.git, /Users/martin/.codex/memories] (network access enabled)
+reasoning effort: none
+reasoning summaries: none
+session id: 019dcdab-308d-78d3-b1bd-1eac245a38ed
+--------
+user
+# 7h-44 W4 — examples expansion + CI examples-validate
+
+Worktree: `/Users/martin/Downloads/Cursor tests/worktrees/cursor-examples-expand`, branch `cursor/examples-expand`, base 8044bb8.
+
+Goal: expand `examples/` from current 5 yaml to 10-12, add CI job that validates each example via `dsk validate`.
+
+# Required reading
+- `examples/` current contents (4 PAM scenario yaml + sharing.example.yaml + scaffold_only/).
+- `examples/SCAFFOLD.md`.
+- `keeper_sdk/cli/main.py` `validate` command (exit codes, family branches).
+- `.github/workflows/ci.yml` (current jobs structure).
+- `keeper_sdk/core/schemas/keeper-vault/keeper-vault.v1.schema.json` (vault example shape).
+
+# Hard requirements
+1. Add 5-7 new yaml examples under `examples/`:
+   - `examples/pam-machine-multi.yaml` — 3-record pamMachine with mixed ports + RBI
+   - `examples/pam-database-cluster.yaml` — 2 db records sharing PAM config
++  - uid_ref: att.runbook.txt
++    record_uid_ref: rec.runbook.login
++    source_path: ./attachments/recovery-steps.txt
++    name: recovery-steps.txt
++    title: "Recovery Steps"
++    mime_type: text/plain
++    content_sha256: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789
+diff --git a/examples/vault-record-types.yaml b/examples/vault-record-types.yaml
+new file mode 100644
+index 0000000000000000000000000000000000000000..36a14f5d8e75ed86d4bb6f20a8af5ca6b594cee9
+--- /dev/null
++++ b/examples/vault-record-types.yaml
+@@ -0,0 +1,40 @@
++schema: keeper-vault.v1
++
++# Custom record-type definitions. These are schema-validated offline; provider
++# lifecycle coverage for record_types[] is intentionally separate from login L1.
++#
++# Run:
++#   dsk validate examples/vault-record-types.yaml
++
++record_types:
++  - uid_ref: rt.service-account
++    scope: enterprise
++    record_type_id: 3001001
++    content:
++      $id: serviceAccount
++      categories: ["login"]
++      description: "Service account credential"
++      fields:
++        - $ref: login
++          label: Username
++          required: true
++        - $ref: password
++          label: Password
++          required: true
++        - $ref: host
++          label: Endpoint
++
++  - uid_ref: rt.break-glass-admin
++    scope: enterprise
++    record_type_id: 3001002
++    content:
++      $id: breakGlassAdmin
++      categories: ["login", "admin"]
++      description: "Emergency access credential"
++      fields:
++        - $ref: login
++          required: true
++        - $ref: password
++          required: true
++        - $ref: securityQuestion
++          label: Recovery Question
+diff --git a/examples/vault-records.yaml b/examples/vault-records.yaml
+new file mode 100644
+index 0000000000000000000000000000000000000000..6409f329e043a286bc394ef2229850741045cfbb
+--- /dev/null
++++ b/examples/vault-records.yaml
+@@ -0,0 +1,99 @@
++schema: keeper-vault.v1
++
++# Five validate-clean vault records. The current CLI validator typed-loads
++# keeper-vault.v1 through the L1 login lifecycle, so these stay type: login
++# while demonstrating field payloads commonly needed for login, credit-card,
++# database-credential, server-credential, and custom record examples.
++#
++# Run:
++#   dsk validate examples/vault-records.yaml
++#   dsk plan     examples/vault-records.yaml --provider mock --json
++
++records:
++  - uid_ref: rec.login.web-admin
++    type: login
++    title: "Example Web Admin"
++    fields:
++      - type: login
++        label: Login
++        value: ["web-admin@example.invalid"]
++      - type: password
++        label: Password
++        value: ["example-password"]
++      - type: url
++        label: URL
++        value: ["https://admin.example.invalid"]
++
++  - uid_ref: rec.credit-card.ops
++    type: login
++    title: "Example Credit Card"
++    fields:
++      - type: paymentCard
++        label: Payment Card
++        value:
++          - cardNumber: "test-card-number"
++            cardExpirationDate: "01/2030"
++            cardSecurityCode: "000"
++    custom:
++      - type: text
++        label: Cost Center
++        value: ["operations"]
++
++  - uid_ref: rec.database.credentials
++    type: login
++    title: "Example Database Credentials"
++    fields:
++      - type: login
++        label: Username
++        value: ["orders_app"]
++      - type: password
++        label: Password
++        value: ["example-db-password"]
++      - type: host
++        label: Host
++        value:
++          - hostName: db.example.invalid
++            port: 5432
++    custom:
++      - type: text
++        label: Database
++        value: ["orders"]
++
++  - uid_ref: rec.server.credentials
++    type: login
++    title: "Example Server Credentials"
++    fields:
++      - type: login
++        label: Username
++        value: ["svc-deploy"]
++      - type: host
++        label: Host
++        value:
++          - hostName: app.example.invalid
++            port: "22"
++      - type: keyPair
++        label: SSH Key
++        value:
++          - publicKey: "ssh-ed25519 example-public-key"
++            privateKey: "example-private-key"
++
++  - uid_ref: rec.custom.asset
++    type: login
++    title: "Example Custom Asset"
++    notes: "Custom metadata-only example with typed custom fields."
++    fields:
++      - type: text
++        label: Asset Tag
++        value: ["asset-12345"]
++    custom:
++      - type: name
++        label: Owner
++        value:
++          - first: Example
++            last: Owner
++      - type: phone
++        label: Support Phone
++        value:
++          - region: US
++            number: "5550100"
++            type: Work
+diff --git a/tests/test_examples_validate.py b/tests/test_examples_validate.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..7c4d124a9ddb454bd1132476315dea9602b01cca
+--- /dev/null
++++ b/tests/test_examples_validate.py
+@@ -0,0 +1,31 @@
++"""Validation coverage for root ``examples/*.yaml`` manifests."""
++
++from __future__ import annotations
++
++from pathlib import Path
++
++import pytest
++
++from keeper_sdk.core.manifest import read_manifest_document
++from keeper_sdk.core.schema import validate_manifest
++
++REPO_ROOT = Path(__file__).resolve().parents[1]
++EXAMPLES_DIR = REPO_ROOT / "examples"
++EXAMPLE_MANIFESTS: tuple[Path, ...] = tuple(sorted(EXAMPLES_DIR.glob("*.yaml")))
++
++
++def _example_id(manifest_path: Path) -> str:
++    return manifest_path.name
++
++
++def test_root_examples_exist() -> None:
++    assert len(EXAMPLE_MANIFESTS) >= 10
++
++
++@pytest.mark.parametrize("manifest_path", EXAMPLE_MANIFESTS, ids=_example_id)
++def test_root_example_validate_manifest_succeeds(manifest_path: Path) -> None:
++    document = read_manifest_document(manifest_path)
++
++    family = validate_manifest(document)
++
++    assert family
+
+2026-04-27T06:48:05.583914Z ERROR codex_core::session: failed to record rollout items: thread 019dcdab-308d-78d3-b1bd-1eac245a38ed not found
+tokens used
+130,123
+DONE: cursor/examples-expand a5151a5
