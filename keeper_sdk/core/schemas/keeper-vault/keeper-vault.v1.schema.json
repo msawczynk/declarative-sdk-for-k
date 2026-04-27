@@ -252,6 +252,10 @@
           "minimum": 1
         },
         "content": { "$ref": "#/$defs/record_type_content" }
+      },
+      "x-keeper-live-proof": {
+        "status": "preview-gated",
+        "notes": "Diff plans record_type changes (W3-AB plumbed live_record_type_defs through plan path); Commander apply path is not yet wired. Plan / dry-run / validate --online surface drift; apply currently no-ops record_type rows. See audit notes/dsk-improvement-audit-2026-04-27.md F1."
       }
     },
     "record_type_content": {
@@ -340,6 +344,10 @@
           "uniqueItems": true,
           "default": []
         }
+      },
+      "x-keeper-live-proof": {
+        "status": "scaffold-only",
+        "notes": "Diff plans keeper_fill changes but apply has no Commander writer in pinned upstream (17.2.x). _vault_apply_keeper_fill_create/update raise CapabilityError; manifest must omit keeper_fill until upstream lands a typed writer. See audit notes/dsk-improvement-audit-2026-04-27.md F2 + W3-AB sprint."
       }
     },
     "keeper_fill_setting": {

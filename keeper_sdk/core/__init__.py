@@ -31,6 +31,7 @@ from keeper_sdk.core.errors import (
     OwnershipError,
     RefError,
     SchemaError,
+    UnsupportedFamilyError,
 )
 from keeper_sdk.core.graph import build_graph, execution_order
 from keeper_sdk.core.interfaces import MetadataStore, Provider, Renderer
@@ -101,6 +102,7 @@ __all__ = [
     "OwnershipError",
     "RefError",
     "SchemaError",
+    "UnsupportedFamilyError",
     "Manifest",
     "Gateway",
     "PamConfiguration",

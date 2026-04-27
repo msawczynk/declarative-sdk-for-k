@@ -44,6 +44,7 @@ from keeper_sdk.core import (
     OwnershipError,
     RefError,
     SchemaError,
+    UnsupportedFamilyError,
     build_graph,
     build_plan,
     build_vault_graph,
@@ -91,6 +92,7 @@ class PlanLoadBundle:
     manifest_name: str
     order: list[str]
     live: list[LiveRecord]
+    live_record_type_defs: list[dict[str, Any]]
     provider: Any
 
 
@@ -143,6 +145,9 @@ def validate(
         click.echo(f"reference error: {exc}", err=True)
         sys.exit(EXIT_REF)
     except CapabilityError as exc:
+        click.echo(f"capability error: {exc}", err=True)
+        sys.exit(EXIT_CAPABILITY)
+    except UnsupportedFamilyError as exc:
         click.echo(f"capability error: {exc}", err=True)
         sys.exit(EXIT_CAPABILITY)
     except ManifestError as exc:
@@ -207,8 +212,13 @@ def validate(
 
                 try:
                     assert live is not None
+                    live_records, live_record_type_defs = _vault_live_inputs(live)
                     changes = compute_vault_diff(
-                        vm, live, manifest_name=manifest_path.stem, adopt=False
+                        vm,
+                        live_records,
+                        manifest_name=manifest_path.stem,
+                        adopt=False,
+                        live_record_type_defs=live_record_type_defs,
                     )
                 except OwnershipError as exc:
                     click.echo(f"ownership error: {exc}", err=True)
@@ -651,12 +661,15 @@ def import_(
     except SchemaError as exc:
         click.echo(f"validation failed: {exc}", err=True)
         sys.exit(EXIT_SCHEMA)
+    except UnsupportedFamilyError as exc:
+        click.echo(f"capability error: {exc}", err=True)
+        sys.exit(EXIT_CAPABILITY)
     except ManifestError as exc:
         click.echo(f"manifest error: {exc}", err=True)
         sys.exit(EXIT_GENERIC)
     if fam != PAM_FAMILY:
-        click.echo("`dsk import` applies to pam-environment.v1 only.", err=True)
-        sys.exit(EXIT_GENERIC)
+        click.echo("capability error: dsk import applies to pam-environment.v1 only.", err=True)
+        sys.exit(EXIT_CAPABILITY)
 
     bundle = _load_plan_context(ctx, manifest_path)
     manifest = bundle.pam
@@ -774,6 +787,7 @@ def _build_plan(ctx: click.Context, manifest_path: Path, *, allow_delete: bool) 
                 bundle.live,
                 manifest_name=bundle.manifest_name,
                 allow_delete=allow_delete,
+                live_record_type_defs=bundle.live_record_type_defs,
             )
             capability_subject = bundle.vault
         else:
@@ -831,6 +845,9 @@ def _load_plan_context(ctx: click.Context, manifest_path: Path) -> PlanLoadBundl
     except CapabilityError as exc:
         click.echo(f"capability error: {exc}", err=True)
         sys.exit(EXIT_CAPABILITY)
+    except UnsupportedFamilyError as exc:
+        click.echo(f"capability error: {exc}", err=True)
+        sys.exit(EXIT_CAPABILITY)
     except ManifestError as exc:
         click.echo(f"manifest error: {exc}", err=True)
         sys.exit(EXIT_GENERIC)
@@ -855,12 +872,15 @@ def _load_plan_context(ctx: click.Context, manifest_path: Path) -> PlanLoadBundl
         sys.exit(EXIT_REF)
 
     provider = _make_provider(ctx, manifest_path, pam=pam, vault=vault, sharing=sharing)
+    live_record_type_defs: list[dict[str, Any]] = []
     if sharing is None:
         try:
             live = provider.discover()
         except CapabilityError as exc:
             click.echo(f"discovery failed: {exc}", err=True)
             sys.exit(EXIT_CAPABILITY)
+        if vault is not None:
+            live, live_record_type_defs = _vault_live_inputs(live)
     else:
         live = []
 
@@ -871,8 +891,28 @@ def _load_plan_context(ctx: click.Context, manifest_path: Path) -> PlanLoadBundl
         manifest_name=manifest_name,
         order=order,
         live=live,
+        live_record_type_defs=live_record_type_defs,
         provider=provider,
     )
+
+
+def _vault_live_inputs(live: list[LiveRecord]) -> tuple[list[LiveRecord], list[dict[str, Any]]]:
+    records: list[LiveRecord] = []
+    record_type_defs: list[dict[str, Any]] = []
+    for record in live:
+        if record.resource_type == "record_type":
+            record_type_defs.append(
+                {
+                    "keeper_uid": record.keeper_uid,
+                    "title": record.title,
+                    "resource_type": record.resource_type,
+                    "payload": dict(record.payload),
+                    "marker": dict(record.marker) if record.marker else None,
+                }
+            )
+            continue
+        records.append(record)
+    return records, record_type_defs
 
 
 def _sharing_apply_order(manifest: SharingManifestV1) -> list[str]:

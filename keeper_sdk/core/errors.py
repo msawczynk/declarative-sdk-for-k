@@ -54,6 +54,10 @@ class CapabilityError(ManifestError):
     """Missing role enforcement, license, KSM app, or environment support."""
 
 
+class UnsupportedFamilyError(ManifestError):
+    """Schema-valid manifest family has no typed planner/apply surface yet."""
+
+
 class DeleteUnsupportedError(CapabilityError):
     """Backward-compatible alias for delete capability failures.
 

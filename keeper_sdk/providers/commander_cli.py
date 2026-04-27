@@ -56,6 +56,11 @@ from keeper_sdk.core.metadata import (
 )
 from keeper_sdk.core.normalize import to_pam_import_json
 from keeper_sdk.core.planner import Plan
+from keeper_sdk.core.vault_diff import (
+    _KEEPER_FILL_RESOURCE_TYPE,
+    _KEEPER_FILL_SETTING_RESOURCE_TYPE,
+    _KEEPER_FILL_UID_REF,
+)
 from keeper_sdk.providers._commander_cli_helpers import (
     _entry_uid_by_name,
     _field_drift,
@@ -68,6 +73,21 @@ from keeper_sdk.providers._commander_cli_helpers import (
     _record_from_get,
     _uses_reference_existing,
 )
+
+
+def _is_keeper_fill_change(change: Change) -> bool:
+    """Detect whether a vault diff Change targets the keeper_fill block.
+
+    Used by ``_apply_vault_plan`` to route create/update through dedicated
+    keeper_fill helpers rather than silently using ``_vault_add_login_record``
+    (which would drop the keeper_fill payload). See W3-AB schema-honesty slice.
+    """
+    rt = change.resource_type
+    if rt in (_KEEPER_FILL_RESOURCE_TYPE, _KEEPER_FILL_SETTING_RESOURCE_TYPE):
+        return True
+    uid = change.uid_ref or ""
+    return uid == _KEEPER_FILL_UID_REF or uid.startswith(_KEEPER_FILL_UID_REF + ":")
+
 
 _SILENT_FAIL_COMMANDS = {
     ("pam", "project", "import"),
@@ -861,6 +881,17 @@ class CommanderCliProvider(Provider):
                         )
                     )
                     continue
+                if _is_keeper_fill_change(change):
+                    keeper_uid = self._vault_apply_keeper_fill_create(change.after or {})
+                    outcomes.append(
+                        ApplyOutcome(
+                            uid_ref=change.uid_ref or "",
+                            keeper_uid=keeper_uid,
+                            action="create",
+                            details={"marker_written": False},
+                        )
+                    )
+                    continue
                 keeper_uid = self._vault_add_login_record(change.after or {})
                 marker = encode_marker(
                     uid_ref=change.uid_ref or change.title,
@@ -900,6 +931,17 @@ class CommanderCliProvider(Provider):
                     )
                     continue
                 patch = dict(change.after or {})
+                if _is_keeper_fill_change(change):
+                    self._vault_apply_keeper_fill_update(keeper_uid, patch)
+                    outcomes.append(
+                        ApplyOutcome(
+                            uid_ref=change.uid_ref or "",
+                            keeper_uid=keeper_uid,
+                            action="update",
+                            details={"marker_written": False, "record_updated": bool(patch)},
+                        )
+                    )
+                    continue
                 if patch:
                     self._vault_apply_login_body_update(keeper_uid, patch)
                 marker = encode_marker(
@@ -1553,6 +1595,45 @@ class CommanderCliProvider(Provider):
             else:
                 out[key] = copy.deepcopy(val)
         return out
+
+    def _vault_apply_keeper_fill_create(self, after: dict[str, Any]) -> str:
+        """Reject keeper_fill create: no Commander verb writes the keeper_fill record-type yet.
+
+        Keeper Commander 17.2.x exposes ``record-add`` only for typed records; the
+        ``keeper_fill`` block has no analogous create verb. The W3-AB schema-honesty
+        slice routes the change here rather than silently dropping it through the
+        login-record path. See audit `notes/dsk-improvement-audit-2026-04-27.md` F2;
+        schema marker for ``keeper_fill`` flipped to ``scaffold-only`` in the same
+        slice. Raise rather than fake support.
+        """
+        del after  # not used; retained so the signature matches the call site
+        raise CapabilityError(
+            reason=(
+                "keeper_fill create has no Commander writer in the pinned upstream "
+                "(17.2.x); manifest declares a keeper_fill block but apply cannot "
+                "land it without a tenant-side verb."
+            ),
+            next_action=(
+                "remove the keeper_fill block from the manifest, or wait for the "
+                "Commander team to publish a typed keeper_fill writer; track via "
+                "schema status `scaffold-only`."
+            ),
+        )
+
+    def _vault_apply_keeper_fill_update(self, keeper_uid: str, patch: dict[str, Any]) -> None:
+        """Reject keeper_fill update for the same reason as create (see above)."""
+        del keeper_uid, patch
+        raise CapabilityError(
+            reason=(
+                "keeper_fill update has no Commander writer in the pinned upstream "
+                "(17.2.x); apply cannot land manifest drift onto the live keeper_fill "
+                "record-type."
+            ),
+            next_action=(
+                "remove the keeper_fill block from the manifest, or wait for upstream "
+                "support; schema status is `scaffold-only`."
+            ),
+        )
 
     def _vault_apply_login_body_update(self, keeper_uid: str, patch: dict[str, Any]) -> None:
         """Push manifest field drift onto an existing v3 ``login`` via RecordEditCommand."""

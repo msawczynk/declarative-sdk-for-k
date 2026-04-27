@@ -16,7 +16,7 @@ import json
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from keeper_sdk.core.errors import ManifestError, SchemaError
+from keeper_sdk.core.errors import ManifestError, SchemaError, UnsupportedFamilyError
 from keeper_sdk.core.models import Manifest
 from keeper_sdk.core.normalize import canonicalize
 from keeper_sdk.core.preview import assert_preview_keys_allowed
@@ -137,7 +137,7 @@ def load_declarative_manifest_string(
         return load_vault_manifest(document)
     if family == SHARING_FAMILY:
         return load_sharing_manifest(document)
-    raise ManifestError(
+    raise UnsupportedFamilyError(
         reason=(
             f"typed plan/load supports {PAM_FAMILY}, {VAULT_FAMILY}, "
             f"and {SHARING_FAMILY} only "

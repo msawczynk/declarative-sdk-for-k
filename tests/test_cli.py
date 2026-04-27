@@ -138,7 +138,8 @@ def test_import_rejects_vault(tmp_path: Path) -> None:
     p = tmp_path / "vault.yaml"
     p.write_text("schema: keeper-vault.v1\nrecords: []\n", encoding="utf-8")
     result = _run(["import", str(p)])
-    assert result.exit_code == EXIT_GENERIC
+    assert result.exit_code == EXIT_CAPABILITY
+    assert "capability error" in result.output
     assert "pam-environment" in result.output
 
 
