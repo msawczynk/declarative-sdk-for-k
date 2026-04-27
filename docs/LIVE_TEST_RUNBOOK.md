@@ -13,6 +13,10 @@ is wired in. Live tests are the only telling tests — unit tests prove
 shape, live tests prove the *behavior* against a real Commander +
 Keeper Vault.
 
+**See also:** [`scripts/daybook/README.md`](../scripts/daybook/README.md) — forwarder
+to session boot / append / sync for **continuity** only; it does **not** replace
+this runbook or [`scripts/smoke/README.md`](../scripts/smoke/README.md).
+
 ## Pre-flight (run before every live session)
 
 1. Confirm tenant (`msawczyn+lab@acme-demo.com` for the lab).

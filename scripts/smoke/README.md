@@ -6,6 +6,7 @@ The `pamRemoteBrowser` and `pamUserNestedRotation` scenarios are proof harnesses
 
 ## Prerequisites
 
+- **Telling proof for the SDK** is this smoke (and `tests/live/` with `KEEPER_LIVE_TENANT=1`). Agent **daybook** / JOURNAL hooks: [`../daybook/README.md`](../daybook/README.md) — separate; do not treat as a substitute for live tenant runs.
 - Keeper Commander >= 17.2.13 on PATH (`keeper --version`)
 - `pip` packages installed: `keepercommander`, `pyotp`, `keeper_secrets_manager_core`, `pyyaml`
 - External profile JSON at `~/.config/dsk/profiles/default.json` or the path named by `DSK_SMOKE_PROFILE`
