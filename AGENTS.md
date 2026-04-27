@@ -57,6 +57,8 @@ agents.
 | `dsk report compliance-report` | Commander session | redacted JSON envelope | `--sanitize-uids`, `--quiet`, `--node`, `--rebuild`; leak check → exit **1** |
 | `dsk report security-audit-report` | Commander session | redacted JSON envelope | `--record-details`, `--sanitize-uids`, `--quiet`, `--node`; leak check → exit **1** |
 
+**msp-environment.v1 (commander):** `dsk validate --online` runs MSP discover (needs MSP admin session). Commander `import` / `apply` stay unsupported; see `docs/COMMANDER.md` (MSP section).
+
 Aliases `pamform` and `keeper-sdk` resolve to the same entrypoint for
 backward compatibility with pre-1.0 callers; they will be removed in 2.0.
 
