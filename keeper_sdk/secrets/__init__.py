@@ -59,7 +59,8 @@ Hardening
 
 from __future__ import annotations
 
-from keeper_sdk.secrets.bootstrap import BootstrapResult, bootstrap_ksm_application
+from typing import TYPE_CHECKING, Any
+
 from keeper_sdk.secrets.ksm import (
     DEFAULT_CONFIG_PROBES,
     KSM_CONFIG_ENV,
@@ -68,6 +69,9 @@ from keeper_sdk.secrets.ksm import (
     KsmSecretStore,
     load_keeper_login_from_ksm,
 )
+
+if TYPE_CHECKING:
+    from keeper_sdk.secrets.bootstrap import BootstrapResult, bootstrap_ksm_application
 
 __all__ = [
     "BootstrapResult",
@@ -79,3 +83,22 @@ __all__ = [
     "bootstrap_ksm_application",
     "load_keeper_login_from_ksm",
 ]
+
+
+def __getattr__(name: str) -> Any:
+    """Lazy-load `bootstrap` symbols on first attribute access.
+
+    `bootstrap` pulls in `keepercommander.api` at module top, whose `rest_api`
+    sub-module triggers a `cryptography 47.x × keepercommander 17.2.x × py3.14`
+    EC-key load bug under `pytest-cov` narrow `--source=<submodule>` invocations
+    (see LESSONS `[audit][coverage-invocation-drift]`). Deferring the import
+    until first access lets `from keeper_sdk.secrets import KsmSecretStore`
+    succeed under coverage without exercising the broken chain.
+    """
+    if name in ("BootstrapResult", "bootstrap_ksm_application"):
+        from keeper_sdk.secrets import bootstrap as _bootstrap
+
+        value = getattr(_bootstrap, name)
+        globals()[name] = value
+        return value
+    raise AttributeError(f"module 'keeper_sdk.secrets' has no attribute {name!r}")
