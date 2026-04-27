@@ -16,6 +16,9 @@ Commands used:
     ``login`` creates; ``RecordEditCommand`` merges manifest drift into existing
     v3 JSON then :meth:`_write_marker` refreshes ownership metadata; same ``ls`` /
     ``get`` discover path filtered to ``login`` rows.
+    keeper-vault-sharing.v1 (provider helpers): ``mkdir -uf``, ``mkdir -sf``,
+    ``mv --user-folder/--shared-folder``, ``rmdir -f``, ``share-record``,
+    ``share-folder``, and ``get <shared_folder_uid> --format json``.
 
 The provider:
     1. Lists the target folder (if configured) and fetches each record.
@@ -40,7 +43,7 @@ import subprocess
 import tempfile
 from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from keeper_sdk.core.diff import _DIFF_IGNORED_FIELDS, Change, ChangeKind
 from keeper_sdk.core.errors import CapabilityError, CollisionError
@@ -119,6 +122,16 @@ def _keepercommander_installed_tuple() -> tuple[int, ...]:
             break
         parts.append(int(digits))
     return tuple(parts)
+
+
+def _commander_on_off(value: bool) -> str:
+    return "on" if value else "off"
+
+
+def _dict_items(value: Any) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [dict(item) for item in value if isinstance(item, dict)]
 
 
 def _ensure_keepercommander_version_for_apply() -> None:
@@ -1295,6 +1308,47 @@ class CommanderCliProvider(Provider):
         except CapabilityError:
             self._run_cmd(["mkdir", "-uf", path])
 
+    def _create_user_folder(
+        self,
+        *,
+        path: str,
+        parent_uid: str | None = None,
+        color: str | None = None,
+    ) -> None:
+        _ = parent_uid
+        args = ["mkdir", "-uf", path]
+        if color is not None:
+            args.extend(["--color", color])
+        self._run_cmd(args)
+
+    def _create_shared_folder(
+        self,
+        *,
+        path: str,
+        manage_records: bool = True,
+        manage_users: bool = True,
+        can_edit: bool = True,
+        can_share: bool = True,
+    ) -> None:
+        args = ["mkdir", "-sf"]
+        if manage_records:
+            args.append("--manage-records")
+        if manage_users:
+            args.append("--manage-users")
+        if can_edit:
+            args.append("--can-edit")
+        if can_share:
+            args.append("--can-share")
+        args.append(path)
+        self._run_cmd(args)
+
+    def _move_folder(self, *, source: str, destination: str, is_shared: bool = False) -> None:
+        folder_flag = "--shared-folder" if is_shared else "--user-folder"
+        self._run_cmd(["mv", folder_flag, source, destination])
+
+    def _delete_folder(self, *, path_or_uid: str) -> None:
+        self._run_cmd(["rmdir", "-f", path_or_uid])
+
     def _ensure_shared_folder_exists(self, path: str) -> None:
         try:
             self._run_cmd(["ls", "--format", "json", path])
@@ -1310,6 +1364,149 @@ class CommanderCliProvider(Provider):
                     path,
                 ]
             )
+
+    def _share_record_to_user(
+        self,
+        *,
+        record_uid: str,
+        user_email: str,
+        can_edit: bool,
+        can_share: bool,
+        expiration_iso: str | None = None,
+    ) -> None:
+        args = ["share-record", "-a", "grant", "-e", user_email]
+        if can_edit:
+            args.append("-w")
+        if can_share:
+            args.append("-s")
+        if expiration_iso is not None:
+            args.extend(["--expire-at", expiration_iso])
+        args.append(record_uid)
+        self._run_cmd(args)
+
+    def _revoke_record_share_from_user(self, *, record_uid: str, user_email: str) -> None:
+        self._run_cmd(["share-record", "-a", "revoke", "-e", user_email, record_uid])
+
+    def _share_folder_to_grantee(
+        self,
+        *,
+        shared_folder_uid: str,
+        grantee_kind: Literal["user", "team", "default"],
+        identifier: str | None = None,
+        manage_records: bool,
+        manage_users: bool,
+    ) -> None:
+        grantee = self._share_folder_grantee_arg(
+            grantee_kind=grantee_kind,
+            identifier=identifier,
+        )
+        self._run_cmd(
+            [
+                "share-folder",
+                shared_folder_uid,
+                "-a",
+                "grant",
+                "-e",
+                grantee,
+                "-p",
+                _commander_on_off(manage_records),
+                "-o",
+                _commander_on_off(manage_users),
+            ]
+        )
+
+    def _revoke_folder_grantee(
+        self,
+        *,
+        shared_folder_uid: str,
+        grantee_kind: Literal["user", "team", "default"],
+        identifier: str | None = None,
+    ) -> None:
+        grantee = self._share_folder_grantee_arg(
+            grantee_kind=grantee_kind,
+            identifier=identifier,
+        )
+        self._run_cmd(["share-folder", shared_folder_uid, "-a", "remove", "-e", grantee])
+
+    def _share_record_to_shared_folder(
+        self,
+        *,
+        shared_folder_uid: str,
+        record_uid: str,
+        can_edit: bool,
+        can_share: bool,
+    ) -> None:
+        self._run_cmd(
+            [
+                "share-folder",
+                shared_folder_uid,
+                "-a",
+                "grant",
+                "-r",
+                record_uid,
+                "-d",
+                _commander_on_off(can_edit),
+                "-s",
+                _commander_on_off(can_share),
+            ]
+        )
+
+    def _set_shared_folder_default_record_share(
+        self,
+        *,
+        shared_folder_uid: str,
+        can_edit: bool,
+        can_share: bool,
+    ) -> None:
+        self._run_cmd(
+            [
+                "share-folder",
+                shared_folder_uid,
+                "-a",
+                "grant",
+                "-r",
+                "*",
+                "-d",
+                _commander_on_off(can_edit),
+                "-s",
+                _commander_on_off(can_share),
+            ]
+        )
+
+    def _discover_shared_folder_acl(self, *, shared_folder_uid: str) -> dict[str, Any]:
+        payload = self._run_cmd(["get", shared_folder_uid, "--format", "json"])
+        item = _load_json(payload, command="get --format json")
+        if not isinstance(item, dict):
+            raise CapabilityError(
+                reason="Commander returned non-object JSON from `get --format json`"
+            )
+        return {
+            "users": _dict_items(item.get("users")),
+            "teams": _dict_items(item.get("teams")),
+            "records": _dict_items(item.get("records")),
+            "default": {
+                "manage_records": item.get("manage_records", item.get("default_manage_records")),
+                "manage_users": item.get("manage_users", item.get("default_manage_users")),
+                "can_edit": item.get("can_edit", item.get("default_can_edit")),
+                "can_share": item.get("can_share", item.get("default_can_share")),
+            },
+        }
+
+    @staticmethod
+    def _share_folder_grantee_arg(
+        *,
+        grantee_kind: Literal["user", "team", "default"],
+        identifier: str | None,
+    ) -> str:
+        if grantee_kind == "default":
+            if identifier is not None:
+                raise ValueError("default shared-folder grantee must not specify identifier")
+            return "*"
+        if grantee_kind in {"user", "team"}:
+            if not identifier:
+                raise ValueError(f"{grantee_kind} shared-folder grantee requires identifier")
+            return identifier
+        raise ValueError(f"unsupported shared-folder grantee kind: {grantee_kind}")
 
     def _share_folder_to_ksm_app(self, *, folder_uid: str, app_uid: str) -> None:
         try:
