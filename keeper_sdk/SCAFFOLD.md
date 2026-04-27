@@ -10,7 +10,8 @@ Pure-Python; no top-level I/O.
 | `core/` | Pure manifest/schema/graph/diff/planner/redact/preview. Zero subprocess. | YES for any pure logic | [`core/SCAFFOLD.md`](./core/SCAFFOLD.md) |
 | `cli/` | `dsk` Click entrypoint + Rich renderer; orchestrates exit codes. | YES for new CLI verbs/flags | [`cli/SCAFFOLD.md`](./cli/SCAFFOLD.md) |
 | `providers/` | `MockProvider` (offline) + `CommanderCliProvider` (live). Implement `core.interfaces.Provider`. | YES for new backends | [`providers/SCAFFOLD.md`](./providers/SCAFFOLD.md) |
-| `auth/` | `EnvLoginHelper` + helper-protocol contract. | YES for new login backends | [`auth/SCAFFOLD.md`](./auth/SCAFFOLD.md) |
+| `auth/` | `EnvLoginHelper` + `KsmLoginHelper` + helper-protocol contract. | YES for new login backends | [`auth/SCAFFOLD.md`](./auth/SCAFFOLD.md) |
+| `secrets/` | KSM app bootstrap (`bootstrap.py`), KSM config reader (`ksm.py`), inter-agent bus (`bus.py` — preview/sealed). | YES for KSM / bootstrap; bus remains skeleton until wire-format gate | `docs/KSM_BOOTSTRAP.md`, `docs/KSM_INTEGRATION.md` |
 
 ## Top-level files
 

@@ -12,6 +12,7 @@ Agent-first Python SDK + CLI (`dsk`) for deterministic `validate -> plan -> appl
 | `keeper_sdk/cli/` | [`keeper_sdk/cli/SCAFFOLD.md`](./keeper_sdk/cli/SCAFFOLD.md) | `dsk` Click entrypoint + Rich renderer + exit codes |
 | `keeper_sdk/providers/` | [`keeper_sdk/providers/SCAFFOLD.md`](./keeper_sdk/providers/SCAFFOLD.md) | Mock + Commander provider; capability gates |
 | `keeper_sdk/auth/` | [`keeper_sdk/auth/SCAFFOLD.md`](./keeper_sdk/auth/SCAFFOLD.md) | `EnvLoginHelper` + helper-protocol contract |
+| `keeper_sdk/secrets/` | (see `docs/KSM_BOOTSTRAP.md`, `docs/KSM_INTEGRATION.md`) | KSM bootstrap + `ksm` reader + bus skeleton (`keeper_sdk/secrets/`) |
 | `tests/` | [`tests/SCAFFOLD.md`](./tests/SCAFFOLD.md) | Per-test-file inventory + where to land new tests |
 | `docs/` | [`docs/SCAFFOLD.md`](./docs/SCAFFOLD.md) | Doc inventory + audience + ownership |
 | `scripts/` | [`scripts/SCAFFOLD.md`](./scripts/SCAFFOLD.md) | Smoke + sync top-level map |
@@ -24,7 +25,7 @@ Reconciliation against `V1_GA_CHECKLIST.md` + `docs/SDK_DA_COMPLETION_PLAN.md` +
 
 ## Tree
 
-`tree` absent locally; annotated from `find . -maxdepth 3` using the same ignore set.
+Snapshot @ `54b5b7c` (refresh when layout shifts). Deeper per-area maps: `keeper_sdk/SCAFFOLD.md`, `docs/SCAFFOLD.md`, `tests/SCAFFOLD.md`. Full file list: `git ls-files`.
 
 ```text
 .
@@ -33,7 +34,9 @@ Reconciliation against `V1_GA_CHECKLIST.md` + `docs/SDK_DA_COMPLETION_PLAN.md` +
 ├── .github/                                # GitHub automation root.
 │   └── workflows/
 │       ├── ci.yml                          # CI: lint, mypy, pytest, examples, drift-check, build.
-│       └── publish.yml                     # GitHub Release: build dist/* + upload assets (no PyPI).
+│       ├── live-smoke.yml                  # Optional live tenant (secrets-backed).
+│       ├── publish.yml                     # GitHub Release: build dist/* + upload assets (no PyPI).
+│       └── scope-fence.yml                 # Blocks operator-only doc paths on PRs.
 ├── .gitignore                              # Git ignore rules.
 ├── AGENTS.md                               # Machine-readable operating manual for agents.
 ├── AUDIT.md                                # Milestone/audit history and design reconciliation log.
@@ -53,38 +56,47 @@ Reconciliation against `V1_GA_CHECKLIST.md` + `docs/SDK_DA_COMPLETION_PLAN.md` +
 │   ├── SDK_DA_COMPLETION_PLAN.md           # Devil's-advocate completion gates, phases, and stop conditions.
 │   ├── SDK_COMPLETION_PLAN.md              # Roadmap and risk gates for completing SDK support.
 │   ├── VALIDATION_STAGES.md                # Stage-by-stage `validate --online` contract.
-│   └── capability-snapshot.json            # Machine-readable mirror consumed by drift-check CI.
+│   ├── capability-snapshot.json            # Machine-readable mirror consumed by drift-check CI.
+│   └── …                                   # KSM / vault / sharing / MSP / V2 / live-proof — `docs/SCAFFOLD.md`.
 ├── examples/                               # Canonical minimal manifests for common PAM resource shapes.
 │   ├── pamDatabase.yaml                    # Minimal database example.
 │   ├── pamDirectory.yaml                   # Minimal directory example.
 │   ├── pamMachine.yaml                     # Minimal machine example.
-│   └── pamRemoteBrowser.yaml               # Minimal remote-browser example.
+│   ├── pamRemoteBrowser.yaml               # Minimal remote-browser example.
+│   ├── sharing*.yaml / vault*.yaml         # Additional corpus (sharing, vault L1) — see `examples/SCAFFOLD.md`.
+│   └── scaffold_only/                      # Narrow fixtures for tests / docs.
 ├── keeper_sdk/                             # Stable 1.x import path; packaged SDK source.
 │   ├── __init__.py                         # Package exports/version surface.
 │   ├── auth/                               # Login helper protocol + env-backed implementation.
 │   │   ├── __init__.py                     # Auth package exports.
-│   │   └── helper.py                       # `EnvLoginHelper` loader + helper contract wiring.
+│   │   └── helper.py                       # `EnvLoginHelper` + `KsmLoginHelper` + helper contract wiring.
+│   ├── secrets/                            # KSM bootstrap, `ksm.py` reader, inter-agent bus (skeleton).
+│   │   ├── bootstrap.py / ksm.py / bus.py  # `bootstrap-ksm` + KSM cred path + sealed bus.
 │   ├── cli/                                # `dsk` entrypoint + Rich renderer.
 │   │   ├── __init__.py                     # CLI package export.
 │   │   ├── __main__.py                     # `python -m keeper_sdk.cli` shim.
 │   │   ├── main.py                         # Click commands + exit-code orchestration.
-│   │   └── renderer.py                     # Human-readable tables and summaries.
+│   │   ├── renderer.py                     # Human-readable tables and summaries.
+│   │   ├── _report/                        # `dsk report password|compliance|security-audit` subprocess wrappers.
+│   │   └── _live/                          # Live runbook / transcript helpers (`live-smoke` support).
 │   ├── core/                               # Pure manifest/schema/graph/diff/planner logic.
 │   │   ├── __init__.py                     # Core exports.
-│   │   ├── diff.py                         # Change classification and diff helpers.
+│   │   ├── diff.py / vault_diff.py         # PAM + vault diffs.
+│   │   ├── msp_diff.py / msp_graph.py / msp_models.py  # `msp-environment.v1` (discover/plan; apply/import out of band).
+│   │   ├── sharing_diff.py / sharing_models.py  # `keeper-vault-sharing.v1` diff surface.
 │   │   ├── errors.py                       # Structured error taxonomy.
-│   │   ├── graph.py                        # Dependency graph + topo ordering.
+│   │   ├── graph.py / vault_graph.py        # PAM + vault dep DAGs.
 │   │   ├── interfaces.py                   # Public protocols / typed interfaces.
 │   │   ├── manifest.py                     # Load/dump/canonical manifest handling.
 │   │   ├── metadata.py                     # Ownership marker encode/decode + timestamps.
-│   │   ├── models.py                       # Pydantic models for the manifest surface.
+│   │   ├── models.py / vault_models.py     # Pydantic models (PAM + vault L1).
 │   │   ├── normalize.py                    # Manifest ↔ Commander payload normalization.
 │   │   ├── planner.py                      # Plan builder and summary accounting.
 │   │   ├── preview.py                      # Preview-key guard (`DSK_PREVIEW=1`).
 │   │   ├── redact.py                       # Redaction helpers for plans/diffs/errors.
 │   │   ├── rules.py                        # Semantic validation rules beyond JSON schema.
 │   │   ├── schema.py                       # JSON-schema loading and validation helpers.
-│   │   └── schemas/                        # Packaged JSON schemas.
+│   │   └── schemas/                        # Packaged JSON schemas (`pam-environment.v1`, …).
 │   └── providers/                          # Provider implementations and Commander helpers.
 │       ├── __init__.py                     # Provider exports.
 │       ├── _commander_cli_helpers.py       # Extracted pure helpers for Commander provider.
@@ -98,43 +110,23 @@ Reconciliation against `V1_GA_CHECKLIST.md` + `docs/SDK_DA_COMPLETION_PLAN.md` +
 │   │   ├── README.md                       # How to run smoke scenarios.
 │   │   ├── __init__.py                     # Smoke package marker.
 │   │   ├── identity.py                     # Tenant identity helpers.
+│   │   ├── parallel_guard.py               # Profile lock + disjoint Commander config preflight.
+│   │   ├── profiles/                       # `DSK_SMOKE_PROFILE` JSON examples (`.gitignore` for local).
 │   │   ├── sandbox.py                      # Ephemeral tenant/scaffold helpers.
 │   │   ├── scenarios.py                    # Registered live-smoke scenarios by resource type.
 │   │   └── smoke.py                        # End-to-end smoke runner CLI.
 │   └── sync_upstream.py                    # Regenerates Commander capability mirror.
-└── tests/                                  # Offline/unit/contract coverage.
+└── tests/                                  # Offline/unit/contract + optional live harness tests.
     ├── __init__.py                         # Tests package marker.
     ├── conftest.py                         # Shared fixtures and test helpers.
+    ├── _fakes/                             # Commander/KSM fakes for narrow tests.
+    ├── live/                               # Opt-in live KSM/bootstrap smoke (`pytest tests/live/ -m live`).
     ├── fixtures/                           # Vendored fixture data for clean CI runs.
     │   ├── examples/                       # Copied example corpus used by tests.
+    │   ├── profiles/                        # Smoke profile JSON fixtures.
     │   └── renderer_snapshots/              # Rich table snapshots.
-    ├── test_auth_helper.py                  # EnvLoginHelper and Commander LoginUi contract tests.
-    ├── test_cli.py                         # CLI command/output/exit-code tests.
-    ├── test_commander_cli.py               # Commander provider behavior under mocks.
-    ├── test_coverage_followups.py          # Regression coverage for prior review gaps.
-    ├── test_diff.py                        # Diff taxonomy tests.
-    ├── test_dor_scenarios.py               # Offline DOR TEST_PLAN scenario mapping.
-    ├── test_errors.py                       # `DeleteUnsupportedError` compat shim still subclass of `CapabilityError`.
-    ├── test_graph.py                       # Graph/order/cycle tests.
-    ├── test_h_series_gaps.py               # H-series audit gap regressions.
-    ├── test_interfaces.py                  # Protocol/interface conformance tests.
-    ├── test_manifest.py                    # Manifest load/dump/canonicalization tests.
-    ├── test_metadata.py                    # Marker encode/decode tests.
-    ├── test_normalize.py                   # Commander payload normalization tests.
-    ├── test_perf.py                        # Performance smoke tests.
-    ├── test_planner.py                     # Plan construction/summary tests.
-    ├── test_preview_gate.py                # Preview-key guard tests.
-    ├── test_providers.py                   # Provider protocol/common-provider tests.
-    ├── test_rbi_readback.py                 # `pamRemoteBrowser` discover + `_merge_rbi_dag_options_into_pam_settings` unit tests (P3).
-    ├── test_redact.py                      # Redaction contract tests.
-    ├── test_renderer_snapshots.py          # RichRenderer snapshot tests.
-    ├── test_rules.py                       # Semantic rule tests.
-    ├── test_schema.py                      # Schema and invalid-fixture validation tests.
-    ├── test_smoke_args.py                  # Smoke-runner CLI args.
-    ├── test_smoke_scenarios.py             # Offline validation of live-smoke scenario shapes.
-    ├── test_stage_5_bindings.py            # `validate --online` stage-5 binding checks.
-    ├── test_sync_upstream.py               # Capability-mirror generator + `--check` tests.
-    └── test_uid_ref_gate.py                # `pam_configuration_uid_ref` gate tests.
+    ├── test_*.py                           # 50+ modules — see `tests/SCAFFOLD.md` (vault, sharing, MSP, KSM, CLI cov splits).
+    └── …                                   # PAM: `test_diff`, `test_planner`, `test_stage_5_bindings`, …; vault/sharing/MSP: dedicated `test_*` files.
 ```
 
 ## Where to land new work
