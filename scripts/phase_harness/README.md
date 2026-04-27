@@ -13,6 +13,7 @@ product `git` commits in this tree.
 | Artifact | Role |
 |----------|------|
 | [`run_local_gates.sh`](./run_local_gates.sh) | Single command: `ruff check` + `ruff format --check` + `mypy keeper_sdk` + `pytest` (use when not delegating a multi-step `phase_runner` phase). |
+| [`bundle_unpushed_commits.sh`](./bundle_unpushed_commits.sh) | `git bundle` of `origin/main..main` for handoff when `git push` is not possible on the current host; see script header. |
 | [`phase-spec.dsk.example.yaml`](./phase-spec.dsk.example.yaml) | Valid `phase_runner` spec shape; `repo_root` must be your machine’s absolute path. |
 
 ## Quick: local merge stack (no harness)

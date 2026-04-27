@@ -39,6 +39,8 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 - **Docs** — [`AGENTS.md`](AGENTS.md): playbook **§E** — programmatic `load_manifest` vs `load_declarative_manifest` for vault L1. [`docs/SCAFFOLD.md`](docs/SCAFFOLD.md): “Where to land” row cites §E.
 
 ### Added
+- **Scripts —** [`scripts/phase_harness/bundle_unpushed_commits.sh`](scripts/phase_harness/bundle_unpushed_commits.sh) —
+  `git bundle` of `main` not yet on `origin` (handoff when push is not possible on host).
 - **Docs — `DSK_NEXT_WORK.md`** — in-repo **product** orchestration queue (P3 / P2.1 / KSM
   priorities, `run_local_gates.sh`, `phase_runner` + `scripts/phase_harness/` pointer;
   live runbook; explicitly not daybook). Indexed from [`AGENTS.md`](AGENTS.md) and
