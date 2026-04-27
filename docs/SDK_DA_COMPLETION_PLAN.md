@@ -112,7 +112,14 @@ Acceptance:
 
 ## Phase 2: Finish Rotation Honestly
 
-Current blocker: live apply reaches marker verification, but clean re-plan fails.
+Current blocker: live apply reaches marker verification, but **clean re-plan (exit
+0) is not proven** on Acme-lab after nested rotation (issue **#4**). **Offline
+(2026-04-28):** `compute_diff` now treats parent-resource `pam_settings` as a
+declared-key overlay and normalizes `pamUser.managed` scalars
+(`keeper_sdk/core/diff.py`, `CHANGELOG` [Unreleased], `tests/test_diff.py`) —
+reduces spurious parent/nested UPDATE rows; **re-run** the live command below
+to confirm the remaining gap (if any) is `rotation_settings` / commander
+readback only.
 
 ### P2.1 Diagnose Rotation Drift
 
