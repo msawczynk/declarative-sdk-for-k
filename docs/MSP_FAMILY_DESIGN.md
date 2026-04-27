@@ -245,6 +245,11 @@ managed_companies:
 
 ### 4.2 With addons (declare desired addon mix)
 
+Per **Q6 TENTATIVE** (§10): addons are **structured** `{name, seats}` only.
+The bare-string shorthand `connection_manager:5` originally drafted here was
+**rejected** by the P0 JSON Schema and is corrected below (Sprint 7h-58 P1
+worker finding):
+
 ```yaml
 schema: msp-environment.v1
 name: msp-with-addons
@@ -254,27 +259,43 @@ managed_companies:
     seats: 25
     file_plan: enterprise  # TBD: must match Commander file-plan string table
     addons:
-      - connection_manager:5
-      - remote_browser_isolation:5
+      - name: connection_manager
+        seats: 5
+      - name: remote_browser_isolation
+        seats: 5
 ```
 
-(Exact **`addons`** structure — **string** vs **object** with `seats` — is a §10
-decision. **RBI+CM** ordering rules exist in Commander and must be preserved on
-`apply`.)
+(**RBI+CM** ordering rules exist in Commander and must be preserved on
+`apply` — the structured shape lets the diff layer reason about per-addon
+seat counts without re-parsing colon-separated strings.)
 
-### 4.3 Custom seat allocation and optional node
+### 4.3 Custom seat allocation (and `node` deferred)
+
+The original draft used `seats: -1` and a top-level `node:` key on each MC.
+Both were **invalid** against the P0 schema (seats minimum is 0;
+`additionalProperties: false` on `managed_company` rejects unknown keys
+including `node`). Sprint 7h-58 P1 worker finding — corrected:
 
 ```yaml
 schema: msp-environment.v1
-name: msp-noded
+name: msp-large
 managed_companies:
   - name: "Adatum Corp"
     plan: business
-    seats: -1   # TBD: manifest encoding of “unlimited” vs large int
-    node: "MSP/AMER"   # TBD: node path vs numeric id; Commander accepts either
+    seats: 0   # 0 = "claim no seats yet"; "unlimited" encoding deferred — see open Q
     file_plan: null
     addons: []
 ```
+
+Open follow-ups (deferred to a future memo update, not blocking P0–P1):
+
+- **Unlimited-seats encoding:** Commander accepts large-int or pool-cap;
+  manifest encoding TBD. For now schema requires `seats >= 0`.
+- **Node placement:** `node` (path or numeric id) is a Commander param on
+  `MSPAddCommand` (see §6) but not yet a schema field. Add as optional
+  `node:` (string) on `managed_company` in a P1.5 schema bump if
+  multi-node MSP placement is required for slice 1; otherwise defer to
+  P2/P3 once graph/diff lands.
 
 ---
 
