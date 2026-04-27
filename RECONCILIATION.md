@@ -1,6 +1,6 @@
 # RECONCILIATION — design vs tree
 
-Written: 2026-04-26 (agent scaffold pass; refreshed 2026-04-27 for tree + `secrets` scaffold).
+Written: 2026-04-26 (agent scaffold pass; refreshed 2026-04-28 for KSM live + rotation/RBI doc queue).
 Source of truth: `main` at time of last doc edit (exact SHA: `git rev-parse HEAD`).
 Cross-checks against `V1_GA_CHECKLIST.md`, `docs/SDK_DA_COMPLETION_PLAN.md`,
 `AUDIT.md`, `REVIEW.md`, and DOR pointers in `keeper-pam-declarative/`.
@@ -12,7 +12,7 @@ This is for human + agent review. Per-folder maps live in `<dir>/SCAFFOLD.md`.
 ## TL;DR
 
 - **Zero remaining v1.0.0 GA blockers.** Tag policy decided: annotated only — distribution is GitHub-only (no PyPI, no `git verify-tag` consumer flow); GPG/SSH signing not required. Upgrade path if supply-chain requirements change → sigstore/cosign `dist/*` in `publish.yml` (OIDC, no maintainer key).
-- **Two open clean-re-plan gates** (preview-gated, not GA blockers): nested-`pamUser` rotation (P2.1), `pamRemoteBrowser` RBI tuning (P3). Apply paths shipped; reviewed clean re-plan is the final lift.
+- **Open clean-re-plan work** (not GA blockers): nested-`pamUser` rotation (P2.1 / issue #4) — apply + rotation edit OK, re-plan still drifts. **P3** `pamRemoteBrowser` E2E smoke is **green** (2026-04-28); per-field *supported* still tracks **#5** + DA. Apply paths shipped; P2.1 readback is the main lift.
 - **Three v1.1 deferrals tracked + accepted:** adoption smoke against unmanaged records, field-drift→UPDATE smoke, two-writer ownership-marker race smoke.
 - **One v2 deferral:** module rename `keeper_sdk` → `declarative_sdk_k` (will ship compat shim).
 - **Nothing has been silently dropped.** Every preview-gated key fails loud at apply via `_detect_unsupported_capabilities` + plan-surface CONFLICT rows (C3 fix; H6 regression test).
@@ -67,8 +67,8 @@ Every modeled capability must classify as `supported` / `preview-gated` / `upstr
 | Standalone top-level `pamUser` | preview-gated → v1.1 | guarded | – | – | `V1_GA_CHECKLIST.md` § 6 |
 | Gateway `mode: create` | preview-gated / design-only | guarded | – | – | `docs/ISSUE_7_GATEWAY_CREATE_PROJECTS_DESIGN.md` |
 | Top-level `projects[]` | preview-gated / design-only | guarded | – | – | same |
-| KSM application provisioning (`dsk bootstrap-ksm`) | supported | shipped | offline-green; live gate next | open | `keeper_sdk/secrets/bootstrap.py`; 89 unit tests in `tests/test_bootstrap_ksm.py`; docs in `docs/KSM_BOOTSTRAP.md`. End-to-end live bootstrap → login → apply loop is the next proof. |
-| `KsmLoginHelper` (Commander credentials read from KSM) | supported | shipped | offline-green; live gate next | open | `keeper_sdk/auth/helper.py::KsmLoginHelper` + `keeper_sdk/secrets/ksm.py`; 175 unit tests across `tests/test_auth_ksm.py` + `tests/test_secrets_ksm.py`; docs in `docs/KSM_INTEGRATION.md`. |
+| KSM application provisioning (`dsk bootstrap-ksm`) | supported | shipped | live-green (bootstrap+login) | low | 2026-04-28: `tests/live/test_ksm_bootstrap_smoke.py` with `KEEPER_LIVE_TENANT=1` + KSM config — see `LIVE_TEST_RUNBOOK`. Also `docs/KSM_BOOTSTRAP.md` + 89 unit tests. Full PAM apply+KSM remains via committed smoke, not this pytest alone. |
+| `KsmLoginHelper` (Commander credentials read from KSM) | supported | shipped | live: exercised on bootstrap+login path per same pytest | low | `keeper_sdk/auth/helper.py` + 175+ unit tests; `docs/KSM_INTEGRATION.md`. |
 | Phase B inter-agent KSM bus (`secrets/bus.py`) | preview-gated / skeleton | sealed (raises `CapabilityError`) | – | – | Bootstrap already provisions the directory record via `--with-bus`; client implementation deferred. Wire format + CAS semantics + implementation checklist frozen in module docstring. |
 
 DA Definition-of-Done compliance:
