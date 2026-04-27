@@ -32,10 +32,12 @@ class ChangeKind(StrEnum):
     """
 
     CREATE = "create"
+    ADD = "create"
     UPDATE = "update"
     DELETE = "delete"
     NOOP = "noop"
     CONFLICT = "conflict"
+    SKIP = "skip"
 
 
 @dataclass
@@ -54,6 +56,8 @@ class Change:
         before / after: Normalised field dicts for diff rendering.
         reason: Optional human-readable explanation (used for NOOP /
             CONFLICT rows).
+        manifest_name: Optional manifest identifier for synthetic rows that
+            do not map to a live record marker.
     """
 
     kind: ChangeKind
@@ -64,6 +68,7 @@ class Change:
     before: dict[str, Any] = field(default_factory=dict)
     after: dict[str, Any] = field(default_factory=dict)
     reason: str | None = None
+    manifest_name: str | None = None
 
 
 _MANAGED_TYPES = (
