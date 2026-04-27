@@ -170,6 +170,29 @@ def _manifest_source_is_vault(source: Any) -> bool:
     return data.get("schema") == "keeper-vault.v1"
 
 
+def _manifest_source_is_sharing(source: Any) -> bool:
+    """True when the provider was constructed with a ``keeper-vault-sharing.v1`` document."""
+    if source is None:
+        return False
+    if hasattr(source, "model_dump"):
+        data = source.model_dump(mode="python", exclude_none=True, by_alias=True)
+    elif isinstance(source, dict):
+        data = source
+    else:
+        return False
+    return data.get("schema") == "keeper-vault-sharing.v1"
+
+
+_SHARING_RESOURCE_TYPES = {
+    "sharing_folder",
+    "sharing_shared_folder",
+    "sharing_record_share",
+    "sharing_share_folder",
+}
+_SHARING_PAYLOAD_FIELD_LABEL = "keeper_declarative_payload"
+_SHARING_MARKER_TITLE_PREFIX = "DSK sharing marker"
+
+
 class CommanderCliProvider(Provider):
     """Delegates to the ``keeper`` Commander CLI via subprocess."""
 
@@ -192,6 +215,7 @@ class CommanderCliProvider(Provider):
         # sourcing it from constructor or KEEPER_PASSWORD rather than prompting.
         self._password = keeper_password or os.environ.get("KEEPER_PASSWORD")
         self._manifest_source = manifest_source or {}
+        self._manifest_name = self._manifest_name_from_source()
         # In-process Commander session — lazily established the first time a
         # subcommand can't run reliably via subprocess (e.g. `pam project
         # import` / `extend` hit persistent-login re-auth prompts in batch
@@ -218,6 +242,9 @@ class CommanderCliProvider(Provider):
     # ------------------------------------------------------------------
 
     def discover(self) -> list[LiveRecord]:
+        if _manifest_source_is_sharing(self._manifest_source):
+            return self._discover_sharing_rows()
+
         folder_uids = self._discover_folder_uids()
         if not folder_uids:
             raise CapabilityError(
@@ -504,6 +531,8 @@ class CommanderCliProvider(Provider):
     def apply_plan(self, plan: Plan, *, dry_run: bool = False) -> list[ApplyOutcome]:
         if _manifest_source_is_vault(self._manifest_source):
             return self._apply_vault_plan(plan, dry_run=dry_run)
+        if _manifest_source_is_sharing(self._manifest_source):
+            return self._apply_sharing_plan(plan, dry_run=dry_run)
         # Last-line defence — CLI should have surfaced these as conflicts
         # already (see unsupported_capabilities above). If an SDK caller
         # bypasses the CLI and hands us a plan directly, we still refuse.
@@ -955,6 +984,501 @@ class CommanderCliProvider(Provider):
         return outcomes
 
     @staticmethod
+    def _sharing_delete_order(changes: list[Change]) -> list[Change]:
+        rank = {
+            "sharing_share_folder": 0,
+            "sharing_record_share": 1,
+            "sharing_shared_folder": 2,
+            "sharing_folder": 3,
+        }
+        return sorted(changes, key=lambda change: (rank.get(change.resource_type, 99), change.title))
+
+    def _apply_sharing_plan(self, plan: Plan, *, dry_run: bool = False) -> list[ApplyOutcome]:
+        """Apply ``keeper-vault-sharing.v1`` folder + ACL rows.
+
+        Keeper folders/ACL rows do not expose record custom fields. For this
+        first Commander-backed sharing slice we persist ownership metadata in
+        small sidecar records in the configured declarative folder, while the
+        actual folders and ACLs are driven through Commander folder/share
+        commands.
+        """
+        _ensure_keepercommander_version_for_apply()
+        if not self._folder_uid:
+            raise CapabilityError(
+                reason="keeper-vault-sharing apply requires a marker shared folder uid",
+                next_action="pass --folder-uid or set KEEPER_DECLARATIVE_FOLDER",
+            )
+
+        outcomes: list[ApplyOutcome] = []
+        for change in plan.ordered():
+            if change.kind is ChangeKind.CREATE:
+                if dry_run:
+                    outcomes.append(
+                        ApplyOutcome(
+                            uid_ref=change.uid_ref or "",
+                            keeper_uid="",
+                            action="create",
+                            details={"dry_run": True},
+                        )
+                    )
+                    continue
+                keeper_uid = self._sharing_apply_create_or_update(change)
+                outcomes.append(
+                    ApplyOutcome(
+                        uid_ref=change.uid_ref or "",
+                        keeper_uid=keeper_uid,
+                        action="create",
+                        details={"marker_sidecar_written": True},
+                    )
+                )
+            elif change.kind is ChangeKind.UPDATE:
+                if dry_run:
+                    outcomes.append(
+                        ApplyOutcome(
+                            uid_ref=change.uid_ref or "",
+                            keeper_uid=change.keeper_uid or "",
+                            action="update",
+                            details={"dry_run": True},
+                        )
+                    )
+                    continue
+                keeper_uid = self._sharing_apply_create_or_update(change)
+                outcomes.append(
+                    ApplyOutcome(
+                        uid_ref=change.uid_ref or "",
+                        keeper_uid=keeper_uid,
+                        action="update",
+                        details={"marker_sidecar_written": True},
+                    )
+                )
+
+        for change in self._sharing_delete_order(plan.deletes):
+            if dry_run:
+                outcomes.append(
+                    ApplyOutcome(
+                        uid_ref=change.uid_ref or "",
+                        keeper_uid=change.keeper_uid or "",
+                        action="delete",
+                        details={"dry_run": True},
+                    )
+                )
+                continue
+            self._sharing_apply_delete(change)
+            outcomes.append(
+                ApplyOutcome(
+                    uid_ref=change.uid_ref or "",
+                    keeper_uid=change.keeper_uid or "",
+                    action="delete",
+                    details={"removed": True},
+                )
+            )
+
+        for change in plan.conflicts:
+            outcomes.append(
+                ApplyOutcome(
+                    uid_ref=change.uid_ref or "",
+                    keeper_uid=change.keeper_uid or "",
+                    action="conflict",
+                    details={"reason": change.reason or ""},
+                )
+            )
+        for change in plan.noops:
+            outcomes.append(
+                ApplyOutcome(
+                    uid_ref=change.uid_ref or "",
+                    keeper_uid=change.keeper_uid or "",
+                    action="noop",
+                )
+            )
+        return outcomes
+
+    def _sharing_apply_create_or_update(self, change: Change) -> str:
+        payload = self._sharing_full_payload(change)
+        marker = self._sharing_marker_for_change(change, payload)
+        resource_type = change.resource_type
+
+        if resource_type == "sharing_folder":
+            path = self._require_payload_str(payload, "path", change)
+            keeper_uid = self._create_user_folder(
+                path=path,
+                parent_uid=payload.get("parent_folder_uid_ref"),
+                color=payload.get("color"),
+            )
+            payload["keeper_uid"] = keeper_uid
+        elif resource_type == "sharing_shared_folder":
+            path = self._require_payload_str(payload, "path", change)
+            keeper_uid = self._create_shared_folder(
+                path=path,
+                manage_records=self._payload_bool(payload, "default_manage_records", True),
+                manage_users=self._payload_bool(payload, "default_manage_users", True),
+                can_edit=self._payload_bool(payload, "default_can_edit", True),
+                can_share=self._payload_bool(payload, "default_can_share", True),
+            )
+            payload["keeper_uid"] = keeper_uid
+            payload.setdefault("name", payload.get("path"))
+        elif resource_type == "sharing_share_folder":
+            self._sharing_apply_share_folder_acl(payload, change=change)
+            keeper_uid = (
+                str(payload.get("keeper_uid"))
+                if payload.get("keeper_uid")
+                else f"{payload.get('shared_folder_uid_ref')}:{change.uid_ref or change.title}"
+            )
+            payload["keeper_uid"] = keeper_uid
+        elif resource_type == "sharing_record_share":
+            self._sharing_apply_record_share(payload, change=change)
+            keeper_uid = (
+                str(payload.get("keeper_uid"))
+                if payload.get("keeper_uid")
+                else f"{payload.get('record_uid_ref')}:{payload.get('user_email')}"
+            )
+            payload["keeper_uid"] = keeper_uid
+        else:
+            raise CapabilityError(
+                reason=f"unsupported keeper-vault-sharing resource type {resource_type!r}",
+                uid_ref=change.uid_ref,
+                resource_type=resource_type,
+                next_action="remove the unsupported sharing row and retry",
+            )
+
+        self._sharing_upsert_sidecar(payload=payload, marker=marker, title=change.title)
+        return str(payload["keeper_uid"])
+
+    def _sharing_apply_delete(self, change: Change) -> None:
+        sidecar = self._sharing_sidecar_for(change.uid_ref, change.resource_type)
+        payload = dict(sidecar.payload if sidecar is not None else change.before or {})
+        if change.resource_type == "sharing_share_folder":
+            self._sharing_revoke_share_folder_acl(payload, change=change)
+        elif change.resource_type == "sharing_record_share":
+            self._sharing_revoke_record_share(payload, change=change)
+        elif change.resource_type in {"sharing_folder", "sharing_shared_folder"}:
+            path_or_uid = str(payload.get("keeper_uid") or change.keeper_uid or payload.get("path"))
+            if path_or_uid:
+                self._delete_folder(path_or_uid=path_or_uid)
+        else:
+            raise CapabilityError(
+                reason=f"unsupported keeper-vault-sharing delete type {change.resource_type!r}",
+                uid_ref=change.uid_ref,
+                resource_type=change.resource_type,
+                next_action="remove the unsupported sharing row and retry",
+            )
+        self._sharing_delete_sidecar(change.uid_ref, change.resource_type)
+
+    def _sharing_full_payload(self, change: Change) -> dict[str, Any]:
+        payload = dict(change.after or {})
+        if change.kind is ChangeKind.UPDATE:
+            sidecar = self._sharing_sidecar_for(change.uid_ref, change.resource_type)
+            if sidecar is not None:
+                merged = dict(sidecar.payload)
+                merged.update(payload)
+                payload = merged
+        return payload
+
+    def _sharing_marker_for_change(self, change: Change, payload: dict[str, Any]) -> dict[str, Any]:
+        raw_marker = payload.get("marker")
+        if isinstance(raw_marker, dict):
+            return dict(raw_marker)
+        return encode_marker(
+            uid_ref=change.uid_ref or change.title,
+            manifest=change.manifest_name or "vault-sharing",
+            resource_type=change.resource_type,
+            parent_uid_ref=(
+                str(payload.get("shared_folder_uid_ref") or payload.get("record_uid_ref"))
+                if payload.get("shared_folder_uid_ref") or payload.get("record_uid_ref")
+                else None
+            ),
+        )
+
+    @staticmethod
+    def _require_payload_str(payload: Mapping[str, Any], key: str, change: Change) -> str:
+        value = payload.get(key)
+        if not isinstance(value, str) or not value.strip():
+            raise CapabilityError(
+                reason=f"{change.resource_type} {change.uid_ref or change.title} missing {key}",
+                uid_ref=change.uid_ref,
+                resource_type=change.resource_type,
+                next_action=f"fix {key} in the sharing manifest and retry",
+            )
+        return value
+
+    @staticmethod
+    def _payload_bool(payload: Mapping[str, Any], key: str, default: bool) -> bool:
+        value = payload.get(key)
+        return default if value is None else bool(value)
+
+    def _sharing_apply_share_folder_acl(self, payload: dict[str, Any], *, change: Change) -> None:
+        sf_uid = self._sharing_resolve_ref(
+            self._require_payload_str(payload, "shared_folder_uid_ref", change),
+            expected_resource_type="sharing_shared_folder",
+        )
+        payload["shared_folder_uid"] = sf_uid
+        kind = self._require_payload_str(payload, "kind", change)
+        if kind == "grantee":
+            grantee_kind, identifier = self._sharing_grantee(payload)
+            self._share_folder_to_grantee(
+                shared_folder_uid=sf_uid,
+                grantee_kind=grantee_kind,
+                identifier=identifier,
+                manage_records=self._payload_bool(payload, "manage_records", False),
+                manage_users=self._payload_bool(payload, "manage_users", False),
+            )
+            return
+        if kind == "default":
+            target = self._require_payload_str(payload, "target", change)
+            if target == "grantee":
+                self._share_folder_to_grantee(
+                    shared_folder_uid=sf_uid,
+                    grantee_kind="default",
+                    manage_records=self._payload_bool(payload, "manage_records", False),
+                    manage_users=self._payload_bool(payload, "manage_users", False),
+                )
+                return
+            if target == "record":
+                self._set_shared_folder_default_record_share(
+                    shared_folder_uid=sf_uid,
+                    can_edit=self._payload_bool(payload, "can_edit", False),
+                    can_share=self._payload_bool(payload, "can_share", False),
+                )
+                return
+        raise CapabilityError(
+            reason=f"unsupported share_folder ACL row kind/target: {kind}/{payload.get('target')}",
+            uid_ref=change.uid_ref,
+            resource_type=change.resource_type,
+            next_action="use a grantee row or a default grantee/record row for V9a",
+        )
+
+    def _sharing_revoke_share_folder_acl(self, payload: dict[str, Any], *, change: Change) -> None:
+        sf_uid = str(payload.get("shared_folder_uid") or "")
+        if not sf_uid and payload.get("shared_folder_uid_ref"):
+            sf_uid = self._sharing_resolve_ref(
+                str(payload["shared_folder_uid_ref"]),
+                expected_resource_type="sharing_shared_folder",
+            )
+        if not sf_uid:
+            return
+        kind = str(payload.get("kind") or "")
+        if kind == "grantee":
+            grantee_kind, identifier = self._sharing_grantee(payload)
+            try:
+                self._revoke_folder_grantee(
+                    shared_folder_uid=sf_uid,
+                    grantee_kind=grantee_kind,
+                    identifier=identifier,
+                )
+            except CapabilityError as exc:
+                if not self._sharing_missing_folder_error(exc):
+                    raise
+        elif kind == "default":
+            try:
+                self._revoke_folder_grantee(shared_folder_uid=sf_uid, grantee_kind="default")
+            except CapabilityError as exc:
+                if not self._sharing_missing_folder_error(exc):
+                    raise
+
+    @staticmethod
+    def _sharing_missing_folder_error(exc: CapabilityError) -> bool:
+        text = f"{exc.reason}\n{exc.context.get('stderr', '')}"
+        return "Enter name of at least one existing folder" in text
+
+    def _sharing_apply_record_share(self, payload: dict[str, Any], *, change: Change) -> None:
+        record_uid = self._sharing_resolve_record_ref(
+            self._require_payload_str(payload, "record_uid_ref", change)
+        )
+        user_email = self._require_payload_str(payload, "user_email", change)
+        payload["record_uid"] = record_uid
+        self._share_record_to_user(
+            record_uid=record_uid,
+            user_email=user_email,
+            can_edit=self._payload_bool(payload, "can_edit", False),
+            can_share=self._payload_bool(payload, "can_share", False),
+            expiration_iso=payload.get("expires_at") if isinstance(payload.get("expires_at"), str) else None,
+        )
+
+    def _sharing_revoke_record_share(self, payload: dict[str, Any], *, change: Change) -> None:
+        record_uid = str(payload.get("record_uid") or "")
+        if not record_uid and payload.get("record_uid_ref"):
+            record_uid = self._sharing_resolve_record_ref(str(payload["record_uid_ref"]))
+        user_email = str(payload.get("user_email") or "")
+        if record_uid and user_email:
+            self._revoke_record_share_from_user(record_uid=record_uid, user_email=user_email)
+
+    @staticmethod
+    def _sharing_grantee(payload: Mapping[str, Any]) -> tuple[Literal["user", "team"], str]:
+        grantee = payload.get("grantee")
+        if isinstance(grantee, Mapping):
+            kind = grantee.get("kind")
+            if kind == "user" and grantee.get("user_email"):
+                return "user", str(grantee["user_email"])
+            if kind == "team" and grantee.get("team_uid_ref"):
+                return "team", str(grantee["team_uid_ref"])
+        if payload.get("user_email"):
+            return "user", str(payload["user_email"])
+        if payload.get("team_uid_ref"):
+            return "team", str(payload["team_uid_ref"])
+        raise CapabilityError(
+            reason="share_folder grantee row is missing a user_email or team_uid_ref",
+            next_action="add grantee.user_email or grantee.team_uid_ref and retry",
+        )
+
+    @staticmethod
+    def _sharing_uid_ref_from_ref(ref: str) -> str:
+        return ref.rsplit(":", 1)[-1]
+
+    def _sharing_resolve_ref(self, ref: str, *, expected_resource_type: str) -> str:
+        uid_ref = self._sharing_uid_ref_from_ref(ref)
+        sidecar = self._sharing_sidecar_for(uid_ref, expected_resource_type)
+        if sidecar is None:
+            raise CapabilityError(
+                reason=f"could not resolve {ref} from sharing marker sidecars",
+                uid_ref=uid_ref,
+                resource_type=expected_resource_type,
+                next_action="apply the referenced sharing folder first, then retry",
+            )
+        return sidecar.keeper_uid
+
+    def _sharing_resolve_record_ref(self, ref: str) -> str:
+        uid_ref = self._sharing_uid_ref_from_ref(ref)
+        for record in self._discover_marker_records():
+            marker = record.marker or {}
+            if marker.get("uid_ref") == uid_ref and marker.get("resource_type") == "login":
+                return record.keeper_uid
+        raise CapabilityError(
+            reason=f"could not resolve record ref {ref} from scoped marker records",
+            uid_ref=uid_ref,
+            resource_type="sharing_record_share",
+            next_action="create the keeper-vault record in the same declarative scope first",
+        )
+
+    def _sharing_upsert_sidecar(
+        self,
+        *,
+        payload: dict[str, Any],
+        marker: dict[str, Any],
+        title: str,
+    ) -> str:
+        self._sharing_delete_sidecar(
+            str(marker.get("uid_ref") or ""),
+            str(marker.get("resource_type") or ""),
+        )
+        payload_for_record = dict(payload)
+        payload_for_record.pop("marker", None)
+        sidecar_title = self._sharing_sidecar_title(marker, title)
+        payload_json = json.dumps(payload_for_record, separators=(",", ":"), sort_keys=True)
+        sidecar_uid = self._vault_add_login_record(
+            {
+                "type": "login",
+                "title": sidecar_title,
+                "fields": [
+                    {
+                        "type": "login",
+                        "label": "Login",
+                        "value": ["dsk-sharing-marker"],
+                    }
+                ],
+                "custom": [
+                    {
+                        "type": "text",
+                        "label": _SHARING_PAYLOAD_FIELD_LABEL,
+                        "value": [payload_json],
+                    }
+                ],
+            }
+        )
+        self._write_marker(sidecar_uid, marker)
+        return sidecar_uid
+
+    @staticmethod
+    def _sharing_sidecar_title(marker: Mapping[str, Any], fallback: str) -> str:
+        manifest = str(marker.get("manifest") or "vault-sharing")
+        uid_ref = str(marker.get("uid_ref") or fallback)
+        return f"{_SHARING_MARKER_TITLE_PREFIX}: {manifest}: {uid_ref}"
+
+    def _sharing_delete_sidecar(self, uid_ref: str | None, resource_type: str | None) -> None:
+        if not uid_ref or not resource_type:
+            return
+        for sidecar in self._discover_sharing_sidecars():
+            marker = sidecar.marker or {}
+            if marker.get("uid_ref") != uid_ref or marker.get("resource_type") != resource_type:
+                continue
+            sidecar_uid = str(sidecar.payload.get("_sidecar_uid") or "")
+            if sidecar_uid:
+                self._run_cmd(["rm", "--force", sidecar_uid])
+            return
+
+    def _sharing_sidecar_for(
+        self,
+        uid_ref: str | None,
+        resource_type: str | None,
+    ) -> LiveRecord | None:
+        if not uid_ref or not resource_type:
+            return None
+        for sidecar in self._discover_sharing_sidecars():
+            marker = sidecar.marker or {}
+            if marker.get("uid_ref") == uid_ref and marker.get("resource_type") == resource_type:
+                return sidecar
+        return None
+
+    def _discover_sharing_rows(self) -> list[LiveRecord]:
+        return self._discover_sharing_sidecars()
+
+    def _discover_sharing_sidecars(self) -> list[LiveRecord]:
+        rows: list[LiveRecord] = []
+        for record in self._discover_marker_records():
+            marker = record.marker or {}
+            resource_type = marker.get("resource_type")
+            if resource_type not in _SHARING_RESOURCE_TYPES:
+                continue
+            raw_payload = record.payload.get(_SHARING_PAYLOAD_FIELD_LABEL)
+            if isinstance(raw_payload, list):
+                raw_payload = raw_payload[0] if raw_payload else None
+            payload: dict[str, Any]
+            if isinstance(raw_payload, str) and raw_payload.strip():
+                try:
+                    loaded = json.loads(raw_payload)
+                    payload = loaded if isinstance(loaded, dict) else {}
+                except ValueError:
+                    payload = {}
+            else:
+                payload = {}
+            payload.setdefault("uid_ref", marker.get("uid_ref"))
+            payload.setdefault("resource_type", resource_type)
+            payload["_sidecar_uid"] = record.keeper_uid
+            keeper_uid = str(payload.get("keeper_uid") or record.keeper_uid)
+            rows.append(
+                LiveRecord(
+                    keeper_uid=keeper_uid,
+                    title=str(payload.get("path") or payload.get("name") or record.title),
+                    resource_type=str(resource_type),
+                    folder_uid=record.folder_uid,
+                    payload=payload,
+                    marker=marker,
+                )
+            )
+        return rows
+
+    def _discover_marker_records(self) -> list[LiveRecord]:
+        if not self._folder_uid:
+            return []
+        payload = self._run_cmd(["ls", self._folder_uid, "--format", "json"])
+        entries = _load_json(payload, command="ls --format json")
+        if not isinstance(entries, list):
+            raise CapabilityError(reason="Commander returned non-array JSON from `ls --format json`")
+        records: list[LiveRecord] = []
+        for entry in entries:
+            if not isinstance(entry, dict) or entry.get("type") != "record":
+                continue
+            keeper_uid = entry.get("uid")
+            if not keeper_uid:
+                continue
+            item_payload = self._run_cmd(["get", str(keeper_uid), "--format", "json"])
+            item = _load_json(item_payload, command="get --format json")
+            if not isinstance(item, dict):
+                continue
+            record = _record_from_get(item, listing_entry={**entry, "folder_uid": self._folder_uid})
+            if record is not None and record.marker:
+                records.append(record)
+        return records
+
+    @staticmethod
     def _vault_custom_field_label(entry: dict[str, Any]) -> str:
         return str(entry.get("label") or entry.get("name") or "").casefold()
 
@@ -1205,7 +1729,7 @@ class CommanderCliProvider(Provider):
 
     # ------------------------------------------------------------------
 
-    def _manifest_name(self) -> str | None:
+    def _manifest_name_from_source(self) -> str | None:
         name = self._manifest_source.get("name") or self._manifest_source.get("project")
         return str(name) if isinstance(name, str) and name.strip() else None
 
@@ -1216,7 +1740,7 @@ class CommanderCliProvider(Provider):
             return None
 
     def _discover_folder_uids(self) -> list[str]:
-        project_name = self._manifest_name()
+        project_name = self._manifest_name
         if project_name:
             self._maybe_resolve_project_resources_folder(project_name)
 
@@ -1229,7 +1753,7 @@ class CommanderCliProvider(Provider):
     def _synthetic_reference_configuration_record(self) -> LiveRecord | None:
         if not _uses_reference_existing(self._manifest_source):
             return None
-        project_name = self._manifest_name()
+        project_name = self._manifest_name
         if not project_name:
             return None
         if not self.last_resolved_folder_uid and not self._maybe_resolve_project_resources_folder(
@@ -1314,12 +1838,13 @@ class CommanderCliProvider(Provider):
         path: str,
         parent_uid: str | None = None,
         color: str | None = None,
-    ) -> None:
+    ) -> str:
         _ = parent_uid
         args = ["mkdir", "-uf", path]
         if color is not None:
             args.extend(["--color", color])
         self._run_cmd(args)
+        return self._resolve_folder_uid_by_path(path)
 
     def _create_shared_folder(
         self,
@@ -1329,7 +1854,7 @@ class CommanderCliProvider(Provider):
         manage_users: bool = True,
         can_edit: bool = True,
         can_share: bool = True,
-    ) -> None:
+    ) -> str:
         args = ["mkdir", "-sf"]
         if manage_records:
             args.append("--manage-records")
@@ -1341,6 +1866,7 @@ class CommanderCliProvider(Provider):
             args.append("--can-share")
         args.append(path)
         self._run_cmd(args)
+        return self._resolve_folder_uid_by_path(path)
 
     def _move_folder(self, *, source: str, destination: str, is_shared: bool = False) -> None:
         folder_flag = "--shared-folder" if is_shared else "--user-folder"
@@ -1348,6 +1874,30 @@ class CommanderCliProvider(Provider):
 
     def _delete_folder(self, *, path_or_uid: str) -> None:
         self._run_cmd(["rmdir", "-f", path_or_uid])
+
+    def _resolve_folder_uid_by_path(self, path: str) -> str:
+        def resolve_once() -> str | None:
+            from keepercommander import api  # type: ignore[import-not-found]
+            from keepercommander.subfolder import get_folder_uids  # type: ignore[import-not-found]
+
+            params = self._get_keeper_params()
+            api.sync_down(params)
+            uids = sorted(uid for uid in get_folder_uids(params, path) if uid)
+            return str(uids[0]) if uids else None
+
+        try:
+            uid = self._with_keeper_session_refresh(resolve_once)
+        except Exception as exc:
+            raise CapabilityError(
+                reason=f"could not resolve folder path {path!r}: {type(exc).__name__}: {exc}",
+                next_action="inspect the Commander folder tree and retry",
+            ) from exc
+        if uid:
+            return uid
+        raise CapabilityError(
+            reason=f"Commander did not return folder UID for {path!r} after create",
+            next_action="inspect `keeper ls -f --format json` and retry",
+        )
 
     def _ensure_shared_folder_exists(self, path: str) -> None:
         try:
@@ -1374,7 +1924,7 @@ class CommanderCliProvider(Provider):
         can_share: bool,
         expiration_iso: str | None = None,
     ) -> None:
-        args = ["share-record", "-a", "grant", "-e", user_email]
+        args = ["share-record", "-a", "grant", "-e", user_email, "-f"]
         if can_edit:
             args.append("-w")
         if can_share:
@@ -1403,15 +1953,16 @@ class CommanderCliProvider(Provider):
         self._run_cmd(
             [
                 "share-folder",
-                shared_folder_uid,
                 "-a",
                 "grant",
                 "-e",
                 grantee,
+                "-f",
                 "-p",
                 _commander_on_off(manage_records),
                 "-o",
                 _commander_on_off(manage_users),
+                shared_folder_uid,
             ]
         )
 
@@ -1426,7 +1977,7 @@ class CommanderCliProvider(Provider):
             grantee_kind=grantee_kind,
             identifier=identifier,
         )
-        self._run_cmd(["share-folder", shared_folder_uid, "-a", "remove", "-e", grantee])
+        self._run_cmd(["share-folder", "-a", "remove", "-e", grantee, "-f", shared_folder_uid])
 
     def _share_record_to_shared_folder(
         self,
@@ -1439,15 +1990,16 @@ class CommanderCliProvider(Provider):
         self._run_cmd(
             [
                 "share-folder",
-                shared_folder_uid,
                 "-a",
                 "grant",
                 "-r",
                 record_uid,
+                "-f",
                 "-d",
                 _commander_on_off(can_edit),
                 "-s",
                 _commander_on_off(can_share),
+                shared_folder_uid,
             ]
         )
 
@@ -1461,15 +2013,16 @@ class CommanderCliProvider(Provider):
         self._run_cmd(
             [
                 "share-folder",
-                shared_folder_uid,
                 "-a",
                 "grant",
                 "-r",
                 "*",
+                "-f",
                 "-d",
                 _commander_on_off(can_edit),
                 "-s",
                 _commander_on_off(can_share),
+                shared_folder_uid,
             ]
         )
 
