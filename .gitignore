@@ -22,6 +22,7 @@ venv/
 # Live smoke logs (operator-side; never commit)
 .smoke-runs/
 .live-smoke/
+.dsk-smoke-locks/
 # Raw transcript artefacts before they are reviewed and promoted into
 # docs/live-proof/. Keep raw outputs out of git; only the sanitized,
 # pin-stamped copy under docs/live-proof/ is committed.

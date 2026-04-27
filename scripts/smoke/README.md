@@ -170,3 +170,28 @@ Marker isolation is deliberately not a profile knob. LESSON
 `[smoke][marker-manager-is-core-contract]` records that
 `MANAGER_NAME = "keeper-pam-declarative"` is a core ownership invariant; profile
 isolation must come from folder, project, and title scope only.
+
+## Concurrency / parallel profiles
+
+Use `--parallel-profile` only with a non-default `--profile` whose Commander
+config path, test user, shared folder, KSM app, and PAM project name are
+disjoint from other live smoke runs:
+
+```bash
+python3 scripts/smoke/smoke.py --parallel-profile --profile p1 --scenario pamMachine
+```
+
+The harness writes a JSON lock under `<repo>/.dsk-smoke-locks/`; override the
+directory with `DSK_SMOKE_LOCK_DIR`. The lock records only PID, UTC start time,
+tenant FQDN, profile id, admin Commander config path, shared-folder title, KSM
+app name, and project name.
+
+Dead-PID locks are removed automatically with a warning. If a lock is older
+than 24 hours but its PID is still alive, the run refuses with a stuck-lock
+message; verify no smoke process is active before deleting that file manually.
+Corrupt lock JSON is never guessed or repaired automatically.
+
+Marker isolation remains out of scope for profiles. LESSON
+`[smoke][marker-manager-is-core-contract]` is the reason: SDK ownership
+`MANAGER_NAME` is a core diff/delete contract, so parallel lanes isolate by
+folder, project, and title scope instead.

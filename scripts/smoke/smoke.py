@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import atexit
 import json
 import logging
 import os
@@ -24,6 +25,7 @@ if str(SCRIPT_DIR) not in sys.path:
 
 # ruff: noqa: E402 - sys.path bootstrap above must precede these imports
 import identity
+import parallel_guard
 import sandbox
 import scenarios as smoke_scenarios
 
@@ -185,6 +187,7 @@ def run_smoke(
     teardown_only: bool = False,
     keep_records: bool = False,
     login_helper: str = "deploy_watcher",
+    parallel_profile: bool = False,
     context: SmokeRunContext | None = None,
     state: dict[str, Any] | None = None,
 ) -> int:
@@ -198,6 +201,27 @@ def run_smoke(
     try:
         admin_params = identity.admin_login(profile=run_context.profile)
         _mark(state, "admin auth OK")
+    except Exception as exc:  # pragma: no cover - live-only path
+        raise PreflightError(f"auth bootstrap failed: {exc}") from exc
+
+    state["admin_params"] = admin_params
+    if parallel_profile:
+        try:
+            tenant_fqdn = _tenant_fqdn(admin_params)
+            parallel_guard.preflight_check(run_context.profile, tenant_fqdn, sandbox_config)
+            lock_path = parallel_guard.acquire(
+                run_context.profile,
+                tenant_fqdn,
+                sandbox_config,
+                run_context.project_name,
+            )
+            state["parallel_lock"] = lock_path
+            atexit.register(parallel_guard.release, lock_path)
+            _mark(state, f"parallel-profile lock acquired ({lock_path})")
+        except parallel_guard.GuardError as exc:
+            raise PreflightError(f"parallel profile guard failed: {exc}") from exc
+
+    try:
         ident = identity.ensure_sdktest_identity(profile=run_context.profile)
         _mark(state, f"test identity OK ({ident['email']})")
         # `ensure_sdktest_identity()` performs its own admin login. On some
@@ -828,6 +852,15 @@ def _looks_like_tenant_constraint(exc: BaseException) -> bool:
     return any(hint in text for hint in hints)
 
 
+def _tenant_fqdn(admin_params: Any) -> str:
+    config = getattr(admin_params, "config", None)
+    if isinstance(config, dict):
+        server = config.get("server")
+        if server:
+            return str(server)
+    return os.environ.get("KEEPER_SERVER") or identity.KEEPER_SERVER
+
+
 def _print_post_mortem(state: dict[str, Any], exc: BaseException) -> None:
     payload = {
         "passed": state.get("passed", []),
@@ -873,6 +906,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Smoke profile id from scripts/smoke/profiles/<id>.json",
     )
     parser.add_argument(
+        "--parallel-profile",
+        action="store_true",
+        help="enable per-profile parallel writer-lane locks; requires --profile != default",
+    )
+    parser.add_argument(
         "--node",
         dest="node_uid",
         default=None,
@@ -915,6 +953,7 @@ def main(argv: list[str] | None = None) -> int:
             teardown_only=args.teardown,
             keep_records=args.keep_records,
             login_helper=args.login_helper,
+            parallel_profile=args.parallel_profile,
             context=context,
             state=state,
         )
@@ -975,6 +1014,12 @@ def main(argv: list[str] | None = None) -> int:
                     "SMOKE_NO_CLEANUP=1 → skipping project tree cleanup for debugging",
                     file=sys.stderr,
                 )
+        parallel_lock = state.get("parallel_lock")
+        if isinstance(parallel_lock, Path):
+            try:
+                parallel_guard.release(parallel_lock)
+            finally:
+                atexit.unregister(parallel_guard.release)
 
 
 if __name__ == "__main__":

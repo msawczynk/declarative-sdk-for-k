@@ -28,9 +28,11 @@ CI may hold the L1 gate **when**:
 - Raw capture stays **out of git** until sanitized; the same rules as
   `dsk report` / `secret_leak_check` apply to anything that lands in the repo.
 
-**Concurrency:** still **one live session / writer lane per tenant at a time**
-(human or automation). Two parallel agents against the same tenant without
-coordination is out of scope — use a lock, a queue, or different tenants.
+**Concurrency:** one writer per profile per tenant, when profiles use disjoint
+Commander config paths, test users, shared folders, KSM apps, and project
+names. The smoke harness enforces this via per-profile lock files when
+`--parallel-profile` is set; without `--parallel-profile`, the legacy
+single-writer-per-tenant rule still applies.
 
 ## Naming convention (committed files only)
 
@@ -97,5 +99,6 @@ README.
 ## Parallel orchestration
 
 See `docs/NEXT_SPRINT_PARALLEL_ORCHESTRATION.md` — **R4** is the prep that feeds
-**L1** (serial **per tenant**: one actor at a time, human or granted code) then
-**F3** (schema pointer + artifact commit).
+**L1** (one writer per profile per tenant when `--parallel-profile` enforces
+disjoint profile locks; otherwise serial per tenant) then **F3** (schema
+pointer + artifact commit).
