@@ -29,16 +29,19 @@ import parallel_guard
 import sandbox
 import scenarios as smoke_scenarios
 
-from keeper_sdk.core.diff import compute_diff
+from keeper_sdk.core.diff import ChangeKind, compute_diff
 from keeper_sdk.core.graph import build_graph, execution_order
 from keeper_sdk.core.manifest import load_declarative_manifest, load_manifest
 from keeper_sdk.core.metadata import MANAGER_NAME, MARKER_FIELD_LABEL
 from keeper_sdk.core.planner import build_plan
-from keeper_sdk.core.schema import PAM_FAMILY, validate_manifest
+from keeper_sdk.core.schema import PAM_FAMILY, SHARING_FAMILY, validate_manifest
+from keeper_sdk.core.sharing_diff import compute_sharing_diff
+from keeper_sdk.core.sharing_models import SharingManifestV1
 from keeper_sdk.core.vault_diff import compute_vault_diff
 from keeper_sdk.core.vault_graph import vault_record_apply_order
 from keeper_sdk.core.vault_models import VAULT_FAMILY, VaultManifestV1
 from keeper_sdk.providers.commander_cli import CommanderCliProvider
+from keeper_sdk.providers.mock import MockProvider
 
 log = logging.getLogger("sdk_smoke.smoke")
 
@@ -47,13 +50,14 @@ GATEWAY_NAME = "Lab GW Rocky"
 PAM_CONFIG_UID_REF = "lab-cfg"
 PAM_CONFIG_TITLE = "Lab Rocky PAM Configuration"
 DEFAULT_SCENARIO_NAME = "pamMachine"
+SHARING_LIFECYCLE_SCENARIO_NAME = "vaultSharingLifecycle"
 SDK_OUTPUT_TAIL_LINES = 40
 
 # Set by ``main`` based on ``--scenario``; default is pamMachine so the
 # legacy one-command invocation (``python3 scripts/smoke/smoke.py``)
 # continues to exercise the baseline two-host cycle unchanged.
 _ACTIVE_SCENARIO: smoke_scenarios.ScenarioSpec = smoke_scenarios.get(DEFAULT_SCENARIO_NAME)
-_ACTIVE_VAULT_SCENARIO: smoke_scenarios.VaultScenarioSpec | None = None
+_ACTIVE_VAULT_SCENARIO: Any | None = None
 _ACTIVE_SCENARIO_FAMILY = PAM_FAMILY
 
 
@@ -98,22 +102,29 @@ def _active_expected_records(context: SmokeRunContext | None = None) -> set[tupl
     return set(_ACTIVE_SCENARIO.expected_records(PAM_CONFIG_UID_REF, run_context.title_prefix))
 
 
-def _active_vault_scenario() -> smoke_scenarios.VaultScenarioSpec:
+def _active_vault_scenario() -> Any:
     if _ACTIVE_VAULT_SCENARIO is None:
-        raise RuntimeError("active smoke scenario is not a vault scenario")
+        raise RuntimeError("active smoke scenario is not a declarative vault scenario")
     return _ACTIVE_VAULT_SCENARIO
 
 
 def _active_scenario_name() -> str:
-    if _ACTIVE_SCENARIO_FAMILY == VAULT_FAMILY:
-        return _active_vault_scenario().name
+    if _is_declarative_family():
+        return str(_active_vault_scenario().name)
     return _ACTIVE_SCENARIO.name
 
 
 def _active_scenario_description() -> str:
-    if _ACTIVE_SCENARIO_FAMILY == VAULT_FAMILY:
-        return _active_vault_scenario().description
+    if _is_declarative_family():
+        return str(getattr(_active_vault_scenario(), "description", ""))
     return _ACTIVE_SCENARIO.description
+
+
+def _is_declarative_family(family: str | None = None) -> bool:
+    return (family if family is not None else _ACTIVE_SCENARIO_FAMILY) in {
+        VAULT_FAMILY,
+        SHARING_FAMILY,
+    }
 
 
 class SmokeError(Exception):
@@ -129,14 +140,48 @@ class TenantConstraintError(Exception):
 
 
 def _scenario_choices() -> list[str]:
-    return sorted(set(smoke_scenarios.names()) | set(smoke_scenarios.vault_names()))
+    return sorted(
+        set(smoke_scenarios.names())
+        | _declarative_scenario_names()
+        | {SHARING_LIFECYCLE_SCENARIO_NAME}
+    )
+
+
+def _declarative_scenario_names() -> set[str]:
+    names = set(smoke_scenarios.vault_names())
+    sharing_names = getattr(smoke_scenarios, "sharing_names", None)
+    if callable(sharing_names):
+        names.update(str(name) for name in sharing_names())
+    return names
+
+
+def _get_declarative_scenario(name: str, family: str) -> Any:
+    if family == SHARING_FAMILY:
+        sharing_get = getattr(smoke_scenarios, "sharing_get", None)
+        if callable(sharing_get):
+            try:
+                return sharing_get(name)
+            except KeyError:
+                if name != SHARING_LIFECYCLE_SCENARIO_NAME:
+                    raise
+        return smoke_scenarios.vault_get(name)
+    return smoke_scenarios.vault_get(name)
 
 
 def _scenario_family(name: str) -> str:
     if name in smoke_scenarios.names():
         return PAM_FAMILY
     if name in smoke_scenarios.vault_names():
-        return VAULT_FAMILY
+        scenario = smoke_scenarios.vault_get(name)
+        family = str(getattr(scenario, "family", VAULT_FAMILY))
+        if family in {VAULT_FAMILY, SHARING_FAMILY}:
+            return family
+        raise KeyError(f"unsupported smoke scenario family {family!r} for {name!r}")
+    sharing_names = getattr(smoke_scenarios, "sharing_names", None)
+    if callable(sharing_names) and name in set(sharing_names()):
+        return SHARING_FAMILY
+    if name == SHARING_LIFECYCLE_SCENARIO_NAME:
+        return SHARING_FAMILY
     available = ", ".join(_scenario_choices())
     raise KeyError(f"unknown smoke scenario {name!r}; available: {available}")
 
@@ -146,8 +191,8 @@ def _set_active_scenario(name: str) -> str:
 
     family = _scenario_family(name)
     _ACTIVE_SCENARIO_FAMILY = family
-    if family == VAULT_FAMILY:
-        _ACTIVE_VAULT_SCENARIO = smoke_scenarios.vault_get(name)
+    if _is_declarative_family(family):
+        _ACTIVE_VAULT_SCENARIO = _get_declarative_scenario(name, family)
         _ACTIVE_SCENARIO = smoke_scenarios.get(DEFAULT_SCENARIO_NAME)
     else:
         _ACTIVE_SCENARIO = smoke_scenarios.get(name)
@@ -271,7 +316,7 @@ def run_smoke(
         empty_manifest_path = _write_empty_manifest(
             sf_uid,
             context=run_context,
-            stem=manifest_path.stem if _ACTIVE_SCENARIO_FAMILY == VAULT_FAMILY else None,
+            stem=manifest_path.stem if _is_declarative_family() else None,
         )
         state["manifest_path"] = str(manifest_path)
         state["empty_manifest_path"] = str(empty_manifest_path)
@@ -338,7 +383,7 @@ def run_smoke(
     manifest_source = yaml.safe_load(manifest_path.read_text())
     if not isinstance(manifest_source, dict):
         manifest_source = {}
-    if _ACTIVE_SCENARIO_FAMILY == VAULT_FAMILY:
+    if _is_declarative_family():
         prov = CommanderCliProvider(
             config_file=admin_config_path,
             keeper_password=admin_password,
@@ -351,8 +396,15 @@ def run_smoke(
 
         live = prov.discover()
         typed = load_declarative_manifest(manifest_path)
-        if not isinstance(typed, VaultManifestV1):
-            raise SmokeError("vault verifier loaded a non-vault manifest")
+        if _ACTIVE_SCENARIO_FAMILY == VAULT_FAMILY:
+            if not isinstance(typed, VaultManifestV1):
+                raise SmokeError("vault verifier loaded a non-vault manifest")
+        elif _ACTIVE_SCENARIO_FAMILY == SHARING_FAMILY:
+            if not isinstance(typed, SharingManifestV1):
+                raise SmokeError("sharing verifier loaded a non-sharing manifest")
+            _verify_sharing_plan_clean(typed, live, manifest_name=manifest_path.stem)
+        else:  # pragma: no cover - guarded by _is_declarative_family()
+            raise SmokeError(f"unsupported declarative smoke family {_ACTIVE_SCENARIO_FAMILY}")
         try:
             _active_vault_scenario().verify(typed, live, run_context.title_prefix)
         except AssertionError as exc:
@@ -459,7 +511,7 @@ def run_smoke(
         config_file=admin_config_path,
         keeper_password=admin_password,
         manifest_source=empty_src,
-        folder_uid=sf_uid if _ACTIVE_SCENARIO_FAMILY == VAULT_FAMILY else None,
+        folder_uid=sf_uid if _is_declarative_family() else None,
     )
     live_after = prov_verify.discover()
     still_ours = [
@@ -481,9 +533,96 @@ def run_smoke(
     return 0
 
 
+def run_offline_smoke(
+    *,
+    context: SmokeRunContext | None = None,
+    state: dict[str, Any] | None = None,
+) -> int:
+    if _ACTIVE_SCENARIO_FAMILY == PAM_FAMILY:
+        raise PreflightError("--offline mock smoke supports declarative vault scenarios only")
+
+    run_context = context if context is not None else _default_context()
+    state = state if state is not None else {}
+    state["profile_context"] = run_context
+    sf_uid = "offline-shared-folder"
+    manifest_path = _write_manifest(sf_uid, context=run_context)
+    empty_manifest_path = _write_empty_manifest(
+        sf_uid,
+        context=run_context,
+        stem=manifest_path.stem,
+    )
+    state["manifest_path"] = str(manifest_path)
+    state["empty_manifest_path"] = str(empty_manifest_path)
+    _mark(state, "offline temp manifests written")
+
+    typed = load_declarative_manifest(manifest_path)
+    _assert_active_declarative_manifest(typed)
+    provider = MockProvider(manifest_path.stem)
+
+    order = _declarative_apply_order(typed)
+    plan = build_plan(
+        manifest_path.stem,
+        _declarative_changes(typed, provider.discover(), manifest_name=manifest_path.stem),
+        order,
+    )
+    if plan.is_clean or not plan.creates:
+        raise SmokeError("offline initial plan did not show creates")
+    _mark(state, "offline initial plan shows creates")
+
+    provider.apply_plan(plan)
+    live = provider.discover()
+    if isinstance(typed, SharingManifestV1):
+        _verify_sharing_plan_clean(typed, live, manifest_name=manifest_path.stem)
+    try:
+        _active_vault_scenario().verify(typed, live, run_context.title_prefix)
+    except AssertionError as exc:
+        raise SmokeError(f"offline scenario verifier failed: {exc}") from exc
+    _mark(state, f"offline verifier OK ({_active_vault_scenario().name})")
+
+    replan = build_plan(
+        manifest_path.stem,
+        _declarative_changes(typed, provider.discover(), manifest_name=manifest_path.stem),
+        order,
+    )
+    if not replan.is_clean:
+        raise SmokeError("offline re-plan expected clean; drift present")
+    _mark(state, "offline re-plan clean")
+
+    empty_typed = load_declarative_manifest(empty_manifest_path)
+    _assert_active_declarative_manifest(empty_typed)
+    destroy_plan = build_plan(
+        manifest_path.stem,
+        _declarative_changes(
+            empty_typed,
+            provider.discover(),
+            manifest_name=manifest_path.stem,
+            allow_delete=True,
+        ),
+        _declarative_apply_order(empty_typed),
+    )
+    if not destroy_plan.deletes:
+        raise SmokeError("offline destroy plan did not show deletes")
+    _mark(state, "offline destroy plan shows deletes")
+
+    provider.apply_plan(destroy_plan)
+    still_ours = [
+        record
+        for record in provider.discover()
+        if record.marker and record.marker.get("manager") == MANAGER_NAME
+    ]
+    if still_ours:
+        raise SmokeError(
+            "offline destroy failed - "
+            f"{len(still_ours)} records still marked SDK-owned: {_live_summary(still_ours)}"
+        )
+    _mark(state, "offline destroy clean")
+    log.info("OFFLINE SMOKE PASSED: create->verify->destroy cycle clean")
+    return 0
+
+
 def _write_manifest(sf_uid: str, *, context: SmokeRunContext | None = None) -> Path:
     run_context = context if context is not None else _default_context()
-    if _ACTIVE_SCENARIO_FAMILY == VAULT_FAMILY:
+    if _is_declarative_family():
         scenario = _active_vault_scenario()
         document = scenario.build_manifest(run_context.title_prefix, sf_uid)
         _preflight_manifest(document)
@@ -504,6 +643,21 @@ def _write_empty_manifest(
     if _ACTIVE_SCENARIO_FAMILY == VAULT_FAMILY:
         del sf_uid
         document: dict[str, Any] = {"schema": VAULT_FAMILY, "records": []}
+        _preflight_manifest(document)
+        return _write_temp_manifest(
+            document,
+            suffix=".yaml" if stem else ".smoke-empty.yaml",
+            stem=stem,
+        )
+    if _ACTIVE_SCENARIO_FAMILY == SHARING_FAMILY:
+        del sf_uid
+        document = {
+            "schema": SHARING_FAMILY,
+            "folders": [],
+            "shared_folders": [],
+            "share_records": [],
+            "share_folders": [],
+        }
         _preflight_manifest(document)
         return _write_temp_manifest(
             document,
@@ -570,6 +724,23 @@ def _preflight_manifest(document: dict[str, Any]) -> None:
             plan = build_plan(path.stem, changes, order)
             if document.get("records") and len(plan.creates) < 1:
                 raise PreflightError("generated vault manifest did not produce a create plan")
+        elif family == SHARING_FAMILY:
+            manifest_typed = load_declarative_manifest(path)
+            if not isinstance(manifest_typed, SharingManifestV1):
+                raise PreflightError("generated sharing manifest did not load as SharingManifestV1")
+            order = _sharing_apply_order(manifest_typed)
+            changes = compute_sharing_diff(
+                manifest_typed,
+                live_folders=[],
+                manifest_name=path.stem,
+                allow_delete=True,
+                live_shared_folders=[],
+                live_share_records=[],
+                live_share_folders=[],
+            )
+            plan = build_plan(path.stem, changes, order)
+            if _sharing_manifest_has_rows(document) and len(plan.creates) < 1:
+                raise PreflightError("generated sharing manifest did not produce a create plan")
         else:
             manifest = load_manifest(path)
             order = execution_order(build_graph(manifest))
@@ -591,6 +762,126 @@ def _write_temp_manifest(document: dict[str, Any], *, suffix: str, stem: str | N
         os.close(fd)
     path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
     return path
+
+
+def _sharing_manifest_has_rows(document: dict[str, Any]) -> bool:
+    return any(
+        document.get(key) for key in ("folders", "shared_folders", "share_records", "share_folders")
+    )
+
+
+def _sharing_apply_order(manifest: SharingManifestV1) -> list[str]:
+    return [
+        *(folder.uid_ref for folder in manifest.folders),
+        *(folder.uid_ref for folder in manifest.shared_folders),
+        *(share.uid_ref for share in manifest.share_records),
+        *(share.uid_ref for share in manifest.share_folders),
+    ]
+
+
+def _assert_active_declarative_manifest(manifest: Any) -> None:
+    if _ACTIVE_SCENARIO_FAMILY == VAULT_FAMILY:
+        if not isinstance(manifest, VaultManifestV1):
+            raise SmokeError("vault dispatch loaded a non-vault manifest")
+        return
+    if _ACTIVE_SCENARIO_FAMILY == SHARING_FAMILY:
+        if not isinstance(manifest, SharingManifestV1):
+            raise SmokeError("sharing dispatch loaded a non-sharing manifest")
+        return
+    raise SmokeError(f"unsupported declarative smoke family {_ACTIVE_SCENARIO_FAMILY}")
+
+
+def _declarative_apply_order(manifest: Any) -> list[str]:
+    if isinstance(manifest, VaultManifestV1):
+        return vault_record_apply_order(manifest)
+    if isinstance(manifest, SharingManifestV1):
+        return _sharing_apply_order(manifest)
+    raise SmokeError(f"unsupported declarative manifest type {type(manifest).__name__}")
+
+
+def _declarative_changes(
+    manifest: Any,
+    live: list[Any],
+    *,
+    manifest_name: str,
+    allow_delete: bool = False,
+) -> list[Any]:
+    if isinstance(manifest, VaultManifestV1):
+        return compute_vault_diff(
+            manifest,
+            live,
+            manifest_name=manifest_name,
+            allow_delete=allow_delete,
+        )
+    if isinstance(manifest, SharingManifestV1):
+        return _compute_sharing_changes(
+            manifest,
+            live,
+            manifest_name=manifest_name,
+            allow_delete=allow_delete,
+        )
+    raise SmokeError(f"unsupported declarative manifest type {type(manifest).__name__}")
+
+
+def _sharing_live_rows_by_type(live: list[Any]) -> dict[str, list[dict[str, Any]]]:
+    rows: dict[str, list[dict[str, Any]]] = {
+        "sharing_folder": [],
+        "sharing_shared_folder": [],
+        "sharing_record_share": [],
+        "sharing_share_folder": [],
+    }
+    for record in live:
+        resource_type = getattr(record, "resource_type", "")
+        if resource_type not in rows:
+            continue
+        rows[resource_type].append(
+            {
+                "keeper_uid": getattr(record, "keeper_uid", None),
+                "resource_type": resource_type,
+                "title": getattr(record, "title", ""),
+                "payload": dict(getattr(record, "payload", {}) or {}),
+                "marker": dict(getattr(record, "marker", None) or {})
+                if getattr(record, "marker", None)
+                else None,
+            }
+        )
+    return rows
+
+
+def _compute_sharing_changes(
+    manifest: SharingManifestV1,
+    live: list[Any],
+    *,
+    manifest_name: str,
+    allow_delete: bool = False,
+) -> list[Any]:
+    live_by_type = _sharing_live_rows_by_type(live)
+    return compute_sharing_diff(
+        manifest,
+        live_folders=live_by_type["sharing_folder"],
+        live_shared_folders=live_by_type["sharing_shared_folder"],
+        live_share_records=live_by_type["sharing_record_share"],
+        live_share_folders=live_by_type["sharing_share_folder"],
+        manifest_name=manifest_name,
+        allow_delete=allow_delete,
+    )
+
+
+def _verify_sharing_plan_clean(
+    manifest: SharingManifestV1,
+    live: list[Any],
+    *,
+    manifest_name: str,
+) -> None:
+    changes = _compute_sharing_changes(manifest, live, manifest_name=manifest_name)
+    blocking = [
+        change
+        for change in changes
+        if change.kind in (ChangeKind.CREATE, ChangeKind.UPDATE, ChangeKind.CONFLICT)
+    ]
+    if blocking:
+        summary = [(change.kind.value, change.title, change.reason) for change in blocking]
+        raise SmokeError(f"sharing verifier found drift/conflict rows: {summary}")
 
 
 def _sdk(args: list[str], *, env: dict[str, str]) -> None:
@@ -923,6 +1214,17 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Smoke profile id from scripts/smoke/profiles/<id>.json",
     )
     parser.add_argument(
+        "--provider",
+        default="commander",
+        choices=["commander", "mock"],
+        help="Smoke provider. commander runs the live harness; mock requires --offline.",
+    )
+    parser.add_argument(
+        "--offline",
+        action="store_true",
+        help="run the declarative vault smoke cycle in-process against the mock provider",
+    )
+    parser.add_argument(
         "--parallel-profile",
         action="store_true",
         help="enable per-profile parallel writer-lane locks; requires --profile != default",
@@ -944,7 +1246,12 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "EnvLoginHelper fallback."
         ),
     )
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if args.offline and args.provider != "mock":
+        parser.error("--offline requires --provider mock")
+    if args.provider == "mock" and not args.offline:
+        parser.error("--provider mock requires --offline")
+    return args
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -954,6 +1261,9 @@ def main(argv: list[str] | None = None) -> int:
     scenario_family = _set_active_scenario(args.scenario)
     profile = identity.load_profile(args.profile)
     context = SmokeRunContext(profile=profile, node_uid=args.node_uid)
+    parallel_profile = args.parallel_profile or (
+        scenario_family == SHARING_FAMILY and not args.offline
+    )
     log.info(
         "smoke scenario: %s (%s) — %s",
         _active_scenario_name(),
@@ -965,15 +1275,18 @@ def main(argv: list[str] | None = None) -> int:
     needs_cleanup = False
 
     try:
-        exit_code = run_smoke(
-            keep_sf=True,
-            teardown_only=args.teardown,
-            keep_records=args.keep_records,
-            login_helper=args.login_helper,
-            parallel_profile=args.parallel_profile,
-            context=context,
-            state=state,
-        )
+        if args.offline:
+            exit_code = run_offline_smoke(context=context, state=state)
+        else:
+            exit_code = run_smoke(
+                keep_sf=True,
+                teardown_only=args.teardown,
+                keep_records=args.keep_records,
+                login_helper=args.login_helper,
+                parallel_profile=parallel_profile,
+                context=context,
+                state=state,
+            )
         return exit_code
     except KeyboardInterrupt as exc:  # pragma: no cover - live-only path
         needs_cleanup = True
