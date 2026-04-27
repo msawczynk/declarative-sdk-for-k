@@ -41,8 +41,8 @@ Latest #5 live proof (updated):
 
 - Code: post-apply smoke builds `CommanderCliProvider(..., manifest_source=<temp yaml>)`; `discover()` best-effort bootstraps in-process params when RBI records exist so TunnelDAG merge can populate `pam_settings.options` (`remote_browser_isolation` / session recording tri-states). Commander exposes the target URL as field `rbiUrl` while the manifest uses `url` — `discover` maps that so re-plan is not spuriously dirty on URL alone. Offline partial overlay diff remains in `tests/test_rbi_readback.py`.
 - **Live smoke (2026-04-28, `main` @ `975c777`):** `python3 scripts/smoke/smoke.py --scenario pamRemoteBrowser --login-helper profile` with Acme-lab KSM + profile → **SMOKE PASSED** (exit 0) — create, post-apply re-plan clean, destroy. Fixes **URL** readback: Commander field `rbiUrl` is merged into `url` in `discover()`. Warnings: post-destroy shared-folder sweeps may log `CommandError` (non-fatal in that run).
-- **Schema evidence (2026-04-28):** `docs/live-proof/keeper-pam-environment.v1.89047920.rbi.sanitized.json` + `x-keeper-live-proof.evidence` updated on `pam-environment.v1` (alongside the machine transcript). **Still for #5 / DA closeout:** `docs/COMMANDER.md` + `SDK_DA_COMPLETION_PLAN.md` Phase 3 field classification (import vs DAG-only) and maintainer sign-off if any row disagrees with smoke scope.
-- Classification: **E2E `pamRemoteBrowser` smoke** is live-proven; **per-field** support labels follow DA + COMMANDER, not this paragraph alone.
+- **Schema evidence (2026-04-28):** `docs/live-proof/keeper-pam-environment.v1.89047920.rbi.sanitized.json` + `x-keeper-live-proof.evidence` updated on `pam-environment.v1` (alongside the machine transcript). **#5 / DA closeout (remaining):** maintainer pass on `docs/COMMANDER.md` P3.1 table + `SDK_DA_COMPLETION_PLAN.md` Phase 3 (buckets and DAG caveats) — copy is **landed**; open GitHub **#5** until the issue body is updated or closed with sign-off.
+- Classification: **E2E `pamRemoteBrowser` smoke** is live-proven; **per-field** support labels are tabulated in COMMANDER/DA, not in this **Issue #5** paragraph alone.
 
 ## Definition Of Complete
 
@@ -133,7 +133,7 @@ Live smoke commands:
 python3 scripts/smoke/smoke.py --login-helper env --scenario pamMachine
 python3 scripts/smoke/smoke.py --login-helper env --scenario pamDatabase
 python3 scripts/smoke/smoke.py --login-helper env --scenario pamDirectory
-python3 scripts/smoke/smoke.py --login-helper env --scenario pamRemoteBrowser # #5 proof harness; latest live run exposes RBI readback gap
+python3 scripts/smoke/smoke.py --login-helper env --scenario pamRemoteBrowser # #5; see docs/COMMANDER.md P3.1 for readback buckets
 ```
 
 Task: add stronger smoke diagnostics.

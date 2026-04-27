@@ -89,9 +89,13 @@ This is the Issue #5 / Job D field map. It maps manifest fields to Commander
 import support vs. post-import edit hooks. It does **not** claim live support:
 `apply_plan()` now has offline-tested wiring that imports or extends the
 project, rediscovers records, resolves live Keeper UIDs, and runs mapped
-`pam connection edit` / `pam rbi edit` argv via `_run_cmd()`. Live tenant proof
-is still pending, so treat this as offline apply wiring until a smoke run proves
-the Commander edit path end-to-end.
+`pam connection edit` / `pam rbi edit` argv via `_run_cmd()`. The committed smoke
+harness and `docs/live-proof/keeper-pam-*.sanitized.json` show **pamMachine /
+pamDatabase / pamDirectory / pamRemoteBrowser** E2E on the Acme-lab bar; *per
+field* readback still depends on whether Commander returns the value on `get`
+or only on the DAG (see P3.1 buckets in the `pamRemoteBrowser` subsection
+below). Treat rows without a clean bucket as wiring-only until a focused proof
+or unit test names them.
 
 ### SDK_DA §P3.1 readback buckets (design vocabulary)
 
@@ -104,15 +108,21 @@ Map each manifest field to one bucket (see `docs/SDK_DA_COMPLETION_PLAN.md` §P3
 | **edit-supported-dirty** | Edit persists on tenant/DAG surfaces Commander uses, but current `get`/`discover()` does **not** populate the manifest field the planner compares — clean re-plan may stay red until readback is extended (RBI isolation/recording rows below, Issue #5). |
 | **upstream-gap** | No safe Commander writer in the pinned matrix, or no typed manifest path — schema may exist; apply stays preview-gated or conflicted. |
 
-Rows in the table below mix **offline apply-wired** (argv exists) with readback truth: treat “tuning-supported (offline apply-wired)” **without** live clean re-plan as **at best** `edit-supported-dirty` until smoke proves `edit-supported-clean`.
+Rows in the table below mix **offline apply-wired** (argv exists) with readback
+truth: treat “tuning-supported (offline apply-wired)” **without** a P3.1
+bucket assignment as **at best** `edit-supported-dirty` until a proof or
+`test_rbi_readback` / smoke names them.
 
-2026-04-25 live smoke status for Issue #5: `pamRemoteBrowser` with
-`--login-helper env` created records and teardown-only cleanup passed, but
-verification failed before clean re-plan. Pinned Commander
-`PAMRbiEditCommand` accepts `--remote-browser-isolation`, yet writes the record
-resource DAG as `allowedSettings.connections`; current SDK `discover()` reads
-Commander `get --format json` record payloads and does not reconstruct that DAG
-state as manifest-shaped `pam_settings.options.remote_browser_isolation`.
+**Issue #5 (2026-04-28):** `scripts/smoke/smoke.py --scenario pamRemoteBrowser`
+on the Acme-lab bar **SMOKE PASSED** (create → clean post-apply re-plan →
+destroy). Readback fixes on `main` include: (1) typed field `rbiUrl` coalesced
+to manifest `url` in `discover()`; (2) in-process `TunnelDAG` merge in
+`CommanderCliProvider._enrich_pam_remote_browser_dag_options()` maps
+`allowedSettings.connections` / `sessionRecording` to
+`pam_settings.options.remote_browser_isolation` / `graphical_session_recording`
+when a `KeeperParams` session and a DAG with `has_graph` are available. If
+TunnelDAG is missing or empty, those option fields can still be **dirty** in
+`plan` — see P3.1 table below.
 
 Status vocabulary:
 
@@ -125,6 +135,15 @@ Status vocabulary:
   pending.
 - **Unsupported / unknown** means the SDK has no first-class model field, no
   confirmed import key, no edit hook, or no verification path yet.
+
+**`pamRemoteBrowser` — P3.1 bucket (2026-04-28)**
+
+| Manifest path | P3.1 bucket | Readback / notes |
+|---------------|-------------|------------------|
+| `url` | **import-supported** | Commander `get` exposes `rbiUrl`; `discover()` coalesces to `url` (`_coalesce_pam_remote_browser_url`). No `pam rbi edit` flag for URL changes. |
+| `pam_settings.options.remote_browser_isolation` | **edit-supported-clean** when in-process `KeeperParams` + PAM config DAG `has_graph`; else **edit-supported-dirty** | Merged from `TunnelDAG` `allowedSettings.connections` in `_enrich_pam_remote_browser_dag_options` (not from raw `get` tri-state alone). |
+| `pam_settings.options.graphical_session_recording` | same split | Merged from `allowedSettings.sessionRecording` in the same hook. |
+| `pam_settings.connection.*` (typed `pamRemoteBrowserSettings`) | **import-supported** for values present on `get` | Lifted in `_merge_pam_remote_browser_from_get_payload` where Commander returns the typed object. List-shaped Commander flags may still be **edit-supported-dirty** until the manifest model is list-native. |
 
 | Field | Manifest path | Current status | Commander command / hook | Caveat |
 |-------|---------------|----------------|---------------------------|--------|
@@ -141,9 +160,9 @@ Status vocabulary:
 | Copy / paste controls | `resources[].pam_settings.connection.disable_copy`, `disable_paste` | Import-supported only for non-RBI resources | `pam project import/extend` | `pam connection edit` has no copy/paste flags; RBI uses separate inverse flags below. |
 | SFTP block | `resources[].pam_settings.connection.sftp.*` | Import-supported only | `pam project import/extend` | No post-import edit flag in the pinned Commander matrix. |
 | Port forward | `resources[].pam_settings.port_forward.port`, `reuse_port` | Import-supported only | `pam project import/extend` | No post-import edit flag in the pinned Commander matrix. |
-| RBI URL | `resources[type=pamRemoteBrowser].url` | Import-supported by current model/examples; tuning unsupported | `pam project import/extend` | `pam rbi edit` has no URL flag in the pinned matrix. |
-| RBI enablement | `resources[type=pamRemoteBrowser].pam_settings.options.remote_browser_isolation` | Tuning-supported (offline apply-wired); import support unknown | `pam rbi edit --remote-browser-isolation` | Live smoke exposed a readback gap: Commander maps this to DAG `allowedSettings.connections`; `discover()` cannot verify it yet. |
-| RBI recording | `resources[type=pamRemoteBrowser].pam_settings.options.graphical_session_recording` | Tuning-supported (offline apply-wired); import support unknown | `pam rbi edit --connections-recording` | Same flag text as connection recording. |
+| RBI URL | `resources[type=pamRemoteBrowser].url` | P3.1: **import-supported** | `pam project import/extend` (typed `rbiUrl` read) | `pam rbi edit` has no URL flag. See P3.1 table above. |
+| RBI enablement | `resources[type=pamRemoteBrowser].pam_settings.options.remote_browser_isolation` | P3.1: **edit-supported-clean** (DAG) or **edit-supported-dirty** | `pam rbi edit --remote-browser-isolation` | When TunnelDAG is available, merged in `discover()`. If DAG has no graph, re-plan can stay dirty. |
+| RBI recording | `resources[type=pamRemoteBrowser].pam_settings.options.graphical_session_recording` | P3.1: **edit-supported-clean** (DAG) or **edit-supported-dirty** | `pam rbi edit --connections-recording` | Same as isolation row. |
 | RBI autofill credential | `resources[type=pamRemoteBrowser].pam_settings.connection.autofill_credentials_uid_ref` | Tuning-supported (offline apply-wired); import support unknown | `pam rbi edit --autofill-credentials` | Provider fails loudly if the referenced credential cannot be resolved after rediscovery. |
 | RBI autofill targets | `resources[type=pamRemoteBrowser].pam_settings.connection.autofill_targets` | Tuning-supported (offline apply-wired); import support unknown | `pam rbi edit --autofill-targets` | Commander supports repeated flags; current model is scalar, so list support needs a model/schema change before claiming contract support. |
 | RBI URL navigation | `resources[type=pamRemoteBrowser].pam_settings.connection.allow_url_manipulation` | Tuning-supported (offline apply-wired); import support unknown | `pam rbi edit --allow-url-navigation` | Boolean maps to `on` / `off`. |

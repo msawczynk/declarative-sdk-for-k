@@ -21,7 +21,7 @@ implementation is at the wheel.
 
 | Focus | What “done” needs | Next command / doc |
 |-------|-------------------|-------------------|
-| **P3 — `pamRemoteBrowser` / RBI** | `x-keeper` + RBI **sanitized** in tree. **Next:** #5 + DA Phase 3 / `COMMANDER.md` rows | [`docs/live-proof/…rbi.sanitized.json`](./live-proof/keeper-pam-environment.v1.89047920.rbi.sanitized.json) |
+| **P3 — `pamRemoteBrowser` / RBI** | Evidence + **COMMANDER P3.1** + **DA §Phase 3** text on `main`. **Next:** close/update GitHub **#5** (maintainer) | [`COMMANDER` § Post-import / RBI](COMMANDER.md#post-import-connection--rbi-tuning-field-map) |
 | **P2.1 — nested `pamUser` rotation** | Clean re-plan + destroy on parent-run live smoke | `scripts/smoke/README.md` (`pamUserNestedRotation` / preview flags) |
 | **KSM** — bootstrap + `KsmLoginHelper` live | End-to-end live loop in DA table | `pytest` live tests in [`docs/LIVE_TEST_RUNBOOK.md`](./LIVE_TEST_RUNBOOK.md); `tests/live/` |
 | **Vault L1, MSP, etc.** | Per DA classification — separate matrix | `SDK_DA` rows; not PAM-bar unless stated |

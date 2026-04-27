@@ -170,8 +170,17 @@ Gate-lift rule:
 
 ## Phase 3: Finish Post-Import Tuning / RBI
 
-Current blocker: Commander writes RBI settings into DAG
-`allowedSettings.connections`, not into fields `discover()` maps today.
+**2026-04-28 update:** E2E `pamRemoteBrowser` live smoke and `docs/live-proof/*rbi*`
+on `main` **passed**; `docs/COMMANDER.md` has P3.1 buckets (URL from `rbiUrl` =
+import-supported; DAG `allowedSettings` → `pam_settings.options` via
+`TunnelDAG` = edit-supported-clean when a graph exists). “Finish” = align every
+RBI/connection **row** in `COMMANDER.md` with a bucket, add tests for any
+preview-only surface, and re-run smoke when the Commander pin moves.
+
+Ongoing risk: Commander still **writes** some RBI tri-states to DAG
+`allowedSettings` first; the SDK does **not** re-read the DAG in subprocess-only
+`discover()` (no in-process `KeeperParams`). The in-process merge is
+best-effort when the session and graph are present.
 
 ### P3.1 Split Tuning Claims
 
@@ -207,9 +216,12 @@ Devil's advocate:
 
 Acceptance:
 
-- `pamRemoteBrowser` live smoke reaches clean re-plan for any field claimed as
-  supported.
-- Dirty/readback-gap fields remain explicit conflicts or preview-only.
+- `pamRemoteBrowser` live smoke (2026-04-28) **passes** end-to-end; fields
+  claimed as **import-supported** or **edit-supported-clean** must match
+  `docs/COMMANDER.md` P3.1 rows and `test_rbi_readback.py` (and smoke where
+  applicable). Fields that are **edit-supported-dirty** or **upstream-gap** stay
+  explicit conflicts, preview, or out of `supported` table rows in the
+  product matrix.
 
 ## Phase 4: Close Deferred v1 Quality Gaps
 
