@@ -23,8 +23,8 @@ from failure without a human in the loop.
 
 **If you are an agent or LLM**: start at [`AGENTS.md`](AGENTS.md) for the
 command table, exit-code contract, JSON shapes, **where multi-session
-orchestration lives** (phase runner, daybook path, in-repo vs out-of-repo),
-and guardrails. Scoped completion contracts live in
+orchestration lives** (phase runner, [`daybook harness`](scripts/daybook/README.md)
+from a clone, in-repo vs out-of-repo), and guardrails. Scoped completion contracts live in
 [`docs/SDK_DA_COMPLETION_PLAN.md`](docs/SDK_DA_COMPLETION_PLAN.md)
 and [`docs/SDK_COMPLETION_PLAN.md`](docs/SDK_COMPLETION_PLAN.md).
 

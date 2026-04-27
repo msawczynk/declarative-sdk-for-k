@@ -6,7 +6,7 @@ See root [`AGENTS.md`](../../AGENTS.md) **§ Where orchestration lives** and
 **§ Phase runner harness** — this folder only provides **in-repo** gates + an example
 spec for copy-paste.
 
-**Daybook session loop (boot, sync, append) from a clone** — use
+**Daybook session loop (boot, `doctor`, sync, append) from a clone** — use
 [`../daybook/README.md`](../daybook/README.md); keep daybook work **separate** from
 product `git` commits in this tree.
 

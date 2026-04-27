@@ -31,6 +31,10 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 - **Docs** — [`AGENTS.md`](AGENTS.md): playbook **§E** — programmatic `load_manifest` vs `load_declarative_manifest` for vault L1. [`docs/SCAFFOLD.md`](docs/SCAFFOLD.md): “Where to land” row cites §E.
 
 ### Added
+- **Scripts — daybook harness** — [`scripts/daybook/README.md`](scripts/daybook/README.md):
+  `harness.sh` forwards to `~/.cursor-daybook-sync` (boot, `doctor`, sync, append, …);
+  canonical JOURNAL/LESSONS are **not** stored in this repo. Tests:
+  [`tests/test_daybook_harness.py`](tests/test_daybook_harness.py).
 - **MSP P7b (discover)** — `CommanderCliProvider.discover_managed_companies()` maps
   `params.enterprise['managed_companies']` after `api.query_enterprise`; `dsk validate --online`
   with `--provider commander` runs MSP stage-5 discover (apply/import/adopt on commander remain
