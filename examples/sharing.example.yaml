@@ -1,0 +1,30 @@
+schema: keeper-vault-sharing.v1
+folders:
+  - uid_ref: folder.ops
+    path: /Operations
+    color: blue
+shared_folders:
+  - uid_ref: sf.ops
+    path: /Shared/Operations
+    defaults:
+      manage_users: false
+      manage_records: true
+      can_edit: true
+      can_share: false
+share_records:
+  - uid_ref: share.admin.alice
+    record_uid_ref: keeper-vault:records:rec.admin
+    user_email: alice@example.com
+    permissions:
+      can_edit: false
+      can_share: false
+share_folders:
+  - kind: grantee
+    uid_ref: sf.ops.alice
+    shared_folder_uid_ref: keeper-vault-sharing:shared_folders:sf.ops
+    grantee:
+      kind: user
+      user_email: alice@example.com
+    permissions:
+      manage_records: true
+      manage_users: false

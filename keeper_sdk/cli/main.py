@@ -37,6 +37,7 @@ from keeper_sdk.cli.renderer import RichRenderer
 from keeper_sdk.core import (
     VAULT_MANIFEST_FAMILY,
     CapabilityError,
+    Change,
     ChangeKind,
     Manifest,
     ManifestError,
@@ -47,6 +48,7 @@ from keeper_sdk.core import (
     build_plan,
     build_vault_graph,
     compute_diff,
+    compute_sharing_diff,
     compute_vault_diff,
     dump_manifest,
     execution_order,
@@ -59,7 +61,8 @@ from keeper_sdk.core.interfaces import LiveRecord
 from keeper_sdk.core.manifest import read_manifest_document
 from keeper_sdk.core.planner import Plan
 from keeper_sdk.core.preview import assert_preview_keys_allowed
-from keeper_sdk.core.schema import PAM_FAMILY, validate_manifest
+from keeper_sdk.core.schema import PAM_FAMILY, SHARING_FAMILY, validate_manifest
+from keeper_sdk.core.sharing_models import SharingManifestV1, load_sharing_manifest
 from keeper_sdk.core.vault_models import VaultManifestV1
 from keeper_sdk.providers import CommanderCliProvider, MockProvider
 from keeper_sdk.secrets import bootstrap_ksm_application
@@ -80,10 +83,11 @@ EXIT_CAPABILITY = 5
 
 @dataclass
 class PlanLoadBundle:
-    """Result of loading a manifest for plan/diff/apply (PAM or vault L1)."""
+    """Result of loading a manifest for plan/diff/apply (PAM, vault L1, or sharing L1)."""
 
     pam: Manifest | None
     vault: VaultManifestV1 | None
+    sharing: SharingManifestV1 | None
     manifest_name: str
     order: list[str]
     live: list[LiveRecord]
@@ -279,6 +283,42 @@ def validate(
                 if online_suffix:
                     msg += online_suffix
                 click.echo(msg)
+            return
+
+        if family == SHARING_FAMILY:
+            sharing_manifest = load_sharing_manifest(document)
+            uid_n = (
+                len(sharing_manifest.folders)
+                + len(sharing_manifest.shared_folders)
+                + len(sharing_manifest.share_records)
+                + len(sharing_manifest.share_folders)
+            )
+            if emit_canonical and not as_json:
+                import yaml
+
+                click.echo(yaml.safe_dump(document, sort_keys=False, allow_unicode=True))
+            if as_json:
+                spayload: dict[str, Any] = {
+                    "ok": True,
+                    "family": family,
+                    "mode": "sharing_offline",
+                    "manifest_path": str(manifest_path.resolve()),
+                    "stages_completed": ["json_schema", "semantic_rules", "typed_model"],
+                    "uid_ref_count": uid_n,
+                    "online": False,
+                }
+                if emit_canonical:
+                    import yaml
+
+                    spayload["canonical_yaml"] = yaml.safe_dump(
+                        document, sort_keys=False, allow_unicode=True
+                    )
+                click.echo(json.dumps(spayload, indent=2))
+            else:
+                click.echo(
+                    f"ok: {SHARING_FAMILY} ({uid_n} uid_refs); "
+                    "uid_ref graph + online stages skipped."
+                )
             return
 
         if emit_canonical and not as_json:
@@ -550,12 +590,27 @@ def bootstrap_ksm_cmd(
 @click.argument("manifest_path", type=click.Path(exists=True, path_type=Path))
 @click.option("--allow-delete", is_flag=True)
 @click.option("--json", "as_json", is_flag=True, help="Emit plan as JSON")
+@click.option(
+    "--provider",
+    "provider_override",
+    type=click.Choice(["mock", "commander"]),
+    default=None,
+    help="Override the configured provider",
+)
 @click.pass_context
-def plan(ctx: click.Context, manifest_path: Path, allow_delete: bool, as_json: bool) -> None:
+def plan(
+    ctx: click.Context,
+    manifest_path: Path,
+    allow_delete: bool,
+    as_json: bool,
+    provider_override: str | None,
+) -> None:
     """Compute an execution plan against the configured provider.
 
     Exits 0 when the plan is clean, 2 when changes are present, 4 when conflicts exist.
     """
+    if provider_override is not None:
+        ctx.obj["provider"] = provider_override
     plan_obj = _build_plan(ctx, manifest_path, allow_delete=allow_delete)
     if as_json:
         click.echo(json.dumps(_plan_to_dict(plan_obj), indent=2))
@@ -647,8 +702,15 @@ def import_(
 @main.command()
 @click.argument("manifest_path", type=click.Path(exists=True, path_type=Path))
 @click.option("--allow-delete", is_flag=True)
-@click.option("--auto-approve", is_flag=True)
+@click.option("--auto-approve", "--yes", is_flag=True)
 @click.option("--dry-run", is_flag=True, help="Render what would run without mutating")
+@click.option(
+    "--provider",
+    "provider_override",
+    type=click.Choice(["mock", "commander"]),
+    default=None,
+    help="Override the configured provider",
+)
 @click.pass_context
 def apply(
     ctx: click.Context,
@@ -656,8 +718,11 @@ def apply(
     allow_delete: bool,
     auto_approve: bool,
     dry_run: bool,
+    provider_override: str | None,
 ) -> None:
     """Apply a manifest via the selected provider."""
+    if provider_override is not None:
+        ctx.obj["provider"] = provider_override
     plan_obj = _build_plan(ctx, manifest_path, allow_delete=allow_delete)
     if dry_run:
         click.echo(ctx.obj["renderer"].render_plan(plan_obj))
@@ -693,7 +758,7 @@ def apply(
 def _build_plan(ctx: click.Context, manifest_path: Path, *, allow_delete: bool) -> Plan:
     bundle = _load_plan_context(ctx, manifest_path)
     ctx.obj["_plan_bundle"] = bundle
-    capability_subject: Manifest | VaultManifestV1
+    capability_subject: Manifest | VaultManifestV1 | SharingManifestV1
     try:
         if bundle.pam is not None:
             changes = compute_diff(
@@ -703,8 +768,7 @@ def _build_plan(ctx: click.Context, manifest_path: Path, *, allow_delete: bool) 
                 allow_delete=allow_delete,
             )
             capability_subject = bundle.pam
-        else:
-            assert bundle.vault is not None
+        elif bundle.vault is not None:
             changes = compute_vault_diff(
                 bundle.vault,
                 bundle.live,
@@ -712,8 +776,19 @@ def _build_plan(ctx: click.Context, manifest_path: Path, *, allow_delete: bool) 
                 allow_delete=allow_delete,
             )
             capability_subject = bundle.vault
+        else:
+            assert bundle.sharing is not None
+            changes = _build_sharing_changes(
+                bundle.provider,
+                bundle.sharing,
+                allow_delete=allow_delete,
+            )
+            capability_subject = bundle.sharing
     except OwnershipError as exc:
         click.echo(f"ownership error: {exc}", err=True)
+        sys.exit(EXIT_CAPABILITY)
+    except CapabilityError as exc:
+        click.echo(f"discovery failed: {exc}", err=True)
         sys.exit(EXIT_CAPABILITY)
 
     # Surface provider capability gaps as CONFLICT rows so plan / dry-run /
@@ -762,34 +837,92 @@ def _load_plan_context(ctx: click.Context, manifest_path: Path) -> PlanLoadBundl
 
     pam: Manifest | None = typed if isinstance(typed, Manifest) else None
     vault: VaultManifestV1 | None = typed if isinstance(typed, VaultManifestV1) else None
+    sharing: SharingManifestV1 | None = typed if isinstance(typed, SharingManifestV1) else None
     manifest_name = pam.name if pam is not None else manifest_path.stem
 
     try:
         if pam is not None:
             graph = build_graph(pam)
             order = execution_order(graph)
-        else:
+        elif vault is not None:
             assert vault is not None
             order = vault_record_apply_order(vault)
+        else:
+            assert sharing is not None
+            order = _sharing_apply_order(sharing)
     except RefError as exc:
         click.echo(f"reference error: {exc}", err=True)
         sys.exit(EXIT_REF)
 
-    provider = _make_provider(ctx, manifest_path, pam=pam, vault=vault)
-    try:
-        live = provider.discover()
-    except CapabilityError as exc:
-        click.echo(f"discovery failed: {exc}", err=True)
-        sys.exit(EXIT_CAPABILITY)
+    provider = _make_provider(ctx, manifest_path, pam=pam, vault=vault, sharing=sharing)
+    if sharing is None:
+        try:
+            live = provider.discover()
+        except CapabilityError as exc:
+            click.echo(f"discovery failed: {exc}", err=True)
+            sys.exit(EXIT_CAPABILITY)
+    else:
+        live = []
 
     return PlanLoadBundle(
         pam=pam,
         vault=vault,
+        sharing=sharing,
         manifest_name=manifest_name,
         order=order,
         live=live,
         provider=provider,
     )
+
+
+def _sharing_apply_order(manifest: SharingManifestV1) -> list[str]:
+    return [
+        *(folder.uid_ref for folder in manifest.folders),
+        *(folder.uid_ref for folder in manifest.shared_folders),
+        *(share.uid_ref for share in manifest.share_records),
+        *(share.uid_ref for share in manifest.share_folders),
+    ]
+
+
+def _build_sharing_changes(
+    provider: Any,
+    manifest: SharingManifestV1,
+    *,
+    allow_delete: bool,
+) -> list[Change]:
+    live_by_type = _sharing_live_rows_by_type(provider.discover())
+    manifest_name = getattr(provider, "_manifest_name", None) or "vault-sharing"
+    return compute_sharing_diff(
+        manifest,
+        live_folders=live_by_type["sharing_folder"],
+        live_shared_folders=live_by_type["sharing_shared_folder"],
+        live_share_records=live_by_type["sharing_record_share"],
+        live_share_folders=live_by_type["sharing_share_folder"],
+        manifest_name=manifest_name,
+        allow_delete=allow_delete,
+    )
+
+
+def _sharing_live_rows_by_type(live: list[LiveRecord]) -> dict[str, list[dict[str, Any]]]:
+    rows: dict[str, list[dict[str, Any]]] = {
+        "sharing_folder": [],
+        "sharing_shared_folder": [],
+        "sharing_record_share": [],
+        "sharing_share_folder": [],
+    }
+    for record in live:
+        if record.resource_type not in rows:
+            continue
+        rows[record.resource_type].append(
+            {
+                "keeper_uid": record.keeper_uid,
+                "resource_type": record.resource_type,
+                "title": record.title,
+                "payload": dict(record.payload),
+                "marker": dict(record.marker) if record.marker else None,
+            }
+        )
+    return rows
 
 
 def _make_provider(
@@ -798,6 +931,7 @@ def _make_provider(
     *,
     pam: Manifest | None = None,
     vault: VaultManifestV1 | None = None,
+    sharing: SharingManifestV1 | None = None,
 ):
     provider_name = ctx.obj.get("provider", "mock")
     folder_uid = ctx.obj.get("folder_uid")
@@ -810,6 +944,8 @@ def _make_provider(
             manifest_source = pam.model_dump(mode="python", exclude_none=True)
         elif vault is not None:
             manifest_source = vault.model_dump(mode="python", exclude_none=True, by_alias=True)
+        elif sharing is not None:
+            manifest_source = sharing.model_dump(mode="python", exclude_none=True, by_alias=True)
         return CommanderCliProvider(
             folder_uid=folder_uid or os.environ.get("KEEPER_DECLARATIVE_FOLDER"),
             manifest_source=manifest_source,
