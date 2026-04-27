@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any, cast
+
 import pytest
 
 from keeper_sdk.core.errors import CapabilityError
@@ -17,7 +19,7 @@ def _assert_not_implemented(exc: CapabilityError) -> None:
 
 def test_init_seals_construction() -> None:
     with pytest.raises(CapabilityError) as excinfo:
-        BusClient(store=object(), directory_uid="bus-directory")
+        BusClient(store=cast(Any, object()), directory_uid="bus-directory")
 
     _assert_not_implemented(excinfo.value)
 

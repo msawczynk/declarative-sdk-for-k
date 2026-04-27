@@ -149,6 +149,10 @@ def test_sandbox_teardown_records_forces_marker_guarded_delete(
 ) -> None:
     calls: list[str] = []
 
+    def record_command(_params: object, command: str) -> str:
+        calls.append(command)
+        return ""
+
     monkeypatch.setattr(
         smoke.sandbox,
         "_list_folder_entries",
@@ -162,7 +166,7 @@ def test_sandbox_teardown_records_forces_marker_guarded_delete(
     monkeypatch.setattr(
         smoke.sandbox,
         "_do",
-        lambda _params, command: calls.append(command) or "",
+        record_command,
     )
 
     removed = smoke.sandbox.teardown_records(

@@ -163,7 +163,7 @@ def test_canonical_payload_from_field_returns_empty_for_unsupported_shapes(
 
 
 def test_merge_pam_remote_browser_settings_ignores_bad_connection_shape() -> None:
-    payload = {"pamRemoteBrowserSettings": {"connection": []}}
+    payload: dict[str, object] = {"pamRemoteBrowserSettings": {"connection": []}}
 
     _merge_pam_remote_browser_from_get_payload(payload)
 

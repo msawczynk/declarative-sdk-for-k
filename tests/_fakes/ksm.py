@@ -88,9 +88,9 @@ def install_fake_ksm_core(
     FakeSecretsManager.get_secrets_calls = 0
     FakeSecretsManager.visibility_delay = visibility_delay
 
-    core = types.ModuleType("keeper_secrets_manager_core")
+    core: Any = types.ModuleType("keeper_secrets_manager_core")
     core.SecretsManager = FakeSecretsManager
-    storage = types.ModuleType("keeper_secrets_manager_core.storage")
+    storage: Any = types.ModuleType("keeper_secrets_manager_core.storage")
     storage.FileKeyValueStorage = FakeFileKeyValueStorage
 
     monkeypatch.setitem(sys.modules, "keeper_secrets_manager_core", core)

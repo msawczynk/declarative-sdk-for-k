@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import io
 from pathlib import Path
+from typing import cast
 
 import pytest
 from rich.console import Console
@@ -17,7 +18,7 @@ from keeper_sdk.cli.renderer import RichRenderer
 from keeper_sdk.core import build_graph, build_plan, compute_diff, execution_order, load_manifest
 from keeper_sdk.core.interfaces import ApplyOutcome, LiveRecord
 from keeper_sdk.core.metadata import encode_marker
-from keeper_sdk.core.models import Manifest
+from keeper_sdk.core.models import Manifest, PamMachine
 
 SNAPSHOT_DIR = Path(__file__).resolve().parent / "fixtures" / "renderer_snapshots"
 
@@ -132,8 +133,9 @@ def _manifest_with_extra_resources(minimal_manifest_path: Path) -> Manifest:
 
 def _snapshot_live_records(manifest: Manifest) -> list[LiveRecord]:
     cfg = manifest.pam_configurations[0].model_dump(mode="python", exclude_none=True)
-    machine = manifest.resources[0].model_dump(mode="python", exclude_none=True)
-    user = manifest.resources[0].users[0].model_dump(mode="python", exclude_none=True)
+    resource = cast(PamMachine, manifest.resources[0])
+    machine = resource.model_dump(mode="python", exclude_none=True)
+    user = resource.users[0].model_dump(mode="python", exclude_none=True)
 
     live_user = dict(user)
     live_user["password"] = "old-password"
@@ -147,7 +149,7 @@ def _snapshot_live_records(manifest: Manifest) -> list[LiveRecord]:
         "ssl_verification": True,
         "operating_system": "Linux",
     }
-    orphan_payload = {
+    orphan_payload: dict[str, object] = {
         "title": "old-db",
         "database_type": "mysql",
         "host": "old-db.example.com",
@@ -165,7 +167,7 @@ def _snapshot_live_records(manifest: Manifest) -> list[LiveRecord]:
         ),
         _managed_record(
             keeper_uid="UID-MACHINE-001",
-            title=manifest.resources[0].title,
+            title=resource.title,
             resource_type="pamMachine",
             uid_ref="acme-lab-linux1",
             manifest_name=manifest.name,
@@ -173,7 +175,7 @@ def _snapshot_live_records(manifest: Manifest) -> list[LiveRecord]:
         ),
         _managed_record(
             keeper_uid="UID-USER-001",
-            title=manifest.resources[0].users[0].title,
+            title=resource.users[0].title,
             resource_type="pamUser",
             uid_ref="acme-lab-linux1-root",
             manifest_name=manifest.name,
