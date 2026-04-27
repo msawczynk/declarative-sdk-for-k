@@ -1,0 +1,200 @@
++        "name": "runbook.pdf",
++        "size": 128,
++        "mime_type": "application/pdf",
++        "content_hash": "hash-a",
++    }
++    data.update(overrides)
++    if managed:
++        data["marker"] = marker or encode_marker(
++            uid_ref=str(data["uid_ref"]),
++            manifest="demo",
++            resource_type="attachment",
++            parent_uid_ref=str(data["record_uid_ref"]),
++        )
++    elif marker is not None:
++        data["marker"] = marker
++    return data
++
++
++def _only(changes: list[Change]) -> Change:
++    assert len(changes) == 1
++    return changes[0]
++
++
++def test_attachment_diff_empty_manifest_and_live_has_no_changes() -> None:
++    changes = compute_vault_diff(_manifest(), [], live_attachments=[])
++
++    assert changes == []
++
++
++def test_attachment_diff_adds_manifest_attachment_missing_from_live() -> None:
++    row = _only(
++        compute_vault_diff(
++            _manifest(_attachment()),
++            [],
++            manifest_name="demo",
++            live_attachments=[],
++        )
++    )
++
++    assert row.kind is ChangeKind.ADD
++    assert row.uid_ref == "att.alpha"
++    assert row.resource_type == "attachment"
++    assert row.after["manifest_name"] == "demo"
++    assert row.after["marker"]["manifest"] == "demo"
++
++
++def test_attachment_diff_deletes_managed_live_attachment_when_allowed() -> None:
++    row = _only(
++        compute_vault_diff(
++            _manifest(),
++            [],
++            manifest_name="demo",
++            allow_delete=True,
++            live_attachments=[_live_attachment()],
++        )
++    )
++
++    assert row.kind is ChangeKind.DELETE
++    assert row.uid_ref == "att.alpha"
++    assert row.before["manifest_name"] == "demo"
++
++
++def test_attachment_diff_ignores_managed_orphan_without_allow_delete() -> None:
++    changes = compute_vault_diff(
++        _manifest(),
++        [],
++        manifest_name="demo",
++        allow_delete=False,
++        live_attachments=[_live_attachment()],
++    )
++
++    assert changes == []
++
++
++def test_attachment_diff_updates_when_size_differs() -> None:
++    row = _only(
++        compute_vault_diff(
++            _manifest(_attachment(size=256)),
++            [],
++            manifest_name="demo",
++            live_attachments=[_live_attachment(size=128)],
++        )
++    )
++
++    assert row.kind is ChangeKind.UPDATE
++    assert row.before == {"size": 128, "manifest_name": "demo"}
++    assert row.after == {"size": 256, "manifest_name": "demo"}
++
++
++def test_attachment_diff_updates_when_content_hash_differs() -> None:
++    row = _only(
++        compute_vault_diff(
++            _manifest(_attachment(content_hash="b" * 64)),
++            [],
++            manifest_name="demo",
++            live_attachments=[_live_attachment(content_hash="a" * 64)],
++        )
++    )
++
++    assert row.kind is ChangeKind.UPDATE
++    assert row.before["content_hash"] == "a" * 64
++    assert row.after["content_hash"] == "b" * 64
++
++
++def test_attachment_diff_updates_when_mime_type_differs() -> None:
++    row = _only(
++        compute_vault_diff(
++            _manifest(_attachment(mime_type="text/plain")),
++            [],
++            manifest_name="demo",
++            live_attachments=[_live_attachment(mime_type="application/pdf")],
++        )
++    )
++
++    assert row.kind is ChangeKind.UPDATE
++    assert row.before["mime_type"] == "application/pdf"
++    assert row.after["mime_type"] == "text/plain"
++
++
++def test_attachment_diff_missing_record_uid_ref_raises_value_error() -> None:
++    attachment = _attachment()
++    attachment.pop("record_uid_ref")
++
++    with pytest.raises(ValueError, match="record_uid_ref"):
++        compute_vault_diff(_manifest(attachment), [], live_attachments=[])
++
++
++def test_attachment_diff_duplicate_record_and_name_in_manifest_raises_value_error() -> None:
++    with pytest.raises(ValueError, match="duplicate attachment"):
++        compute_vault_diff(
++            _manifest(
++                _attachment(uid_ref="att.one"),
++                _attachment(uid_ref="att.two"),
++            ),
++            [],
++            live_attachments=[],
++        )
++
++
++def test_attachment_diff_unmanaged_live_attachment_is_skip() -> None:
++    row = _only(
++        compute_vault_diff(
++            _manifest(),
++            [],
++            manifest_name="demo",
++            live_attachments=[_live_attachment(managed=False)],
++        )
++    )
++
++    assert row.kind is ChangeKind.SKIP
++    assert row.reason == "unmanaged attachment"
++
++
++def test_attachment_diff_preserves_record_level_changes_alongside_attachments() -> None:
++    changes = compute_vault_diff(
++        _manifest(
++            _attachment(),
++            records=[{"uid_ref": "rec.alpha", "type": "login", "title": "Alpha"}],
++        ),
++        [],
++        manifest_name="demo",
++        live_attachments=[],
++    )
++
++    assert [(c.kind, c.resource_type, c.uid_ref) for c in changes] == [
++        (ChangeKind.CREATE, "login", "rec.alpha"),
++        (ChangeKind.ADD, "attachment", "att.alpha"),
++    ]
++
++
++def test_attachment_diff_change_rows_carry_manifest_name() -> None:
++    row = _only(
++        compute_vault_diff(
++            _manifest(_attachment()),
++            [],
++            manifest_name="custom-manifest",
++            live_attachments=[],
++        )
++    )
++
++    assert row.after["manifest_name"] == "custom-manifest"
++    assert row.after["marker"]["manifest"] == "custom-manifest"
+
+2026-04-27T05:06:09.720539Z ERROR codex_core::session: failed to record rollout items: thread 019dcd4e-9fbc-7e70-bb79-3535629693cc not found
+tokens used
+101,140
+DONE.
+
+Implemented and pushed `97ca3b5` to `origin/cursor/vault-l1-attachments`.
+
+Changed:
+- [vault_diff.py](</Users/martin/Downloads/Cursor tests/dsk-wt-vault-attachments/keeper_sdk/core/vault_diff.py>): added `live_attachments` kwarg and `_compute_attachment_changes(...)`.
+- [diff.py](</Users/martin/Downloads/Cursor tests/dsk-wt-vault-attachments/keeper_sdk/core/diff.py>): added `ChangeKind.ADD` alias and `ChangeKind.SKIP`.
+- [test_vault_diff_attachments.py](</Users/martin/Downloads/Cursor tests/dsk-wt-vault-attachments/tests/test_vault_diff_attachments.py>): added 12 offline cases.
+
+Verification:
+- `python3 -m ruff check .` passed
+- `python3 -m pytest` passed: `560 passed, 1 skipped`
+- `python3 -m mypy keeper_sdk/core/vault_diff.py tests/test_vault_diff_attachments.py` passed
+- Full `python3 -m mypy .` still fails on existing repo typing issues: `69 errors in 13 files`, none in touched files.

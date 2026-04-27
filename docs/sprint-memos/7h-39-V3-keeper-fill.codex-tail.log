@@ -1,0 +1,200 @@
++    *settings: dict[str, Any],
++    marker: dict[str, Any] | None = None,
++) -> dict[str, Any]:
++    out: dict[str, Any] = {"keeper_uid": "kf-uid", "settings": list(settings)}
++    if marker is not None:
++        out["marker"] = marker
++    return out
++
++
++def _live_custom_marker(*settings: dict[str, Any]) -> dict[str, Any]:
++    marker = _marker()
++    return {
++        "keeper_uid": "kf-uid",
++        "settings": list(settings),
++        "custom": [
++            {
++                "type": "text",
++                "label": MARKER_FIELD_LABEL,
++                "value": [serialize_marker(marker)],
++            }
++        ],
++    }
++
++
++def test_keeper_fill_both_none_no_changes() -> None:
++    changes = compute_vault_diff(_manifest(), [], live_keeper_fill={})
++
++    assert changes == []
++
++
++def test_keeper_fill_manifest_set_live_none_adds_whole_block() -> None:
++    manifest = _manifest(_keeper_fill(_setting()))
++
++    changes = compute_vault_diff(manifest, [], manifest_name="demo")
++
++    assert len(changes) == 1
++    assert changes[0].kind is ChangeKind.ADD
++    assert changes[0].uid_ref == "keeper_fill:tenant"
++    assert changes[0].resource_type == "keeper_fill"
++
++
++def test_keeper_fill_live_marked_manifest_none_deletes_with_allow_delete() -> None:
++    live = _live(_setting(), marker=_marker())
++
++    changes = compute_vault_diff(
++        _manifest(),
++        [],
++        manifest_name="demo",
++        allow_delete=True,
++        live_keeper_fill=live,
++    )
++
++    assert len(changes) == 1
++    assert changes[0].kind is ChangeKind.DELETE
++    assert changes[0].uid_ref == "keeper_fill:tenant"
++
++
++def test_keeper_fill_same_settings_no_changes_with_custom_marker() -> None:
++    setting = _setting()
++
++    changes = compute_vault_diff(
++        _manifest(_keeper_fill(setting)),
++        [],
++        manifest_name="demo",
++        live_keeper_fill=_live_custom_marker(setting),
++    )
++
++    assert changes == []
++
++
++def test_keeper_fill_policy_drift_updates_setting() -> None:
++    manifest = _manifest(
++        _keeper_fill(_domain_setting(policy={"auto_fill": "on", "auto_submit": "off"}))
++    )
++    live = _live(
++        _domain_setting(policy={"auto_fill": "off", "auto_submit": "off"}),
++        marker=_marker(),
++    )
++
++    changes = compute_vault_diff(manifest, [], manifest_name="demo", live_keeper_fill=live)
++
++    assert len(changes) == 1
++    assert changes[0].kind is ChangeKind.UPDATE
++    assert changes[0].resource_type == "keeper_fill_setting"
++    assert changes[0].title == "example.com"
++    assert changes[0].after == {"policy": {"auto_fill": "on", "auto_submit": "off"}}
++
++
++def test_keeper_fill_scope_drift_updates_setting() -> None:
++    manifest = _manifest(_keeper_fill(_domain_setting(scope="enterprise")))
++    live = _live(_domain_setting(scope="team"), marker=_marker())
++
++    changes = compute_vault_diff(manifest, [], manifest_name="demo", live_keeper_fill=live)
++
++    assert len(changes) == 1
++    assert changes[0].kind is ChangeKind.UPDATE
++    assert changes[0].after == {"scope": "enterprise"}
++
++
++def test_keeper_fill_new_manifest_setting_adds_setting_row() -> None:
++    manifest = _manifest(_keeper_fill(_setting("rec.a"), _setting("rec.b")))
++    live = _live(_setting("rec.a"), marker=_marker())
++
++    changes = compute_vault_diff(manifest, [], manifest_name="demo", live_keeper_fill=live)
++
++    assert len(changes) == 1
++    assert changes[0].kind is ChangeKind.ADD
++    assert changes[0].uid_ref == "keeper_fill:tenant:rec.b"
++    assert changes[0].after == _setting("rec.b")
++
++
++def test_keeper_fill_removed_live_setting_deletes_with_allow_delete() -> None:
++    manifest = _manifest(_keeper_fill(_setting("rec.a")))
++    live = _live(_setting("rec.a"), _setting("rec.b"), marker=_marker())
++
++    changes = compute_vault_diff(
++        manifest,
++        [],
++        manifest_name="demo",
++        allow_delete=True,
++        live_keeper_fill=live,
++    )
++
++    assert len(changes) == 1
++    assert changes[0].kind is ChangeKind.DELETE
++    assert changes[0].uid_ref == "keeper_fill:tenant:rec.b"
++    assert changes[0].before == _setting("rec.b")
++
++
++def test_keeper_fill_live_unmanaged_skips() -> None:
++    changes = compute_vault_diff(
++        _manifest(_keeper_fill(_setting())),
++        [],
++        manifest_name="demo",
++        live_keeper_fill=_live(_setting()),
++    )
++
++    assert len(changes) == 1
++    assert changes[0].kind is ChangeKind.SKIP
++    assert changes[0].reason == "unmanaged keeper_fill"
++
++
++def test_keeper_fill_rows_include_manifest_name() -> None:
++    changes = compute_vault_diff(
++        _manifest(_keeper_fill(_setting())),
++        [],
++        manifest_name="tenant-demo",
++    )
++
++    assert len(changes) == 1
++    assert changes[0].manifest_name == "tenant-demo"
++
++
++def test_keeper_fill_preserves_record_level_changes_alongside() -> None:
++    manifest = _record_manifest(_keeper_fill(_setting()))
++    live_record = LiveRecord(
++        keeper_uid="uid-1",
++        title="Alpha",
++        resource_type="login",
++        payload={"type": "login", "title": "Alpha", "Login": "other-user"},
++        marker=encode_marker(
++            uid_ref="vault.login.alpha",
++            manifest="demo",
++            resource_type="login",
++        ),
++    )
++
++    changes = compute_vault_diff(manifest, [live_record], manifest_name="demo")
++
++    assert [change.kind for change in changes] == [ChangeKind.UPDATE, ChangeKind.ADD]
++    assert [change.uid_ref for change in changes] == ["vault.login.alpha", "keeper_fill:tenant"]
++
++
++def test_keeper_fill_duplicate_manifest_domain_raises_value_error() -> None:
++    manifest = _manifest(
++        _keeper_fill(_domain_setting("example.com"), _domain_setting("example.com"))
++    )
++
++    with pytest.raises(ValueError, match="example.com"):
++        compute_vault_diff(
++            manifest,
++            [],
++            manifest_name="demo",
++            live_keeper_fill=_live(_domain_setting("example.com"), marker=_marker()),
++        )
+
+2026-04-27T05:06:10.471139Z ERROR codex_core::session: failed to record rollout items: thread 019dcd4e-a258-71d0-9778-cc340302e983 not found
+tokens used
+111,954
+DONE. Pushed `51c55db` to `origin/cursor/vault-l1-keeperfill`.
+
+Changed [vault_diff.py](/Users/martin/Downloads/Cursor%20tests/dsk-wt-vault-keeperfill/keeper_sdk/core/vault_diff.py): keeper_fill offline diff helper, `live_keeper_fill` kwarg, marker/custom handling, per-setting rows. Added [test_vault_diff_keeper_fill.py](/Users/martin/Downloads/Cursor%20tests/dsk-wt-vault-keeperfill/tests/test_vault_diff_keeper_fill.py) with 12 cases.
+
+Gates:
+- `python3 -m ruff check .` PASS
+- `python3 -m pytest` PASS: `560 passed, 1 skipped`
+- `python3 -m mypy keeper_sdk tests/test_vault_diff_keeper_fill.py` PASS
+- `python3 -m mypy keeper_sdk tests` still FAILS on pre-existing unrelated test typing errors; new keeper_fill file no longer appears.
+
+No live tenant. No provider apply path. Marker manager constant untouched.
