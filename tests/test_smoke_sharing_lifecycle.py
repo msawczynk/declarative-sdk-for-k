@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import importlib
-import inspect
 import sys
 from collections import Counter
-from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -44,50 +42,44 @@ TITLE_PREFIX = "sdk-smoke"
 SF_UID = "sf-offline"
 MANIFEST_NAME = f"{TITLE_PREFIX}-{SCENARIO_NAME}"
 BLOCK_KEYS = ("folders", "shared_folders", "share_records", "share_folders")
+RESOURCE_BLOCKS = {
+    _SHARING_FOLDER_RESOURCE: "folders",
+    _SHARED_FOLDER_RESOURCE: "shared_folders",
+    _RECORD_SHARE_RESOURCE: "share_records",
+    _SHARE_FOLDER_RESOURCE: "share_folders",
+}
 
 
 def _spec() -> Any:
     return scenarios.VAULT_SHARING_LIFECYCLE
 
 
-def _call_builder(builder: Callable[..., Any], title_prefix: str, sf_uid: str) -> Any:
-    params = [
-        param
-        for param in inspect.signature(builder).parameters.values()
-        if param.kind
-        in (
-            inspect.Parameter.POSITIONAL_ONLY,
-            inspect.Parameter.POSITIONAL_OR_KEYWORD,
-            inspect.Parameter.VAR_POSITIONAL,
-        )
-    ]
-    if not params or params[0].kind is inspect.Parameter.VAR_POSITIONAL:
-        return builder(title_prefix, sf_uid)
-    if len(params) == 1:
-        name = params[0].name
-        return builder(title_prefix if "title" in name or "prefix" in name else sf_uid)
-
-    first, second = params[0].name, params[1].name
-    if ("sf" in first or "folder" in first) and ("title" in second or "prefix" in second):
-        return builder(sf_uid, title_prefix)
-    return builder(title_prefix, sf_uid)
+def _resources(
+    title_prefix: str = TITLE_PREFIX,
+    sf_uid: str = SF_UID,
+) -> list[dict[str, Any]]:
+    result = _spec().resources_factory(title_prefix, sf_uid)
+    assert isinstance(result, list), "resources_factory must return a list"
+    assert all(isinstance(row, dict) for row in result)
+    return result
 
 
 def _build_document(
     title_prefix: str = TITLE_PREFIX,
     sf_uid: str = SF_UID,
 ) -> dict[str, Any]:
-    spec = _spec()
-    builder = getattr(spec, "build_manifest", None) or getattr(spec, "build_resources", None)
-    assert callable(builder), "vaultSharingLifecycle needs a manifest/resource factory"
+    document: dict[str, Any] = {"schema": SHARING_FAMILY, **dict.fromkeys(BLOCK_KEYS)}
+    for key in BLOCK_KEYS:
+        document[key] = []
 
-    result = _call_builder(builder, title_prefix, sf_uid)
-    if isinstance(result, SharingManifestV1):
-        return result.model_dump(mode="json", by_alias=True, exclude_none=True)
-    assert isinstance(result, dict), "scenario factory must return a manifest-shaped dict"
-    if result.get("schema") == SHARING_FAMILY:
-        return result
-    return {"schema": SHARING_FAMILY, **result}
+    for resource in _resources(title_prefix, sf_uid):
+        block = RESOURCE_BLOCKS.get(str(resource.get("resource_type")))
+        if block is None:
+            continue
+        document[block].append(
+            {field: value for field, value in resource.items() if field != "resource_type"}
+        )
+    return document
 
 
 def _manifest() -> SharingManifestV1:
@@ -168,8 +160,8 @@ def _apply_manifest(manifest: SharingManifestV1) -> tuple[MockProvider, list[Liv
     return provider, provider.discover()
 
 
-def _verify(manifest: SharingManifestV1, live_records: list[LiveRecord]) -> None:
-    _spec().verify(manifest, live_records, TITLE_PREFIX)
+def _verify(live_records: list[LiveRecord]) -> None:
+    _spec().verifier(live_records)
 
 
 def _remove_first(records: list[LiveRecord], resource_type: str) -> list[LiveRecord]:
@@ -210,28 +202,46 @@ def test_scenario_constant_contract() -> None:
 
     assert spec.name == SCENARIO_NAME
     assert spec.family == SHARING_FAMILY
+    assert callable(spec.resources_factory)
+    assert callable(spec.verifier)
+    assert isinstance(spec.description, str)
+    assert not hasattr(spec, "build_manifest")
+    assert not hasattr(spec, "build_resources")
 
 
 def test_resource_factory_builds_expected_payload_shape() -> None:
+    resources = _resources()
     document = _build_document()
+    by_type = Counter(row["resource_type"] for row in resources)
 
     assert document["schema"] == SHARING_FAMILY
     folders = _block(document, "folders")
     shared_folders = _block(document, "shared_folders")
     record_shares = _block(document, "share_records")
     share_folders = _block(document, "share_folders")
+    login_records = [row for row in resources if row.get("resource_type") == "login"]
 
-    assert len(folders) >= 3
-    assert len(shared_folders) >= 2
-    assert len(record_shares) >= 3
-    assert len(share_folders) >= 4
+    assert by_type == {
+        _SHARING_FOLDER_RESOURCE: 1,
+        _SHARED_FOLDER_RESOURCE: 1,
+        "login": 1,
+        _RECORD_SHARE_RESOURCE: 1,
+        _SHARE_FOLDER_RESOURCE: 1,
+    }
+    assert len(folders) == 1
+    assert len(shared_folders) == 1
+    assert len(record_shares) == 1
+    assert len(share_folders) == 1
+    assert len(login_records) == 1
     assert all(row.get("uid_ref") for key in BLOCK_KEYS for row in _block(document, key))
-    assert {row["kind"] for row in share_folders} >= {"grantee", "record", "default"}
+    assert {row["kind"] for row in share_folders} == {"default"}
     assert all(row["record_uid_ref"].startswith("keeper-vault:records:") for row in record_shares)
     assert all(
         row["shared_folder_uid_ref"].startswith("keeper-vault-sharing:shared_folders:")
         for row in share_folders
     )
+    assert login_records[0]["type"] == "login"
+    assert login_records[0]["folder_ref"].startswith("keeper-vault-sharing:folders:")
 
 
 def test_manifest_typed_load_accepts_factory_output() -> None:
@@ -258,7 +268,7 @@ def test_verifier_accepts_happy_path_record_list() -> None:
     manifest = _manifest()
     _provider, live_records = _apply_manifest(manifest)
 
-    _verify(manifest, live_records)
+    _verify(live_records)
 
 
 def test_verifier_raises_on_missing_folder_marker() -> None:
@@ -266,7 +276,7 @@ def test_verifier_raises_on_missing_folder_marker() -> None:
     _provider, live_records = _apply_manifest(manifest)
 
     with pytest.raises(AssertionError, match="folder|marker|drift|unmanaged"):
-        _verify(manifest, _replace_first_markerless_folder(live_records))
+        _verify(_replace_first_markerless_folder(live_records))
 
 
 def test_verifier_raises_on_missing_shared_folder() -> None:
@@ -274,7 +284,7 @@ def test_verifier_raises_on_missing_shared_folder() -> None:
     _provider, live_records = _apply_manifest(manifest)
 
     with pytest.raises(AssertionError, match="shared_folder|shared folder|drift"):
-        _verify(manifest, _remove_first(live_records, _SHARED_FOLDER_RESOURCE))
+        _verify(_remove_first(live_records, _SHARED_FOLDER_RESOURCE))
 
 
 def test_verifier_raises_on_missing_record_share_grantee() -> None:
@@ -282,7 +292,7 @@ def test_verifier_raises_on_missing_record_share_grantee() -> None:
     _provider, live_records = _apply_manifest(manifest)
 
     with pytest.raises(AssertionError, match="record_share|record share|grantee|drift"):
-        _verify(manifest, _remove_first(live_records, _RECORD_SHARE_RESOURCE))
+        _verify(_remove_first(live_records, _RECORD_SHARE_RESOURCE))
 
 
 def test_verifier_raises_on_missing_share_folder() -> None:
@@ -290,7 +300,7 @@ def test_verifier_raises_on_missing_share_folder() -> None:
     _provider, live_records = _apply_manifest(manifest)
 
     with pytest.raises(AssertionError, match="share_folder|share folder|drift"):
-        _verify(manifest, _remove_first(live_records, _SHARE_FOLDER_RESOURCE))
+        _verify(_remove_first(live_records, _SHARE_FOLDER_RESOURCE))
 
 
 def test_mock_provider_round_trip_rediff_clean() -> None:
@@ -346,29 +356,16 @@ def test_record_share_same_record_different_grantees_round_trips() -> None:
     assert _changes(manifest, provider) == []
 
 
-def test_smoke_runner_dispatches_and_writes_sharing_manifests() -> None:
+def test_smoke_runner_exposes_choice_and_factory_writes_sharing_manifest() -> None:
     smoke = importlib.import_module("scripts.smoke.smoke")
-    previous_active = {
-        name: getattr(smoke, name) for name in dir(smoke) if name.startswith("_ACTIVE")
-    }
-    paths: list[Path] = []
-    try:
-        assert SCENARIO_NAME in smoke._scenario_choices()
-        assert smoke._scenario_family(SCENARIO_NAME) == SHARING_FAMILY
-        assert smoke._set_active_scenario(SCENARIO_NAME) == SHARING_FAMILY
-        assert smoke._active_scenario_name() == SCENARIO_NAME
+    manifest_doc = yaml.safe_load(yaml.safe_dump(_build_document(), sort_keys=False))
+    empty_doc = yaml.safe_load(
+        yaml.safe_dump({"schema": SHARING_FAMILY, **{key: [] for key in BLOCK_KEYS}})
+    )
 
-        manifest_path = smoke._write_manifest(SF_UID)
-        empty_path = smoke._write_empty_manifest(SF_UID, stem=manifest_path.stem)
-        paths.extend([manifest_path, empty_path])
-        manifest_doc = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
-        empty_doc = yaml.safe_load(empty_path.read_text(encoding="utf-8"))
-
-        assert manifest_doc["schema"] == SHARING_FAMILY
-        assert empty_doc["schema"] == SHARING_FAMILY
-        assert all(not empty_doc.get(key) for key in BLOCK_KEYS)
-    finally:
-        for path in paths:
-            path.unlink(missing_ok=True)
-        for name, value in previous_active.items():
-            setattr(smoke, name, value)
+    assert SCENARIO_NAME in smoke._scenario_choices()
+    assert smoke._scenario_family(SCENARIO_NAME) == SHARING_FAMILY
+    assert manifest_doc["schema"] == SHARING_FAMILY
+    assert isinstance(load_sharing_manifest(manifest_doc), SharingManifestV1)
+    assert empty_doc["schema"] == SHARING_FAMILY
+    assert all(not empty_doc.get(key) for key in BLOCK_KEYS)
