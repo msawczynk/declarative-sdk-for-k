@@ -16,6 +16,10 @@ vendoring the harness.
 | Cost / tier probe | `bash scripts/daybook/harness.sh cost-check` |
 | Before Commander / Keeper login | `bash scripts/daybook/harness.sh ksm-preflight` |
 | Atomic append (preferred over hand-editing) | `bash scripts/daybook/harness.sh append JOURNAL '…one line…'` |
+| After Cursor subagent workers return | `bash scripts/daybook/harness.sh harvest` |
+| JOURNAL bloat / distill gate (boot may nag) | `bash scripts/daybook/harness.sh distill-check` |
+| End-of-session auto-review digest | `bash scripts/daybook/harness.sh review-loop` |
+| Print `export` lines for `~/Downloads` + `DAYBOOK_REPO` | `bash scripts/daybook/harness.sh print-env` |
 
 Help: `bash scripts/daybook/harness.sh help`
 
@@ -27,10 +31,11 @@ for `daybook_append`).
 `~/.cursor-daybook-sync/`. If your **canonical** files live under `~/Downloads/`
 (see `AGENT_PREAMBLE.md` / `agent_session_boot.sh`), set before `append` or `sync`:
 
+Or generate the same (with your `$HOME` expanded):
+
 ```bash
-export JOURNAL_PATH="$HOME/Downloads/JOURNAL.md"
-export LESSONS_PATH="$HOME/Downloads/LESSONS.md"
-export DAYBOOK_REPO="$HOME/.cursor-daybook-sync"
+bash scripts/daybook/harness.sh print-env
+# eval:  source <(bash scripts/daybook/harness.sh print-env)
 ```
 
 Then run `harness.sh append` / `harness.sh sync` in the same shell.

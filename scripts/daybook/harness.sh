@@ -15,11 +15,15 @@ print_help() {
 dsk daybook harness — forwards to ~/.cursor-daybook-sync/scripts (or DAYBOOK_SYNC_ROOT).
 Canonical JOURNAL/LESSONS: ~/Downloads/JOURNAL.md and ~/Downloads/LESSONS.md (not in this repo).
 
-  bash scripts/daybook/harness.sh boot           # session boot
-  bash scripts/daybook/harness.sh pre-claim     # before done/gate-lift claim
-  bash scripts/daybook/harness.sh sync          # daybook → GitHub mirror
-  bash scripts/daybook/harness.sh cost-check    # tier/cost probe
-  bash scripts/daybook/harness.sh ksm-preflight  # before Commander login
+  bash scripts/daybook/harness.sh boot            # session boot
+  bash scripts/daybook/harness.sh pre-claim        # before done/gate-lift claim
+  bash scripts/daybook/harness.sh sync             # daybook → GitHub mirror
+  bash scripts/daybook/harness.sh cost-check       # tier/cost probe
+  bash scripts/daybook/harness.sh ksm-preflight     # before Commander login
+  bash scripts/daybook/harness.sh harvest          # subagent_harvest (after workers)
+  bash scripts/daybook/harness.sh distill-check     # JOURNAL bloat / stale sprint check
+  bash scripts/daybook/harness.sh review-loop       # write hooks-log review digest
+  bash scripts/daybook/harness.sh print-env         # print export lines (Downloads JOURNAL)
   bash scripts/daybook/harness.sh append JOURNAL '…one line…'
   bash scripts/daybook/harness.sh append LESSONS '…one line…'
 
@@ -28,9 +32,21 @@ Environment: DAYBOOK_SYNC_ROOT — daybook script repo (default: ~/.cursor-daybo
 EOF
 }
 
+print_env() {
+  # Matches agent_session_boot: default JOURNAL/LESSONS under $HOME/Downloads.
+  printf 'export JOURNAL_PATH="${JOURNAL_PATH:-%s/Downloads/JOURNAL.md}"\n' "$HOME"
+  printf 'export LESSONS_PATH="${LESSONS_PATH:-%s/Downloads/LESSONS.md}"\n' "$HOME"
+  printf 'export DAYBOOK_REPO="${DAYBOOK_REPO:-%s/.cursor-daybook-sync}"\n' "$HOME"
+  echo "# source these before: append, sync, daybook_append"
+}
+
 case "${1:-}" in
   "" | help | --help | -h)
     print_help
+    exit 0
+    ;;
+  print-env)
+    print_env
     exit 0
     ;;
 esac
@@ -44,6 +60,9 @@ case "$cmd" in
   sync) exec bash "$ROOT/sync_daybook.sh" "$@" ;;
   cost-check) exec bash "$ROOT/cost_check_now.sh" "$@" ;;
   ksm-preflight) exec bash "$ROOT/ksm_login_preflight.sh" "$@" ;;
+  harvest) exec bash "$ROOT/subagent_harvest.sh" "$@" ;;
+  distill-check) exec bash "$ROOT/agent_distill_check.sh" "$@" ;;
+  review-loop) exec bash "$ROOT/agent_review_loop.sh" "$@" ;;
   append)
     kind="${1:-}"
     shift || true
