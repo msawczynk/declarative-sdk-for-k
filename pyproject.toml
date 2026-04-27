@@ -104,3 +104,6 @@ markers = [
     "integration: requires a live Keeper tenant (set KEEPER_CONFIG)",
     "slow: perf / long tests",
 ]
+
+[tool.coverage.run]
+omit = ["keeper_sdk/secrets/bus.py"]

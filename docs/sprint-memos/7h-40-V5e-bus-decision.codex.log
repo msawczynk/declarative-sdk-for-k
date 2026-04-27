@@ -1,0 +1,1645 @@
+Reading additional input from stdin...
+OpenAI Codex v0.125.0-alpha.3 (research preview)
+--------
+workdir: /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: workspace-write [workdir, /tmp, $TMPDIR, /Users/martin/.codex/memories] (network access enabled)
+reasoning effort: none
+reasoning summaries: none
+session id: 019dcd63-d385-7861-b3ac-9d5a1217f178
+--------
+user
+## Sprint 7h-40 V5e — bus.py decision finalisation (codex readonly memo)
+
+You are a codex CLI **readonly** worker. WORKTREES.md §7 has been pending since Sprint 7h-9/7h-10; Sprint 7h-35 worker memo (`71504ca0`) recommended Option A/B/C with conditions. The orchestrator now wants a **decision-finalisation memo** that:
+
+1. Re-confirms the 7h-35 worker's three-option analysis is still valid against the current `main` (commit `306cb26`).
+2. Resolves the two PARENT-DECIDE items WORKTREES §7 lists.
+3. Produces a concrete patch (or pragma block) for the chosen option that the orchestrator can apply directly.
+
+# Required reading
+
+1. `keeper_sdk/secrets/bus.py` — full read (currently 225 LOC; check actual line count). Confirm: `BusClient` + `BusMessage` dataclass, 5 public methods raising `CapabilityError`, Phase B checklist in module docstring at lines 97:117.
+2. `keeper_sdk/exceptions.py` (or wherever `CapabilityError` lives) — confirm raise sites point at the right exception class.
+3. `pyproject.toml` — find `[tool.coverage.*]` (likely absent), `[tool.pytest.ini_options]`, and the CI floor `--cov-fail-under=84`.
+4. `.coveragerc` — likely absent.
+5. `.github/workflows/ci.yml` — `--cov-fail-under` flag at ~ line 64.
+6. WORKTREES.md §7 — full read.
+7. `/Users/martin/Downloads/JOURNAL.md` Sprint 7h-9 + 7h-10 entries — find the cov-bus-skeleton history; specifically the 7h-10 F4 LESSON re: metric-gaming.
+8. `/Users/martin/Downloads/LESSONS.md` `[coverage][sealed-skeleton]` entry — the worker recommendation Sprint 7h-35 captured.
+9. `git log --all --oneline | grep -i bus` — find PR #24 / `cursor/cov-bus-skeleton` SHAs to verify subsumed-or-not.
+
+# Deliverable: ~120-line decision memo + patch
+
+## Section 1: Current state audit
+
+Cite each:
+- `bus.py` LOC, public method count, exception type. Confirm matches 7h-35 memo.
+- Phase B checklist items (6 per 7h-35 memo). Cite line range.
+- Caller search: `grep -rn "from keeper_sdk.secrets.bus import\|keeper_sdk.secrets.bus" keeper_sdk tests scripts docs` — confirm zero internal callers. (Use the Grep tool.)
+- `pyproject.toml`/`.coveragerc` state for omit/exclude lists.
+
+## Section 2: Resolve PARENT-DECIDE (i) — 7h-9/10 PR #24 reconciliation
+
+Use `git log` + `git show` to determine:
+- Is `cursor/cov-bus-skeleton` still on origin? (`git ls-remote origin cursor/cov-bus-skeleton`.)
+- Was it merged? Check `git log --all --grep="cov-bus" --oneline`.
+- Does `tests/test_bus.py` exist on current `main`? If yes, what's its content (cite line count).
+- Verdict: **SUBSUMED**, **STILL OPEN**, or **ABANDONED**.
+
+## Section 3: Resolve PARENT-DECIDE (ii) — exception-type text fix
+
+WORKTREES §7 was textually corrected in Sprint 7h-35 (`NotImplementedError` → `CapabilityError`). Confirm the current text is correct by reading WORKTREES.md §7 directly. If still wrong, propose the exact diff.
+
+## Section 4: Recommend A vs B vs C
+
+Pick ONE based on the audit:
+
+- **A** = implement Phase B (full feature). Cost: 6-step checklist, ~400 LOC + tests + docs + CLI. Justify only if KSM bus is on the near-term roadmap.
+- **B** = `CapabilityError` stub coverage. Cost: ~20 LOC test file. Already explored 7h-9/10; flagged as metric-gaming. Justify only if cov number absolutely must include this module.
+- **C** = exclude from coverage via `# pragma: no cover` per-method OR `[tool.coverage.run] omit = ["keeper_sdk/secrets/bus.py"]`. Cost: 1 line config OR ~6 pragma comments. Justify if Phase B is parked indefinitely.
+
+State your recommendation explicitly: `RECOMMEND: <A|B|C>`.
+
+## Section 5: Patch for chosen option
+
+Provide a unified diff:
+
+- For C-omit: `pyproject.toml` adds `[tool.coverage.run] omit = ["keeper_sdk/secrets/bus.py"]`.
+- For C-pragma: `bus.py` adds `# pragma: no cover` to each `raise CapabilityError(...)` line.
+- For B: `tests/test_bus_capability_error.py` NEW — 5 tests asserting each method raises `CapabilityError`.
+- For A: out of scope for this memo — produce a phase-B implementation plan instead, NOT the implementation itself.
+
+Provide the patch in unified diff format that orchestrator can `git apply`.
+
+## Section 6: Coverage impact prediction
+
+If C-omit:
+- `bus.py` 0% → excluded entirely; total cov number rises by `(225 / total_LOC_under_cov) * (current_uncovered_pct) = ?%`. Cite total LOC under cov.
+- This unlocks Pending §8 (cov ratchet 84 → 85)? State exact prediction.
+
+If C-pragma:
+- Each pragma line excluded from cov. ~5 lines excluded. Smaller bump.
+
+If B:
+- 5 new test cases each cover 1 raise line. Maybe 10 LOC of bus.py becomes covered. Tiny effect on total.
+
+## Section 7: CANDIDATE LESSON
+
+`2026-04-27 [coverage][bus-decision-finalised] <one-line>`.
+
+# Constraints
+
+- Read-only.
+- Cite file:line for every non-trivial claim.
+- Output the full memo as your final response.
+- Do not modify any files.
+- If you discover that the audit reveals state different from what 7h-35 memo claimed, FLAG it explicitly and re-baseline.
+codex
+I’ll keep this strictly read-only. I’m going to verify the repo state, read the named files with line numbers, then produce the memo and an apply-ready diff without touching the worktree.
+  → Verify current commit and repository state
+  • Audit bus.py, exceptions, coverage config, CI, WORKTREES
+  • Reconcile PR #24 branch/log/test state
+  • Read journal and lessons history
+  • Compute coverage impact and write memo with patch
+exec
+/bin/zsh -lc 'git rev-parse --short HEAD' in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+exec
+/bin/zsh -lc 'git status --short' in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ succeeded in 0ms:
+306cb26
+
+ succeeded in 0ms:
+exec
+/bin/zsh -lc 'wc -l keeper_sdk/secrets/bus.py' in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ succeeded in 0ms:
+     224 keeper_sdk/secrets/bus.py
+
+exec
+/bin/zsh -lc 'git branch --show-current' in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ succeeded in 0ms:
+main
+
+codex
+The local checkout is on `main` at `306cb26` with a clean status. One early discrepancy to carry forward: `keeper_sdk/secrets/bus.py` is 224 lines, not 225, so I’ll cite the actual count and flag it in the memo.
+  ✓ Verify current commit and repository state
+  → Audit bus.py, exceptions, coverage config, CI, WORKTREES
+  • Reconcile PR #24 branch/log/test state
+  • Read journal and lessons history
+  • Compute coverage impact and write memo with patch
+exec
+/bin/zsh -lc "awk '{printf \"%6d\\t%s\\n\", NR, "'$0}'"' keeper_sdk/secrets/bus.py" in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ succeeded in 0ms:
+     1	"""Phase B: KSM-backed inter-agent message bus (SKELETON, do not enable).
+     2	
+     3	Status
+     4	------
+     5	
+     6	This module is **not implemented**. It is a sealed scaffold so the next
+     7	agent can wire the API without re-deriving the design. Every public entry
+     8	point raises :class:`CapabilityError` with a precise next-action so
+     9	accidental imports fail loudly instead of silently no-oping.
+    10	
+    11	The ``bootstrap_ksm_application(create_bus_directory=True, ...)`` flow
+    12	already provisions the on-tenant directory record this module will read
+    13	and write; that contract is frozen and covered by unit tests in
+    14	``tests/test_bootstrap_ksm.py::test_bootstrap_with_bus_creates_directory_record``
+    15	and ``...::test_bootstrap_with_bus_reuses_existing_directory``.
+    16	
+    17	Why we picked KSM as the bus substrate
+    18	--------------------------------------
+    19	
+    20	We considered three substrates before settling on KSM directory records:
+    21	
+    22	1. **Standalone Keeper records (one per message)** — would explode the
+    23	   tenant's record count, blow past the 25k-records-per-app soft limit,
+    24	   and lose ordering. Rejected.
+    25	
+    26	2. **External broker (Redis/SQS/etc.)** — adds a second auth surface,
+    27	   second secrets-rotation story, and a second outage axis. The whole
+    28	   point of the KSM bootstrap is that operators already trust the vault
+    29	   for credentials; reusing it for low-volume agent coordination is
+    30	   strictly less infrastructure. Selected.
+    31	
+    32	3. **Filesystem under ``~/.cursor-daybook-sync``** — works on a single
+    33	   workstation, falls apart for cross-host agents and CI runners. The
+    34	   daybook stays human-readable; the bus stays machine-coordinated.
+    35	   Out of scope.
+    36	
+    37	Wire format
+    38	-----------
+    39	
+    40	A single KSM record (the *directory record*, created on demand by
+    41	``bootstrap_ksm_application(create_bus_directory=True)``) holds the bus
+    42	state. Its custom fields encode messages as JSON envelopes::
+    43	
+    44	    {
+    45	      "v": 1,                       # envelope version, monotonic
+    46	      "id": "<uuid4>",              # message id, immutable
+    47	      "from": "<agent-id>",         # producer label, free-form
+    48	      "to": "<agent-id>|*",         # consumer label or broadcast
+    49	      "subject": "<topic>",         # short routing key
+    50	      "ts": "<ISO-8601 UTC>",       # producer wall clock
+    51	      "payload": <json-value>,      # caller-supplied body
+    52	      "ttl_s": <int>,               # optional, default 3600
+    53	      "trace_id": "<uuid4>"         # optional, propagates across agents
+    54	    }
+    55	
+    56	A separate custom field, ``cursor`` (single value, integer), is the
+    57	high-watermark a consumer last acknowledged.
+    58	
+    59	Compare-and-swap (CAS) semantics
+    60	--------------------------------
+    61	
+    62	The directory record is single-writer-at-a-time by convention; concurrent
+    63	producers race in the open. We coordinate via the record's revision
+    64	number returned from ``KSMCommand.update_record``. Each ``post`` /
+    65	``ack`` operation:
+    66	
+    67	1. Loads the directory record and snapshots its revision.
+    68	2. Applies the local mutation (append envelope, advance cursor).
+    69	3. Issues an update with ``If-Match: <snapshot revision>``.
+    70	4. On 409, reloads, re-applies, retries with bounded backoff (max 8
+    71	   tries, total ≤ 12s — same rationale as the bootstrap verify loop).
+    72	
+    73	Producers MUST be idempotent on ``id`` so a retry after a partial
+    74	visible-but-not-acked write doesn't duplicate. Consumers MUST treat the
+    75	cursor as advisory and de-dup on ``id`` to absorb the same edge.
+    76	
+    77	Public API (TO IMPLEMENT)
+    78	-------------------------
+    79	
+    80	::
+    81	
+    82	    class BusClient:
+    83	        def __init__(self, *, store: KsmSecretStore, directory_uid: str): ...
+    84	        def post(self, *, to: str, subject: str, payload: Any, ttl_s: int = 3600,
+    85	                 trace_id: str | None = None) -> str: ...
+    86	        def fetch(self, *, since_id: str | None = None,
+    87	                  consumer: str = "*") -> list[BusMessage]: ...
+    88	        def ack(self, *, last_id: str, consumer: str) -> None: ...
+    89	        def gc(self, *, now: datetime | None = None) -> int: ...
+    90	
+    91	    @dataclass(frozen=True)
+    92	    class BusMessage: ...
+    93	
+    94	Next-action checklist for the implementing agent
+    95	-------------------------------------------------
+    96	
+    97	1. Add ``KSMCommand.update_record`` and ``KSMCommand.get_record`` probes
+    98	   under ``scripts/probe_commander.py`` to confirm the revision header is
+    99	   surfaced in this Commander pin (``.commander-pin``). If not, use the
+   100	   ``record_management.update_record_v3`` path instead — log the rev
+   101	   source choice in JOURNAL.md.
+   102	2. Wire CAS retries through the same exponential backoff helper used in
+   103	   ``keeper_sdk.secrets.bootstrap._verify_redeemed_config`` (extract to
+   104	   ``keeper_sdk.core.retry`` first; current bootstrap copy is fine to
+   105	   inline-replace).
+   106	3. Cap envelope size at 32 KB (KSM custom field practical ceiling).
+   107	   Reject larger payloads with :class:`CapabilityError` — operators
+   108	   should put bulk artefacts in regular records and pass the UID.
+   109	4. Add ``tests/test_bus_ksm.py`` with the same fake-KSM substrate from
+   110	   ``tests/_fakes/ksm.py``. Cover: post + fetch, CAS conflict + retry,
+   111	   TTL expiry sweep, broadcast vs. addressed delivery, idempotency on
+   112	   replayed ``id``.
+   113	5. Document the operator runbook in ``docs/KSM_BUS.md`` (model on
+   114	   ``docs/KSM_BOOTSTRAP.md``); link it from ``docs/KSM_INTEGRATION.md``.
+   115	6. Wire a ``dsk bus`` family of CLI subcommands in
+   116	   ``keeper_sdk/cli/main.py`` (``post``, ``tail``, ``ack``, ``gc``) so
+   117	   operators can debug without writing Python.
+   118	
+   119	Until the steps above are done this module stays sealed: importing it is
+   120	fine, instantiating ``BusClient`` raises :class:`CapabilityError` so the
+   121	guardrail is structural, not aspirational.
+   122	"""
+   123	
+   124	from __future__ import annotations
+   125	
+   126	from dataclasses import dataclass
+   127	from datetime import datetime
+   128	from typing import TYPE_CHECKING, Any
+   129	
+   130	from keeper_sdk.core.errors import CapabilityError
+   131	
+   132	if TYPE_CHECKING:
+   133	    from keeper_sdk.secrets.ksm import KsmSecretStore
+   134	
+   135	
+   136	_NOT_IMPLEMENTED_NEXT_ACTION = (
+   137	    "Phase B (KSM bus) is not implemented yet; see "
+   138	    "keeper_sdk/secrets/bus.py module docstring for the next-action "
+   139	    "checklist before turning this on."
+   140	)
+   141	
+   142	
+   143	@dataclass(frozen=True)
+   144	class BusMessage:
+   145	    """Frozen view of one envelope read from the bus directory record.
+   146	
+   147	    Kept here (rather than left as a TODO comment) so callers that want
+   148	    to type-annotate consumer code today don't have to wait for the bus
+   149	    to ship; the wire format above is the contract.
+   150	    """
+   151	
+   152	    id: str
+   153	    sender: str
+   154	    recipient: str
+   155	    subject: str
+   156	    timestamp: str
+   157	    payload: Any
+   158	    trace_id: str | None = None
+   159	    ttl_seconds: int = 3600
+   160	
+   161	
+   162	class BusClient:
+   163	    """Sealed entry point for the Phase B inter-agent bus.
+   164	
+   165	    All methods raise :class:`CapabilityError` so that any code path that
+   166	    accidentally activates the bus today fails with the canonical error
+   167	    shape — not a silent no-op, not a generic ``NotImplementedError``.
+   168	    """
+   169	
+   170	    def __init__(
+   171	        self,
+   172	        *,
+   173	        store: KsmSecretStore,
+   174	        directory_uid: str,
+   175	    ) -> None:
+   176	        _ = store, directory_uid
+   177	        raise CapabilityError(
+   178	            reason="Phase B KSM bus client is not implemented",
+   179	            next_action=_NOT_IMPLEMENTED_NEXT_ACTION,
+   180	        )
+   181	
+   182	    def post(
+   183	        self,
+   184	        *,
+   185	        to: str,
+   186	        subject: str,
+   187	        payload: Any,
+   188	        ttl_s: int = 3600,
+   189	        trace_id: str | None = None,
+   190	    ) -> str:
+   191	        _ = to, subject, payload, ttl_s, trace_id
+   192	        raise CapabilityError(
+   193	            reason="Phase B KSM bus 'post' is not implemented",
+   194	            next_action=_NOT_IMPLEMENTED_NEXT_ACTION,
+   195	        )
+   196	
+   197	    def fetch(
+   198	        self,
+   199	        *,
+   200	        since_id: str | None = None,
+   201	        consumer: str = "*",
+   202	    ) -> list[BusMessage]:
+   203	        _ = since_id, consumer
+   204	        raise CapabilityError(
+   205	            reason="Phase B KSM bus 'fetch' is not implemented",
+   206	            next_action=_NOT_IMPLEMENTED_NEXT_ACTION,
+   207	        )
+   208	
+   209	    def ack(self, *, last_id: str, consumer: str) -> None:
+   210	        _ = last_id, consumer
+   211	        raise CapabilityError(
+   212	            reason="Phase B KSM bus 'ack' is not implemented",
+   213	            next_action=_NOT_IMPLEMENTED_NEXT_ACTION,
+   214	        )
+   215	
+   216	    def gc(self, *, now: datetime | None = None) -> int:
+   217	        _ = now
+   218	        raise CapabilityError(
+   219	            reason="Phase B KSM bus 'gc' is not implemented",
+   220	            next_action=_NOT_IMPLEMENTED_NEXT_ACTION,
+   221	        )
+   222	
+   223	
+   224	__all__ = ["BusClient", "BusMessage"]
+
+exec
+/bin/zsh -lc "awk '{printf \"%6d\\t%s\\n\", NR, "'$0}'"' keeper_sdk/exceptions.py" in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ exited 2 in 0ms:
+awk: can't open file keeper_sdk/exceptions.py
+ source line number 1
+
+exec
+/bin/zsh -lc "rg -n \"coverage|pytest|cov|cov-fail-under|tool\\.coverage|tool\\.pytest\" pyproject.toml" in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ exited 127 in 0ms:
+zsh:1: command not found: rg
+
+exec
+/bin/zsh -lc "awk 'NR>=1 && NR<=120 {printf \"%6d\\t%s\\n\", NR, "'$0}'"' .github/workflows/ci.yml" in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ succeeded in 0ms:
+     1	name: CI
+     2	
+     3	on:
+     4	  push:
+     5	    branches: [main]
+     6	  pull_request:
+     7	    # Trigger on PRs targeting `main` AND PRs targeting any `cursor/**`
+     8	    # or `codex/**` branch so stacked PRs (child PRs whose base is a
+     9	    # parent PR's branch instead of `main`) receive CI signal before
+    10	    # they're rebased onto `main`. Lesson `[pr-merge][stacked-base-retarget]`
+    11	    # 2026-04-26 traced a CI-blind merge to this gap.
+    12	    branches: [main, 'cursor/**', 'codex/**']
+    13	
+    14	permissions:
+    15	  contents: read
+    16	
+    17	concurrency:
+    18	  group: ci-${{ github.ref }}
+    19	  cancel-in-progress: true
+    20	
+    21	jobs:
+    22	  lint:
+    23	    name: lint (ruff)
+    24	    runs-on: ubuntu-latest
+    25	    steps:
+    26	      - uses: actions/checkout@v4
+    27	      - uses: actions/setup-python@v5
+    28	        with:
+    29	          python-version: "3.12"
+    30	      - run: pip install ruff
+    31	      - run: ruff check .
+    32	      - run: ruff format --check .
+    33	
+    34	  typecheck:
+    35	    name: typecheck (mypy)
+    36	    runs-on: ubuntu-latest
+    37	    steps:
+    38	      - uses: actions/checkout@v4
+    39	      - uses: actions/setup-python@v5
+    40	        with:
+    41	          python-version: "3.12"
+    42	      - run: pip install -e ".[dev]"
+    43	      - run: mypy keeper_sdk
+    44	
+    45	  test:
+    46	    name: test (py${{ matrix.python }})
+    47	    runs-on: ubuntu-latest
+    48	    strategy:
+    49	      fail-fast: false
+    50	      matrix:
+    51	        python: ["3.11", "3.12", "3.13"]
+    52	    steps:
+    53	      - uses: actions/checkout@v4
+    54	      - uses: actions/setup-python@v5
+    55	        with:
+    56	          python-version: ${{ matrix.python }}
+    57	      - run: pip install -e ".[dev]"
+    58	      # Coverage ratchet: baseline at 86% (commit 2026-04-26 post-Sprint-7h-5
+    59	      # cov slices for redact/schema/normalize landing at 100%, 315 tests).
+    60	      # Floor set to 84% (baseline - 2) so small refactors don't gate CI
+    61	      # while still catching genuine regressions (~70 LOC of un-tested
+    62	      # logic). Raise the floor when adding net-new tested surface; never
+    63	      # lower it without a written rationale in JOURNAL.md.
+    64	      - run: pytest -q --cov=keeper_sdk --cov-report=term-missing --cov-fail-under=84
+    65	        env:
+    66	          # Offline-only; live-smoke against a real tenant runs via
+    67	          # scripts/smoke/smoke.py in a separate, credential-bearing
+    68	          # workflow (not in public CI).
+    69	          DSK_CI: "1"
+    70	
+    71	  examples:
+    72	    name: examples (validate + mock-plan)
+    73	    runs-on: ubuntu-latest
+    74	    steps:
+    75	      - uses: actions/checkout@v4
+    76	      - uses: actions/setup-python@v5
+    77	        with:
+    78	          python-version: "3.12"
+    79	      - run: pip install -e ".[dev]"
+    80	      - name: Validate every example manifest (offline schema gate)
+    81	        run: |
+    82	          set -euo pipefail
+    83	          shopt -s nullglob
+    84	          for f in examples/*.yaml examples/scaffold_only/*.yaml; do
+    85	            echo "::group::validate $f"
+    86	            dsk validate "$f"
+    87	            echo "::endgroup::"
+    88	          done
+    89	      - name: Plan every example against mock provider (no CONFLICT rows)
+    90	        run: |
+    91	          set -e
+    92	          for f in examples/*.yaml; do
+    93	            echo "::group::plan $f"
+    94	            # plan exits 2 on "changes pending" (intentional, see
+    95	            # docs/VALIDATION_STAGES.md) — capture instead of failing.
+    96	            out=$(dsk --provider mock plan "$f" --json) || true
+    97	            echo "$out" | python -c 'import json,sys,os; d=json.loads(sys.stdin.read()); s=d["summary"]; print(s); sys.exit(0 if s["conflict"]==0 else 1)'
+    98	            echo "::endgroup::"
+    99	          done
+   100	
+   101	  schema-validate:
+   102	    name: schema-validate (RFC 8259)
+   103	    runs-on: ubuntu-latest
+   104	    steps:
+   105	      - uses: actions/checkout@v4
+   106	      - uses: actions/setup-python@v5
+   107	        with:
+   108	          python-version: "3.12"
+   109	      # Plain stdlib json.tool — RFC 8259 strict (no trailing commas, no
+   110	      # comments). Sprint 7h-15 LESSON [worker][format-on-rebase-jsonc-trap]:
+   111	      # ruff format over the schemas dir introduces JSONC trailing commas
+   112	      # that pytest tolerates but external schema validators reject.
+   113	      - name: Validate every schema file is RFC 8259-compliant JSON
+   114	        run: |
+   115	          set -e
+   116	          fail=0
+   117	          for f in $(find keeper_sdk/core/schemas -name '*.json' -type f); do
+   118	            if ! python -m json.tool < "$f" > /dev/null 2>&1; then
+   119	              echo "::error file=$f::not RFC 8259-compliant JSON (trailing comma? comment? unquoted key?)"
+   120	              fail=1
+
+exec
+/bin/zsh -lc 'find . -maxdepth 1 -name .coveragerc -print' in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+exec
+/bin/zsh -lc "rg -n \"from keeper_sdk\\.secrets\\.bus import|keeper_sdk\\.secrets\\.bus\" keeper_sdk tests scripts docs" in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ succeeded in 0ms:
+ exited 127 in 0ms:
+zsh:1: command not found: rg
+
+codex
+`rg` is not installed in this environment, so I’m using `grep`/`find` as the available grep equivalent. The first pass confirms `.coveragerc` is absent at repo root and CI still enforces `--cov-fail-under=84` at `.github/workflows/ci.yml:64`.
+exec
+/bin/zsh -lc "awk '{printf \"%6d\\t%s\\n\", NR, "'$0}'"' keeper_sdk/core/errors.py" in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ succeeded in 0ms:
+     1	"""Shared error taxonomy.
+     2	
+     3	Each subclass carries enough context for an operator-facing remediation message:
+     4	resource type, uid_ref, reason, and concrete next action.
+     5	"""
+     6	
+     7	from __future__ import annotations
+     8	
+     9	from dataclasses import dataclass, field
+    10	from typing import Any
+    11	
+    12	
+    13	@dataclass
+    14	class ManifestError(Exception):
+    15	    """Base class for all declarative-engine errors."""
+    16	
+    17	    reason: str
+    18	    uid_ref: str | None = None
+    19	    resource_type: str | None = None
+    20	    live_identifier: str | None = None
+    21	    next_action: str | None = None
+    22	    context: dict[str, Any] = field(default_factory=dict)
+    23	
+    24	    def __str__(self) -> str:  # pragma: no cover - trivial
+    25	        parts: list[str] = []
+    26	        if self.resource_type:
+    27	            parts.append(self.resource_type)
+    28	        if self.uid_ref:
+    29	            parts.append(f"uid_ref={self.uid_ref}")
+    30	        if self.live_identifier:
+    31	            parts.append(f"live={self.live_identifier}")
+    32	        header = "[" + " ".join(parts) + "] " if parts else ""
+    33	        tail = f" Next: {self.next_action}" if self.next_action else ""
+    34	        return f"{header}{self.reason}.{tail}"
+    35	
+    36	
+    37	class SchemaError(ManifestError):
+    38	    """Manifest failed JSON Schema or typed-model validation."""
+    39	
+    40	
+    41	class RefError(ManifestError):
+    42	    """A *_uid_ref target is missing, duplicate, cyclic, or by-title unresolved."""
+    43	
+    44	
+    45	class OwnershipError(ManifestError):
+    46	    """Ownership metadata conflict, wrong manager, wrong version, or ambiguity."""
+    47	
+    48	
+    49	class CollisionError(ManifestError):
+    50	    """An unmanaged live record blocks a declarative create."""
+    51	
+    52	
+    53	class CapabilityError(ManifestError):
+    54	    """Missing role enforcement, license, KSM app, or environment support."""
+    55	
+    56	
+    57	class DeleteUnsupportedError(CapabilityError):
+    58	    """Backward-compatible alias for delete capability failures.
+    59	
+    60	    v1 provider code now raises :class:`CapabilityError` directly, but
+    61	    pre-GA callers may still import this public symbol.
+    62	    """
+
+exec
+/bin/zsh -lc "grep -n -E \"coverage|pytest|cov|cov-fail-under|tool\\.coverage|tool\\.pytest\" pyproject.toml" in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ succeeded in 0ms:
+54:    "pytest>=7.0",
+55:    "pytest-cov",
+101:[tool.pytest.ini_options]
+
+exec
+/bin/zsh -lc 'grep -n "''^## .*7'"\\|"'^### .*7'"\\|WORKTREES\\|bus\\|PARENT-DECIDE\" WORKTREES.md" in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ exited 2 in 0ms:
+grep: WORKTREES.md: No such file or directory
+
+exec
+/bin/zsh -lc "grep -R -n \"class CapabilityError\\|CapabilityError\" keeper_sdk | head -40" in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ succeeded in 0ms:
+keeper_sdk/core/SCAFFOLD.md:20:| `errors.py` | 62 | Structured taxonomy: `ManifestError`, `SchemaError`, `RefError`, `OwnershipError`, `CollisionError`, `CapabilityError`, `DeleteUnsupportedError` (compat shim subclassing `CapabilityError`). Every error carries `reason` + `next_action` + optional `context`. | All error classes |
+keeper_sdk/core/SCAFFOLD.md:35:| New error variant | `errors.py` | `CapabilityError` (carries `next_action`) |
+keeper_sdk/core/__init__.py:25:    CapabilityError,
+keeper_sdk/core/__init__.py:79:    "CapabilityError",
+keeper_sdk/core/rules.py:18:from keeper_sdk.core.errors import CapabilityError, SchemaError
+keeper_sdk/core/rules.py:25:            raise CapabilityError(
+Binary file keeper_sdk/core/__pycache__/rules.cpython-314.pyc matches
+Binary file keeper_sdk/core/__pycache__/errors.cpython-314.pyc matches
+Binary file keeper_sdk/core/__pycache__/__init__.cpython-314.pyc matches
+keeper_sdk/core/errors.py:53:class CapabilityError(ManifestError):
+keeper_sdk/core/errors.py:57:class DeleteUnsupportedError(CapabilityError):
+keeper_sdk/core/errors.py:60:    v1 provider code now raises :class:`CapabilityError` directly, but
+keeper_sdk/auth/__init__.py:31:- Errors raise ``CapabilityError`` with a concrete ``next_action`` so
+Binary file keeper_sdk/auth/__pycache__/__init__.cpython-314.pyc matches
+Binary file keeper_sdk/auth/__pycache__/helper.cpython-314.pyc matches
+keeper_sdk/auth/helper.py:15:from keeper_sdk.core.errors import CapabilityError
+keeper_sdk/auth/helper.py:78:        raise CapabilityError(
+keeper_sdk/auth/helper.py:95:            raise CapabilityError(
+keeper_sdk/auth/helper.py:121:        raise CapabilityError(
+keeper_sdk/auth/helper.py:131:        raise CapabilityError(
+keeper_sdk/auth/helper.py:163:        Raise ``CapabilityError`` with a clear ``next_action`` if any
+keeper_sdk/auth/helper.py:216:            raise CapabilityError(
+keeper_sdk/auth/helper.py:303:            raise CapabilityError(
+keeper_sdk/auth/helper.py:412:        raise CapabilityError(
+keeper_sdk/auth/helper.py:418:        raise CapabilityError(
+keeper_sdk/auth/helper.py:427:        raise CapabilityError(
+keeper_sdk/secrets/bootstrap.py:27:from keeper_sdk.core.errors import CapabilityError
+keeper_sdk/secrets/bootstrap.py:166:        raise CapabilityError(
+keeper_sdk/secrets/bootstrap.py:171:        raise CapabilityError(
+keeper_sdk/secrets/bootstrap.py:176:        raise CapabilityError(
+keeper_sdk/secrets/bootstrap.py:181:        raise CapabilityError(
+keeper_sdk/secrets/bootstrap.py:186:        raise CapabilityError(
+keeper_sdk/secrets/bootstrap.py:193:        raise CapabilityError(
+keeper_sdk/secrets/bootstrap.py:198:        raise CapabilityError(
+keeper_sdk/secrets/bootstrap.py:216:            raise CapabilityError(
+keeper_sdk/secrets/bootstrap.py:224:        raise CapabilityError(
+keeper_sdk/secrets/bootstrap.py:273:        raise CapabilityError(
+keeper_sdk/secrets/bootstrap.py:350:        raise CapabilityError(
+keeper_sdk/secrets/bootstrap.py:357:        raise CapabilityError(
+keeper_sdk/secrets/bootstrap.py:378:        raise CapabilityError(
+
+exec
+/bin/zsh -lc "awk '{printf \"%6d\\t%s\\n\", NR, "'$0}'"' pyproject.toml" in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ succeeded in 0ms:
+     1	[build-system]
+     2	requires = ["setuptools>=77.0"]
+     3	build-backend = "setuptools.build_meta"
+     4	
+     5	[project]
+     6	name = "declarative-sdk-for-k"
+     7	version = "1.1.0"
+     8	description = "Declarative lifecycle (validate / export / plan / diff / apply) across the full K surface — vault records, shared folders, teams, roles, enterprise config, KSM, PAM, compliance, rotation — agent- and LLM-friendly by design."
+     9	requires-python = ">=3.11"
+    10	readme = "README.md"
+    11	license = "MIT"
+    12	authors = [{ name = "declarative-sdk-for-k contributors" }]
+    13	keywords = [
+    14	    "keeper",
+    15	    "vault",
+    16	    "pam",
+    17	    "ksm",
+    18	    "enterprise",
+    19	    "declarative",
+    20	    "iac",
+    21	    "agents",
+    22	    "llm",
+    23	    "terraform-like",
+    24	]
+    25	classifiers = [
+    26	    "Development Status :: 4 - Beta",
+    27	    "Programming Language :: Python :: 3",
+    28	    "Programming Language :: Python :: 3.11",
+    29	    "Programming Language :: Python :: 3.12",
+    30	    "Programming Language :: Python :: 3.13",
+    31	    "Topic :: Security",
+    32	    "Topic :: System :: Systems Administration",
+    33	    "Intended Audience :: Developers",
+    34	    "Intended Audience :: System Administrators",
+    35	]
+    36	dependencies = [
+    37	    "click>=8.1",
+    38	    "pydantic>=2.0",
+    39	    "networkx>=3.0",
+    40	    "pyyaml>=6.0",
+    41	    "rich>=13.0",
+    42	    "jsonschema>=4.21",
+    43	    "keepercommander>=17.2.13,<18",
+    44	    "pyotp",
+    45	]
+    46	
+    47	[project.urls]
+    48	Homepage = "https://github.com/msawczynk/declarative-sdk-for-k"
+    49	Issues = "https://github.com/msawczynk/declarative-sdk-for-k/issues"
+    50	Documentation = "https://github.com/msawczynk/declarative-sdk-for-k#readme"
+    51	
+    52	[project.optional-dependencies]
+    53	dev = [
+    54	    "pytest>=7.0",
+    55	    "pytest-cov",
+    56	    "mypy",
+    57	    "ruff",
+    58	    "types-PyYAML",
+    59	    "types-jsonschema",
+    60	]
+    61	ksm = [
+    62	    "keeper-secrets-manager-core>=17.2.0,<18",
+    63	]
+    64	
+    65	[project.scripts]
+    66	# Short, tab-completable, agent-friendly. Primary CLI name.
+    67	dsk = "keeper_sdk.cli:main"
+    68	# Backwards-compat aliases for pre-1.0 callers + CI scripts. Will be
+    69	# removed in v2.0.0 when the package is also renamed to `declarative_sdk_k`.
+    70	pamform = "keeper_sdk.cli:main"
+    71	keeper-sdk = "keeper_sdk.cli:main"
+    72	
+    73	[tool.setuptools]
+    74	include-package-data = true
+    75	
+    76	[tool.setuptools.packages.find]
+    77	include = ["keeper_sdk*"]
+    78	exclude = ["tests*"]
+    79	
+    80	[tool.setuptools.package-data]
+    81	"keeper_sdk.core.schemas" = ["*.json", "**/*.json"]
+    82	
+    83	[tool.mypy]
+    84	python_version = "3.11"
+    85	ignore_missing_imports = true
+    86	# yaml stubs live in types-PyYAML (dev dep); silence on systems where
+    87	# someone runs mypy without installing the dev extra.
+    88	[[tool.mypy.overrides]]
+    89	module = ["yaml", "yaml.*"]
+    90	ignore_missing_imports = true
+    91	follow_imports = "skip"
+    92	
+    93	[tool.ruff]
+    94	target-version = "py311"
+    95	line-length = 100
+    96	
+    97	[tool.ruff.lint]
+    98	select = ["E", "F", "W", "I", "UP"]
+    99	ignore = ["E501"]
+   100	
+   101	[tool.pytest.ini_options]
+   102	testpaths = ["tests"]
+   103	markers = [
+   104	    "integration: requires a live Keeper tenant (set KEEPER_CONFIG)",
+   105	    "slow: perf / long tests",
+   106	]
+
+exec
+/bin/zsh -lc "grep -R -n -E \"from keeper_sdk\\.secrets\\.bus import|keeper_sdk\\.secrets\\.bus\" keeper_sdk tests scripts docs" in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ succeeded in 0ms:
+Binary file tests/__pycache__/test_bus.cpython-314-pytest-9.0.3.pyc matches
+tests/test_bus.py:6:from keeper_sdk.secrets.bus import BusClient
+
+codex
+The audit is already diverging from the prompt’s expected baseline: `tests/test_bus.py` exists and imports `BusClient`, so the caller search is not zero if tests are included. I’ll re-baseline the recommendation around the actual current `306cb26` state rather than preserving the old assumption.
+exec
+/bin/zsh -lc "awk '{printf \"%6d\\t%s\\n\", NR, "'$0}'"' tests/test_bus.py" in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ succeeded in 0ms:
+     1	from __future__ import annotations
+     2	
+     3	import pytest
+     4	
+     5	from keeper_sdk.core.errors import CapabilityError
+     6	from keeper_sdk.secrets.bus import BusClient
+     7	
+     8	
+     9	def _client() -> BusClient:
+    10	    """Bypass the sealed __init__ that raises on construction."""
+    11	    return object.__new__(BusClient)
+    12	
+    13	
+    14	def _assert_not_implemented(exc: CapabilityError) -> None:
+    15	    assert "not implemented" in str(exc).lower()
+    16	
+    17	
+    18	def test_init_seals_construction() -> None:
+    19	    with pytest.raises(CapabilityError) as excinfo:
+    20	        BusClient(store=object(), directory_uid="bus-directory")
+    21	
+    22	    _assert_not_implemented(excinfo.value)
+    23	
+    24	
+    25	@pytest.mark.parametrize(
+    26	    ("method_name", "kwargs"),
+    27	    [
+    28	        ("post", {"to": "*", "subject": "topic", "payload": {"ok": True}}),
+    29	        ("fetch", {"since_id": None, "consumer": "*"}),
+    30	        ("ack", {"last_id": "message-id", "consumer": "*"}),
+    31	        ("gc", {}),
+    32	    ],
+    33	)
+    34	def test_method_raises_capability_error(method_name: str, kwargs: dict[str, object]) -> None:
+    35	    method = getattr(_client(), method_name)
+    36	
+    37	    with pytest.raises(CapabilityError) as excinfo:
+    38	        method(**kwargs)
+    39	
+    40	    _assert_not_implemented(excinfo.value)
+
+exec
+/bin/zsh -lc 'wc -l tests/test_bus.py' in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ succeeded in 0ms:
+      40 tests/test_bus.py
+
+exec
+/bin/zsh -lc "find . -maxdepth 2 -name '*coverage*' -o -name '.coveragerc' -print" in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+exec
+/bin/zsh -lc 'find /Users/martin/Downloads -maxdepth 3 -name WORKTREES.md -print' in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ succeeded in 0ms:
+ succeeded in 0ms:
+/Users/martin/Downloads/Cursor tests/WORKTREES.md
+
+exec
+/bin/zsh -lc 'git ls-files .coveragerc' in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ succeeded in 0ms:
+exec
+/bin/zsh -lc "grep -R -n -E --exclude-dir=__pycache__ \"from keeper_sdk\\.secrets\\.bus import|keeper_sdk\\.secrets\\.bus\" keeper_sdk tests scripts docs" in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ succeeded in 0ms:
+tests/test_bus.py:6:from keeper_sdk.secrets.bus import BusClient
+
+exec
+/bin/zsh -lc 'grep -n "''^## .*7'"\\|"'^### .*7'"\\|PARENT-DECIDE\\|bus.py\\|cov-bus\\|NotImplementedError\\|CapabilityError\" \"/Users/martin/Downloads/Cursor tests/WORKTREES.md\"" in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ succeeded in 0ms:
+12:### Sprint 7h-12..7h-14 PRs (2026-04-26 evening)
+19:| #24 | `cursor/cov-bus-skeleton` | (sibling) | **MERGED** Sprint 7h-9 | bus.py 0→100% via CapabilityError contract pin |
+28:### Recovery SHAs (Sprint 7h-8 teardowns, 2026-04-26 ~18:25 BST — codex/* triage)
+38:### Recovery SHAs (Sprint 7h-2 teardowns, 2026-04-26 ~16:00 BST)
+54:## Active worktrees (as of 2026-04-26 Sprint 7h reconcile)
+71:### Open `cursor/*` branches on origin (post-Sprint 7h-8)
+96:7. **`keeper_sdk/secrets/bus.py` 0% cov decision.** Three options: (A) implement Phase B (six-step docstring checklist at `bus.py` 97:117 — Commander probes, CAS retry, 32 KB size cap, `tests/test_bus_ksm.py`, `docs/KSM_BUS.md`, `dsk bus` CLI). (B) Add `CapabilityError` stub coverage (NOT `NotImplementedError` — the module raises `CapabilityError`; see `bus.py` 165:168 + raise sites). Sprint 7h-9 / 7h-10 already explored Option B on `cursor/cov-bus-skeleton`; 7h-10 F4 flagged it as metric-gaming with zero defensive value. (C) Move to `_skeleton/` or add `# pragma: no cover` and exclude from cov target — currently no omit list exists in `pyproject.toml` or `.coveragerc`. Defer until Phase B implementation timing decided. Worker memo (Sprint 7h-35, agent `71504ca0`): C aligns with defer; A when Phase B on roadmap; B only if team wants stub in cov number with eyes open. PARENT-DECIDE: (i) reconcile 7h-9/10 PR #24 vs current main, (ii) accept B-text as `CapabilityError`.
+
+exec
+/bin/zsh -lc 'grep -n "''^#'"\\|Sprint 7h-9\\|Sprint 7h-10\\|cov-bus\\|bus skeleton\\|metric-gaming\\|F4 LESSON\\|coverage\\]\\[sealed-skeleton\\]\" /Users/martin/Downloads/JOURNAL.md" in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ succeeded in 0ms:
+1:# JOURNAL — Downloads workspace (Cursor)
+6:## What this is
+18:## Current state snapshot
+20:### `declarative-sdk-for-k` (primary SDK, public since 2026-04-24)
+34:### `keeper-pam-declarative` (capability mirror, reframed 2026-04-24)
+46:### `keeper-vault-rbi-pam-testenv` (live-tenant smoke harness)
+52:### `Jesper/pam_rbi_license_optimization` (customer workflow)
+56:## What shipped (condensed from Week 1-4)
+89:## V1.0 shipping gates still open
+114:## Deferred to v1.1
+123:## Hardening backlog (non-blocking)
+135:## Active workspace conventions
+152:## Sprint 5 — landed (2026-04-25)
+188:## Sprint 6 — landed (2026-04-26)
+208:## Open for next session
+236:## Sprint 7b — operationalise the discipline (2026-04-26 ~14:25 BST)
+267:## 2026-04-26 — KSM as first-class SDK feature shipped (PR-ready: `cursor/sdk-ksm-integration`)
+281:## 2026-04-26 — `dsk bootstrap-ksm` shipped (PR-ready: `cursor/sdk-ksm-bootstrap`, stacked on integration)
+305:## 2026-04-26 — HANDOFF card (parent closes pending tracks for new agent)
+312:  - `cursor/sdk-ksm-bootstrap` — `dsk bootstrap-ksm` provisioning + propagation-race fix + Phase B bus skeleton + CI cov ratchet. Stacked on integration; merge after it. **This is the active branch.**
+337:  - `https://github.com/msawczynk/declarative-sdk-for-k/pull/new/cursor/sdk-ksm-bootstrap` (Phase A2 — bootstrap + retry + bus skeleton + cov ratchet)
+339:## Sprint 7c — close the structural loopholes (2026-04-26 ~14:55 BST)
+378:## Sprint 7d — close the discipline loop with auto-review (2026-04-26 ~15:10 BST)
+412:## Branches + PRs reconcile (2026-04-26 ~15:15 BST)
+416:### Workspace memory repos
+425:### Commander (`Cursor tests/Commander/`)
+440:### declarative-sdk-for-k (the SDK fork — main worktree)
+463:### SDK worktrees (6, all share `declarative-sdk-for-k`'s `.git`)
+478:### Customer / demo / lab repos
+504:### Wrap-up
+514:### Action queue (carried into next session)
+524:### Reconciliation cadence (proposal)
+528:## Sprint 7f — propagation gap closed for non-Downloads workspaces
+559:## Sprint 7h — branch + worktree reconcile (2026-04-26 ~15:50 BST)
+596:### Sprint 7h-4 — `gh` installed + all 7 PRs opened (2026-04-26 ~17:15 BST)
+636:### Sprint 7h-3.2 — shared-object-store + 3 cov slices landed (2026-04-26 ~16:50 BST)
+656:### Sprint 7h-3.1 — driver sandbox-gitdir + helper PID-suffix + cov-redact landed (2026-04-26 ~16:35 BST)
+687:### Sprint 7h-3 — codex prompt library (2026-04-26 ~16:25 BST)
+717:### Sprint 7h-2 — worktree teardown (2026-04-26 ~16:00 BST)
+736:### Sprint 7h-3 — codex prompt-library landed + cov slices via parent-commit (2026-04-26 ~16:30 BST)
+750:### Sprint 7h-4 — gh CLI install + 7 PRs opened (2026-04-26 ~17:00 BST)
+761:### Sprint 7h-5 — token rotation + branch-stack pollution + CI repair (2026-04-26 ~17:30 BST)
+789:### Sprint 7h-6 — merge cascade + cov ratchet bump (2026-04-26 ~17:50 BST)
+832:## Sprint 7h-8 — doc reconcile + codex/* triage + ci broaden (2026-04-26 ~18:30 BST)
+870:## Sprint 7h-9 — codex orchestration optimization + bus.py memo (2026-04-26 ~18:30 BST)
+905:- Apply the bus.py Option B slice (`tests/test_bus.py` with `object.__new__(BusClient)` calls, ~40 LOC, plus the wording-drift doc fix). PREFAB_cov-slice + manual override of "use unbound-method calls". Branch `cursor/cov-bus-skeleton`.
+908:- After 2 of 3 above land: bump `--cov-fail-under` 84 → 86 in ci.yml (account for the bus skeleton at 100% lifting the floor by ~1.3pp + the helpers slice contributing ~0.5pp).
+912:## Sprint 7h-10 — parallel cov batch + meta daybook review (2026-04-26 ~19:00 BST)
+921:| `cursor/cov-bus-skeleton` | bus.py 0→100% via Option B + docstring fix | PR #24 open, CI green |
+943:| F4 | cov-floor on sealed-stub modules is metric-gaming (100% on bus.py adds zero defensive value) | LESSON only — current slice took test-route for contract-pinning; future sealed skeletons should use `# pragma: no cover` or `[tool.coverage.report] omit` |
+973:## Sprint 7h-11 — full-Commander coverage roadmap + context-optimisation thread (2026-04-26 ~19:25 BST)
+979:### Thread A — full-Commander coverage memo
+981:Existing roadmap (Sprint 7h-9 memo) covered current PAM-only DSK scope. User's broader ask = "all of Commander". Read-only worker launched via `codex_offline_bg.sh` + `PREFAB_roadmap-plan` substituted for `${PROJECT}=declarative-sdk-for-k`, `${TARGET_STATE}=full-Commander-coverage`.
+1028:### Thread B — context-optimisation: sticky-alert compaction
+1046:### Verify-on-next-run checklist
+1052:### Pending for next session (decision-class items requiring user input)
+1059:## Sprint 7h-12 — V2 decisions frozen + scaffolds shipped + context-opt batch (2026-04-26 ~19:35 BST)
+1063:### Implementations landed
+1065:**A. PRs cleared (carry-over from 7h-10).** PRs #24/#25/#26 (cov-bus/bootstrap/helpers) were left open at end of prior session despite the prior summary claiming merged. Used `pr_merge_clean.sh` — first attempt failed because the helper's `awk '{p=$2}'` split on spaces and our worktree path is `/Users/martin/Downloads/Cursor tests/_codex-worktrees/...`. Fix: `p = substr($0, 10)` to capture everything after `worktree `. With fix in place, all 3 PRs merged + worktrees torn down + main fast-forwarded to `37014dd`.
+1088:### Test posture
+1095:### Worker delegation
+1101:### Pending follow-ups
+1108:### Context-optimisation summary
+1118:### Verify-on-next-run checklist
+1125:## Sprint 7h-13 — live-test harness + daybook structural enforcement (2026-04-26 ~19:50 BST)
+1127:### What landed
+1143:### Daybook structural enforcement (companion bundle, daybook repo not SDK)
+1152:### Why this sprint mattered
+1158:### Pending follow-ups
+1165:### Verify-on-next-run checklist
+1172:## Sprint 7h-14 — orchestration reset + 4 parallel design memos + P9 vault impl (2026-04-26 ~20:20 BST)
+1184:### What landed
+1239:### Pending follow-ups (next sprint)
+1261:### Verify-on-next-run checklist
+1272:### Honest meta-takeaway
+1281:## Sprint 7h-15 — P10 vault-sharing impl + P12/P14 design memos in parallel (2026-04-26 ~20:40 BST)
+1338:### Verify-on-next-run checklist
+1345:### Honest meta-takeaway
+1351:## Sprint 7h-16 — Process optimization batch + P11 enterprise impl + 2 readonly memos (2026-04-26 evening)
+1355:### Process review (4 axes)
+1366:### Cycle execution
+1375:### Shipping cycle real-world test (`dsk_ship.sh` debut)
+1384:### Family status board (post-7h-16)
+1400:### Velocity update
+1404:### Honest meta-takeaway
+1410:## Sprint 7h-17 — P14 keeper-pam-extended.v1 slice M (2026-04-26)
+1420:## Sprint 7h-18 — P12 integrations N=2 split landed (2026-04-26)
+1428:## Sprint 7h-19 — `dsk report password-report` (2026-04-26)
+1436:## Sprint 7h-20 — `dsk report` compliance + security-audit (2026-04-26)
+1444:## Sprint 7h-21 — Report hardening + JOURNAL board reconcile (2026-04-26)
+1450:### Refined approach (daybook + delivery, 7h-22 note)
+1459:## Sprint 7h-23 — `[F]` P17 `dsk report` row scrub + `--sanitize-uids` (2026-04-26)
+1467:## Sprint 7h-24 — `[F]` live-proof Wave-1 prep (R4 + pointers) (2026-04-26)
+1475:## Program board — SDK capability → maintenance (2026-04-26)
+1495:### Autonomous policy (clarified 2026-04-26 — not blocking on operator)
+1522:## Sprint 7h-25 — `[F]` P18 R1 memo + enterprise live-proof pointer (2026-04-26)
+1540:## Sprint 7h-26 — `[F]` P18a `sync_upstream` enterprise registry (2026-04-26)
+1556:## Sprint 7h-27 — `[F]` P18b vault + integrations `sync_upstream` (2026-04-26)
+1576:## Sprint 7h-28 — vault `validate --online` + orchestration §10 (2026-04-27)
+1588:## Sprint 7h-29 — vault docs reconcile (2026-04-27)
+1598:## Sprint 7h-30 — vault Commander UPDATE body sync (2026-04-27)
+1632:## Sprint 7h-35 — daybook auto-review carry-over fix (2026-04-27 03:35Z)
+1654:- Sprint **7h-9 / 7h-10** already shipped a B-style `tests/test_bus.py` on `cursor/cov-bus-skeleton`; 7h-10 F4 LESSON flagged it as metric-gaming.
+1657:- CANDIDATE LESSON (worker): `[coverage][sealed-skeleton]` 2026-04-27 — sealed raise-only façades default to omit/pragma; "100% cov" on stubs is metric-without-behavior; align decision docs with the actual exception type (`CapabilityError` here) so stub tests don't encode the wrong contract.
+1662:- Worker LESSON candidate accepted as 2026-04-27 `[coverage][sealed-skeleton]` — append to LESSONS in next daybook sync if not already present.
+1667:## Sprint 7h-36 — multi-account / parallel-codex review + schema drift fix (2026-04-27 04:55Z)
+1724:## 2026-04-27 Sprint 7h-37 — 5-sprint plan, 4-way parallel write+readonly fan-out, S1+S2 merged
+1766:## 2026-04-27 Sprint 7h-38 — L1 vault live + L3 concurrency guard (parallel write fan-out)
+1821:## 2026-04-27 Sprint 7h-39 — codex-utilization review + V1/V2/V3 vault sibling diff fan-out + V4 daybook regex
+
+exec
+/bin/zsh -lc 'wc -l "/Users/martin/Downloads/Cursor tests/WORKTREES.md"' in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ succeeded in 0ms:
+     137 /Users/martin/Downloads/Cursor tests/WORKTREES.md
+
+exec
+/bin/zsh -lc "grep -n \"coverage\\]\\[sealed-skeleton\\]\\|sealed-skeleton\\|metric-gaming\\|bus\" /Users/martin/Downloads/LESSONS.md" in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ succeeded in 0ms:
+178:- 2026-04-26 [worker][upstream-drift-catch] **Read-only roadmap workers reliably catch upstream-pin drift the parent forgets to track.** Sprint 7h-11: full-Commander-coverage memo worker discovered DSK `.commander-pin = 631505404f` while sibling Commander checkout is at `89047920a0` (~50 commits ahead). Parent had not regenerated the capability matrix since last pin (Apr 24). Same pattern as the bus.py memo worker (Sprint 7h-9) which caught the JOURNAL HANDOFF-card stale-claim. Workers methodically read `.commander-pin` + `git -C <sibling> rev-parse HEAD` + cross-reference; parent often skips the cross-reference. Pattern: every roadmap memo PREFAB should prompt the worker to surface "is the pin current?" as an explicit row in the CURRENT STATE section. Cheap signal; high false-negative cost if missed.
+287:- 2026-04-24 [mypy] `**ignore_missing_imports = true` does NOT silence `Library stubs not installed` errors** for modules mypy knows have published stubs (yaml, jsonschema). Fix is either `pip install types-PyYAML types-jsonschema` in the dev extra, or a per-module override with `follow_imports = "skip"`. Did both so CI is robust whether or not the dev extra is installed.
+311:- 2026-04-26 [sdk][ksm][bootstrap] **`dsk bootstrap-ksm` is the production on-ramp; without it KSM-as-SDK-feature has a four-step manual prefix.** Adopters won't actually use `KsmLoginHelper` if the prerequisite (KSM app + admin-record share + redeemed config on disk) requires Web UI clicks. Bootstrap collapses (a) app-create-or-reuse, (b) admin-record-create-or-share, (c) one-time-token generation, (d) token redemption + config write, (e) verification, into one Commander-driven invocation. Idempotency matters: re-running with the same `--app-name` reuses the existing app rather than creating a duplicate; same for `--with-bus` directory record by title. `--login-helper {commander,ksm,/path}` lets bootstrap drive itself once initial bootstrap landed (rotate clients without a fresh interactive login). All Commander calls wrapped in `redirect_stdout`/`redirect_stderr` so tokens never reach stdout. `CapabilityError(context=partial)` on every failure carries `app_uid` / `record_uid` / `config_path` so the operator can copy-paste cleanup commands from the next-action.
+316:- 2026-04-26 [sdk][handoff] **A handoff card replaces a handoff conversation.** "Finish it all for a new agent to take over" is not "do everything pending"; it's "leave the next agent a single document that lets them decide what to do without re-reading the transcript". Shape: branch state + per-track next-action (concrete, with file pointers) + verify commands that should pass on first turn + hardening reminders the next agent will otherwise relearn. Anti-patterns: (a) listing pending tracks without next-actions ("Phase B bus" alone is useless), (b) carrying forward phantom symbols without grounding ("Wave-1B `_resolve_project_tree`" turned out to not exist anywhere — verify with grep before listing), (c) prose paragraphs where bullets work. The new agent's first two messages should be: read handoff card, run verify commands. If either fails, the handoff was wrong and the originating agent owes a follow-up.
+351:- 2026-04-26 [codex-sandbox][shared-object-store] **Linked worktrees need TWO directories writable beyond the cwd, not one: the per-worktree gitdir (`<primary>/.git/worktrees/<n>/`) AND the common gitdir (`<primary>/.git/`).** First fix patched `codex_offline.sh` to add only the per-worktree gitdir from `git rev-parse --git-dir`; workers immediately hit a second `Operation not permitted` writing blobs to `<primary>/.git/objects/`. The common gitdir holds the shared object store + refs that every linked worktree commits into. Final fix: also auto-add `git rev-parse --git-common-dir` (with dedup when equal to per-worktree gitdir for normal clones). Pattern: when sandbox-tightening blocks ANY git operation in a linked worktree, the answer is always BOTH gitdirs (`--git-dir` + `--git-common-dir`); a partial fix that only adds one is a recurring failure mode that re-bites at the next operation. Verified by 3 cov slices (redact, schema, normalize) all landing successfully via parent-commit in the same session — workers only need to be re-launched if the deliverable itself is wrong, not if the tooling layer is busted.
+366:- 2026-04-26 [codex-prompts][prefab] **Recurring slice shapes deserve paste-ready PREFAB templates separate from headers.** Prior infrastructure had `HEADER_OFFLINE` / `HEADER_OFFLINE_READONLY` / `HEADER_LIVE` (composite contract snippets) but every per-task body was hand-derived. After 3 cov slices that were ~80% identical (`PREFAB_cov-slice` candidates), 1 phantom-symbol audit (`PREFAB_phantom-symbol-sweep`), and the bus.py decision (`PREFAB_decision-memo`), it's clear the slice TYPES are stable. Stored at `codex-prompts/tasks/PREFAB_*.md`; parent fills `${MODULE_PATH}` / `${TARGET_COV}` / `${TOPIC}` / `${OPTIONS}` etc. and gets a complete prompt for ~3 minutes of work. Versioning: each PREFAB carries `version: <date>`; bump on any contract change. Headers + PREFABs together = full 2-layer template system.
+368:- 2026-04-26 [codex-cli][bg-detach] **Background launchers must use `nohup` + runner-script + redirect-from-/dev/null, not `( ... ) &`.** Cursor's Shell tool starts a fresh bash per command that exits when the command returns. Naive `( ... ) &` subshells inherit that bash as their parent and catch SIGHUP when it exits — the cleanup block (writing `STATE=DONE` to the marker) never runs. First version of `codex_offline_bg.sh` had this bug; bus.py worker completed a clean READONLY-OK memo in the log but the marker stayed `LAUNCHED` forever. Fix: write the codex command + cleanup into a runner script (`/tmp/codex-offline-<ts>-<pid>.runner.sh`) and launch via `nohup bash $RUNNER </dev/null >/dev/null 2>&1 &`. `disown` alone is not enough on macOS bash inside an exiting parent. Verified: trivial test prompt now writes `STATE=DONE EXIT_CODE=0` correctly within seconds of codex finishing.
+369:- 2026-04-26 [codex-prompts][readonly-memo] **READ-ONLY decision-memo workers consistently surface drift the parent skipped.** Bus.py decision worker flagged (a) JOURNAL drift at line 309 — the HANDOFF card claimed `cursor/sdk-ksm-bootstrap` was the active branch, but it had been merged + torn down in Sprint 7h-6 (4 sprints ago); (b) SOURCE drift between docstring/changelog (`NotImplementedError`) and implementation (`CapabilityError`); (c) a non-obvious test-design caveat (because `__init__` raises, `post/fetch/ack/gc` need `object.__new__(BusClient)` calls, not normal construction). Parent had been carrying that bus.py decision as "pending" for 2 sprints; 30s of worker time closed it with a 76-line cited memo. Pattern: every JOURNAL "pending decision" item is a candidate for a `PREFAB_decision-memo` slice BEFORE parent commits to a path. Workers read more methodically + cite every claim `path:line`. Cost is low; opportunity cost of NOT running is hidden parent-overload.
+370:- 2026-04-26 [coverage] Sealed skeletons inside `--cov=keeper_sdk` need contract tests in the landing slice, not a later ratchet cleanup. (LESSON CANDIDATE from bus.py memo worker — captured here, parent applies on the bus.py Option B slice.)
+375:- 2026-04-26 [coverage][skeleton-theatre] **Stub-only modules reaching 100% via tests asserting `raise CapabilityError` look great in the cov-floor metric but add zero defensive value.** bus.py 0→100% via `tests/test_bus.py` (Option B) is correct as a *contract pin* — when the seal lifts to Phase B, the test suite forces an explicit decision about what each method now does. But the cov-fail-under floor reads richer than the value: 100% on a sealed stub ≠ 100% on a 200-line state-machine. Two correct moves for future sealed skeletons: (a) add `# pragma: no cover` to method bodies and rely on a single `pytest.raises(CapabilityError)` import-time assertion, OR (b) `[tool.coverage.report] omit = ["keeper_sdk/secrets/bus.py"]` until provider lands. Pattern: when ratcheting `--cov-fail-under`, audit which lines in the new floor came from skeletons vs real branches; if >X% is skeleton, the ratchet measures contract-pinning, not coverage.
+410:- 2026-04-27 [coverage][sealed-skeleton] **A module that is a deliberate raise-only façade should default to `# pragma: no cover` or an `_skeleton/` exclude — adding stub tests that assert "raises X on every method" inflates the cov number with zero behavioral value.** `keeper_sdk/secrets/bus.py` is the canonical case: 5 public methods all raise `CapabilityError` (NOT `NotImplementedError` — WORKTREES.md §7 had the wrong exception type for ~3 sprints; fixed 7h-35). Sprint 7h-9 / 7h-10 shipped a B-style `tests/test_bus.py` and 7h-10 F4 immediately flagged it as metric-gaming. Pattern: when a module's public surface is "raise on call" by intent (sealed Phase B placeholder), the honest options are **A** (implement fully) or **C** (omit from cov), not **B** (stub-test the raises). Decision docs that name the exception type must cite a `file:line` so the stub tests don't encode the wrong contract — text drift between WORKTREES.md and `bus.py` 165:168 cost a downstream worker memo cycle to catch.
+412:- 2026-04-27 [daybook][regex-by-reference-inflation] **`pending_journal_items` regex (`agent_review_loop.py`: `^[-*]\s*\[\s\]` OR `"Pending decisions" in line`) double-counts every JOURNAL line that *references* the WORKTREES.md "Pending decisions" section, even when the referenced rows are DONE.** Sprint 7h-30 review fired sticky DAYBOOK alert (`pending_trend=[6,6,6]`) but 5 of 6 hits were historical sprint carry-over notes pointing at items 1-5 (closed in 7h-6); only 3 truly-open items remained in WORKTREES.md (#6 KSM live-proof, #7 bus.py cov, #8 cov ratchet 84→85). Fix applied in 7h-31: rephrase historical refs from `"Pending decisions"` (quoted) to `worktree-followups` (unquoted, regex-defanged) + `_[CLOSED 7h-6]_` suffix; pending count drops 6 → 0 honestly. Pattern: substring-match counters over append-only logs accumulate ghost-debt because closed items' textual references survive the closure event. Two structural mitigations: (A) regex requires line to start with checkbox or section header, not arbitrary in-line phrase, (B) close-out events rewrite the referenced phrase to a different token. Applied B for cheapness; A is the cleaner long-term fix in `agent_review_loop.py`.
+
+exec
+/bin/zsh -lc 'git log --all --oneline --decorate --regexp-ignore-case --grep=bus' in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ succeeded in 0ms:
+e4aa555 test(bus): cover sealed-skeleton CapabilityError contract (0% -> 100%) (#24)
+ad23f3e docs(truth-freeze): fix CapabilityError wording, stale HEAD ref, phantom symbol (#23)
+a04cd4c chore(docs+ci): reconcile changelog/V1_GA/reconciliation against 7h-6 + broaden ci pull_request triggers
+61e8341 docs(readme): reconcile against Sprint 7h-6 main (KSM as SDK feature, 315 tests, cov 86%)
+8a7c586 ksm-bootstrap: propagation-race fix + Phase B skeleton + cov ratchet
+d1fbc75 feat(secrets+cli): dsk bootstrap-ksm — Commander-driven KSM provisioning
+94c4803 w13: CommanderCliProvider.discover robustness
+
+exec
+/bin/zsh -lc 'git log --all --grep="cov-bus" --oneline --decorate' in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ succeeded in 0ms:
+exec
+/bin/zsh -lc "awk 'NR>=90 && NR<=104 {printf \"%6d\\t%s\\n\", NR, "'$0}'"' \"/Users/martin/Downloads/Cursor tests/WORKTREES.md\"" in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ succeeded in 0ms:
+    90	1. ~~**Open the 4 PR-pending `cursor/*` branches via web.**~~ **DONE 2026-04-26 Sprint 7h-4** + merged in 7h-6.
+    91	2. ~~**Delete `cursor/rotation-drift-suppress`**~~ **DONE 2026-04-26 Sprint 7h-4**.
+    92	3. ~~**Codex experimental branches**~~ **DONE 2026-04-26 Sprint 7h-8.** Cherry-pick probe revealed all 3 already subsumed by PR #2. Torn down; recovery SHAs in §Recovery SHAs.
+    93	4. ~~**Abandon the 3 wp/worker worktrees.**~~ **DONE 2026-04-26 Sprint 7h-2.**
+    94	5. ~~**Watch CI on the 7 PRs.**~~ **DONE 2026-04-26 Sprint 7h-6.** All merged.
+    95	6. **Live KSM bootstrap → KsmLoginHelper → apply loop proof.** Closes the offline-vs-live gate on KSM-as-feature; closes V1_GA_CHECKLIST § 6 rotation + RBI tuning live-proof rows. Issues #4 + #5 stay open until then.
+    96	7. **`keeper_sdk/secrets/bus.py` 0% cov decision.** Three options: (A) implement Phase B (six-step docstring checklist at `bus.py` 97:117 — Commander probes, CAS retry, 32 KB size cap, `tests/test_bus_ksm.py`, `docs/KSM_BUS.md`, `dsk bus` CLI). (B) Add `CapabilityError` stub coverage (NOT `NotImplementedError` — the module raises `CapabilityError`; see `bus.py` 165:168 + raise sites). Sprint 7h-9 / 7h-10 already explored Option B on `cursor/cov-bus-skeleton`; 7h-10 F4 flagged it as metric-gaming with zero defensive value. (C) Move to `_skeleton/` or add `# pragma: no cover` and exclude from cov target — currently no omit list exists in `pyproject.toml` or `.coveragerc`. Defer until Phase B implementation timing decided. Worker memo (Sprint 7h-35, agent `71504ca0`): C aligns with defer; A when Phase B on roadmap; B only if team wants stub in cov number with eyes open. PARENT-DECIDE: (i) reconcile 7h-9/10 PR #24 vs current main, (ii) accept B-text as `CapabilityError`.
+    97	8. **Optional cov ratchet 84 → 85** once `bootstrap.py` (79%) and `_commander_cli_helpers.py` (81%) gain edge-case tests.
+    98	
+    99	## Lifecycle rules
+   100	
+   101	1. **Before spawning a worker on a slice**, grep this file for the slice name. If a sibling exists and is clean, *resume that worktree* — do not create a new one.
+   102	2. **Worktree create command** (parent only). Two layouts coexist (legacy + current); prefer the current `worktrees/` subdir layout for new work — Sprint 7h-14 standardised on it because it ringfences workers under one directory and keeps the repo siblings clean.
+   103	
+   104	   **Current convention (preferred — Sprint 7h-14+):**
+
+exec
+/bin/zsh -lc "awk 'NR>=1632 && NR<=1664 {printf \"%6d\\t%s\\n\", NR, "'$0}'"' /Users/martin/Downloads/JOURNAL.md" in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ succeeded in 0ms:
+  1632	## Sprint 7h-35 — daybook auto-review carry-over fix (2026-04-27 03:35Z)
+  1633	
+  1634	**Trigger:** user msg "review what the previous Composer 2 agent didn't understand and fix it." Prev session (`620cd8b8`) auto-review fired three sticky alerts: PROSE 12.59% > 12% cap, ORCHESTRATION 0 subagents on >30k assistant chars, DAYBOOK pending_journal_items=6 non-decreasing across 3 reviews. Prev agent absorbed the alerts (cited the lesson tags) but did not act on them — kept doing serial doc tweaks (canvas, README, `manifest.py` docstrings, `vault_models` docstring, AGENTS §E) and shipped via small PRs (`863b08e` → `2ae7070`).
+  1635	
+  1636	**What prev agent didn't understand**
+  1637	1. **Pending counter is mechanical, not semantic.** Cited `[orchestration][daybook-gated-sprints]` (LESSON 2026-04-26) as if acknowledgement closed the gap; the regex in `agent_review_loop.py` (checkbox-line OR the literal phrase `P` + `ending decisions`) mechanically scans for a substring. Acknowledgement does not decrement the count.
+  1638	2. **Caveman-ultra is the workspace lock, not a hint.** Project rule pins ultra; prev session prose density 12.59% means polished sentences slipped in. Boot review pinged this 3 sessions running.
+  1639	3. **Delegation rule has a hard threshold.** >30k assistant chars → at least one Task subagent or codex run. 19 mentions of "delegate" / "worker" without a single subagent invocation = self-rationalisation, not orchestration.
+  1640	4. **User reprompts are evidence.** Canvas+gaps reprompted (transcript user[396] → user[400] same query verbatim) means the first attempt didn't satisfy. Twenty queued "continue" nudges (user[349]) means agent stalled. Agent treated them as resume-tokens, not signal of insufficient delivery.
+  1641	
+  1642	**Fix landed this sprint (Downloads workspace, no SDK changes)**
+  1643	- `JOURNAL.md` 5 historical worktree-followups textual refs (formerly the literal phrase the counter scans for) → `worktree-followups` (regex-defanged) + `_[CLOSED 7h-6]_` suffix. L728 DONE marker likewise rephrased. Pending count: **6 → 0** verified by `grep -cE '^[-*][[:space:]]*\[[[:space:]]\]|P''ending decisions'` (note the inline split to keep this LINE from self-counting).
+  1644	- `LESSONS.md` new entry `[daybook][regex-by-reference-inflation]` 2026-04-27: explains the substring-match ghost-debt accumulation pattern; recommends regex tightening in `agent_review_loop.py` (line-anchor on checkbox or section header) as long-term fix.
+  1645	- Backup `JOURNAL.md.bak.20260427T033733Z` created before edits.
+  1646	
+  1647	**Real pending (carried, not closed)**
+  1648	WORKTREES.md worktree-followups §6/§7/§8 are still open: KSM live-proof loop, `keeper_sdk/secrets/bus.py` 0% cov decision, optional cov ratchet 84 → 85. None of these were touched by prev agent's docstring/canvas churn. §7 dispatched to a parallel readonly analysis subagent in this sprint (agent `71504ca0`, ~80-line memo) as a delegation-rule compliance probe.
+  1649	
+  1650	**Worker memo distilled (`71504ca0`, `bus.py` decision)**
+  1651	- File state: 225 LOC; sealed `BusClient` + `BusMessage` dataclass; **5** public methods all raise `CapabilityError` (`bus.py` 165:168, 177:180, 192:195, 204:206, 211:213, 218:220). **Not `NotImplementedError`** — WORKTREES §7 text was wrong; corrected this sprint.
+  1652	- No `[tool.coverage.*]` in `pyproject.toml`; no `.coveragerc`; CI floor `--cov-fail-under=84` (`ci.yml:64`).
+  1653	- Phase B checklist (`bus.py` 97:117) is **six** items: Commander rev probes, CAS retry extraction to `keeper_sdk.core.retry`, 32 KB envelope cap, `tests/test_bus_ksm.py`, `docs/KSM_BUS.md`, `dsk bus` CLI.
+  1654	- Sprint **7h-9 / 7h-10** already shipped a B-style `tests/test_bus.py` on `cursor/cov-bus-skeleton`; 7h-10 F4 LESSON flagged it as metric-gaming.
+  1655	- Worker recommendation: **C** (`# pragma: no cover` or `_skeleton/` move) when Phase B is parked; **A** (full impl) when Phase B is on the roadmap; **B** only if cov number absolutely must count the stub.
+  1656	- PARENT-DECIDE: (i) confirm 7h-9/10 stub-test PR (#24?) state on current `main`; (ii) text-only fix to WORKTREES §7 (`NotImplementedError` → `CapabilityError`) — landed this sprint.
+  1657	- CANDIDATE LESSON (worker): `[coverage][sealed-skeleton]` 2026-04-27 — sealed raise-only façades default to omit/pragma; "100% cov" on stubs is metric-without-behavior; align decision docs with the actual exception type (`CapabilityError` here) so stub tests don't encode the wrong contract.
+  1658	
+  1659	**Parent disposition this sprint**
+  1660	- WORKTREES.md §7 wording corrected (`NotImplementedError` → `CapabilityError`; 3-option memo summarised inline; PARENT-DECIDE flagged).
+  1661	- bus.py decision **deferred** — no SDK code touched. Real implementation gate stays Phase B timing per worker rec C.
+  1662	- Worker LESSON candidate accepted as 2026-04-27 `[coverage][sealed-skeleton]` — append to LESSONS in next daybook sync if not already present.
+  1663	
+  1664	**Next** post-merge auto-review should show `pending_journal_items=0` (or =3 once `agent_review_loop.py` regex tightens to real WORKTREES.md items). Expect PROSE density alert to clear because this entry is bullet-dense, not prose-dense. Subagent count = 1, satisfies the >30k delegation rule even though this session's chars are well below threshold.
+
+exec
+/bin/zsh -lc "awk 'NR>=860 && NR<=950 {printf \"%6d\\t%s\\n\", NR, "'$0}'"' /Users/martin/Downloads/JOURNAL.md" in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ succeeded in 0ms:
+   860	- Issues #4 (rotation integration) + #5 (tuning integration) remain open but gate on **live proof**, not orchestration. Issues #1 (PyPI publish) + #6 (JIT boundary) tracked separately.
+   861	- Daybook (this commit `ff552e4` + this sprint append) caught up. WORKTREES.md refreshed to "zero parallel worktrees" state.
+   862	
+   863	**Pending for next session:**
+   864	
+   865	- Live KSM bootstrap → KsmLoginHelper → apply-loop proof. Closes the offline-vs-live gate on KSM-as-feature; closes V1_GA_CHECKLIST § 6 rotation + RBI tuning live-proof rows; lets issues #4 + #5 close.
+   866	- `keeper_sdk/secrets/bus.py` 0% cov decision: either (a) implement Phase B per the docstring's checklist, (b) add `NotImplementedError` stub coverage to bring it to 100%, or (c) move to `_skeleton/` namespace to exclude from cov target. Defer until Phase B implementation timing is decided.
+   867	- Optional cov ratchet 84 → 85 once `bootstrap.py` (79%) and `_commander_cli_helpers.py` (81%) gain edge-case tests.
+   868	
+   869	
+   870	## Sprint 7h-9 — codex orchestration optimization + bus.py memo (2026-04-26 ~18:30 BST)
+   871	
+   872	User msg: "now step back and do the daybook routines to optimize. especially if not more work can be done by the codex cli than you currently allow them". Stepping out of the delivery loop to audit the orchestration layer + actually USE codex CLI for a pending decision instead of deferring it.
+   873	
+   874	**Audit finding (parent honesty):** zero codex worker runs across Sprints 7h-4 → 7h-8. All 8 PRs, 4 doc reconciles, 1 codex/* triage, 1 PAT rotation, branch-stack-pollution recovery, README+CHANGELOG+RECONCILIATION+V1_GA refresh — done parent-only. The reasons were defensible per-task (PR work needs `gh` PAT decisions; doc reconcile is mostly summarising what parent just did) but the *aggregate* pattern is parent-overload. Workers were idle for ~3 hours of operator time.
+   875	
+   876	**Orchestration layer additions (this sprint):**
+   877	
+   878	- `~/.cursor-daybook-sync/codex-prompts/AGENT_PREAMBLE.md` (new) — single-file worker preamble per the `daybook` skill's `references/orchestration.md` recommendation. Workers cat this BEFORE the header. States the mandatory step-zero (read JOURNAL head + LESSONS tail + git status), DONE-dump format, 3-attempt stop rule, daybook ownership, scope-fence rules, secret-redaction. Saves ~700 tokens per prompt; updates propagate to every next worker for free.
+   879	- `~/.cursor-daybook-sync/codex-prompts/tasks/PREFAB_*.md` (3 new) — paste-ready slice templates for the recurring shapes:
+   880	  - `PREFAB_cov-slice.md` — coverage gap-fill (substitute `${MODULE_PATH}` `${TARGET_COV}` `${MISSING_LINES}`).
+   881	  - `PREFAB_decision-memo.md` — read-only structured memo (substitute `${TOPIC}` `${SUBJECT_PATH}` `${OPTIONS}`).
+   882	  - `PREFAB_phantom-symbol-sweep.md` — read-only ref-classification (substitute `${SCOPE}` `${SYMBOLS}`).
+   883	- `~/.cursor-daybook-sync/scripts/codex_offline_bg.sh` (new) — fire-and-forget background launcher. Same contract as `codex_offline.sh` but returns immediately with `LOG=` `MARKER=` `PID=`; parent polls the marker for `STATE=DONE` to detect completion. Enables "queue 2 workers + work on something else while they run" without blocking the parent's terminal.
+   884	- `~/.cursor-daybook-sync/codex-prompts/codex_prompt.sh` extended — gains `--bg` (uses bg launcher) and `--with-preamble` (prepends `AGENT_PREAMBLE.md`).
+   885	- `_memos/2026-04-26_bus-py-decision.md` (new artefact dir) — captures the bus.py decision-memo worker's output. Lives outside the SDK repo (parent-owned per scope-fence).
+   886	
+   887	**bus.py 0% cov decision — closed via codex worker:**
+   888	
+   889	Launched the first codex worker in 3 sprints, on the n3 / pending-2-sprints bus.py decision. `HEADER_OFFLINE_READONLY` + `PREFAB_decision-memo` (with `${TOPIC}` `${SUBJECT_PATH}` `${OPTIONS}` substituted) + `AGENT_PREAMBLE`. ~1200 tokens prompt, ~30s wall-clock, structured memo back. Worker outputs:
+   890	
+   891	- **Recommendation: Option B** (NIE-stub-cov, ~40 LOC test-only, lifts cov to 100%).
+   892	- **Caveat parent had not preempted:** because `__init__` raises, `post/fetch/ack/gc` cannot be reached via normal construction. Tests need `object.__new__(BusClient)` or unbound-method calls. The seal is deeper than one layer; Option B's 40-LOC estimate accounts for this but a casual implementer would miss it.
+   893	- **JOURNAL DRIFT caught:** worker flagged that line 309 ("`cursor/sdk-ksm-bootstrap` ... **This is the active branch.**") was stale — branch was torn down in 7h-6. Fixed by prepending a SUPERSEDED note above the HANDOFF card section (see edit above).
+   894	- **SOURCE DRIFT caught:** docs (`CHANGELOG.md:33-35`, `README.md:28`) say `NotImplementedError` but the implementation raises `CapabilityError`. To be folded into Option B's slice or a separate doc-fix slice.
+   895	- **Open questions** (4 sharp ones the parent hadn't preempted): doc-fix bundling, `BusClient` re-export timing, py3.14/cryptography compat for local venvs (CI is 3.11–3.13), Option A probe-first split.
+   896	
+   897	Full memo at `~/.cursor-daybook-sync/codex-prompts/_memos/2026-04-26_bus-py-decision.md` (76 lines, every claim cited `path:line`).
+   898	
+   899	**Verdict:** the codex CLI was *under-utilised* by ~70% during 7h-4 → 7h-8. The 30s wall-clock + structured memo on bus.py shows the cost-benefit is good even for "small" decisions parent could have done in 5 min — the worker reads more methodically and surfaces drift parent skipped. Pattern to bake in: every non-trivial pending decision in JOURNAL gets a `PREFAB_decision-memo` worker before parent commits to a path.
+   900	
+   901	**Bug fixed in this sprint (codex_offline_bg.sh v1):** initial bg-script implementation used `( ... ) &` which dies on SIGHUP when the launcher's parent shell exits (Cursor's Shell tool starts a fresh bash per command). The cleanup block writing `STATE=DONE` never ran for the bus.py worker — recovered manually from the log. Fixed by switching to a runner-script + `nohup bash $RUNNER </dev/null >/dev/null 2>&1 &` for full detachment. Verified: trivial test prompt now writes `STATE=DONE EXIT_CODE=0` correctly. Old bus.py marker reconciled via `STATE=DONE_MANUAL_RECONCILE` append.
+   902	
+   903	**Pending for next session (now actually queueable as codex workers):**
+   904	
+   905	- Apply the bus.py Option B slice (`tests/test_bus.py` with `object.__new__(BusClient)` calls, ~40 LOC, plus the wording-drift doc fix). PREFAB_cov-slice + manual override of "use unbound-method calls". Branch `cursor/cov-bus-skeleton`.
+   906	- `keeper_sdk/secrets/bootstrap.py` 79% → ≥90% cov slice. PREFAB_cov-slice with `${MODULE_PATH}=keeper_sdk/secrets/bootstrap.py ${TARGET_COV}=90`. Branch `cursor/cov-bootstrap-edges`.
+   907	- `keeper_sdk/providers/_commander_cli_helpers.py` 81% → ≥90% cov slice. Same shape. Branch `cursor/cov-commander-helpers`.
+   908	- After 2 of 3 above land: bump `--cov-fail-under` 84 → 86 in ci.yml (account for the bus skeleton at 100% lifting the floor by ~1.3pp + the helpers slice contributing ~0.5pp).
+   909	- Live KSM bootstrap → KsmLoginHelper → apply-loop proof. Closes offline-vs-live KSM gate; closes issues #4/#5. Parent-owned because of credentials.
+   910	
+   911	
+   912	## Sprint 7h-10 — parallel cov batch + meta daybook review (2026-04-26 ~19:00 BST)
+   913	
+   914	User msg sequence: "do it all and fix it. then review all other items in daybook" → "is the test coverage important for improving and enhancing the actual sdk?" → "do the daybook review what worked and what didn't work and find and apply fixes to test in next run."
+   915	
+   916	**Delivery slice (worker batch):** four codex workers in parallel via `codex_offline_bg.sh`, each on its own worktree under `Cursor tests/_codex-worktrees/`. PREFAB-driven prompts (cov-slice + decision-memo + roadmap-plan). Validates 7h-9's prefab + bg-detach pattern in production.
+   917	
+   918	| Branch | Slice | Result |
+   919	|---|---|---|
+   920	| `cursor/p1-truth-freeze` | doc drift G5/G6/G7 (4 files, 8 replacements) | merged PR #23 (`ad23f3e` on main) |
+   921	| `cursor/cov-bus-skeleton` | bus.py 0→100% via Option B + docstring fix | PR #24 open, CI green |
+   922	| `cursor/cov-bootstrap-edges` | bootstrap.py 79→100% | PR #25 open, CI green |
+   923	| `cursor/cov-commander-helpers` | _commander_cli_helpers.py 81→100% | PR #26 open, CI green |
+   924	
+   925	Cumulative: ~120 LOC of new tests, 3 sealed-skeleton/edge-branch modules cleared the cov ratchet ceiling, ~7min wall-clock.
+   926	
+   927	**Meta daybook review — what worked (validated patterns):**
+   928	
+   929	1. Parallel codex batch via prefabs + bg launcher (4 workers, all green, no flakes).
+   930	2. Pre-claim devil's-advocate gate caught the JOURNAL clobber regression at the 7h-9 → 7h-10 boundary (second occurrence — first was 7h-8 → 7h-9).
+   931	3. Sticky-alert re-injection on every prompt (PROSE warning correctly stays on until cleared).
+   932	4. Decision-memo + roadmap workers consistently surface drift parent skipped (G5/G6/G7 caught by roadmap worker; bus.py construction caveat caught by memo worker).
+   933	5. Cherry-pick triage probe (Sprint 7h-8 lesson) cleanly distinguishes subsumed vs unique commits.
+   934	6. SCAFFOLD.md + boot block + scope-fence CI: structural discipline > behavioural rules.
+   935	
+   936	**Meta daybook review — what didn't work (failure modes structurally fixed this sprint):**
+   937	
+   938	| ID | Failure mode | Fix landed |
+   939	|---|---|---|
+   940	| F1 | post-hoc-only auto-review missed mid-session prose drift | `score_latest_reply.py` integrated into `agent_pre_claim.sh`; transcript-envelope parsing fix (drill into `obj["message"]` for Cursor's `{role, message:{content:[{type,text}]}}` shape) |
+   941	| F2 | JOURNAL/LESSONS working-tree silently regressed after sync push (twice in 2 sprints) | `sync_daybook.sh` writes `.sync-state.json` per push; new `daybook_clobber_verify.sh` compares working-tree blob to recorded + walks history; wired into `agent_pre_claim.sh` |
+   942	| F3 | `gh pr merge --delete-branch` errors when branch is checked out in linked worktree | new `pr_merge_clean.sh`: validate mergeable → remove worktree → gh pr merge → belt-and-braces local-branch purge |
+   943	| F4 | cov-floor on sealed-stub modules is metric-gaming (100% on bus.py adds zero defensive value) | LESSON only — current slice took test-route for contract-pinning; future sealed skeletons should use `# pragma: no cover` or `[tool.coverage.report] omit` |
+   944	| F8 | density-clean replies can still be bloated (8.45% density, 4935 chars in this session) | `REPLY_CHAR_BLOAT=4000` axis already in scorer; verified now firing |
+   945	| F9 | `cp identical, not copied` confusion when files are symlinks | LESSON only — `readlink -f` before reasoning about cross-path freshness |
+   946	
+   947	Residual (not-yet-fixed):
+   948	- F7 codex-utilisation: 4 workers ran this sprint (good), but PR-merge sequence still parent-owned. Acceptable tradeoff (gh PAT decisions hard to delegate cleanly).
+   949	- py3.14 cryptography incompat in local venv: workers adapt (Option A: static `coverage.analysis2`; Option B: isolated 3.13 venv). Parent-level decision deferred — pin local 3.13 vs document 3.14 caveat.
+   950	
+
+exec
+/bin/zsh -lc "awk 'NR>=370 && NR<=412 {printf \"%6d\\t%s\\n\", NR, "'$0}'"' /Users/martin/Downloads/LESSONS.md" in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ succeeded in 0ms:
+   370	- 2026-04-26 [coverage] Sealed skeletons inside `--cov=keeper_sdk` need contract tests in the landing slice, not a later ratchet cleanup. (LESSON CANDIDATE from bus.py memo worker — captured here, parent applies on the bus.py Option B slice.)
+   371	- 2026-04-26 [orchestration][superseded-card] **Old HANDOFF cards in JOURNAL must get a SUPERSEDED note when the world moves on, not be silently invalidated by later entries.** The 2026-04-26 HANDOFF card claimed `cursor/sdk-ksm-bootstrap` was active; subsequent sprints merged it without going back to mark the card stale. A new agent reading the journal sequentially would see contradictory statements (HANDOFF: "active branch is X" → 4 sprints later: "all branches torn down"). Worker caught this. Fix pattern: when an entry's claims become false, prepend `> **SUPERSEDED <date> (Sprint Xh-Y onward):** <one-line reason>` to the entry's first line. Don't delete the historical content — it's evidence of how state evolved. Triggered by daybook skill's parent-check question 5: "does the journal still match reality?".
+   372	- 2026-04-26 [auto-review][post-hoc-only][closed] **Mid-session prose-density gate via `score_latest_reply.py` integrated into `agent_pre_claim.sh` closes the gap that `agent_review_loop.py` only measures at session-stop.** Sprint 7h-10 wired the scorer to read the live transcript's most-recent assistant turn, strip code fences/inline code, count prose tokens (the/a/just/...) per total words, exit non-zero ≥12% density (matches token-economy.mdc threshold) OR ≥4000 chars (`REPLY_CHAR_BLOAT`). Gate validation: first run reported "no assistant turn yet" because the scorer didn't drill into Cursor's `{role: assistant, message: {content: [{type:text, text:"..."}]}}` envelope; fixed to always check `obj["message"]` if present. Live re-run on the prior reply: density 8.45% (clean) but chars=4935 → BLOAT triggered. Density-clean ≠ short — both axes needed. Pattern: any post-hoc measurement loop also needs a pre-claim gate that reads the same live signal; the loop's job is trend, the gate's job is THIS reply.
+   373	- 2026-04-26 [daybook][clobber-regression][closed] **Post-push state file (`.sync-state.json`) + working-tree blob walk catches silent JOURNAL/LESSONS reversion.** Mechanism: `sync_daybook.sh` writes `head_sha` + `journal_blob` + `lessons_blob` per push; `daybook_clobber_verify.sh` compares current `git hash-object <file>` to recorded blob; if they differ AND the current blob exists as a HISTORICAL blob in the file's git-log, working tree has regressed (clobbered by external writer between syncs). Wired into `agent_pre_claim.sh` so every claim re-checks. Triggered twice in 7h-9 → 7h-10 sequence: sync pushed +44 lines, working-tree later reverted to 866 lines (lost 42); recovered via `git checkout HEAD -- JOURNAL.md` both times. Likely root cause: stale Cursor/editor buffer auto-saved over the symlink target. The verify is structural; the prevention (force fresh-read before any external write) is not enforceable from the daybook side.
+   374	- 2026-04-26 [pr-merge][worktree-block][closed] **`gh pr merge --delete-branch` errors when head branch is checked out in a linked worktree; helper `pr_merge_clean.sh` removes worktree FIRST, then merges with delete-branch.** Sprint 7h-10: PR #23 merge OK on remote, local-side `git branch -D cursor/p1-truth-freeze` failed with "branch used by worktree at /.../p1-truth-freeze". Manual recovery (`git worktree remove --force <path>` then re-run merge) is verbose + frequently aborts a batch cascade mid-run. Helper sequence: (1) `gh pr view --json mergeable` (wait if UNKNOWN), (2) `git worktree list --porcelain | awk` to locate any worktree on `refs/heads/<branch>`, (3) `git worktree remove --force` if found, (4) `gh pr merge --squash --delete-branch`, (5) belt-and-braces `git branch -D <branch>` if still present. Pattern: any tool that "deletes a branch" needs to first remove worktrees that hold the ref; bake this into the helper so individual users don't have to learn it.
+   375	- 2026-04-26 [coverage][skeleton-theatre] **Stub-only modules reaching 100% via tests asserting `raise CapabilityError` look great in the cov-floor metric but add zero defensive value.** bus.py 0→100% via `tests/test_bus.py` (Option B) is correct as a *contract pin* — when the seal lifts to Phase B, the test suite forces an explicit decision about what each method now does. But the cov-fail-under floor reads richer than the value: 100% on a sealed stub ≠ 100% on a 200-line state-machine. Two correct moves for future sealed skeletons: (a) add `# pragma: no cover` to method bodies and rely on a single `pytest.raises(CapabilityError)` import-time assertion, OR (b) `[tool.coverage.report] omit = ["keeper_sdk/secrets/bus.py"]` until provider lands. Pattern: when ratcheting `--cov-fail-under`, audit which lines in the new floor came from skeletons vs real branches; if >X% is skeleton, the ratchet measures contract-pinning, not coverage.
+   376	- 2026-04-26 [reply-bloat][char-cap] **Density-clean replies can still be bloated; `score_latest_reply.py` BLOAT axis (`REPLY_CHAR_BLOAT=4000`) catches long table/list-heavy replies that the prose-density signal misses.** Sprint 7h-10 daybook-review reply: density 8.45% (well under 12% fail) but chars=4935 (>4000). Prose-density measures *what kind* of words; char-cap measures *how many*. Two-axis gate; both must be clean. Pattern: any quality-of-output measurement should mix a *ratio* signal (kind/total) with an *absolute* signal (total volume); a single signal is reliably gameable.
+   377	- 2026-04-26 [symlink-trap][cp-identical] **`~/Downloads/JOURNAL.md` and `~/.cursor-daybook-sync/JOURNAL.md` are the same inode; `cp source target` reports "identical files (not copied)" because the resolved paths match.** Confused diagnostic in 7h-9 clobber recovery: I assumed two separate copies and was reasoning about "which copy is fresher" when both `ls`-resolutions pointed at the daybook repo's tracked file. Pattern: before reasoning about file freshness across paths in `~/Downloads/`, run `ls -la <path>` and `readlink -f <path>` to confirm separateness. The symlinks are intentional (single source of truth) but make `cp` a no-op + `stat` mtimes of the symlink itself misleading.
+   378	- 2026-04-26 [daybook-review][meta-cadence] **Schedule a meta-daybook-review every ~5 sprints to surface latent failure modes before they recur a third time.** Sprint 7h-10 review surfaced 6 fixable failure modes (F1-F4, F8-F9 above) and 1 acknowledged residual (F7 codex-utilisation, partially closed). Of the 6, three (F2 clobber, F3 worktree-block, F8 reply-bloat) had each fired ≥2 times before being structurally addressed — review caught them as patterns rather than individual incidents. Pattern: sprint-level audits catch per-task drift; meta-reviews catch *patterns of drift*. Cadence trigger: every 5 sprints OR every user-prompt that says "review what worked / didn't work".
+   379	- 2026-04-26 [live-test][skip-by-default] **Live-tenant tests collected only when `KEEPER_LIVE_TENANT=1` AND each test's declared `requires=(...)` env vars are present; gate enforced at pytest-collection time, not runtime.** `tests/live/conftest.py` walks every collected item, looks for `pytest.mark.live(requires=(...))`, and adds a skip marker if `KEEPER_LIVE_TENANT` isn't `1` or any required env var is missing. Why collection-time vs runtime: a runtime check (`if not os.environ.get(...): pytest.skip(...)`) still imports the test module, runs fixtures, and shows the test in the report as "skipped" with a Python-level reason — workable but noisier and import-time crashes leak. Collection-time skip means `pytest tests/` reports exactly one skipped item per live test, no fixture work, no module-level imports of live-only deps. Pattern: any test category that depends on out-of-band setup (creds, GPU, network) should gate at collection so the default offline run is metrics-clean.
+   380	- 2026-04-26 [live-test][transcript-shape] **Live-test proof transcript MUST be machine-readable + schema-shaped + sanitized at write time, not committed-as-raw and triaged later.** `keeper_sdk/cli/_live/transcript.py` writes a fixed-shape JSON (`schema_family`, `schema_version`, `commander_pin`, `started_at`, `finished_at`, `phases[]`, `summary`) that `x-keeper-live-proof.evidence` consumes directly — no transformation step between live-run output and schema-graduation evidence. Sanitization is allowlist-based: `_SECRET_KEYS` (password/token/private_key/config/appKey/applicationKey/totp) get values replaced with literal `<redacted>`; UID-shaped strings (20-28 char URL-safe base64) get `_fingerprint`'d to `<uid:sha256-8>`. Post-write `secret_leak_check` greps for PEM blocks + raw env-var values + long unbroken hex runs as belt-and-braces. The CLI verb refuses to leave the file on disk if the leak check flags anything. Pattern: any "evidence" artefact that crosses the secret/public boundary needs (a) a fixed shape so consumers can parse without dialect, (b) write-time sanitization not post-hoc, and (c) a separate consistency check that doesn't share code with the sanitizer (different bug surface).
+   381	- 2026-04-26 [enforcement][sticky-via-prefix] **Adding a new `<PREFIX>:` to `prompt_resume_guard.sh`'s `hard_prefixes` tuple is the cheapest way to convert an advisory log entry into a sticky-until-cleared user-visible alert.** Sprint 7h-13: `pre_claim_stop.sh` now injects `PRECLAIM:` recommendations into `review-latest.json` when `agent_pre_claim.sh` exits non-zero; one-line addition `"PRECLAIM:"` to `hard_prefixes` propagates the existing fingerprint→sticky→compact-after-N machinery to the new alert class. No new state file, no new injection path, no new compaction logic. Pattern: when a new failure mode needs sticky enforcement, prefer extending the existing alert-prefix taxonomy over inventing a parallel mechanism — the cost is one tuple entry + one upstream injector that emits with the prefix. Existing taxonomy now: PROSE, BLOAT, ORCHESTRATION, BOOT, DAYBOOK, PRECLAIM.
+   382	- 2026-04-26 [enforcement][safe-launch-wrapper] **A pre-flight wrapper that refuses on dirty-tree + unpushed-commits closes the worker step-zero race deterministically; rule reminders alone do not.** Sprint 7h-12 LESSONS [worker][step-zero-race] documented the failure mode (first P9 worker launch failed READONLY-FAIL because parent's commit hadn't landed yet). Sprint 7h-13 fix: `codex_safe_launch.sh` reads `git status --porcelain` (must be empty) AND `git rev-list --count @{u}..HEAD` (must be 0); refuses with explicit override flags `--allow-dirty` / `--allow-unpushed`. Wrapper exec's the underlying launcher only when checks pass. Calling pattern stays one command, just one indirection deeper. Pattern: any "do X only when state Y holds" rule that fires across sessions should live in a wrapper script not a rule reminder — wrappers compose into pipelines, reminders rely on agent recall. Add as a habit: when documenting a recurring pre-condition violation in LESSONS, audit whether a wrapper script could turn it into a hard refusal.
+   383	- 2026-04-26 [enforcement][trend-watch] **Auto-review can detect rotting-pending by reading prior archives; one-shot session metrics miss the slow-growing failure modes.** `agent_review_loop.py` `audit_daybook` now reads the prior 2 entries from `review-archive/` (cheap regex extraction of `pending_journal_items: N` from the markdown), builds a 1-3 element `pending_trend`, and the recommender fires hard `DAYBOOK:` alert when the trend is non-decreasing. Why this matters: a single session with `pending=12` looks indistinguishable from a healthy session that just happens to have queue work; three consecutive sessions with `pending` ≥ each prior is the rot signal. Pattern: per-session metric thresholds catch acute drift; cross-session trends catch chronic drift. Both axes needed — rely on either alone and the other slips.
+   384	
+   385	- 2026-04-26 [orchestration][parallel-readonly-memos] **4 parallel offline-readonly Codex workers complete in wall-time bounded by the largest single worker, not summed; on a clean main with shared workspace, no per-worker worktree is needed.** Sprint 7h-14: 4 schema-design memos (P10/P11/P12/P13 of V2 lineup) dispatched simultaneously via `codex_safe_launch.sh --repo "$SDK"` against a single clean `main` checkout. P11 (largest scope, enterprise) finished at 4min; P12/P13/P10 finished within 1min of P11. Total wall: ~5min vs ~30+ min serial. Shared workspace works because read-only workers can't collide on writes; the parent just extracts each worker's stdout from `/tmp/codex-offline-*-<pid>.log`. Pattern: (a) read-only workers parallelize trivially, share workspace; (b) write workers need worktrees + serial execution per branch; (c) wall-time predictor for parallel readonly = max(per-worker estimate), not sum. Practical implication: when the parent is between product slices and has 3+ research questions queued, ALWAYS dispatch them in parallel rather than asking sequentially.
+   386	- 2026-04-26 [worker][source-drift-detector] **Codex readonly workers reliably catch path/identifier drift in the parent's task body and the daybook; treat their `**JOURNAL DRIFT:**` / `**SOURCE DRIFT:**` annotations as free CI on the parent thread.** Sprint 7h-14: 4 memos surfaced 5 drift items the parent thread had not noticed — `JOURNAL.md:38` referenced an old `.commander-pin` (`63150540` instead of bumped `89047920a0`); my P11 task body named `keeper_sdk/providers/commander.py` (real path is `commander_cli.py`); `commands/sso.py` doesn't exist (SSO surface is in protos); `pam-environment.identity.ksm_*` doesn't exist (real binding is `gateways[].ksm_application_name`); `ApplicationAddRequest` lives in `record_pb2.pyi` not `APIRequest_pb2.pyi`. Each annotation cited `path:line` — actionable without re-investigation. Pattern: workers reading the codebase fresh notice the typos / staleness an in-context parent has habituated to. Treat the worker DONE-dump's drift annotations as a 0-cost audit — extract them into a follow-up commit list before harvesting the memo body.
+   387	- 2026-04-26 [worker][safe-launch-worktree-fix] **Worktree `.git` is a regular file (pointer), not a directory; bash `[[ -d "$REPO/.git" ]]` checks fail for valid worktrees.** Sprint 7h-14: first `codex_safe_launch.sh` invocation against a worktree (`cursor-p9-vault-impl`) failed with "not a git repo" because the safety check used `-d`. The cheap correct test is `-e "$REPO/.git"` (file OR dir) followed by `cd "$REPO" && git rev-parse --git-dir >/dev/null 2>&1`. The latter handles every git-repo layout the SDK uses (main checkout, worktree pointer, submodule). Pattern: any "is this a git repo?" check in shell scripts must use rev-parse, not a file-system test against `.git`; the `.git` filesystem entity is only stable as a thing-that-exists, not as a directory.
+   388	- 2026-04-26 [orchestration][meta-cadence-correction] **5 sprints of enforcement-layer work in a row is the discipline-drift signal; the parent thread is using "we need a hook for that" as a way to avoid product slices.** Sprints 7h-9..7h-13 added: clobber-verify, sync-state recording, sticky alerts, pre-claim hooks, score_latest_reply, codex_safe_launch, sync-diff sanity, pending-trend watch, PRECLAIM prefix injection, journal_archive. Each one was individually justified by a real failure mode. The PATTERN is the problem: enforcement compounds and the parent stops shipping product. User asked the corrective question explicitly ("do all the daybook changes actually help me get work done?"); answer surfaced as 0 Codex dispatches in 7h-13. Pattern: track per-week ratio of (orchestration-layer commits) : (product-slice commits); if it crosses 1:1 for two consecutive weeks, declare an "orchestration freeze" — no new hooks, no new enforcement, until the product-slice ratio recovers. The discipline layer has diminishing returns past a certain density; new failure modes don't justify new mechanisms if existing ones cover them.
+   389	- 2026-04-26 [schema][uid-ref-uniqueness-semantic] **JSON Schema cannot enforce `uid_ref` uniqueness across sibling arrays (e.g. `records[].uid_ref` cannot collide with `record_types[].uid_ref` in the same manifest); the family's test module must carry a semantic-collision check until typed-model parsing owns the invariant.** Sprint 7h-14 P9 vault.v1 worker DONE-dump LESSON CANDIDATE: `keeper-vault.v1` has 4 top-level keys (`records`, `record_types`, `attachments`, `keeper_fill`) each with `uid_ref` fields and the planner expects globally-unique uid_refs across the whole manifest. JSON Schema's `uniqueItems` is per-array; cross-array uniqueness is undecidable in pure Schema. Worker added an explicit pytest case (`test_keeper_vault_schema_rejects_uid_ref_collisions`) that walks all four arrays and asserts `len(uid_refs) == len(set(uid_refs))`, raising `SchemaError` with field name in the reason. Pattern: any schema family with cross-block identifier uniqueness needs (a) a documented gap-comment in the schema JSON saying which invariant is enforced semantically not structurally, and (b) a test module that asserts the invariant at the family level. Future P10/P11/P13 schemas with `uid_ref` should follow the same dual pattern.
+   390	
+   391	- 2026-04-26 [orchestration][parallel-cadence-repeats] **The 1-write+2-readonly parallel pattern is a repeatable per-`continue`-cycle unit, not a one-off.** Sprint 7h-14 dispatched 4 readonly + 1 write; 7h-15 repeated as 1 write (P10) + 2 readonly (P12, P14) and hit the same ~7min wall + ~5min parent-attention envelope. The pattern composes: write worker churns on a worktree while readonly memos run against shared workspace; serialized only on log-extraction (parent's bottleneck is awk-pattern-finding, not codex). Cadence target for future "continue": always launch ≥1 write worker AND ≥1 readonly memo per cycle; never launch only enforcement/daybook work without a product slice. If you can't think of a write slice, the queue is empty and that's a real signal — not an excuse to police more.
+   392	- 2026-04-26 [worker][format-on-rebase-jsonc-trap] **`ruff format` over a directory containing JSON schemas can introduce JSONC trailing commas into otherwise-valid JSON.** P10 worker's LESSON CANDIDATE flagged this: the worker's pre-commit autoformat hook ran `ruff format keeper_sdk` and the schema body file (under that path) gained trailing commas inside `enum` arrays. The 17 tests still passed because pytest's loader is tolerant, but `json.tool` would fail. Pattern: scope `ruff format` to `--include='*.py'` explicitly, OR exclude `*/schemas/*.json` paths in `pyproject.toml [tool.ruff] extend-exclude`. Add a `python -m json.tool < <path>` guard to CI for schemas. Worker correctly self-flagged; parent must add the exclude rule before it bites a future slice that depends on strict JSON parsing (e.g. external schema validators).
+   393	- 2026-04-26 [memo][carve-up-recommendation] **A design memo recommending family SPLIT is a 1st-class output, not a deviation.** P12 worker recommended `keeper-integrations.v1` → N=2 split (`-identity` + `-events`) because the 6 proposed top-level blocks have radically different declarative-fitness (SCIM endpoints declarative-friendly, automator webhooks one-shot-fit, API keys live in KSM-binding territory). V2_DECISIONS.md Q1 already mandates "N small families" — workers should feel free to push N higher when the surface has natural seams. Guidance for future task bodies: explicitly invite split recommendations ("Decisions to surface" item 1 should ALWAYS include carve-up as an option, never assume the table-row family count is final). Capture split recommendations as an Q1 amendment in V2_DECISIONS.md, same shape as the P13b dropped-design amendment.
+   394	- 2026-04-26 [schema][defer-blocks-without-commander-backing] **Don't scaffold-lock blocks that have no current Commander surface; defer to v1.1.** P14 worker's BLOCK MIGRATION TABLE flagged `service_mappings` and `saas_mappings` as having no defined Commander command currently backing them — listing them as proposed top-level keys in V2_DECISIONS.md was aspirational, not evidence-backed. Worker's recommendation: defer both to a v1.1 follow-up rather than scaffold-locking placeholder shapes. This is the schema-family analogue of P13b's dropped-design pattern: better to have N-2 blocks shipping cleanly than N blocks where 2 are ghost-scaffolds. Pattern: every proposed top-level block in V2 table must cite a Commander source path (file:line) at memo-time; if memo can't find one, the block defers, not ships.
+   395	
+   396	- 2026-04-26 [process][optimization-batch-cadence] **A dedicated process-optimization sprint, scheduled deliberately and bounded to cheap+compounding picks, returns ROI by the 2nd downstream slice.** Sprint 7h-16 paused product velocity for one cycle to land 3 picks: (A) `keeper_sdk/core/schemas/CONVENTIONS.md` removes ~30% of redundant context per per-family worker task body, (B) `python -m json.tool` schema-validate CI job catches the JSONC trailing-comma trap from Sprint 7h-15 LESSON `[worker][format-on-rebase-jsonc-trap]` BEFORE merge instead of locally, (C) `dsk_ship.sh` end-to-end ship wrapper replaces a 4-step manual sequence with idempotent exit-coded automation. ROI math: A amortizes at slice 2 (5+ schema slices remain), B amortizes at slice 1 (caught zero violations this run but is now structural), C amortizes at ship 2 (already revealed 2 latent bugs in its debut). The pattern: budget 1 cycle of every ~5-8 product cycles for explicit process review; reject anything that looks like enforcement rather than acceleration (skipped: memo→amendment auto-check, weekly auto-prune — both add gates without removing work).
+   397	- 2026-04-26 [ship-wrapper][worktree-aware-default] **`gh pr merge --delete-branch` from a worktree fails because gh tries to check out the default branch locally to delete the feature branch, but main is owned by the parent repo's worktree.** First debut of `dsk_ship.sh` on PR #34 surfaced the bug. The remote merge succeeded; the local cleanup attempted by gh failed with "main is already used by worktree at <parent path>". Fix: pass `--delete-branch=false` to `gh pr merge` when running from a worktree and handle local + remote branch deletion explicitly in the cleanup step (`git branch -D <branch>; git push origin --delete <branch>`). The wrapper is now worktree-safe by default. Pattern: any tool that "helpfully" mutates local state by checking out the default branch needs a worktree-aware code path (gh, git pull, hub).
+   398	- 2026-04-26 [shell-script][porcelain-paths-with-spaces] **`git worktree list --porcelain | awk '{print $2}'` whitespace-splits paths containing spaces.** The lab workspace path is `/Users/martin/Downloads/Cursor tests/...` — embedded space breaks the awk extraction, returning `/Users/martin/Downloads/Cursor` and the cd fails. Fix: use `awk '/^worktree /{sub(/^worktree /, ""); print; exit}'` to strip the literal prefix and keep the remainder of the line intact (porcelain format guarantees one path per line, terminated by newline). Pattern: NEVER use `$N` field extraction on paths from porcelain output; always sub-and-print or use `--null-data` boundaries. Generalizes beyond `git worktree list` to `git ls-files`, `git status --porcelain`, `find -print`.
+   399	- 2026-04-26 [conventions-doc][reduces-task-body-overhead] **A single canonical CONVENTIONS doc inside the artifact directory it governs (here: `keeper_sdk/core/schemas/CONVENTIONS.md`) removes ~30% of per-task redundant context.** Before: every P*-impl task body re-derived `additionalProperties: false`, `x-keeper-live-proof` block shape, `$id` pattern, cross-family ref grammar, `uid_ref` semantic uniqueness pattern, `$comment` TODO marker convention, commit-message format. After: task body cites CONVENTIONS by path; worker reads it first; task body shrinks to the family-specific scope only. Workers propose amendments via DONE-dump LESSON CANDIDATE; parent integrates after 2+ families hit the same pattern (don't amend on a single-family quirk). Pattern: when 3+ artifact instances share 80%+ of their construction rules, factor the rules into a CONVENTIONS doc colocated with the artifacts. The doc becomes parent-owned; workers cite, don't edit.
+   400	- 2026-04-26 [ci-guard][stdlib-strict-vs-tolerant-parsers] **The `python -m json.tool` CI guard catches the JSONC trailing-comma class of bugs that `pytest`'s lenient parser tolerates.** Sprint 7h-15 LESSON `[worker][format-on-rebase-jsonc-trap]` warned `ruff format` over the schemas dir introduces JSONC trailing commas. Pytest's `json.load` (via `keeper_sdk.core.schemas`) silently tolerates them; external strict parsers (RFC 8259) reject. Adding the strict guard to `.github/workflows/ci.yml` (`schema-validate` job, `build` depends on it) shifts the discovery from "downstream consumer breakage" to "CI fail on the PR before merge". General pattern: every artifact format read by both lenient + strict parsers needs a CI-time strict-parser guard. Don't rely on the test suite for format-validity if the test suite uses the lenient parser. Other candidates in this codebase: `dsk validate <yaml>` already uses strict YAML; `examples/*.yaml` are guarded; what about `pyproject.toml` (toml)? `docs/*.md` (markdown frontmatter)? Audit when next bites.
+   401	
+   402	- 2026-04-26 [orchestration][daybook-gated-sprints] **Treat §16 (post-sprint daybook review + one optimization) as a merge gate for the next sprint plan — otherwise velocity metrics lie and WIP never tightens.** Program state (gap-closure vs maintenance) belongs in JOURNAL so autonomous integrators know which playbook to run; operator-only inputs (tenant, org sign-off, ambiguous pin) should be listed explicitly so workers stop instead of guessing.
+   403	
+   404	- 2026-04-26 [orchestration][autonomous-live-policy] **When maintainer declares live grant for orchestrator + Codex, drop “operator-only” blockers for tenant/pin/daybook — replace with executable policy:** pin ambiguity resolves by **live A/B** + `sync_upstream --check`, Commander **support copy** lives **upstream**, daybook is **private GitHub** + sync script. Human escalation shrinks to secrets/legal/out-of-repo policy only.
+   405	
+   406	- 2026-04-26 [orchestration][orchestrator-owns-prereqs] **Lab toolchain + daybook continuity are the orchestrator’s standing job, not a conditional footnote.** AGENTS + orchestration doc: verify smoke/L1 prerequisites before gates, log in JOURNAL, `sync_daybook` after edits; daybook history is proof-of-life — regressions get triage entries, not “user please confirm env exists.”
+   407	
+   408	- 2026-04-26 [orchestration][session-boundary-honesty] **§0 cold start shrinks the *content* of “continue” to one word + repo open; it does not schedule work while no chat session exists.** User still prods between idle periods — that is normal. Honest fix for fewer prods: CI cron, Codex on a timer, or Cursor background agent — not promises of perpetual autonomous LLM without a trigger.
+   409	
+   410	- 2026-04-27 [coverage][sealed-skeleton] **A module that is a deliberate raise-only façade should default to `# pragma: no cover` or an `_skeleton/` exclude — adding stub tests that assert "raises X on every method" inflates the cov number with zero behavioral value.** `keeper_sdk/secrets/bus.py` is the canonical case: 5 public methods all raise `CapabilityError` (NOT `NotImplementedError` — WORKTREES.md §7 had the wrong exception type for ~3 sprints; fixed 7h-35). Sprint 7h-9 / 7h-10 shipped a B-style `tests/test_bus.py` and 7h-10 F4 immediately flagged it as metric-gaming. Pattern: when a module's public surface is "raise on call" by intent (sealed Phase B placeholder), the honest options are **A** (implement fully) or **C** (omit from cov), not **B** (stub-test the raises). Decision docs that name the exception type must cite a `file:line` so the stub tests don't encode the wrong contract — text drift between WORKTREES.md and `bus.py` 165:168 cost a downstream worker memo cycle to catch.
+   411	
+   412	- 2026-04-27 [daybook][regex-by-reference-inflation] **`pending_journal_items` regex (`agent_review_loop.py`: `^[-*]\s*\[\s\]` OR `"Pending decisions" in line`) double-counts every JOURNAL line that *references* the WORKTREES.md "Pending decisions" section, even when the referenced rows are DONE.** Sprint 7h-30 review fired sticky DAYBOOK alert (`pending_trend=[6,6,6]`) but 5 of 6 hits were historical sprint carry-over notes pointing at items 1-5 (closed in 7h-6); only 3 truly-open items remained in WORKTREES.md (#6 KSM live-proof, #7 bus.py cov, #8 cov ratchet 84→85). Fix applied in 7h-31: rephrase historical refs from `"Pending decisions"` (quoted) to `worktree-followups` (unquoted, regex-defanged) + `_[CLOSED 7h-6]_` suffix; pending count drops 6 → 0 honestly. Pattern: substring-match counters over append-only logs accumulate ghost-debt because closed items' textual references survive the closure event. Two structural mitigations: (A) regex requires line to start with checkbox or section header, not arbitrary in-line phrase, (B) close-out events rewrite the referenced phrase to a different token. Applied B for cheapness; A is the cleaner long-term fix in `agent_review_loop.py`.
+
+exec
+/bin/zsh -lc "awk 'NR>=1059 && NR<=1075 {printf \"%6d\\t%s\\n\", NR, "'$0}'"' /Users/martin/Downloads/JOURNAL.md" in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ succeeded in 0ms:
+  1059	## Sprint 7h-12 — V2 decisions frozen + scaffolds shipped + context-opt batch (2026-04-26 ~19:35 BST)
+  1060	
+  1061	User msg: "review options and implement them" (referring to the 6 OPEN QUESTIONS from Sprint 7h-11's full-Commander-coverage memo).
+  1062	
+  1063	### Implementations landed
+  1064	
+  1065	**A. PRs cleared (carry-over from 7h-10).** PRs #24/#25/#26 (cov-bus/bootstrap/helpers) were left open at end of prior session despite the prior summary claiming merged. Used `pr_merge_clean.sh` — first attempt failed because the helper's `awk '{p=$2}'` split on spaces and our worktree path is `/Users/martin/Downloads/Cursor tests/_codex-worktrees/...`. Fix: `p = substr($0, 10)` to capture everything after `worktree `. With fix in place, all 3 PRs merged + worktrees torn down + main fast-forwarded to `37014dd`.
+  1066	
+  1067	**B. V2 decisions doc.** `docs/V2_DECISIONS.md` (162 lines) freezes all 6 OPEN QUESTIONS:
+  1068	
+  1069	1. **Schema families** — N small, one per family.
+  1070	2. **Back-compat** — 2-pin-bump overlap window via `x-keeper-deprecated`.
+  1071	3. **Runtime passthrough** — `dsk run` (mutating) + `dsk report` (read-with-redaction).
+  1072	4. **Live-proof** — per-phase via `x-keeper-live-proof` schema-level annotation.
+  1073	5. **MSP** dropped-design (watch-only); **EPM** kept (P16) with documented un-drop triggers.
+  1074	6. **"All of Commander"** = 137 statically registered command roots (machine-counted by P18 extractor extension).
+  1075	
+
+exec
+/bin/zsh -lc 'git ls-remote origin cursor/cov-bus-skeleton' in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ succeeded in 535ms:
+exec
+/bin/zsh -lc 'git show --stat --oneline --name-status e4aa555' in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ succeeded in 0ms:
+e4aa555 test(bus): cover sealed-skeleton CapabilityError contract (0% -> 100%) (#24)
+M	keeper_sdk/secrets/bus.py
+A	tests/test_bus.py
+
+exec
+/bin/zsh -lc 'git branch -a --contains e4aa555' in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ succeeded in 0ms:
++ cursor/sharing-v1
+* main
+  remotes/origin/HEAD -> origin/main
+  remotes/origin/main
+
+exec
+/bin/zsh -lc 'git merge-base --is-ancestor e4aa555 HEAD' in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ succeeded in 0ms:
+exec
+/bin/zsh -lc 'git log --all --oneline | grep -i bus' in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ succeeded in 0ms:
+e4aa555 test(bus): cover sealed-skeleton CapabilityError contract (0% -> 100%) (#24)
+94c4803 w13: CommanderCliProvider.discover robustness
+
+exec
+/bin/zsh -lc 'git show --no-patch --pretty=fuller e4aa555' in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ succeeded in 0ms:
+commit e4aa5555eb307d6ca103eec3ca5117fa6de8474a
+Author:     msawczynk <146010367+msawczynk@users.noreply.github.com>
+AuthorDate: Sun Apr 26 19:25:31 2026 +0100
+Commit:     GitHub <noreply@github.com>
+CommitDate: Sun Apr 26 19:25:31 2026 +0100
+
+    test(bus): cover sealed-skeleton CapabilityError contract (0% -> 100%) (#24)
+    
+    Adds tests/test_bus.py exercising __init__ + post/fetch/ack/gc seals. Uses object.__new__(BusClient) to bypass the sealed __init__ for the method tests. Also corrects the bus.py docstring (NotImplementedError -> CapabilityError) so source matches behaviour.
+    
+    Refs roadmap memo P2 + bus-py-decision memo (Option B).
+
+exec
+/bin/zsh -lc 'git show e4aa555:tests/test_bus.py' in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ succeeded in 0ms:
+from __future__ import annotations
+
+import pytest
+
+from keeper_sdk.core.errors import CapabilityError
+from keeper_sdk.secrets.bus import BusClient
+
+
+def _client() -> BusClient:
+    """Bypass the sealed __init__ that raises on construction."""
+    return object.__new__(BusClient)
+
+
+def _assert_not_implemented(exc: CapabilityError) -> None:
+    assert "not implemented" in str(exc).lower()
+
+
+def test_init_seals_construction() -> None:
+    with pytest.raises(CapabilityError) as excinfo:
+        BusClient(store=object(), directory_uid="bus-directory")
+
+    _assert_not_implemented(excinfo.value)
+
+
+@pytest.mark.parametrize(
+    ("method_name", "kwargs"),
+    [
+        ("post", {"to": "*", "subject": "topic", "payload": {"ok": True}}),
+        ("fetch", {"since_id": None, "consumer": "*"}),
+        ("ack", {"last_id": "message-id", "consumer": "*"}),
+        ("gc", {}),
+    ],
+)
+def test_method_raises_capability_error(method_name: str, kwargs: dict[str, object]) -> None:
+    method = getattr(_client(), method_name)
+
+    with pytest.raises(CapabilityError) as excinfo:
+        method(**kwargs)
+
+    _assert_not_implemented(excinfo.value)
+
+codex
+PR #24 is a squash commit on current `main`: `e4aa555` is an ancestor of `306cb26`, `tests/test_bus.py` is present, and `origin/cursor/cov-bus-skeleton` no longer exists. I’m running coverage into `/tmp` next so the impact prediction uses today’s denominator instead of the old “0% bus” assumption.
+  ✓ Verify current commit and repository state
+  ✓ Audit bus.py, exceptions, coverage config, CI, WORKTREES
+  ✓ Reconcile PR #24 branch/log/test state
+  ✓ Read journal and lessons history
+  → Compute coverage impact and write memo with patch
+exec
+/bin/zsh -lc 'COVERAGE_FILE=/tmp/bus-decision.coverage DSK_CI=1 pytest -q --cov=keeper_sdk --cov-report=term-missing --cov-report=json:/tmp/bus-decision-coverage.json --cov-fail-under=0 -p no:cacheprovider' in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ exited 127 in 0ms:
+zsh:1: command not found: pytest
+
+codex
+`pytest` is not on PATH in this shell, so I can’t get the denominator from a fresh run directly. I’ll look for the project venv or prior coverage artifacts, and if none are usable I’ll compute a conservative static denominator from Python source lines under `keeper_sdk` and clearly mark it as static, not `coverage.py`’s executed-statement denominator.
+exec
+/bin/zsh -lc 'find . -maxdepth 3 -type f -name pytest -print' in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ succeeded in 0ms:
+./.venv/bin/pytest
+
+exec
+/bin/zsh -lc 'python --version' in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ exited 127 in 0ms:
+zsh:1: command not found: python
+
+exec
+/bin/zsh -lc "find . -maxdepth 3 -type d -name 'bin' -print" in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+exec
+/bin/zsh -lc "find /tmp -maxdepth 2 -name '*coverage*.json' -o -name '.coverage*' -print" in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ succeeded in 0ms:
+./.venv/bin
+
+ succeeded in 0ms:
+exec
+/bin/zsh -lc 'python -m pytest --version' in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ exited 127 in 0ms:
+zsh:1: command not found: python
+
+exec
+/bin/zsh -lc "find . -maxdepth 3 -name '.coverage*' -o -name 'coverage.json' -o -name '*coverage*.json' -print" in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ succeeded in 0ms:
+codex
+There is a repo-local `.venv/bin/pytest`; I’m using that with `COVERAGE_FILE=/tmp/...` and cache disabled so coverage artifacts stay out of the checkout.
+exec
+/bin/zsh -lc 'COVERAGE_FILE=/tmp/bus-decision.coverage DSK_CI=1 ./.venv/bin/pytest -q --cov=keeper_sdk --cov-report=term-missing --cov-report=json:/tmp/bus-decision-coverage.json --cov-fail-under=0 -p no:cacheprovider' in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ succeeded in 24479ms:
+s....................................................................... [ 12%]
+........................................................................ [ 24%]
+........................................................................ [ 36%]
+........................................................................ [ 49%]
+........................................................................ [ 61%]
+........................................................................ [ 73%]
+........................................................................ [ 86%]
+........................................................................ [ 98%]
+.........                                                                [100%]
+================================ tests coverage ================================
+_______________ coverage: platform darwin, python 3.14.4-final-0 _______________
+
+Name                                             Stmts   Miss  Cover   Missing
+------------------------------------------------------------------------------
+keeper_sdk/__init__.py                               4      0   100%
+keeper_sdk/auth/__init__.py                          3      0   100%
+keeper_sdk/auth/helper.py                          133     19    86%   47, 77-78, 93, 120-121, 131, 256, 381, 390, 416-433
+keeper_sdk/cli/__init__.py                           2      0   100%
+keeper_sdk/cli/__main__.py                           3      3     0%   3-6
+keeper_sdk/cli/_live/__init__.py                     0      0   100%
+keeper_sdk/cli/_live/runbook.py                    104     89    14%   39-51, 61-74, 84-99, 104-118, 123-140, 145-154, 171-206
+keeper_sdk/cli/_live/transcript.py                  99      9    91%   92, 107, 116, 120-122, 212, 216, 223
+keeper_sdk/cli/_report/__init__.py                   4      0   100%
+keeper_sdk/cli/_report/common.py                    57      7    88%   53-54, 68-69, 75, 85, 116
+keeper_sdk/cli/_report/compliance.py                20      5    75%   31, 33, 35, 37, 39
+keeper_sdk/cli/_report/password.py                  14      2    86%   29, 31
+keeper_sdk/cli/_report/runner.py                    32     25    22%   14-15, 31-71
+keeper_sdk/cli/_report/security_audit.py            20      2    90%   33, 35
+keeper_sdk/cli/main.py                             572    190    67%   139-140, 144-146, 150-154, 192-194, 198-202, 209-211, 218, 230-234, 238, 241-243, 271-273, 278-281, 284-308, 313-315, 330-332, 348, 357-359, 400-406, 415, 420, 439-450, 537, 573-575, 596-601, 612-614, 630, 635-637, 668-669, 674, 679-684, 715-717, 726-729, 750-761, 774-776, 781-783, 807-817, 821-835, 839-866, 871, 978-980, 1032-1034, 1100-1102, 1175-1221, 1225
+keeper_sdk/cli/renderer.py                          57      0   100%
+keeper_sdk/core/__init__.py                         16      0   100%
+keeper_sdk/core/diff.py                            291     27    91%   99, 108, 185, 190, 195, 197, 209-211, 218, 225, 236, 245, 271, 318, 321, 323, 331, 334, 339, 342, 364, 388, 418, 546, 597, 637
+keeper_sdk/core/errors.py                           17      0   100%
+keeper_sdk/core/graph.py                            92     14    85%   48-50, 88, 91, 109, 138, 142-144, 153-160
+keeper_sdk/core/interfaces.py                       24      0   100%
+keeper_sdk/core/manifest.py                         78     12    85%   34, 42, 53, 103, 115, 124-125, 131, 150, 155, 174-176
+keeper_sdk/core/metadata.py                         29      1    97%   69
+keeper_sdk/core/models.py                          304     14    95%   390, 424-444
+keeper_sdk/core/normalize.py                       187      0   100%
+keeper_sdk/core/planner.py                          40      0   100%
+keeper_sdk/core/preview.py                          35      0   100%
+keeper_sdk/core/redact.py                           52      0   100%
+keeper_sdk/core/rules.py                            24      1    96%   39
+keeper_sdk/core/schema.py                          104      5    95%   92-93, 122, 164, 195
+keeper_sdk/core/schemas/__init__.py                  0      0   100%
+keeper_sdk/core/vault_diff.py                      357     38    89%   118, 178-189, 233, 264-267, 285-298, 327-329, 332, 340, 343, 433-444, 465, 494, 531-535, 539, 541, 583, 597, 600, 617, 667, 678, 698, 758
+keeper_sdk/core/vault_graph.py                      37      0   100%
+keeper_sdk/core/vault_models.py                     41      1    98%   87
+keeper_sdk/providers/__init__.py                     3      0   100%
+keeper_sdk/providers/_commander_cli_helpers.py     229      0   100%
+keeper_sdk/providers/commander_cli.py             1443    283    80%   100, 108-109, 117, 119, 127, 150, 152, 156, 192, 201, 225, 233, 243, 261, 268-290, 305-342, 389, 392-394, 403-405, 412-413, 416-417, 461, 550, 606-607, 763-764, 768, 777, 793, 803, 813-821, 841-849, 851-859, 880-923, 926, 935, 969, 972-973, 981-990, 1004-1006, 1016-1090, 1097-1150, 1221, 1225, 1278, 1328-1333, 1354, 1359, 1388, 1392, 1411-1414, 1418, 1449, 1458-1459, 1491, 1495, 1522-1523, 1533, 1540-1542, 1544-1545, 1555-1558, 1576, 1588, 1699, 1746-1747, 1789-1794, 1898-1899, 1942-1943, 2031-2032, 2077, 2102, 2109, 2160, 2173-2174, 2180, 2184-2185, 2189, 2193, 2196-2197, 2211, 2228-2230, 2252-2253, 2261, 2363, 2378, 2460, 2545, 2593, 2606, 2614-2618, 2638, 2650, 2684, 2720, 2742-2743, 2769, 2785, 2793-2796, 2821, 2878, 2880, 2884, 2934-2935, 2937
+keeper_sdk/providers/mock.py                        72      5    93%   93-101, 145-156
+keeper_sdk/secrets/__init__.py                       4      0   100%
+keeper_sdk/secrets/bootstrap.py                    231      0   100%
+keeper_sdk/secrets/bus.py                           33      0   100%
+keeper_sdk/secrets/ksm.py                          106      3    97%   124, 165, 310
+------------------------------------------------------------------------------
+TOTAL                                             4973    755    85%
+Coverage JSON written to file /tmp/bus-decision-coverage.json
+584 passed, 1 skipped in 23.44s
+
+exec
+/bin/zsh -lc 'git status --short' in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+exec
+/bin/zsh -lc "./.venv/bin/python - <<'PY'
+import json
+p='/tmp/bus-decision-coverage.json'
+d=json.load(open(p))
+t=d['totals']
+b=d['files']['keeper_sdk/secrets/bus.py']['summary']
+covered=t['covered_lines']
+num=t['num_statements']
+missing=t['missing_lines']
+print('total_num_statements', num)
+print('total_covered_lines', covered)
+print('total_missing_lines', missing)
+print('total_percent_covered', t['percent_covered'])
+print('bus_num_statements', b['num_statements'])
+print('bus_covered_lines', b['covered_lines'])
+print('bus_missing_lines', b['missing_lines'])
+print('bus_percent_covered', b['percent_covered'])
+new_num=num-b['num_statements']
+new_cov=covered-b['covered_lines']
+print('omit_num_statements', new_num)
+print('omit_covered_lines', new_cov)
+print('omit_percent_covered', 100*new_cov/new_num)
+for n in [5,6]:
+    print(f'pragma_{n}_lines_percent', 100*(covered-n)/(num-n))
+PY" in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ succeeded in 0ms:
+ succeeded in 0ms:
+total_num_statements 4973
+total_covered_lines 4218
+total_missing_lines 755
+total_percent_covered 84.81801729338427
+bus_num_statements 33
+bus_covered_lines 33
+bus_missing_lines 0
+bus_percent_covered 100.0
+omit_num_statements 4940
+omit_covered_lines 4185
+omit_percent_covered 84.7165991902834
+pragma_5_lines_percent 84.80273752012883
+pragma_6_lines_percent 84.7996778739682
+
+exec
+/bin/zsh -lc 'COVERAGE_FILE=/tmp/bus-decision-fail85.coverage DSK_CI=1 ./.venv/bin/pytest -q --cov=keeper_sdk --cov-report=term --cov-fail-under=85 -p no:cacheprovider' in /Users/martin/Downloads/Cursor tests/declarative-sdk-for-k
+ succeeded in 28489ms:
+s....................................................................... [ 12%]
+........................................................................ [ 24%]
+........................................................................ [ 36%]
+........................................................................ [ 49%]
+........................................................................ [ 61%]
+........................................................................ [ 73%]
+........................................................................ [ 86%]
+........................................................................ [ 98%]
+.........                                                                [100%]
+================================ tests coverage ================================
+_______________ coverage: platform darwin, python 3.14.4-final-0 _______________
+
+Name                                             Stmts   Miss  Cover
+--------------------------------------------------------------------
+keeper_sdk/__init__.py                               4      0   100%
+keeper_sdk/auth/__init__.py                          3      0   100%
+keeper_sdk/auth/helper.py                          133     18    86%
+keeper_sdk/cli/__init__.py                           2      0   100%
+keeper_sdk/cli/__main__.py                           3      3     0%
+keeper_sdk/cli/_live/__init__.py                     0      0   100%
+keeper_sdk/cli/_live/runbook.py                    104     89    14%
+keeper_sdk/cli/_live/transcript.py                  99      9    91%
+keeper_sdk/cli/_report/__init__.py                   4      0   100%
+keeper_sdk/cli/_report/common.py                    57      7    88%
+keeper_sdk/cli/_report/compliance.py                20      5    75%
+keeper_sdk/cli/_report/password.py                  14      2    86%
+keeper_sdk/cli/_report/runner.py                    32     25    22%
+keeper_sdk/cli/_report/security_audit.py            20      2    90%
+keeper_sdk/cli/main.py                             572    190    67%
+keeper_sdk/cli/renderer.py                          57      0   100%
+keeper_sdk/core/__init__.py                         16      0   100%
+keeper_sdk/core/diff.py                            291     27    91%
+keeper_sdk/core/errors.py                           17      0   100%
+keeper_sdk/core/graph.py                            92     14    85%
+keeper_sdk/core/interfaces.py                       24      0   100%
+keeper_sdk/core/manifest.py                         78     12    85%
+keeper_sdk/core/metadata.py                         29      1    97%
+keeper_sdk/core/models.py                          304     14    95%
+keeper_sdk/core/normalize.py                       187      0   100%
+keeper_sdk/core/planner.py                          40      0   100%
+keeper_sdk/core/preview.py                          35      0   100%
+keeper_sdk/core/redact.py                           52      0   100%
+keeper_sdk/core/rules.py                            24      1    96%
+keeper_sdk/core/schema.py                          104      5    95%
+keeper_sdk/core/schemas/__init__.py                  0      0   100%
+keeper_sdk/core/vault_diff.py                      357     38    89%
+keeper_sdk/core/vault_graph.py                      37      0   100%
+keeper_sdk/core/vault_models.py                     41      1    98%
+keeper_sdk/providers/__init__.py                     3      0   100%
+keeper_sdk/providers/_commander_cli_helpers.py     229      0   100%
+keeper_sdk/providers/commander_cli.py             1443    283    80%
+keeper_sdk/providers/mock.py                        72      5    93%
+keeper_sdk/secrets/__init__.py                       4      0   100%
+keeper_sdk/secrets/bootstrap.py                    231      0   100%
+keeper_sdk/secrets/bus.py                           33      0   100%
+keeper_sdk/secrets/ksm.py                          106      3    97%
+--------------------------------------------------------------------
+TOTAL                                             4973    754    85%
+FAIL Required test coverage of 85% not reached. Total coverage: 84.84%
+584 passed, 1 skipped in 28.00s
+
+codex
+**Decision Memo**
+
+Read-only audit completed on `main` at `306cb26`; no files modified.
+
+**1. Current State Audit**
+
+FLAG: Sprint 7h-35 memo said `bus.py` was 225 LOC, but current file ends at `keeper_sdk/secrets/bus.py:224`.
+
+`keeper_sdk/secrets/bus.py` still matches the sealed skeleton shape: `BusMessage` dataclass is at `keeper_sdk/secrets/bus.py:143-159`, `BusClient` starts at `keeper_sdk/secrets/bus.py:162`, and its 5 callable entry points all raise `CapabilityError`: `__init__` `177-180`, `post` `192-195`, `fetch` `204-207`, `ack` `211-214`, `gc` `218-221`.
+
+`CapabilityError` is imported from `keeper_sdk.core.errors` at `keeper_sdk/secrets/bus.py:130`; the class itself is `keeper_sdk/core/errors.py:53-54`. There is no `keeper_sdk/exceptions.py` in this checkout.
+
+Phase B checklist is still exactly 6 items at `keeper_sdk/secrets/bus.py:97-117`: Commander rev probes, CAS retry extraction, 32 KB cap, `tests/test_bus_ksm.py`, `docs/KSM_BUS.md`, and `dsk bus` CLI.
+
+Caller search is NOT zero across the requested scope anymore: `tests/test_bus.py:6` imports `BusClient`. There are no production callers in `keeper_sdk`, `scripts`, or `docs`.
+
+Coverage config: `pyproject.toml` has `pytest-cov` as a dev dependency at `pyproject.toml:54-55` and pytest config at `pyproject.toml:101-106`; no `[tool.coverage.*]` section exists. `.coveragerc` is absent at repo root. CI floor remains `--cov-fail-under=84` at `.github/workflows/ci.yml:64`.
+
+**2. PARENT-DECIDE (i): PR #24 Reconciliation**
+
+`git ls-remote origin cursor/cov-bus-skeleton` returned no branch. `git log --all --oneline | grep -i bus` shows `e4aa555 test(bus): cover sealed-skeleton CapabilityError contract (0% -> 100%) (#24)`. `git show e4aa555` says it added `tests/test_bus.py` and modified `keeper_sdk/secrets/bus.py`.
+
+`e4aa555` is an ancestor of current `HEAD`; `git branch -a --contains e4aa555` includes `main`, `origin/main`, and `cursor/sharing-v1`.
+
+`tests/test_bus.py` exists, 40 LOC. It tests `__init__` at `tests/test_bus.py:18-22` and parametrized `post/fetch/ack/gc` via `object.__new__(BusClient)` at `tests/test_bus.py:25-40`.
+
+Verdict: **SUBSUMED**. PR #24 landed as squash commit `e4aa555`; the old branch is gone.
+
+**3. PARENT-DECIDE (ii): Exception Text**
+
+WORKTREES §7 is currently correct: it says Option B is `CapabilityError`, “NOT `NotImplementedError`,” and cites bus raise sites at `/Users/martin/Downloads/Cursor tests/WORKTREES.md:96`.
+
+No WORKTREES patch needed for this item.
+
+**4. Recommend A vs B vs C**
+
+The 7h-35 three-option analysis is still valid, but the current baseline changed: Option B is already merged, and `bus.py` is no longer 0% in coverage.
+
+A is not recommended now. The Phase B checklist is substantial (`keeper_sdk/secrets/bus.py:97-117`), and WORKTREES says to defer until Phase B timing is decided (`WORKTREES.md:96`).
+
+B is already applied. It is useful as a contract pin, but the daybook explicitly called it metric-gaming: Sprint 7h-10 F4 says sealed-stub coverage adds zero defensive value (`/Users/martin/Downloads/JOURNAL.md:943`), and LESSONS repeats that sealed raise-only façades should default to pragma/omit (`/Users/martin/Downloads/LESSONS.md:410`).
+
+C is still the clean decision while Phase B is parked. Prefer config omit over inline pragmas: it keeps production skeleton code untouched and makes the coverage policy explicit.
+
+RECOMMEND: **C**
+
+**5. Patch For Chosen Option**
+
+```diff
+diff --git a/pyproject.toml b/pyproject.toml
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -104,3 +104,6 @@ markers = [
+     "integration: requires a live Keeper tenant (set KEEPER_CONFIG)",
+     "slow: perf / long tests",
+ ]
++
++[tool.coverage.run]
++omit = ["keeper_sdk/secrets/bus.py"]
+```
+
+**6. Coverage Impact Prediction**
+
+Fresh run command used `.venv/bin/pytest` with `COVERAGE_FILE=/tmp/...` and cache disabled. Result: `584 passed, 1 skipped`.
+
+Current coverage denominator is 4,973 coverage statements, not physical LOC. `bus.py` is 33 statements, 33 covered, 0 missed, 100%.
+
+Because PR #24 is already merged, C-omit does not raise coverage. It removes 33 already-covered statements:
+
+`4218 / 4973 = 84.818%` current exact coverage.  
+`(4218 - 33) / (4973 - 33) = 4185 / 4940 = 84.717%` after omit.
+
+Prediction: C-omit lowers exact coverage by about `0.10pp`, while making the metric honest. It does **not** unlock WORKTREES §8 ratchet `84 -> 85`; §8 remains open (`WORKTREES.md:97`).
+
+**7. CANDIDATE LESSON**
+
+`2026-04-27 [coverage][bus-decision-finalised] PR #24 is SUBSUMED; keep sealed-bus contract tests if useful, but omit Phase B bus skeleton from coverage until implementation so ratchets measure behavior, not raise-only façades.`
+2026-04-27T05:26:42.338513Z ERROR codex_core::session: failed to record rollout items: thread 019dcd63-d385-7861-b3ac-9d5a1217f178 not found
+tokens used
+66,074
+**Decision Memo**
+
+Read-only audit completed on `main` at `306cb26`; no files modified.
+
+**1. Current State Audit**
+
+FLAG: Sprint 7h-35 memo said `bus.py` was 225 LOC, but current file ends at `keeper_sdk/secrets/bus.py:224`.
+
+`keeper_sdk/secrets/bus.py` still matches the sealed skeleton shape: `BusMessage` dataclass is at `keeper_sdk/secrets/bus.py:143-159`, `BusClient` starts at `keeper_sdk/secrets/bus.py:162`, and its 5 callable entry points all raise `CapabilityError`: `__init__` `177-180`, `post` `192-195`, `fetch` `204-207`, `ack` `211-214`, `gc` `218-221`.
+
+`CapabilityError` is imported from `keeper_sdk.core.errors` at `keeper_sdk/secrets/bus.py:130`; the class itself is `keeper_sdk/core/errors.py:53-54`. There is no `keeper_sdk/exceptions.py` in this checkout.
+
+Phase B checklist is still exactly 6 items at `keeper_sdk/secrets/bus.py:97-117`: Commander rev probes, CAS retry extraction, 32 KB cap, `tests/test_bus_ksm.py`, `docs/KSM_BUS.md`, and `dsk bus` CLI.
+
+Caller search is NOT zero across the requested scope anymore: `tests/test_bus.py:6` imports `BusClient`. There are no production callers in `keeper_sdk`, `scripts`, or `docs`.
+
+Coverage config: `pyproject.toml` has `pytest-cov` as a dev dependency at `pyproject.toml:54-55` and pytest config at `pyproject.toml:101-106`; no `[tool.coverage.*]` section exists. `.coveragerc` is absent at repo root. CI floor remains `--cov-fail-under=84` at `.github/workflows/ci.yml:64`.
+
+**2. PARENT-DECIDE (i): PR #24 Reconciliation**
+
+`git ls-remote origin cursor/cov-bus-skeleton` returned no branch. `git log --all --oneline | grep -i bus` shows `e4aa555 test(bus): cover sealed-skeleton CapabilityError contract (0% -> 100%) (#24)`. `git show e4aa555` says it added `tests/test_bus.py` and modified `keeper_sdk/secrets/bus.py`.
+
+`e4aa555` is an ancestor of current `HEAD`; `git branch -a --contains e4aa555` includes `main`, `origin/main`, and `cursor/sharing-v1`.
+
+`tests/test_bus.py` exists, 40 LOC. It tests `__init__` at `tests/test_bus.py:18-22` and parametrized `post/fetch/ack/gc` via `object.__new__(BusClient)` at `tests/test_bus.py:25-40`.
+
+Verdict: **SUBSUMED**. PR #24 landed as squash commit `e4aa555`; the old branch is gone.
+
+**3. PARENT-DECIDE (ii): Exception Text**
+
+WORKTREES §7 is currently correct: it says Option B is `CapabilityError`, “NOT `NotImplementedError`,” and cites bus raise sites at `/Users/martin/Downloads/Cursor tests/WORKTREES.md:96`.
+
+No WORKTREES patch needed for this item.
+
+**4. Recommend A vs B vs C**
+
+The 7h-35 three-option analysis is still valid, but the current baseline changed: Option B is already merged, and `bus.py` is no longer 0% in coverage.
+
+A is not recommended now. The Phase B checklist is substantial (`keeper_sdk/secrets/bus.py:97-117`), and WORKTREES says to defer until Phase B timing is decided (`WORKTREES.md:96`).
+
+B is already applied. It is useful as a contract pin, but the daybook explicitly called it metric-gaming: Sprint 7h-10 F4 says sealed-stub coverage adds zero defensive value (`/Users/martin/Downloads/JOURNAL.md:943`), and LESSONS repeats that sealed raise-only façades should default to pragma/omit (`/Users/martin/Downloads/LESSONS.md:410`).
+
+C is still the clean decision while Phase B is parked. Prefer config omit over inline pragmas: it keeps production skeleton code untouched and makes the coverage policy explicit.
+
+RECOMMEND: **C**
+
+**5. Patch For Chosen Option**
+
+```diff
+diff --git a/pyproject.toml b/pyproject.toml
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -104,3 +104,6 @@ markers = [
+     "integration: requires a live Keeper tenant (set KEEPER_CONFIG)",
+     "slow: perf / long tests",
+ ]
++
++[tool.coverage.run]
++omit = ["keeper_sdk/secrets/bus.py"]
+```
+
+**6. Coverage Impact Prediction**
+
+Fresh run command used `.venv/bin/pytest` with `COVERAGE_FILE=/tmp/...` and cache disabled. Result: `584 passed, 1 skipped`.
+
+Current coverage denominator is 4,973 coverage statements, not physical LOC. `bus.py` is 33 statements, 33 covered, 0 missed, 100%.
+
+Because PR #24 is already merged, C-omit does not raise coverage. It removes 33 already-covered statements:
+
+`4218 / 4973 = 84.818%` current exact coverage.  
+`(4218 - 33) / (4973 - 33) = 4185 / 4940 = 84.717%` after omit.
+
+Prediction: C-omit lowers exact coverage by about `0.10pp`, while making the metric honest. It does **not** unlock WORKTREES §8 ratchet `84 -> 85`; §8 remains open (`WORKTREES.md:97`).
+
+**7. CANDIDATE LESSON**
+
+`2026-04-27 [coverage][bus-decision-finalised] PR #24 is SUBSUMED; keep sealed-bus contract tests if useful, but omit Phase B bus skeleton from coverage until implementation so ratchets measure behavior, not raise-only façades.`
