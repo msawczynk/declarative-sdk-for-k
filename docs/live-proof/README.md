@@ -90,6 +90,7 @@ transcript helpers (`keeper_sdk.cli._live.transcript`). When in doubt, keep
 | `keeper-vault.v1` | `scaffold-only` | Commander L1 + `validate --online` in code; commit a **sanitized** transcript (see template + checklist §6) before `supported` |
 | `keeper-vault-sharing.v1` | `scaffold-only` | This README until a transcript lands |
 | `keeper-enterprise.v1` | `scaffold-only` | This README until a transcript lands |
+| `keeper-pam-environment.v1` (RBI slice) | `supported` (E2E smoke) | [`keeper-pam-environment.v1.89047920.rbi.sanitized.json`](./keeper-pam-environment.v1.89047920.rbi.sanitized.json) — `pamRemoteBrowser` 2026-04-28; see also machine transcript |
 
 When a real file exists, point `evidence` at that file path instead of this
 README.

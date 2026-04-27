@@ -7,10 +7,11 @@
     "status": "supported",
     "evidence": [
       "scripts/smoke/scenarios.py",
-      "docs/live-proof/keeper-pam-environment.v1.89047920.machine.sanitized.json"
+      "docs/live-proof/keeper-pam-environment.v1.89047920.machine.sanitized.json",
+      "docs/live-proof/keeper-pam-environment.v1.89047920.rbi.sanitized.json"
     ],
     "since_pin": "89047920a0df857e01fb59adcb0bfb9fa6db70bf",
-    "notes": "PAM lifecycle live-proven via the smoke matrix: pamMachine, pamDatabase, pamDirectory all run plan -> apply -> clean re-plan -> destroy through Commander. pamRemoteBrowser and pamUserNestedRotation remain experimental (preview-gated; see scripts/smoke/README.md and docs/SDK_DA_COMPLETION_PLAN.md Phase 2/3). Live-proof annotation is supported for this schema family."
+    "notes": "PAM lifecycle live-proven via the smoke matrix: pamMachine, pamDatabase, pamDirectory, and pamRemoteBrowser (2026-04-28) run plan -> apply -> clean re-plan -> destroy through the committed harness. `pamUserNestedRotation` / rotation preview paths remain as in scripts/smoke/README.md and docs/SDK_DA_COMPLETION_PLAN.md. Field-level import vs DAG-only labels: docs/SDK_DA_COMPLETION_PLAN.md Phase 3."
   },
   "type": "object",
   "additionalProperties": false,
