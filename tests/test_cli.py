@@ -84,9 +84,7 @@ def test_validate_vault_online_requires_commander() -> None:
 
 
 def test_validate_vault_online_requires_folder_uid() -> None:
-    result = _run(
-        ["--provider", "commander", "validate", str(_vault_minimal_path()), "--online"]
-    )
+    result = _run(["--provider", "commander", "validate", str(_vault_minimal_path()), "--online"])
     assert result.exit_code == EXIT_CAPABILITY, result.output
     assert "folder" in result.output.lower()
 

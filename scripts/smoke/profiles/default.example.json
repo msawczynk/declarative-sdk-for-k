@@ -1,0 +1,12 @@
+{
+  "id": "p1",
+  "target_email": "msawczyn+sdk-p1@acme-demo.com",
+  "ksm_config": "/Users/martin/Downloads/Cursor tests/keeper-vault-rbi-pam-testenv/ksm-config.json",
+  "admin_commander_config": "/Users/martin/Downloads/Cursor tests/keeper-vault-rbi-pam-testenv/commander-config.json",
+  "sdktest_commander_config": "scripts/smoke/.commander-config-sdk-p1.json",
+  "keeper_server": "keepersecurity.com",
+  "channel_name": "sdk-declarative-p1",
+  "password": "AcmeDemo123!!",
+  "default_admin_record_uid": "MyiZN4cw-wtEIpY1jHlhLw",
+  "sdk_test_login_record_title": "SDK Test — sdk-p1 Login"
+}

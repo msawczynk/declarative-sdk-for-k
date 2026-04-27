@@ -615,9 +615,7 @@ def render_markdown(snapshot: dict[str, Any], warnings: Sequence[str]) -> str:
         lines.append(_md_table(["Group", "Subcommand", "Class", "Help"], vault_group_rows))
         lines.append("")
 
-    ent_cmds = [
-        c for c in snapshot["commands"] if str(c["group_command"]).startswith("enterprise")
-    ]
+    ent_cmds = [c for c in snapshot["commands"] if str(c["group_command"]).startswith("enterprise")]
     vault_cmds = [
         c for c in snapshot["commands"] if c["group_command"] in _VAULT_FAMILY_COMMAND_LABELS
     ]

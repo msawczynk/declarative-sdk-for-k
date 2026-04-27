@@ -7,6 +7,7 @@ import argparse
 import json
 import logging
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -23,57 +24,99 @@ SANDBOX_KSM_APP_NAME = "SDK Test KSM"
 GATEWAY_NAME = "Lab GW Rocky"
 
 
-def ensure_sandbox(admin_params, *, testuser_email: str) -> dict:
-    """Ensure the SDK smoke sandbox exists and is wired for reuse."""
-    _sync_down(admin_params)
-    _ensure_gateway_visible(admin_params)
+@dataclass(frozen=True)
+class SandboxConfig:
+    sf_title: str
+    ksm_app_name: str
+    gateway_name: str
 
-    sf_uid = _find_shared_folder_uid(admin_params, SANDBOX_SF_TITLE)
+
+DEFAULT_SANDBOX_CONFIG = SandboxConfig(
+    sf_title=SANDBOX_SF_TITLE,
+    ksm_app_name=SANDBOX_KSM_APP_NAME,
+    gateway_name=GATEWAY_NAME,
+)
+
+
+def config_for_profile(profile: Any) -> SandboxConfig:
+    profile_id = str(getattr(profile, "id", "default"))
+    if profile_id == "default":
+        return DEFAULT_SANDBOX_CONFIG
+    return SandboxConfig(
+        sf_title=f"SDK Test (ephemeral) {profile_id}",
+        ksm_app_name=f"SDK Test KSM {profile_id}",
+        gateway_name=GATEWAY_NAME,
+    )
+
+
+def _sandbox_or_default(sandbox: SandboxConfig | None) -> SandboxConfig:
+    return sandbox if sandbox is not None else DEFAULT_SANDBOX_CONFIG
+
+
+def ensure_sandbox(
+    admin_params, *, testuser_email: str, sandbox: SandboxConfig | None = None
+) -> dict:
+    """Ensure the SDK smoke sandbox exists and is wired for reuse."""
+    sandbox_config = _sandbox_or_default(sandbox)
+    _sync_down(admin_params)
+    _ensure_gateway_visible(admin_params, sandbox=sandbox_config)
+
+    sf_uid = _find_shared_folder_uid(admin_params, sandbox_config.sf_title)
     if not sf_uid:
-        log.info("Creating shared folder %s", SANDBOX_SF_TITLE)
+        log.info("Creating shared folder %s", sandbox_config.sf_title)
         _do(
             admin_params,
-            f'mkdir -sf --manage-users --manage-records --can-edit --can-share "{SANDBOX_SF_TITLE}"',
+            f'mkdir -sf --manage-users --manage-records --can-edit --can-share "{sandbox_config.sf_title}"',
         )
-        sf_uid = _find_shared_folder_uid(admin_params, SANDBOX_SF_TITLE)
+        sf_uid = _find_shared_folder_uid(admin_params, sandbox_config.sf_title)
         if not sf_uid:
             raise RuntimeError(
-                f"Created shared folder {SANDBOX_SF_TITLE!r} but could not resolve its UID. "
+                f"Created shared folder {sandbox_config.sf_title!r} but could not resolve its UID. "
                 "Re-run `keeper ls -f --format json` as the admin and inspect the folder listing."
             )
 
-    shared_to_testuser = _ensure_shared_to_user(admin_params, testuser_email=testuser_email)
+    shared_to_testuser = _ensure_shared_to_user(
+        admin_params, testuser_email=testuser_email, sandbox=sandbox_config
+    )
 
-    existing_app = _find_ksm_app(admin_params, SANDBOX_KSM_APP_NAME)
+    existing_app = _find_ksm_app(admin_params, sandbox_config.ksm_app_name)
     if existing_app is None:
-        log.info("Creating KSM application %s", SANDBOX_KSM_APP_NAME)
-        _do(admin_params, f'secrets-manager app create "{SANDBOX_KSM_APP_NAME}"')
-        existing_app = _find_ksm_app(admin_params, SANDBOX_KSM_APP_NAME)
+        log.info("Creating KSM application %s", sandbox_config.ksm_app_name)
+        _do(admin_params, f'secrets-manager app create "{sandbox_config.ksm_app_name}"')
+        existing_app = _find_ksm_app(admin_params, sandbox_config.ksm_app_name)
         if existing_app is None:
             raise RuntimeError(
-                f"Created KSM application {SANDBOX_KSM_APP_NAME!r} but could not resolve its UID. "
+                f"Created KSM application {sandbox_config.ksm_app_name!r} but could not resolve its UID. "
                 "Re-run `keeper secrets-manager app list --format json` and confirm Commander supports JSON output."
             )
     else:
         log.info(
-            "KSM application %s already exists (%s)", SANDBOX_KSM_APP_NAME, existing_app["uid"]
+            "KSM application %s already exists (%s)",
+            sandbox_config.ksm_app_name,
+            existing_app["uid"],
         )
 
     return {
         "sf_uid": sf_uid,
         "ksm_app_uid": existing_app["uid"],
-        "gateway_name": GATEWAY_NAME,
+        "gateway_name": sandbox_config.gateway_name,
         "shared_to_testuser": shared_to_testuser,
     }
 
 
-def record_count(admin_params, sf_uid: str) -> int:
+def record_count(admin_params, sf_uid: str, *, sandbox: SandboxConfig | None = None) -> int:
     """Return how many records currently live in the shared folder."""
     entries = _list_folder_entries(admin_params, sf_uid)
     return sum(1 for entry in entries if _entry_type(entry) == "record")
 
 
-def teardown_records(admin_params, sf_uid: str, *, manager: str) -> list[str]:
+def teardown_records(
+    admin_params,
+    sf_uid: str,
+    *,
+    manager: str,
+    sandbox: SandboxConfig | None = None,
+) -> list[str]:
     """Delete only SDK-managed records in the sandbox shared folder."""
     removed: list[str] = []
     for entry in _list_folder_entries(admin_params, sf_uid):
@@ -91,19 +134,22 @@ def teardown_records(admin_params, sf_uid: str, *, manager: str) -> list[str]:
     return removed
 
 
-def teardown_sandbox(admin_params, *, keep_sf: bool = True) -> None:
+def teardown_sandbox(
+    admin_params, *, keep_sf: bool = True, sandbox: SandboxConfig | None = None
+) -> None:
     """Remove the sandbox app binding and optionally the sandbox shared folder."""
+    sandbox_config = _sandbox_or_default(sandbox)
     _sync_down(admin_params)
 
-    sf_uid = _find_shared_folder_uid(admin_params, SANDBOX_SF_TITLE)
-    app = _find_ksm_app(admin_params, SANDBOX_KSM_APP_NAME)
+    sf_uid = _find_shared_folder_uid(admin_params, sandbox_config.sf_title)
+    app = _find_ksm_app(admin_params, sandbox_config.ksm_app_name)
 
     if sf_uid and app:
         try:
-            log.info("Removing sandbox shared-folder binding from %s", SANDBOX_KSM_APP_NAME)
+            log.info("Removing sandbox shared-folder binding from %s", sandbox_config.ksm_app_name)
             _do(
                 admin_params,
-                f'secrets-manager share remove --app "{SANDBOX_KSM_APP_NAME}" --secret {sf_uid}',
+                f'secrets-manager share remove --app "{sandbox_config.ksm_app_name}" --secret {sf_uid}',
             )
         except Exception as exc:
             if not _looks_like_missing_share(str(exc)):
@@ -111,8 +157,8 @@ def teardown_sandbox(admin_params, *, keep_sf: bool = True) -> None:
             log.info("Sandbox shared-folder binding already absent")
 
     if not keep_sf and sf_uid:
-        log.info("Removing sandbox shared folder %s", SANDBOX_SF_TITLE)
-        _do(admin_params, f'rmdir "{SANDBOX_SF_TITLE}"')
+        log.info("Removing sandbox shared folder %s", sandbox_config.sf_title)
+        _do(admin_params, f'rmdir "{sandbox_config.sf_title}"')
 
 
 def _sync_down(admin_params) -> None:
@@ -143,21 +189,21 @@ def _do(admin_params, command: str) -> str:
     return captured
 
 
-def _ensure_gateway_visible(admin_params) -> None:
+def _ensure_gateway_visible(admin_params, *, sandbox: SandboxConfig) -> None:
     output = _do(admin_params, "pam gateway list")
-    if GATEWAY_NAME in output:
+    if sandbox.gateway_name in output:
         return
 
     for record in getattr(admin_params, "record_cache", {}).values():
         try:
             raw = record.get("data_unencrypted", "{}")
-            if GATEWAY_NAME in raw:
+            if sandbox.gateway_name in raw:
                 return
         except Exception:
             continue
 
     raise RuntimeError(
-        f"Required gateway {GATEWAY_NAME!r} is not visible after sync_down. "
+        f"Required gateway {sandbox.gateway_name!r} is not visible after sync_down. "
         "Next action: log in as the tenant admin, run `keeper pam gateway list`, "
         "and confirm the gateway exists and is shared to that admin session before re-running smoke."
     )
@@ -177,8 +223,8 @@ def _list_folders(admin_params) -> list[dict[str, Any]]:
     return [entry for entry in entries if isinstance(entry, dict)]
 
 
-def _ensure_shared_to_user(admin_params, *, testuser_email: str) -> bool:
-    before = _share_folder_info(admin_params)
+def _ensure_shared_to_user(admin_params, *, testuser_email: str, sandbox: SandboxConfig) -> bool:
+    before = _share_folder_info(admin_params, sandbox=sandbox)
     if _share_info_mentions_user(before, testuser_email):
         log.info("Shared folder already granted to %s", testuser_email)
         return True
@@ -187,7 +233,7 @@ def _ensure_shared_to_user(admin_params, *, testuser_email: str) -> bool:
     # -o on|off (manage-users), -d on|off (can-edit), -s on|off (can-share),
     # -f to ignore default folder permissions on the initial sharing action.
     command = (
-        f'share-folder "{SANDBOX_SF_TITLE}" -a grant -e {testuser_email} -p on -o on -d on -s on -f'
+        f'share-folder "{sandbox.sf_title}" -a grant -e {testuser_email} -p on -o on -d on -s on -f'
     )
     try:
         output = _do(admin_params, command)
@@ -199,14 +245,14 @@ def _ensure_shared_to_user(admin_params, *, testuser_email: str) -> bool:
         log.info("Share-folder grant already existed for %s", testuser_email)
         return True
 
-    after = _share_folder_info(admin_params)
+    after = _share_folder_info(admin_params, sandbox=sandbox)
     return _share_info_mentions_user(after, testuser_email)
 
 
-def _share_folder_info(admin_params) -> str:
+def _share_folder_info(admin_params, *, sandbox: SandboxConfig) -> str:
     # Commander 17.x has no `share-folder --info`; use `get <sf_uid>` which
     # includes the user_permissions and shared_folder_permissions blocks.
-    sf_uid = _find_shared_folder_uid(admin_params, SANDBOX_SF_TITLE)
+    sf_uid = _find_shared_folder_uid(admin_params, sandbox.sf_title)
     if not sf_uid:
         return ""
     return _do(admin_params, f"get {sf_uid}")
@@ -229,18 +275,18 @@ def _find_ksm_app(admin_params, name: str) -> dict[str, str] | None:
     return None
 
 
-def _ensure_app_share(admin_params, *, sf_uid: str) -> None:
+def _ensure_app_share(admin_params, *, sf_uid: str, sandbox: SandboxConfig) -> None:
     command = (
-        f'secrets-manager share add --app "{SANDBOX_KSM_APP_NAME}" --secret {sf_uid} --editable'
+        f'secrets-manager share add --app "{sandbox.ksm_app_name}" --secret {sf_uid} --editable'
     )
     try:
         output = _do(admin_params, command)
         if "already" in output.lower():
-            log.info("Shared folder %s already bound to %s", sf_uid, SANDBOX_KSM_APP_NAME)
+            log.info("Shared folder %s already bound to %s", sf_uid, sandbox.ksm_app_name)
     except Exception as exc:
         if "already" not in str(exc).lower():
             raise
-        log.info("Shared folder %s already bound to %s", sf_uid, SANDBOX_KSM_APP_NAME)
+        log.info("Shared folder %s already bound to %s", sf_uid, sandbox.ksm_app_name)
 
 
 def _list_folder_entries(admin_params, folder_ref: str) -> list[dict[str, Any]]:

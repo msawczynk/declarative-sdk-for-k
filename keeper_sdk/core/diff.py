@@ -394,7 +394,8 @@ def _field_diff_vault_login(live: dict[str, Any], desired: dict[str, Any]) -> li
             and str(e.get("label") or e.get("name") or "").casefold()
             != MARKER_FIELD_LABEL.casefold()
         ]
-        l_raw = live.get("custom") if isinstance(live.get("custom"), list) else []
+        live_custom = live.get("custom")
+        l_raw = live_custom if isinstance(live_custom, list) else []
         l_list = [
             e
             for e in l_raw

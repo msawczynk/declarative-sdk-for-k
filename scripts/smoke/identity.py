@@ -9,6 +9,7 @@ import logging
 import os
 import sys
 import time
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -26,17 +27,135 @@ log.setLevel(logging.INFO)
 
 SDK_ROOT = Path(__file__).resolve().parent.parent.parent
 LAB_ROOT = Path.home() / "Downloads" / "Cursor tests" / "keeper-vault-rbi-pam-testenv"
-KSM_CONFIG = LAB_ROOT / "ksm-config.json"
-ADMIN_COMMANDER_CONFIG = LAB_ROOT / "commander-config.json"
-SDKTEST_COMMANDER_CONFIG = SDK_ROOT / "scripts" / "smoke" / ".commander-config-testuser2.json"
+PROFILES_DIR = Path(__file__).resolve().parent / "profiles"
 
-KEEPER_SERVER = "keepersecurity.com"
-TARGET_EMAIL = "msawczyn+testuser2@acme-demo.com"
-ADMIN_CRED_RECORD_UID = "MyiZN4cw-wtEIpY1jHlhLw"
-SDK_TEST_LOGIN_RECORD_TITLE = "SDK Test — testuser2 Login"
-CHANNEL_NAME = "sdk-declarative"
-# Lab-wide shared test password; matches provision_prospect_ots.py::DEFAULT_PASSWORD.
-DEFAULT_PASSWORD = "AcmeDemo123!!"
+
+@dataclass(frozen=True, kw_only=True)
+class SmokeProfile:
+    id: str
+    target_email: str
+    ksm_config: Path
+    admin_commander_config: Path
+    sdktest_commander_config: Path
+    keeper_server: str = "keepersecurity.com"
+    channel_name: str = "sdk-declarative"
+    password: str
+    default_admin_record_uid: str
+    sdk_test_login_record_title: str
+
+    @property
+    def project_name(self) -> str:
+        """Return the PAM project name; default preserves the legacy live-smoke path."""
+        if self.id == "default":
+            return "sdk-smoke-testuser2"
+        return f"sdk-smoke-{self.id}"
+
+    @property
+    def title_prefix(self) -> str:
+        """Return scenario record title prefix; default preserves legacy record titles."""
+        if self.id == "default":
+            return "sdk-smoke"
+        return f"sdk-smoke-{self.id}"
+
+    @property
+    def deploy_watcher_path(self) -> Path:
+        return self.ksm_config.parent / "scripts" / "deploy_watcher.py"
+
+
+DEFAULT_PROFILE = SmokeProfile(
+    id="default",
+    target_email="msawczyn+testuser2@acme-demo.com",
+    ksm_config=LAB_ROOT / "ksm-config.json",
+    admin_commander_config=LAB_ROOT / "commander-config.json",
+    sdktest_commander_config=SDK_ROOT / "scripts" / "smoke" / ".commander-config-testuser2.json",
+    keeper_server="keepersecurity.com",
+    channel_name="sdk-declarative",
+    # Lab-wide shared test password; matches provision_prospect_ots.py::DEFAULT_PASSWORD.
+    password="AcmeDemo123!!",
+    default_admin_record_uid="MyiZN4cw-wtEIpY1jHlhLw",
+    sdk_test_login_record_title="SDK Test — testuser2 Login",
+)
+
+# Legacy aliases kept for callers that imported smoke constants directly.
+KSM_CONFIG = DEFAULT_PROFILE.ksm_config
+ADMIN_COMMANDER_CONFIG = DEFAULT_PROFILE.admin_commander_config
+SDKTEST_COMMANDER_CONFIG = DEFAULT_PROFILE.sdktest_commander_config
+KEEPER_SERVER = DEFAULT_PROFILE.keeper_server
+TARGET_EMAIL = DEFAULT_PROFILE.target_email
+ADMIN_CRED_RECORD_UID = DEFAULT_PROFILE.default_admin_record_uid
+SDK_TEST_LOGIN_RECORD_TITLE = DEFAULT_PROFILE.sdk_test_login_record_title
+CHANNEL_NAME = DEFAULT_PROFILE.channel_name
+DEFAULT_PASSWORD = DEFAULT_PROFILE.password
+
+_REQUIRED_PROFILE_FIELDS = (
+    "id",
+    "target_email",
+    "ksm_config",
+    "admin_commander_config",
+    "sdktest_commander_config",
+    "password",
+    "default_admin_record_uid",
+    "sdk_test_login_record_title",
+)
+
+
+def load_profile(profile_id: str = "default") -> SmokeProfile:
+    if profile_id == "default":
+        return DEFAULT_PROFILE
+
+    path = PROFILES_DIR / f"{profile_id}.json"
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"missing smoke profile {profile_id!r}: expected {path}. "
+            "See scripts/smoke/README.md § Profiles."
+        )
+
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise ValueError(f"smoke profile {path} must contain a JSON object")
+    profile = _profile_from_mapping(raw, source=path)
+    if profile.id != profile_id:
+        raise ValueError(f"smoke profile {path} has id {profile.id!r}; expected {profile_id!r}")
+    return profile
+
+
+def _profile_from_mapping(raw: dict[str, Any], *, source: Path) -> SmokeProfile:
+    missing = [field for field in _REQUIRED_PROFILE_FIELDS if raw.get(field) in (None, "")]
+    if missing:
+        raise ValueError(
+            f"smoke profile {source} is missing required field(s): {', '.join(missing)}"
+        )
+
+    profile_id = str(raw["id"])
+    return SmokeProfile(
+        id=profile_id,
+        target_email=str(raw["target_email"]),
+        ksm_config=_profile_path(raw["ksm_config"]),
+        admin_commander_config=_profile_path(raw["admin_commander_config"]),
+        sdktest_commander_config=_profile_path(raw["sdktest_commander_config"]),
+        keeper_server=str(raw.get("keeper_server") or "keepersecurity.com"),
+        channel_name=str(raw.get("channel_name") or _default_channel_name(profile_id)),
+        password=str(raw["password"]),
+        default_admin_record_uid=str(raw["default_admin_record_uid"]),
+        sdk_test_login_record_title=str(raw["sdk_test_login_record_title"]),
+    )
+
+
+def _profile_path(value: Any) -> Path:
+    path = Path(str(value)).expanduser()
+    if path.is_absolute():
+        return path
+    return SDK_ROOT / path
+
+
+def _default_channel_name(profile_id: str) -> str:
+    if profile_id == "default":
+        return "sdk-declarative"
+    return f"sdk-declarative-{profile_id}"
+
+
+def _profile_or_default(profile: SmokeProfile | None) -> SmokeProfile:
+    return profile if profile is not None else DEFAULT_PROFILE
 
 
 def _dependency_error(exc: Exception) -> ImportError:
@@ -111,6 +230,7 @@ def _login_user(
     *,
     config_path: Path,
     totp_secret: str | None = None,
+    keeper_server: str = "keepersecurity.com",
 ):
     try:
         from keepercommander import api
@@ -127,13 +247,13 @@ def _login_user(
     config_path.parent.mkdir(parents=True, exist_ok=True)
     os.environ.setdefault("HOME", str(SDK_ROOT))
     if not config_path.is_file():
-        config_path.write_text(json.dumps({"server": KEEPER_SERVER}), encoding="utf-8")
+        config_path.write_text(json.dumps({"server": keeper_server}), encoding="utf-8")
 
     config = json.loads(config_path.read_text(encoding="utf-8"))
     params = KeeperParams(
         config_filename=str(config_path),
         config=config,
-        server=config.get("server", KEEPER_SERVER),
+        server=config.get("server", keeper_server),
     )
     params.user = email
     params.password = password
@@ -201,6 +321,7 @@ def _retry_totp_login(
     *,
     config_path: Path,
     totp_secret: str,
+    keeper_server: str = "keepersecurity.com",
     attempts: int = 3,
 ):
     """Wrap _login_user with retries on KeeperApiError 'two_factor_code_invalid'.
@@ -221,6 +342,7 @@ def _retry_totp_login(
                 password,
                 config_path=config_path,
                 totp_secret=totp_secret,
+                keeper_server=keeper_server,
             )
         except KeeperApiError as exc:
             last_exc = exc
@@ -233,7 +355,8 @@ def _retry_totp_login(
     raise RuntimeError(f"TOTP login for {email} failed after {attempts} attempts") from last_exc
 
 
-def _enroll_totp(params) -> tuple[str, str, str]:
+def _enroll_totp(params, profile: SmokeProfile | None = None) -> tuple[str, str, str]:
+    smoke_profile = _profile_or_default(profile)
     try:
         from keepercommander import api, utils
         from keepercommander.proto import APIRequest_pb2
@@ -247,18 +370,18 @@ def _enroll_totp(params) -> tuple[str, str, str]:
         rs_type=APIRequest_pb2.TwoFactorListResponse,
     )
     for channel in rs.channels:
-        if channel.channelName == CHANNEL_NAME:
+        if channel.channelName == smoke_profile.channel_name:
             rq_del = APIRequest_pb2.TwoFactorDeleteRequest()
             rq_del.channel_uid = channel.channel_uid
             try:
                 api.communicate_rest(params, rq_del, "authentication/2fa_delete")
-                log.info("deleted stale 2FA channel '%s'", CHANNEL_NAME)
+                log.info("deleted stale 2FA channel '%s'", smoke_profile.channel_name)
             except Exception as exc:
                 log.warning("could not delete stale channel: %s", exc)
 
     rq = APIRequest_pb2.TwoFactorAddRequest()
     rq.channel_uid = utils.base64_url_decode(utils.generate_uid())
-    rq.channelName = CHANNEL_NAME
+    rq.channelName = smoke_profile.channel_name
     rq.channelType = APIRequest_pb2.TWO_FA_CT_TOTP
     rs_add = api.communicate_rest(
         params,
@@ -275,7 +398,7 @@ def _enroll_totp(params) -> tuple[str, str, str]:
     rq_val.channel_uid = rq.channel_uid
     rq_val.value = _totp_guarded(secret)
     api.communicate_rest(params, rq_val, "authentication/2fa_add_validate")
-    log.info("TOTP channel '%s' validated and active", CHANNEL_NAME)
+    log.info("TOTP channel '%s' validated and active", smoke_profile.channel_name)
 
     return utils.base64_url_encode(rq.channel_uid), secret, otpauth
 
@@ -286,13 +409,15 @@ def _upsert_admin_record(
     user_email: str,
     user_password: str,
     otpauth_url: str,
+    profile: SmokeProfile | None = None,
 ) -> str:
+    smoke_profile = _profile_or_default(profile)
     try:
         from keepercommander import api, cli, utils
     except ImportError as exc:
         raise _dependency_error(exc)
 
-    existing_uid = _find_admin_record_uid(params, SDK_TEST_LOGIN_RECORD_TITLE)
+    existing_uid = _find_admin_record_uid(params, smoke_profile.sdk_test_login_record_title)
     if existing_uid:
         try:
             cli.do_command(params, f"rm --force {existing_uid}")
@@ -306,7 +431,7 @@ def _upsert_admin_record(
         f"{datetime.now(UTC).strftime('%Y-%m-%dT%H:%M:%SZ')}"
     )
     data = {
-        "title": SDK_TEST_LOGIN_RECORD_TITLE,
+        "title": smoke_profile.sdk_test_login_record_title,
         "type": "login",
         "notes": note,
         "fields": [
@@ -351,31 +476,36 @@ def _build_identity_result(
     otpauth_url: str,
     params,
     admin_record_uid: str,
+    profile: SmokeProfile | None = None,
 ) -> dict[str, Any]:
+    smoke_profile = _profile_or_default(profile)
     return {
         "email": email,
         "password": password,
         "totp_secret": totp_secret,
         "otpauth_url": otpauth_url,
         "params": params,
-        "commander_config_path": str(SDKTEST_COMMANDER_CONFIG),
+        "commander_config_path": str(smoke_profile.sdktest_commander_config),
         "admin_record_uid": admin_record_uid,
-        "ksm_record_uid": ADMIN_CRED_RECORD_UID,
+        "ksm_record_uid": smoke_profile.default_admin_record_uid,
     }
 
 
-def admin_login():
-    """Log in as the lab admin using KSM + TOTP from ADMIN_CRED_RECORD_UID.
+def admin_login(profile: SmokeProfile | None = None):
+    """Log in as the lab admin using the profile's lab KSM + TOTP helper.
     Uses the exact same pattern as deploy_watcher.keeper_login — import it
     via sys.path if practical, otherwise inline the helper. Prefer
     importing to avoid drift.
     """
-    module_path = LAB_ROOT / "scripts" / "deploy_watcher.py"
+    smoke_profile = _profile_or_default(profile)
+    module_path = smoke_profile.deploy_watcher_path
     if not module_path.is_file():
         raise FileNotFoundError(f"missing lab helper: {module_path}")
 
     try:
         deploy_watcher = _load_lab_module("sdk_smoke_deploy_watcher", module_path)
+        if hasattr(deploy_watcher, "ROOT"):
+            deploy_watcher.ROOT = smoke_profile.ksm_config.parent
         email, password, totp_secret = deploy_watcher.load_keeper_creds()
         params = deploy_watcher.keeper_login(email, password, totp_secret)
         from keepercommander import api
@@ -391,41 +521,43 @@ def admin_login():
     return params
 
 
-def ensure_sdktest_identity(*, force_reenroll: bool = False) -> dict[str, Any]:
-    """Ensure testuser2 has a known TOTP the SDK can use. Idempotent.
+def ensure_sdktest_identity(
+    *, force_reenroll: bool = False, profile: SmokeProfile | None = None
+) -> dict[str, Any]:
+    """Ensure the profile smoke user has a known TOTP the SDK can use. Idempotent.
     Returns {'email', 'password', 'totp_secret', 'otpauth_url',
-             'params' (live KeeperParams for testuser2),
+             'params' (live KeeperParams for smoke user),
              'commander_config_path' (str), 'admin_record_uid' (str)}.
     Flow:
       1. admin_login()
-      2. Look up admin record titled SDK_TEST_LOGIN_RECORD_TITLE in the admin
+      2. Look up the profile login record title in the admin
          vault (search via api.query_enterprise or cli.do_command get-matter).
          If the record exists AND force_reenroll is False AND
          its login/password/oneTimeCode all resolve AND
-         testuser2 login with (password, TOTP-now) succeeds,
+         profile user login with (password, TOTP-now) succeeds,
          return immediately with the stored creds.
-      3. Otherwise: run `enterprise-user --disable-2fa --force testuser2` via
+      3. Otherwise: run `enterprise-user --disable-2fa --force <profile email>` via
          cli.do_command on the admin session.
-      4. Log in as testuser2 (password only, no 2FA).
-      5. REST-enroll a fresh TOTP channel named 'sdk-declarative' via
+      4. Log in as the profile user (password only, no 2FA).
+      5. REST-enroll a fresh TOTP channel named by the profile via
          authentication/2fa_add + /2fa_add_validate.
          Reuse the exact REST pattern from provision_prospect_ots._enroll_totp.
       6. Upsert the admin record.
-      7. Re-login as testuser2 using the newly-stored creds to verify.
-      8. Write the resulting params.config to
-         scripts/smoke/.commander-config-testuser2.json.
+      7. Re-login as the profile user using the newly-stored creds to verify.
+      8. Write the resulting params.config to the profile Commander config path.
       9. Return the dict.
     """
+    smoke_profile = _profile_or_default(profile)
     try:
         from keepercommander import api, cli
     except ImportError as exc:
         raise _dependency_error(exc)
 
     log.info("=== admin login (KSM-backed) ===")
-    admin_params = admin_login()
+    admin_params = admin_login(profile=smoke_profile)
     api.sync_down(admin_params)
 
-    existing_uid = _find_admin_record_uid(admin_params, SDK_TEST_LOGIN_RECORD_TITLE)
+    existing_uid = _find_admin_record_uid(admin_params, smoke_profile.sdk_test_login_record_title)
     if existing_uid and not force_reenroll:
         data = _record_data(admin_params, existing_uid)
         email = _field_value(data, "login")
@@ -437,10 +569,11 @@ def ensure_sdktest_identity(*, force_reenroll: bool = False) -> dict[str, Any]:
                 params = _login_user(
                     email,
                     password,
-                    config_path=SDKTEST_COMMANDER_CONFIG,
+                    config_path=smoke_profile.sdktest_commander_config,
                     totp_secret=totp_secret,
+                    keeper_server=smoke_profile.keeper_server,
                 )
-                _write_commander_config(params, SDKTEST_COMMANDER_CONFIG)
+                _write_commander_config(params, smoke_profile.sdktest_commander_config)
                 log.info("reused stored SDK smoke identity from admin record %s", existing_uid)
                 return _build_identity_result(
                     email=email,
@@ -449,31 +582,37 @@ def ensure_sdktest_identity(*, force_reenroll: bool = False) -> dict[str, Any]:
                     otpauth_url=otpauth_url,
                     params=params,
                     admin_record_uid=existing_uid,
+                    profile=smoke_profile,
                 )
             except Exception as exc:
                 log.info("stored SDK smoke identity unusable; re-enrolling: %s", exc)
 
     log.info("=== admin clears target 2FA ===")
-    cli.do_command(admin_params, f"enterprise-user --disable-2fa --force {TARGET_EMAIL}")
-    log.info("admin cleared 2FA on %s", TARGET_EMAIL)
+    cli.do_command(
+        admin_params,
+        f"enterprise-user --disable-2fa --force {smoke_profile.target_email}",
+    )
+    log.info("admin cleared 2FA on %s", smoke_profile.target_email)
 
     log.info("=== target login (password only) ===")
     unenrolled_params = _login_user(
-        TARGET_EMAIL,
-        DEFAULT_PASSWORD,
-        config_path=SDKTEST_COMMANDER_CONFIG,
+        smoke_profile.target_email,
+        smoke_profile.password,
+        config_path=smoke_profile.sdktest_commander_config,
+        keeper_server=smoke_profile.keeper_server,
     )
     log.info("target session OK before TOTP enrollment")
 
-    _, totp_secret, otpauth_url = _enroll_totp(unenrolled_params)
+    _, totp_secret, otpauth_url = _enroll_totp(unenrolled_params, profile=smoke_profile)
 
     log.info("=== admin record upsert ===")
     api.sync_down(admin_params)
     admin_record_uid = _upsert_admin_record(
         admin_params,
-        user_email=TARGET_EMAIL,
-        user_password=DEFAULT_PASSWORD,
+        user_email=smoke_profile.target_email,
+        user_password=smoke_profile.password,
         otpauth_url=otpauth_url,
+        profile=smoke_profile,
     )
 
     log.info("=== target relogin (verify stored creds) ===")
@@ -482,38 +621,43 @@ def ensure_sdktest_identity(*, force_reenroll: bool = False) -> dict[str, Any]:
     # Sleep to the start of the next 30-second window + 2s safety.
     _wait_for_next_totp_window(log_label="post-enrollment settle")
     verified_params = _retry_totp_login(
-        TARGET_EMAIL,
-        DEFAULT_PASSWORD,
-        config_path=SDKTEST_COMMANDER_CONFIG,
+        smoke_profile.target_email,
+        smoke_profile.password,
+        config_path=smoke_profile.sdktest_commander_config,
         totp_secret=totp_secret,
+        keeper_server=smoke_profile.keeper_server,
         attempts=3,
     )
-    _write_commander_config(verified_params, SDKTEST_COMMANDER_CONFIG)
+    _write_commander_config(verified_params, smoke_profile.sdktest_commander_config)
 
     return _build_identity_result(
-        email=TARGET_EMAIL,
-        password=DEFAULT_PASSWORD,
+        email=smoke_profile.target_email,
+        password=smoke_profile.password,
         totp_secret=totp_secret,
         otpauth_url=otpauth_url,
         params=verified_params,
         admin_record_uid=admin_record_uid,
+        profile=smoke_profile,
     )
 
 
-def sdktest_keeper_args() -> list[str]:
-    """Return the argv prefix for invoking the keeper CLI as testuser2:
-       ['keeper', '--config', '<scripts/smoke/.commander-config-testuser2.json>', '--batch-mode']
+def sdktest_keeper_args(profile: SmokeProfile | None = None) -> list[str]:
+    """Return the argv prefix for invoking the keeper CLI as the profile user:
+       ['keeper', '--config', '<profile commander config>', '--batch-mode']
     Caller appends subcommand + args.
     """
-    return ["keeper", "--config", str(SDKTEST_COMMANDER_CONFIG), "--batch-mode"]
+    smoke_profile = _profile_or_default(profile)
+    return ["keeper", "--config", str(smoke_profile.sdktest_commander_config), "--batch-mode"]
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Ensure SDK smoke identity for testuser2.")
+    parser = argparse.ArgumentParser(description="Ensure SDK smoke identity for a profile user.")
     parser.add_argument("--force", action="store_true", help="force TOTP re-enrollment")
+    parser.add_argument("--profile", default="default", help="smoke profile id")
     args = parser.parse_args(argv)
 
-    ident = ensure_sdktest_identity(force_reenroll=args.force)
+    profile = load_profile(args.profile)
+    ident = ensure_sdktest_identity(force_reenroll=args.force, profile=profile)
     preview = hashlib.sha256(ident["totp_secret"].encode("utf-8")).hexdigest()
     summary = {
         "email": ident["email"],

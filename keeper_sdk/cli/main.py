@@ -183,9 +183,7 @@ def validate(
                         err=True,
                     )
                     sys.exit(EXIT_CAPABILITY)
-                manifest_source = vm.model_dump(
-                    mode="python", exclude_none=True, by_alias=True
-                )
+                manifest_source = vm.model_dump(mode="python", exclude_none=True, by_alias=True)
                 provider = CommanderCliProvider(
                     folder_uid=folder_uid, manifest_source=manifest_source
                 )
@@ -195,9 +193,7 @@ def validate(
                     click.echo(f"discovery failed: {exc}", err=True)
                     sys.exit(EXIT_CAPABILITY)
 
-                gaps: list[str] = getattr(provider, "unsupported_capabilities", lambda _m: [])(
-                    vm
-                )
+                gaps: list[str] = getattr(provider, "unsupported_capabilities", lambda _m: [])(vm)
                 if gaps:
                     stage4_failed = True
                     if not as_json:
@@ -326,24 +322,27 @@ def validate(
         sys.exit(EXIT_REF)
 
     online_suffix = ""
+    pam_live: list[LiveRecord] | None = None
     if online:
         provider = _make_provider(ctx, manifest_path, pam=manifest, vault=None)
         try:
-            live = provider.discover()
+            pam_live = provider.discover()
         except CapabilityError as exc:
             click.echo(f"discovery failed: {exc}", err=True)
             sys.exit(EXIT_CAPABILITY)
 
-        gaps: list[str] = getattr(provider, "unsupported_capabilities", lambda _m: [])(manifest)
+        pam_gaps: list[str] = getattr(provider, "unsupported_capabilities", lambda _m: [])(manifest)
         stage4_failed = False
-        if gaps:
+        if pam_gaps:
             if not as_json:
                 click.echo("capability gaps (will appear as plan conflicts):", err=True)
-                for reason in gaps:
+                for reason in pam_gaps:
                     click.echo(f"  - {reason}", err=True)
             stage4_failed = True
 
-        live_gateway_names = {record.title for record in live if record.resource_type == "gateway"}
+        live_gateway_names = {
+            record.title for record in pam_live if record.resource_type == "gateway"
+        }
         for gateway in manifest.gateways:
             if gateway.mode != "reference_existing":
                 continue
@@ -354,7 +353,7 @@ def validate(
             stage4_failed = True
 
         try:
-            changes = compute_diff(manifest, live, adopt=False)
+            changes = compute_diff(manifest, pam_live, adopt=False)
         except OwnershipError as exc:
             click.echo(f"ownership error: {exc}", err=True)
             sys.exit(EXIT_CAPABILITY)
@@ -372,18 +371,18 @@ def validate(
                 f"{conflict_count} conflicts"
             )
 
-        binding_issues: list[str] = getattr(provider, "check_tenant_bindings", lambda _m: [])(
+        pam_binding_issues: list[str] = getattr(provider, "check_tenant_bindings", lambda _m: [])(
             manifest
         )
         stage5_failed = False
-        if binding_issues:
+        if pam_binding_issues:
             stage5_failed = True
             if not as_json:
                 click.echo("stage 5: tenant binding failures:", err=True)
-                for issue in binding_issues:
+                for issue in pam_binding_issues:
                     click.echo(f"  - {issue}", err=True)
 
-        online_suffix = f"; online: {len(live)} live records"
+        online_suffix = f"; online: {len(pam_live)} live records"
         if stage4_failed or stage5_failed:
             sys.exit(EXIT_CAPABILITY)
 
@@ -398,11 +397,12 @@ def validate(
             "stages_completed": ["json_schema", "semantic_rules", "typed_model", "uid_ref_graph"],
         }
         if online:
+            assert pam_live is not None
             payload["stages_completed"].extend(
                 ["tenant_capability", "tenant_bindings", "diff_smoke"]
             )
             payload["online"] = True
-            payload["live_record_count"] = len(live)
+            payload["live_record_count"] = len(pam_live)
             payload["stage5_summary"] = {
                 "create": create_count,
                 "update": update_count,
@@ -693,6 +693,7 @@ def apply(
 def _build_plan(ctx: click.Context, manifest_path: Path, *, allow_delete: bool) -> Plan:
     bundle = _load_plan_context(ctx, manifest_path)
     ctx.obj["_plan_bundle"] = bundle
+    capability_subject: Manifest | VaultManifestV1
     try:
         if bundle.pam is not None:
             changes = compute_diff(
@@ -1184,11 +1185,7 @@ def live_smoke(
     workdir.mkdir(parents=True, exist_ok=True)
     empty = workdir / "_smoke_empty.yml"
     if not empty.exists():
-        empty.write_text(
-            'version: "1"\n'
-            "name: _smoke_placeholder\n"
-            "schema: pam-environment.v1\n"
-        )
+        empty.write_text('version: "1"\nname: _smoke_placeholder\nschema: pam-environment.v1\n')
 
     transcript = Transcript(
         schema_family=schema_family,

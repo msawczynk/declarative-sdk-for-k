@@ -3567,12 +3567,8 @@ def test_vault_apply_plan_create_writes_marker(monkeypatch: pytest.MonkeyPatch) 
     def fake_write_marker(self, keeper_uid: str, marker: dict) -> None:
         marker_calls.append({"keeper_uid": keeper_uid, "uid_ref": marker.get("uid_ref")})
 
-    monkeypatch.setattr(
-        commander_cli_mod.CommanderCliProvider, "_write_marker", fake_write_marker
-    )
-    monkeypatch.setattr(
-        commander_cli_mod.CommanderCliProvider, "_run_cmd", lambda self, args: ""
-    )
+    monkeypatch.setattr(commander_cli_mod.CommanderCliProvider, "_write_marker", fake_write_marker)
+    monkeypatch.setattr(commander_cli_mod.CommanderCliProvider, "_run_cmd", lambda self, args: "")
     monkeypatch.setattr(
         "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
     )
@@ -3648,12 +3644,8 @@ def test_vault_apply_plan_update_body_then_marker(monkeypatch: pytest.MonkeyPatc
     def fake_write_marker(self, keeper_uid: str, marker: dict) -> None:
         marker_calls.append({"keeper_uid": keeper_uid, "uid_ref": marker.get("uid_ref")})
 
-    monkeypatch.setattr(
-        commander_cli_mod.CommanderCliProvider, "_write_marker", fake_write_marker
-    )
-    monkeypatch.setattr(
-        commander_cli_mod.CommanderCliProvider, "_run_cmd", lambda self, args: ""
-    )
+    monkeypatch.setattr(commander_cli_mod.CommanderCliProvider, "_write_marker", fake_write_marker)
+    monkeypatch.setattr(commander_cli_mod.CommanderCliProvider, "_run_cmd", lambda self, args: "")
     monkeypatch.setattr(
         "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
     )

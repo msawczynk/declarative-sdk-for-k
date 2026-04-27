@@ -9,6 +9,7 @@ import shlex
 import subprocess
 import sys
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -40,9 +41,7 @@ GATEWAY_UID_REF = "lab-gw"
 GATEWAY_NAME = "Lab GW Rocky"
 PAM_CONFIG_UID_REF = "lab-cfg"
 PAM_CONFIG_TITLE = "Lab Rocky PAM Configuration"
-SMOKE_PROJECT_NAME = "sdk-smoke-testuser2"
 DEFAULT_SCENARIO_NAME = "pamMachine"
-TITLE_PREFIX = "sdk-smoke"
 SDK_OUTPUT_TAIL_LINES = 40
 
 # Set by ``main`` based on ``--scenario``; default is pamMachine so the
@@ -51,16 +50,43 @@ SDK_OUTPUT_TAIL_LINES = 40
 _ACTIVE_SCENARIO: smoke_scenarios.ScenarioSpec = smoke_scenarios.get(DEFAULT_SCENARIO_NAME)
 
 
-def _active_resources() -> list[dict[str, Any]]:
-    return _ACTIVE_SCENARIO.build_resources(PAM_CONFIG_UID_REF, TITLE_PREFIX)
+@dataclass(frozen=True)
+class SmokeRunContext:
+    """Run-scoped profile metadata.
+
+    ``node_uid`` is smoke-side metadata only. The SDK CLI does not have
+    ``dsk plan/apply --node`` support yet, so this runner deliberately does not
+    forward it to SDK subprocesses.
+    """
+
+    profile: identity.SmokeProfile
+    node_uid: str | None = None
+
+    @property
+    def project_name(self) -> str:
+        return self.profile.project_name
+
+    @property
+    def title_prefix(self) -> str:
+        return self.profile.title_prefix
 
 
-def _active_titles() -> list[str]:
-    return [str(res["title"]) for res in _active_resources()]
+def _default_context() -> SmokeRunContext:
+    return SmokeRunContext(profile=identity.DEFAULT_PROFILE)
 
 
-def _active_expected_records() -> set[tuple[str, str]]:
-    return set(_ACTIVE_SCENARIO.expected_records(PAM_CONFIG_UID_REF, TITLE_PREFIX))
+def _active_resources(context: SmokeRunContext | None = None) -> list[dict[str, Any]]:
+    run_context = context if context is not None else _default_context()
+    return _ACTIVE_SCENARIO.build_resources(PAM_CONFIG_UID_REF, run_context.title_prefix)
+
+
+def _active_titles(context: SmokeRunContext | None = None) -> list[str]:
+    return [str(res["title"]) for res in _active_resources(context)]
+
+
+def _active_expected_records(context: SmokeRunContext | None = None) -> set[tuple[str, str]]:
+    run_context = context if context is not None else _default_context()
+    return set(_ACTIVE_SCENARIO.expected_records(PAM_CONFIG_UID_REF, run_context.title_prefix))
 
 
 class SmokeError(Exception):
@@ -107,20 +133,25 @@ def run_smoke(
     teardown_only: bool = False,
     keep_records: bool = False,
     login_helper: str = "deploy_watcher",
+    context: SmokeRunContext | None = None,
     state: dict[str, Any] | None = None,
 ) -> int:
     del keep_sf  # Shared-folder removal is intentionally not part of this runner.
+    run_context = context if context is not None else _default_context()
+    sandbox_config = sandbox.config_for_profile(run_context.profile)
     state = state if state is not None else {}
+    state["profile_context"] = run_context
+    state["sandbox_config"] = sandbox_config
 
     try:
-        admin_params = identity.admin_login()
+        admin_params = identity.admin_login(profile=run_context.profile)
         _mark(state, "admin auth OK")
-        ident = identity.ensure_sdktest_identity()
+        ident = identity.ensure_sdktest_identity(profile=run_context.profile)
         _mark(state, f"test identity OK ({ident['email']})")
         # `ensure_sdktest_identity()` performs its own admin login. On some
         # tenants that invalidates the earlier in-process session, so refresh
         # before sandbox provisioning uses `admin_params`.
-        admin_params = identity.admin_login()
+        admin_params = identity.admin_login(profile=run_context.profile)
         _mark(state, "admin auth refreshed after identity bootstrap")
     except Exception as exc:  # pragma: no cover - live-only path
         raise PreflightError(f"auth bootstrap failed: {exc}") from exc
@@ -129,7 +160,11 @@ def run_smoke(
     state["ident"] = ident
 
     try:
-        sb = sandbox.ensure_sandbox(admin_params, testuser_email=ident["email"])
+        sb = sandbox.ensure_sandbox(
+            admin_params,
+            testuser_email=ident["email"],
+            sandbox=sandbox_config,
+        )
         sf_uid = sb["sf_uid"]
         state["sf_uid"] = sf_uid
         _mark(state, f"sandbox ready ({sf_uid})")
@@ -139,7 +174,12 @@ def run_smoke(
         raise PreflightError(f"sandbox provisioning failed: {exc}") from exc
 
     try:
-        removed = sandbox.teardown_records(admin_params, sf_uid, manager=MANAGER_NAME)
+        removed = sandbox.teardown_records(
+            admin_params,
+            sf_uid,
+            manager=MANAGER_NAME,
+            sandbox=sandbox_config,
+        )
         if removed:
             log.info("pre-clean removed %d orphan records: %s", len(removed), removed)
         _mark(state, f"pre-clean complete ({len(removed)} removed)")
@@ -151,8 +191,8 @@ def run_smoke(
         return 0
 
     try:
-        manifest_path = _write_manifest(sf_uid)
-        empty_manifest_path = _write_empty_manifest(sf_uid)
+        manifest_path = _write_manifest(sf_uid, context=run_context)
+        empty_manifest_path = _write_empty_manifest(sf_uid, context=run_context)
         state["manifest_path"] = str(manifest_path)
         state["empty_manifest_path"] = str(empty_manifest_path)
         _mark(state, "temp manifests written")
@@ -162,16 +202,14 @@ def run_smoke(
     # SDK apply/plan/validate must run as the tenant admin: `pam project
     # import` is gated on a role-enforcement the smoke test user lacks
     # ("Communication Error: This feature has been disabled by your Keeper
-    # administrator."). testuser2 still owns the sandbox share for the
+    # administrator."). The profile test user still owns the sandbox share for the
     # visibility proof further down. The admin Commander config is already
     # authenticated by identity.admin_login().
-    admin_config_path = getattr(admin_params, "config_filename", None) or str(
-        identity.ADMIN_COMMANDER_CONFIG
-    )
+    admin_config_path = str(run_context.profile.admin_commander_config)
     admin_password = getattr(admin_params, "password", None)
     if not admin_password:
         # KeeperParams drops .password after login; re-fetch from KSM.
-        admin_password = _load_admin_password()
+        admin_password = _load_admin_password(run_context.profile)
     argv_prefix = ["keeper", "--config", admin_config_path]
     env = dict(os.environ)
     env["KEEPER_CONFIG"] = admin_config_path
@@ -181,7 +219,7 @@ def run_smoke(
     # the prompt without hitting stdin.
     env["KEEPER_PASSWORD"] = admin_password
     if login_helper == "env":
-        email, _password, totp_secret = _load_admin_creds()
+        email, _password, totp_secret = _load_admin_creds(run_context.profile)
         env["KEEPER_EMAIL"] = email
         env["KEEPER_TOTP_SECRET"] = totp_secret
         env.pop("KEEPER_SDK_LOGIN_HELPER", None)
@@ -191,7 +229,7 @@ def run_smoke(
         # The SDK routes pam project import/extend + marker writes through the
         # in-process Commander API; point it at the lab's deploy_watcher.py so
         # _get_keeper_params() can bootstrap a KeeperParams session.
-        helper_path = str(identity.LAB_ROOT / "scripts" / "deploy_watcher.py")
+        helper_path = str(run_context.profile.deploy_watcher_path)
         env["KEEPER_SDK_LOGIN_HELPER"] = helper_path
         os.environ["KEEPER_SDK_LOGIN_HELPER"] = helper_path
         auth_path = _auth_path_message("deploy_watcher", helper_path=helper_path)
@@ -200,7 +238,7 @@ def run_smoke(
     _mark(state, auth_path)
     state["keeper_args"] = argv_prefix
     state["admin_config_path"] = admin_config_path
-    _remove_project_tree(argv_prefix, env=env, project_name=SMOKE_PROJECT_NAME)
+    _remove_project_tree(argv_prefix, env=env, project_name=run_context.project_name)
     _mark(state, "project tree pre-clean complete")
 
     _sdk(["validate", str(manifest_path)], env=env)
@@ -222,13 +260,14 @@ def run_smoke(
         keeper_password=admin_password,
         manifest_source=manifest_source,
     )
-    resolved_sf_uid = prov._resolve_project_resources_folder(SMOKE_PROJECT_NAME)
+    resolved_sf_uid = prov._resolve_project_resources_folder(run_context.project_name)
     state["managed_folder_uid"] = resolved_sf_uid
     _mark(state, f"resources folder resolved ({resolved_sf_uid})")
     _share_ksm_app_folder(
         admin_params,
         app_uid=sb["ksm_app_uid"],
         folder_uid=resolved_sf_uid,
+        profile=run_context.profile,
     )
     _mark(state, "resources folder shared to KSM app")
 
@@ -236,7 +275,7 @@ def run_smoke(
         raise SmokeError("provider did not cache the resolved Resources shared-folder UID")
 
     live = prov.discover()
-    expected_records = _active_expected_records()
+    expected_records = _active_expected_records(run_context)
     expected_count = len(expected_records)
     owned = [
         record
@@ -287,7 +326,12 @@ def run_smoke(
         if not folder_uid:
             continue
         try:
-            extra = sandbox.teardown_records(admin_params, folder_uid, manager=MANAGER_NAME)
+            extra = sandbox.teardown_records(
+                admin_params,
+                folder_uid,
+                manager=MANAGER_NAME,
+                sandbox=sandbox_config,
+            )
         except Exception as exc:
             # Destroy may remove the Users/Resources tree; UIDs cached before
             # apply are then stale. Missing-folder errors are non-fatal here.
@@ -322,22 +366,24 @@ def run_smoke(
         raise SmokeError(
             f"destroy failed - {len(still_ours)} records still marked SDK-owned: {_live_summary(still_ours)}"
         )
-    _remove_project_tree(argv_prefix, env=env, project_name=SMOKE_PROJECT_NAME)
+    _remove_project_tree(argv_prefix, env=env, project_name=run_context.project_name)
     _mark(state, "project tree cleanup OK")
 
     log.info("SMOKE PASSED: create->verify->destroy cycle clean")
     return 0
 
 
-def _write_manifest(sf_uid: str) -> Path:
-    document = _base_manifest(sf_uid)
-    document["resources"] = _active_resources()
+def _write_manifest(sf_uid: str, *, context: SmokeRunContext | None = None) -> Path:
+    run_context = context if context is not None else _default_context()
+    document = _base_manifest(sf_uid, context=run_context)
+    document["resources"] = _active_resources(run_context)
     _preflight_manifest(document)
     return _write_temp_manifest(document, suffix=f".smoke-{_ACTIVE_SCENARIO.name}.yaml")
 
 
-def _write_empty_manifest(sf_uid: str) -> Path:
-    document = _base_manifest(sf_uid)
+def _write_empty_manifest(sf_uid: str, *, context: SmokeRunContext | None = None) -> Path:
+    run_context = context if context is not None else _default_context()
+    document = _base_manifest(sf_uid, context=run_context)
     document.pop("shared_folders", None)
     document.pop("gateways", None)
     document.pop("pam_configurations", None)
@@ -346,11 +392,12 @@ def _write_empty_manifest(sf_uid: str) -> Path:
     return _write_temp_manifest(document, suffix=".smoke-empty.yaml")
 
 
-def _base_manifest(sf_uid: str) -> dict[str, Any]:
+def _base_manifest(sf_uid: str, *, context: SmokeRunContext | None = None) -> dict[str, Any]:
     del sf_uid
+    run_context = context if context is not None else _default_context()
     return {
         "version": "1",
-        "name": SMOKE_PROJECT_NAME,
+        "name": run_context.project_name,
         "shared_folders": {
             "resources": {
                 "uid_ref": "smoke-sf-resources",
@@ -491,7 +538,7 @@ def _quote_cmd(command: list[str]) -> str:
     return " ".join(shlex.quote(part) for part in command)
 
 
-def _load_admin_creds() -> tuple[str, str, str]:
+def _load_admin_creds(profile: identity.SmokeProfile | None = None) -> tuple[str, str, str]:
     """Re-fetch admin creds via deploy_watcher.load_keeper_creds().
 
     KeeperParams zeroes .password after successful login, so we can't pull
@@ -499,22 +546,30 @@ def _load_admin_creds() -> tuple[str, str, str]:
     lets the smoke runner exercise either login-helper path without
     plumbing secrets through identity.admin_login()'s return.
     """
-    module_path = identity.LAB_ROOT / "scripts" / "deploy_watcher.py"
+    smoke_profile = profile if profile is not None else identity.DEFAULT_PROFILE
+    module_path = smoke_profile.deploy_watcher_path
     deploy_watcher = identity._load_lab_module("sdk_smoke_admin_creds", module_path)
+    if hasattr(deploy_watcher, "ROOT"):
+        deploy_watcher.ROOT = smoke_profile.ksm_config.parent
     email, password, totp_secret = deploy_watcher.load_keeper_creds()
     return email, password, totp_secret
 
 
-def _load_admin_password() -> str:
-    return _load_admin_creds()[1]
+def _load_admin_password(profile: identity.SmokeProfile | None = None) -> str:
+    return _load_admin_creds(profile)[1]
 
 
-def _share_ksm_app_folder(admin_params: Any, *, app_uid: str, folder_uid: str) -> None:
-    config_path = getattr(admin_params, "config_filename", None) or str(
-        identity.ADMIN_COMMANDER_CONFIG
-    )
+def _share_ksm_app_folder(
+    admin_params: Any,
+    *,
+    app_uid: str,
+    folder_uid: str,
+    profile: identity.SmokeProfile | None = None,
+) -> None:
+    smoke_profile = profile if profile is not None else identity.DEFAULT_PROFILE
+    config_path = str(smoke_profile.admin_commander_config)
     env = dict(os.environ)
-    password = getattr(admin_params, "password", None) or _load_admin_password()
+    password = getattr(admin_params, "password", None) or _load_admin_password(smoke_profile)
     env["KEEPER_PASSWORD"] = password
     cmd = [
         "keeper",
@@ -592,10 +647,18 @@ def _candidate_cleanup_folder_uids(state: dict[str, Any]) -> list[str]:
 
 def _teardown_records_with_fallback(state: dict[str, Any]) -> list[Any]:
     admin_params = state["admin_params"]
+    sandbox_config = state.get("sandbox_config")
+    if not isinstance(sandbox_config, sandbox.SandboxConfig):
+        sandbox_config = sandbox.DEFAULT_SANDBOX_CONFIG
     errors: list[str] = []
     for folder_uid in _candidate_cleanup_folder_uids(state):
         try:
-            return sandbox.teardown_records(admin_params, folder_uid, manager=MANAGER_NAME)
+            return sandbox.teardown_records(
+                admin_params,
+                folder_uid,
+                manager=MANAGER_NAME,
+                sandbox=sandbox_config,
+            )
         except Exception as exc:  # pragma: no cover - exercised via unit test with fake sandbox
             errors.append(f"{folder_uid}: {exc}")
             log.warning("cleanup failed for folder %s; trying fallback if available", folder_uid)
@@ -700,6 +763,17 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--profile",
+        default="default",
+        help="Smoke profile id from scripts/smoke/profiles/<id>.json",
+    )
+    parser.add_argument(
+        "--node",
+        dest="node_uid",
+        default=None,
+        help="Enterprise node UID metadata for this smoke run; not passed to dsk plan/apply yet",
+    )
+    parser.add_argument(
         "--login-helper",
         default="deploy_watcher",
         choices=["deploy_watcher", "env"],
@@ -719,6 +793,8 @@ def main(argv: list[str] | None = None) -> int:
     log.setLevel(getattr(logging, args.log_level))
     global _ACTIVE_SCENARIO
     _ACTIVE_SCENARIO = smoke_scenarios.get(args.scenario)
+    profile = identity.load_profile(args.profile)
+    context = SmokeRunContext(profile=profile, node_uid=args.node_uid)
     log.info("smoke scenario: %s — %s", _ACTIVE_SCENARIO.name, _ACTIVE_SCENARIO.description)
     state: dict[str, Any] = {"passed": []}
     exit_code = 0
@@ -730,6 +806,7 @@ def main(argv: list[str] | None = None) -> int:
             teardown_only=args.teardown,
             keep_records=args.keep_records,
             login_helper=args.login_helper,
+            context=context,
             state=state,
         )
         return exit_code
@@ -763,7 +840,7 @@ def main(argv: list[str] | None = None) -> int:
                 admin_password = getattr(admin_params, "password", None)
             if admin_config_path and not admin_password:
                 try:
-                    admin_password = _load_admin_password()
+                    admin_password = _load_admin_password(context.profile)
                 except Exception:
                     admin_password = None
             if admin_config_path and admin_password and not os.environ.get("SMOKE_NO_CLEANUP"):
@@ -775,7 +852,7 @@ def main(argv: list[str] | None = None) -> int:
                     _remove_project_tree(
                         ["keeper", "--config", admin_config_path],
                         env=cleanup_env,
-                        project_name=SMOKE_PROJECT_NAME,
+                        project_name=context.project_name,
                     )
                 except Exception as cleanup_exc:  # pragma: no cover - live-only path
                     print(f"project cleanup failed: {cleanup_exc}", file=sys.stderr)

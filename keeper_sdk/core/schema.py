@@ -128,7 +128,15 @@ def load_schema_for_family(family: str) -> dict[str, Any]:
         try:
             text = _read_packaged_schema_bytes(PAM_FAMILY)
             return json.loads(text)
-        except (SchemaError, FileNotFoundError, OSError, ModuleNotFoundError, AttributeError, TypeError, ValueError):
+        except (
+            SchemaError,
+            FileNotFoundError,
+            OSError,
+            ModuleNotFoundError,
+            AttributeError,
+            TypeError,
+            ValueError,
+        ):
             blob = _read_pam_schema_from_sibling_or_env()
             if blob is not None:
                 return blob

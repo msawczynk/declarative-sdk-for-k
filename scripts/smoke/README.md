@@ -123,3 +123,50 @@ No `keeper_dag` imports are allowed in this workflow, all tenant-side mutations 
 - The KSM application `SDK Test KSM` remains in place and bound to the sandbox shared folder
 - The share from the sandbox shared folder to `testuser2` remains in place
 - All SDK-managed records created inside the sandbox shared folder during the smoke are deleted by the destroy phase
+
+## Profiles
+
+`--profile <id>` lets multiple smoke identities use disjoint shared folders,
+KSM apps, Commander configs, PAM project names, record-title prefixes, and TOTP
+channel names. The default profile is built in and preserves the historical
+one-command behavior:
+
+```bash
+python3 scripts/smoke/smoke.py --scenario pamMachine
+python3 scripts/smoke/smoke.py --profile p1 --scenario pamMachine
+python3 scripts/smoke/identity.py --profile p1
+```
+
+Non-default profiles are read from `scripts/smoke/profiles/<id>.json`. Real
+profile JSON files are gitignored; commit only `default.example.json`.
+
+```json
+{
+  "id": "p1",
+  "target_email": "msawczyn+sdk-p1@acme-demo.com",
+  "ksm_config": "/path/to/ksm-config.json",
+  "admin_commander_config": "/path/to/commander-config.json",
+  "sdktest_commander_config": "scripts/smoke/.commander-config-sdk-p1.json",
+  "keeper_server": "keepersecurity.com",
+  "channel_name": "sdk-declarative-p1",
+  "password": "profile-test-user-password",
+  "default_admin_record_uid": "ADMIN_CREDS_RECORD_UID",
+  "sdk_test_login_record_title": "SDK Test — sdk-p1 Login"
+}
+```
+
+Each profile needs its own active test user and Commander config path.
+`identity.ensure_sdktest_identity()` is profile-aware and writes the configured
+test-user Commander config after TOTP enrollment or reuse. `sandbox.config_for_profile()`
+keeps the default shared folder/app names unchanged, while non-default profiles
+use `SDK Test (ephemeral) <id>` and `SDK Test KSM <id>`; the gateway remains
+`Lab GW Rocky`.
+
+`--node <node_uid>` is accepted as smoke-side metadata for future tenant/node
+partitioning, but the runner does not pass it to `dsk plan` or `dsk apply`
+because those CLI commands do not expose `--node` yet.
+
+Marker isolation is deliberately not a profile knob. LESSON
+`[smoke][marker-manager-is-core-contract]` records that
+`MANAGER_NAME = "keeper-pam-declarative"` is a core ownership invariant; profile
+isolation must come from folder, project, and title scope only.

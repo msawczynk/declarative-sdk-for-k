@@ -28,9 +28,7 @@ def test_build_vault_graph_empty() -> None:
 
 
 def test_build_vault_graph_no_folder_no_edges() -> None:
-    m = load_vault_manifest(
-        {"schema": "keeper-vault.v1", "records": [_login("a"), _login("b")]}
-    )
+    m = load_vault_manifest({"schema": "keeper-vault.v1", "records": [_login("a"), _login("b")]})
     g = build_vault_graph(m)
     assert g.number_of_nodes() == 2
     assert g.number_of_edges() == 0

@@ -15,11 +15,19 @@ import smoke  # noqa: E402
 def test_parse_args_login_helper_default() -> None:
     args = smoke._parse_args([])
     assert args.login_helper == "deploy_watcher"
+    assert args.profile == "default"
+    assert args.node_uid is None
 
 
 def test_parse_args_login_helper_env() -> None:
     args = smoke._parse_args(["--login-helper", "env"])
     assert args.login_helper == "env"
+
+
+def test_parse_args_profile_and_node() -> None:
+    args = smoke._parse_args(["--profile", "p1", "--node", "NODE123"])
+    assert args.profile == "p1"
+    assert args.node_uid == "NODE123"
 
 
 def test_auth_path_message_names_public_env_helper() -> None:
@@ -102,9 +110,16 @@ def test_sdk_constraint_error_preserves_failure_details(
 def test_cleanup_falls_back_to_sandbox_folder(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[str] = []
 
-    def fake_teardown_records(_admin_params: object, folder_uid: str, *, manager: str) -> list[str]:
+    def fake_teardown_records(
+        _admin_params: object,
+        folder_uid: str,
+        *,
+        manager: str,
+        sandbox: object | None = None,
+    ) -> list[str]:
         calls.append(folder_uid)
         assert manager == smoke.MANAGER_NAME
+        assert sandbox is smoke.sandbox.DEFAULT_SANDBOX_CONFIG
         if folder_uid == "stale-managed-folder":
             raise RuntimeError("No such folder or record")
         return ["removed-record"]
