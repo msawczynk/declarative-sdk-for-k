@@ -98,12 +98,8 @@ def test_msp_unknown_top_level_key_rejected() -> None:
         )
 
 
-@pytest.mark.xfail(
-    reason="Q9 enforcement deferred to P1 rules layer; schema-only check passes here.",
-    strict=False,
-)
-def test_msp_duplicate_mc_names_pending() -> None:
-    with pytest.raises(SchemaError):
+def test_msp_duplicate_mc_names_rejected() -> None:
+    with pytest.raises(SchemaError) as exc:
         validate_manifest(
             {
                 "schema": "msp-environment.v1",
@@ -114,3 +110,4 @@ def test_msp_duplicate_mc_names_pending() -> None:
                 ],
             }
         )
+    assert "duplicate" in exc.value.reason.lower()

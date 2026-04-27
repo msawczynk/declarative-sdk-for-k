@@ -60,6 +60,24 @@ def apply_semantic_rules(document: dict[str, Any]) -> None:
                     ),
                 )
 
+    if document.get("schema") == "msp-environment.v1":
+        seen: set[str] = set()
+        for mc in document.get("managed_companies") or []:
+            if not isinstance(mc, dict):
+                continue
+            raw_name = mc.get("name")
+            if not isinstance(raw_name, str):
+                continue
+            if raw_name in seen:
+                raise SchemaError(
+                    reason=f"managed_companies has duplicate name {raw_name!r}",
+                    next_action=(
+                        "rename or remove the duplicate; manifest names must be "
+                        "unique within msp-environment.v1"
+                    ),
+                )
+            seen.add(raw_name)
+
     rotatable_resource_types = {"pamMachine", "pamDatabase", "pamDirectory"}
     for resource in document.get("resources") or []:
         resource_type = resource.get("type")
