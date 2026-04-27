@@ -90,44 +90,11 @@ records before `apply`. Read the **Vault — operator caveats** section in
 [`docs/VALIDATION_STAGES.md`](./docs/VALIDATION_STAGES.md) and
 [`docs/VAULT_L1_DESIGN.md`](./docs/VAULT_L1_DESIGN.md) §4.
 
-## Autonomous execution (maintainer grant)
+## Autonomous execution
 
-Maintainers grant **standing permission** to run this repo's committed
-live-smoke harness (`scripts/smoke/smoke.py`) without asking for approval
-before each command. The **orchestrator** (Cursor lead agent in this
-workspace) **owns** keeping that path healthy: Commander + config layout per
-`scripts/smoke/README.md`, lab tenant reachability, and smoke/L1
-prerequisites. Successful runs are evidenced in the **daybook** (`JOURNAL` /
-sprint lines); if something regresses, the orchestrator **triages and fixes or
-documents a blocker in JOURNAL** before claiming live gates — not an operator
-todo list.
-
-Agents still must not echo secrets, must use the smoke harness (not ad-hoc
-tenant edits), and must treat failures as evidence (fix, document, or stop
-per `docs/SDK_DA_COMPLETION_PLAN.md`).
-
-The **same contract** applies when agents or CI produce **live-proof**
-evidence for schema graduation: whitelisted commands only (smoke harness,
-documented `dsk` steps, or a maintainer-approved command list in the task),
-sanitized artifacts before any git commit, and `docs/live-proof/README.md`
-for the L1 checklist. **At most one concurrent live session** per tenant
-(coordinate humans + automation so two writers never trample the same
-tenant state).
-
-**Orchestrator + Codex CLI** are in the same grant class as other autonomous
-agents: same harness, same no-secret-dump rules, same L1 checklist in
-`docs/live-proof/README.md`.
-
-**Support text:** end-user documentation for **Commander product behavior**
-belongs in **upstream** Commander / Keeper Security repositories. This SDK’s
-`README`, `AGENTS`, and `docs/` describe **how to use the SDK** (install,
-validate/plan/apply, drift, live-proof discipline) — not a duplicate of
-upstream feature support pages. Link out when semantics need Commander
-authority.
-
-**Autonomous entry:** long-running orchestration without repeating chat context
-starts from [`docs/NEXT_SPRINT_PARALLEL_ORCHESTRATION.md`](./docs/NEXT_SPRINT_PARALLEL_ORCHESTRATION.md) **§0**
-+ Downloads `JOURNAL.md` newest “next queue”.
+Live tenant access is granted via the project's standing operator policy; use
+the committed live-smoke harness (`scripts/smoke/smoke.py`) and do not echo
+secrets in any output.
 
 ## Agent playbook
 
@@ -265,15 +232,10 @@ See `docs/LOGIN.md` for the 30-line helper skeleton.
    them.** Validation passes; `apply` converts them to CONFLICT rows;
    the tenant state is unchanged but the manifest contains a lie.
 
-## Orchestration
+## Operator tooling
 
-Cursor / Codex / daybook orchestration (parent / worker split, Codex CLI
-wrappers, parallel slice prompts, GitHub-Codex Action / issue template,
-Phase-0 gate scripts) is **operator-side infrastructure**, not part of
-this product. It is maintained canonically in the maintainer's private
-daybook (`msawczynk/cursor-daybook`: `docs/orchestration/` and
-`templates/`). This repo does not ship those files; consumers and forks
-should not expect them.
+Operator-side orchestration tooling is not part of this SDK and is not
+documented here.
 
 Inside this repo, the binding contracts agents read are:
 
@@ -282,8 +244,6 @@ Inside this repo, the binding contracts agents read are:
   classifies every modeled capability as `supported` / `preview-gated` /
   `upstream-gap`. Wins over wish-list roadmaps.
 - `docs/SDK_COMPLETION_PLAN.md` — long-form roadmap + risk gates.
-- `docs/SDK_ORCHESTRATED_FEATURE_COMPLETE.md` — master phase × gate ×
-  live-proof index.
 - `scripts/smoke/README.md` — committed live-smoke harness contract.
 
 ## Where to read next
@@ -291,7 +251,6 @@ Inside this repo, the binding contracts agents read are:
 - `README.md` — human-oriented overview.
 - `docs/COMMANDER.md` — pinned Commander version + capability matrix.
 - `docs/SDK_DA_COMPLETION_PLAN.md` — devil's-advocate completion gates.
-- `docs/SDK_ORCHESTRATED_FEATURE_COMPLETE.md` — master phase × gate × live-proof table.
 - `docs/SDK_COMPLETION_PLAN.md` — long-form completion roadmap.
 - `docs/LOGIN.md` — custom-helper contract.
 - `V1_GA_CHECKLIST.md` — roadmap toward v1.0.0 GA.

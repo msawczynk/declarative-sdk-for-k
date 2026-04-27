@@ -1,10 +1,9 @@
 # RECONCILIATION — design vs tree
 
-Written: 2026-04-26 (agent scaffold pass; refreshed 2026-04-26 Sprint 7h-9 for the KSM-as-feature delivery).
+Written: 2026-04-26 (agent scaffold pass; refreshed 2026-04-26 for the KSM-as-feature delivery).
 Source of truth: this repo @ HEAD `b2a50b3` (post-merge cascade: PRs #13/#14/#15/#16/#17/#18/#19/#20/#21/#22).
 Cross-checks against `V1_GA_CHECKLIST.md`, `docs/SDK_DA_COMPLETION_PLAN.md`,
-`docs/SDK_ORCHESTRATED_FEATURE_COMPLETE.md`, `AUDIT.md`, `REVIEW.md`, and
-DOR pointers in `keeper-pam-declarative/`.
+`AUDIT.md`, `REVIEW.md`, and DOR pointers in `keeper-pam-declarative/`.
 
 This is for human + agent review. Per-folder maps live in `<dir>/SCAFFOLD.md`.
 
@@ -13,7 +12,7 @@ This is for human + agent review. Per-folder maps live in `<dir>/SCAFFOLD.md`.
 ## TL;DR
 
 - **Zero remaining v1.0.0 GA blockers.** Tag policy decided: annotated only — distribution is GitHub-only (no PyPI, no `git verify-tag` consumer flow); GPG/SSH signing not required. Upgrade path if supply-chain requirements change → sigstore/cosign `dist/*` in `publish.yml` (OIDC, no maintainer key).
-- **Two open clean-re-plan gates** (preview-gated, not GA blockers): nested-`pamUser` rotation (P2.1), `pamRemoteBrowser` RBI tuning (P3). Apply paths shipped; re-plan parent-verification is the final lift.
+- **Two open clean-re-plan gates** (preview-gated, not GA blockers): nested-`pamUser` rotation (P2.1), `pamRemoteBrowser` RBI tuning (P3). Apply paths shipped; reviewed clean re-plan is the final lift.
 - **Three v1.1 deferrals tracked + accepted:** adoption smoke against unmanaged records, field-drift→UPDATE smoke, two-writer ownership-marker race smoke.
 - **One v2 deferral:** module rename `keeper_sdk` → `declarative_sdk_k` (will ship compat shim).
 - **Nothing has been silently dropped.** Every preview-gated key fails loud at apply via `_detect_unsupported_capabilities` + plan-surface CONFLICT rows (C3 fix; H6 regression test).
@@ -59,9 +58,9 @@ Every modeled capability must classify as `supported` / `preview-gated` / `upstr
 | `pamDatabase` GA fields | supported | shipped | offline-green; live-green | scenario | – |
 | `pamDirectory` GA fields | supported | shipped | offline-green; live-green | scenario | – |
 | `pamRemoteBrowser` connection fields | supported | shipped | offline-green | scenario | – |
-| `pamRemoteBrowser` RBI tri-state / audio (DAG-backed) | preview-gated | DAG → manifest merge shipped | parent-verified gate (P3) | open | `_merge_rbi_dag_options_into_pam_settings`; `tests/test_rbi_readback.py` |
+| `pamRemoteBrowser` RBI tri-state / audio (DAG-backed) | preview-gated | DAG → manifest merge shipped | reviewed gate (P3) | open | `_merge_rbi_dag_options_into_pam_settings`; `tests/test_rbi_readback.py` |
 | Nested `pamUser` shape (in `resources[].users[]`) | supported (shape) | shipped | green | scenario | `pamUserNested` |
-| Nested `pamUser.rotation_settings` | preview-gated | apply lands | parent-verified gate (P2.1) | open | offline diff anchor in `tests/test_diff.py` |
+| Nested `pamUser.rotation_settings` | preview-gated | apply lands | reviewed gate (P2.1) | open | offline diff anchor in `tests/test_diff.py` |
 | Top-level `users[].rotation_settings` | preview-gated | guarded | – | – | gate-lift rule: stays blocked even after nested clears |
 | `default_rotation_schedule` | preview-gated | guarded | – | – | needs separate setter/readback proof |
 | `jit_settings` | upstream-gap | guarded | – | – | `docs/ISSUE_6_JIT_SUPPORT_BOUNDARY.md` |
@@ -86,7 +85,7 @@ DA Definition-of-Done compliance:
 
 ## Has anything been DROPPED?
 
-Cross-checking the 2026-04-24 AUDIT scope (W1–W20), DOR contract, REVIEW deferrals, and `SDK_ORCHESTRATED_FEATURE_COMPLETE.md` phase table:
+Cross-checking the 2026-04-24 AUDIT scope (W1–W20), DOR contract, and REVIEW deferrals:
 
 | Candidate "drop" | Verdict | Justification |
 |---|---|---|
@@ -112,23 +111,13 @@ Prior `SCAFFOLD.md` predates several committed paths. Refresh applied:
 
 - `tests/test_errors.py` — `DeleteUnsupportedError` compat shim.
 - `tests/test_rbi_readback.py` — RBI discover + DAG-merge unit tests.
-- `keeper_sdk/secrets/{bootstrap,ksm,bus}.py` — KSM-as-feature delivery (Sprint 7h-6).
+- `keeper_sdk/secrets/{bootstrap,ksm,bus}.py` — KSM-as-feature delivery.
 - `tests/test_auth_ksm.py`, `tests/test_secrets_ksm.py`, `tests/test_bootstrap_ksm.py`, `tests/_fakes/{ksm,commander}.py` — 264 KSM unit tests.
 - `docs/KSM_BOOTSTRAP.md`, `docs/KSM_INTEGRATION.md` — KSM operator docs.
 - `.github/workflows/scope-fence.yml` — structural orchestration-path denylist.
 - This file (`RECONCILIATION.md`) and the per-folder `SCAFFOLD.md` set.
 
-The `scripts/agent/` Codex CLI orchestration tree (offline slice / live
-smoke / parallel runner / Phase-0 gate / slice prompts) was removed from
-this repo on 2026-04-26 along with `docs/CODEX_CLI.md`,
-`docs/CODEX_GITHUB.md`, `docs/ORCHESTRATION_PHASE0_PARALLEL.md`,
-`.github/codex/`, `.github/ISSUE_TEMPLATE/codex_task.yml`, and
-`.github/workflows/codex-task.yml`. Cursor / Codex / daybook orchestration
-is now operator-side infrastructure only, maintained canonically in the
-maintainer's private daybook (`msawczynk/cursor-daybook`:
-`docs/orchestration/` + `templates/`). Product repos that want it adopt
-templates with `# adapt:` markers; this repo no longer ships those
-files.
+Operator-side tooling is not part of this SDK and is not documented here.
 
 ---
 

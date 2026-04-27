@@ -1,9 +1,9 @@
 # Live-proof artifacts (`docs/live-proof/`)
 
-**Audience:** maintainer, **Cursor orchestrator**, **Codex CLI**, or any other
-agent / CI **explicitly granted** live access to a lab tenant for this repo
-(same bar as [`AGENTS.md`](../AGENTS.md) § Autonomous execution). Read this
-before changing `x-keeper-live-proof.status` on a family schema.
+**Audience:** maintainer, agent, or CI **explicitly granted** live access to a
+lab tenant for this repo (same bar as [`AGENTS.md`](../AGENTS.md) § Autonomous
+execution). Read this before changing `x-keeper-live-proof.status` on a family
+schema.
 
 **Normative rules:** `keeper_sdk/core/schemas/CONVENTIONS.md` (block shape,
 `since_pin` = full 40-char SHA from `.commander-pin`). Meta schema:
@@ -11,18 +11,16 @@ before changing `x-keeper-live-proof.status` on a family schema.
 
 **Vault L1 semantics (before interpreting a vault transcript):** [`VAULT_L1_DESIGN.md`](../VAULT_L1_DESIGN.md) §4 and [`VALIDATION_STAGES.md`](../VALIDATION_STAGES.md) (*Vault — operator caveats*) — scalar diff limits, races, offline vs `vault_online` CI.
 
-**Prerequisite health:** the **orchestrator** keeps smoke/L1 prerequisites
-aligned with `scripts/smoke/README.md` and records pass/fail in the daybook —
-same ownership as `AGENTS.md` § Autonomous execution.
+**Prerequisite health:** keep smoke/L1 prerequisites aligned with
+`scripts/smoke/README.md` and use the committed smoke harness for live proof.
 
-## Live access for code (agents, workers, CI, Codex)
+## Live access for code
 
-Live proof is **not** parent-only. The orchestrator, **Codex CLI**, workers, or
-CI may hold the L1 gate **when**:
+Agents or CI may hold the L1 gate **when**:
 
-- The maintainer has granted **standing or per-sprint** permission (see
-  `AGENTS.md` — smoke harness, **Codex/orchestrator** runs with the same
-  whitelist, or a task body that lists exact argv / scenarios and tenant scope).
+- The maintainer has granted **standing or per-run** permission (see
+  `AGENTS.md`, or a task body that lists exact argv / scenarios and tenant
+  scope).
 - The actor uses **committed** harnesses or documented CLI steps — not
   exploratory shell on the tenant.
 - Raw capture stays **out of git** until sanitized; the same rules as
@@ -96,9 +94,7 @@ transcript helpers (`keeper_sdk.cli._live.transcript`). When in doubt, keep
 When a real file exists, point `evidence` at that file path instead of this
 README.
 
-## Parallel orchestration
+## Live proof sequence
 
-See `docs/NEXT_SPRINT_PARALLEL_ORCHESTRATION.md` — **R4** is the prep that feeds
-**L1** (one writer per profile per tenant when `--parallel-profile` enforces
-disjoint profile locks; otherwise serial per tenant) then **F3** (schema
-pointer + artifact commit).
+Run one live writer per tenant profile, commit only sanitized transcripts, and
+update the relevant schema evidence pointer after the proof passes.

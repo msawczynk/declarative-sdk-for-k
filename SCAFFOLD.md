@@ -51,8 +51,7 @@ Reconciliation against `V1_GA_CHECKLIST.md` + `docs/SDK_DA_COMPLETION_PLAN.md` +
 │   ├── LOGIN.md                            # `EnvLoginHelper` + custom login-helper contract.
 │   ├── RELEASING.md                        # Maintainer release ritual (GitHub-only; no PyPI).
 │   ├── SDK_DA_COMPLETION_PLAN.md           # Devil's-advocate completion gates, phases, and stop conditions.
-│   ├── SDK_ORCHESTRATED_FEATURE_COMPLETE.md # Phases × gates × live smoke (master index).
-│   ├── SDK_COMPLETION_PLAN.md              # Parent/Codex orchestration plan for completing SDK support.
+│   ├── SDK_COMPLETION_PLAN.md              # Roadmap and risk gates for completing SDK support.
 │   ├── VALIDATION_STAGES.md                # Stage-by-stage `validate --online` contract.
 │   └── capability-snapshot.json            # Machine-readable mirror consumed by drift-check CI.
 ├── examples/                               # Canonical minimal manifests for common PAM resource shapes.
