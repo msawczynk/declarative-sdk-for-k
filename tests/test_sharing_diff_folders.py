@@ -177,9 +177,10 @@ def test_sharing_folders_duplicate_manifest_uid_ref_raises() -> None:
         compute_sharing_diff(manifest, live_folders=[])
 
 
-def test_compute_sharing_diff_future_blocks_raise_not_implemented() -> None:
-    with pytest.raises(NotImplementedError, match="shared_folders"):
-        compute_sharing_diff(_manifest(), live_shared_folders=[])
+def test_compute_sharing_diff_empty_future_block_has_no_changes() -> None:
+    changes = compute_sharing_diff(_manifest(), live_shared_folders=[])
+
+    assert changes == []
 
 
 def test_sharing_folders_manifest_name_propagates_to_change_rows() -> None:

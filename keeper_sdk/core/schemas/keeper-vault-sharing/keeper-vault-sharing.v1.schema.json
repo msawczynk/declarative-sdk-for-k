@@ -7,7 +7,7 @@
     "status": "scaffold-only",
     "evidence": "docs/live-proof/README.md",
     "since_pin": "89047920a0df857e01fb59adcb0bfb9fa6db70bf",
-    "notes": "Design memo context retained in sprint notes; proof gate unchanged. Evidence path is operator runbook until sanitized transcript is committed per docs/live-proof/README.md."
+    "notes": "Offline diff support now covers folders plus sibling blocks: shared_folders, share_records, and share_folders. Live proof gate unchanged; evidence path is operator runbook until sanitized transcript is committed per docs/live-proof/README.md."
   },
   "type": "object",
   "required": ["schema"],
