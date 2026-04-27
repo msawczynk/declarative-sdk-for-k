@@ -55,6 +55,8 @@ dev = [
     "pytest-cov",
     "mypy",
     "ruff",
+    "build",
+    "twine",
     "types-PyYAML",
     "types-jsonschema",
 ]
