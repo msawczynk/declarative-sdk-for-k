@@ -46,14 +46,28 @@ this runbook or [`scripts/smoke/README.md`](../scripts/smoke/README.md).
 ```bash
 export KEEPER_LIVE_TENANT=1
 export KEEPER_LIVE_KSM_RECORD_UID=<uid-of-bootstrap-record>
-export KEEPER_CONFIG=$HOME/.keeper/config.json   # commander session
+export KEEPER_LIVE_KSM_CONFIG=$HOME/.keeper/ksm-config.json   # recommended headless path
+# Or, for local Commander-session mode, leave KEEPER_LIVE_KSM_CONFIG unset and use:
+# export KEEPER_CONFIG=$HOME/.keeper/config.json
 
-pytest tests/live/test_ksm_bootstrap_smoke.py -v
+python3 -m pytest tests/live/test_ksm_bootstrap_smoke.py -v
 ```
 
 Without `KEEPER_LIVE_TENANT=1` the test is skipped at collection
 time (see `tests/live/conftest.py`) — so plain `pytest tests/` stays
 offline.
+
+If the command exits 0 but reports:
+
+```text
+SKIPPED [1] tests/live/test_ksm_bootstrap_smoke.py:39: live-tenant test missing env vars: KEEPER_LIVE_KSM_RECORD_UID
+```
+
+then no live proof ran. Re-run only after the operator injects
+`KEEPER_LIVE_KSM_RECORD_UID` for the bootstrap admin login record, plus
+either `KEEPER_LIVE_KSM_CONFIG` for the headless KSM helper or a valid
+Commander session config for local commander mode. Add `-rs` while
+diagnosing skips so pytest prints the exact missing prerequisite.
 
 ## Run the full smoke loop (CLI verb)
 
