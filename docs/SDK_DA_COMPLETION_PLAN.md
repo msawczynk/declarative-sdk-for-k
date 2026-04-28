@@ -181,8 +181,12 @@ Gate-lift rule:
 on `main` **passed**; `docs/COMMANDER.md` has P3.1 buckets (URL from `rbiUrl` =
 import-supported; DAG `allowedSettings` → `pam_settings.options` via
 `TunnelDAG` = edit-supported-clean when a graph exists). “Finish” = align every
-RBI/connection **row** in `COMMANDER.md` with a bucket, add tests for any
-preview-only surface, and re-run smoke when the Commander pin moves.
+RBI **row** in `COMMANDER.md` with a bucket, keep list-shaped and audio-only
+surfaces out of supported claims, and re-run smoke when the Commander pin
+moves. Issue #5 closeout evidence: smoke rc=0 (`pamRemoteBrowser` create ->
+verify -> clean re-plan -> destroy), committed sanitized artifact
+`docs/live-proof/keeper-pam-environment.v1.89047920.rbi.sanitized.json`, and
+COMMANDER P3.1 table buckets for each current RBI field.
 
 Ongoing risk: Commander still **writes** some RBI tri-states to DAG
 `allowedSettings` first; the SDK does **not** re-read the DAG in subprocess-only
@@ -200,8 +204,8 @@ Classify each field as one of:
 
 Tasks:
 
-1. Update `docs/COMMANDER.md` with the classification.
-2. Add tests that assert unsupported/dirty fields remain preview-gated.
+1. Keep `docs/COMMANDER.md` P3.1 classifications aligned with the field map.
+2. Add tests when a dirty/upstream-gap field moves into a supported bucket.
 3. Do not bundle connection fields with RBI fields if their readback behavior
    differs.
 
@@ -229,6 +233,10 @@ Acceptance:
   applicable). Fields that are **edit-supported-dirty** or **upstream-gap** stay
   explicit conflicts, preview, or out of `supported` table rows in the
   product matrix.
+- Maintainer closeout checklist for GitHub #5: cite the sanitized RBI artifact,
+  `COMMANDER.md` P3.1 table, `SDK_DA_COMPLETION_PLAN.md` Phase 3 acceptance,
+  and `bash scripts/phase_harness/run_local_gates.sh`; do not paste raw logs or
+  credentialed transcript paths.
 
 ## Phase 4: Close Deferred v1 Quality Gaps
 

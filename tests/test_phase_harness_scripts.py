@@ -34,10 +34,10 @@ def test_bundle_unpushed_commits_script_runs_helpfully_when_nothing_to_pack(tmp_
         text=True,
         check=False,
     )
-    if proc.returncode != 0 and "Nothing to bundle" in (proc.stdout + proc.stderr):
+    out_combined = proc.stdout + proc.stderr
+    if "Nothing to bundle" in out_combined:
         pytest.skip("main is not ahead of origin in this clone")
     assert proc.returncode == 0, proc.stderr
-    out_combined = proc.stdout + proc.stderr
     assert "git pull" in out_combined and "git push" in out_combined, out_combined
     assert out.is_file()
     v = subprocess.run(

@@ -7,6 +7,10 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Fixed
+- **Tests —** `test_unsupported_nested_rotation_settings_gate_stays_closed` clears
+  `DSK_EXPERIMENTAL_ROTATION_APPLY` so a shell-exported opt-in cannot silently empty the nested
+  rotation unsupported hit; bundle smoke skips when `main` is not ahead of `origin` even if the
+  bundle script exits **0** with “Nothing to bundle”.
 - **PAM plan/diff (P2.1 / issue #4)** — `pamMachine` / `pamDatabase` / `pamDirectory` now treat
   `pam_settings` as a **partial overlay** (manifest keys must match; Commander/DAG may add extra
   `options` / `connection` / `port_forward` keys). `pamUser.managed` compares normalized booleans
@@ -16,6 +20,10 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   without raising); skip the call when patch yields no net change.
 
 ### Changed
+- **Docs — RBI / GitHub #5 closeout** — [`docs/COMMANDER.md`](docs/COMMANDER.md)
+  now gives each current `pamRemoteBrowser` post-import field an explicit P3.1
+  bucket; [`docs/SDK_DA_COMPLETION_PLAN.md`](docs/SDK_DA_COMPLETION_PLAN.md)
+  records the sanitized smoke artifact and maintainer closeout checklist.
 - **Docs — live access (any credentialed agent)** — [`docs/LIVE_TEST_RUNBOOK.md`](docs/LIVE_TEST_RUNBOOK.md),
   [`AGENTS.md`](AGENTS.md) **Autonomous execution**, [`docs/DSK_NEXT_WORK.md`](docs/DSK_NEXT_WORK.md),
   [`scripts/daybook/README.md`](scripts/daybook/README.md) — not “primary only”;

@@ -20,6 +20,9 @@ fi
 AHEAD="$(git rev-list --count origin/main..main 2>/dev/null || echo 0)"
 if [[ "$AHEAD" -eq 0 ]]; then
   echo "Nothing to bundle (main is not ahead of origin/main)."
+  # Keep helpful handoff lines so harness tests and operators always see the same verbs.
+  echo "On a clone whose origin/main matches this machine (when you do create a bundle):"
+  echo "  git pull /path/to/bundle main && git push origin main"
   exit 0
 fi
 # shellcheck disable=SC2016

@@ -28,6 +28,16 @@ from a clone, in-repo vs out-of-repo), and guardrails. Scoped completion contrac
 [`docs/SDK_DA_COMPLETION_PLAN.md`](docs/SDK_DA_COMPLETION_PLAN.md)
 and [`docs/SDK_COMPLETION_PLAN.md`](docs/SDK_COMPLETION_PLAN.md).
 
+### Progress snapshot (2026-04)
+
+Already on **`main`** (see **[`CHANGELOG.md`](CHANGELOG.md)** [**Unreleased**] for detail):
+
+- **P2.1 (nested rotation drift):** offline `compute_diff` treats `pam_settings` on `pamMachine` / `pamDatabase` / `pamDirectory` as an overlay (Commander may add extra keys) and normalizes `pamUser.managed` string/boolean skew — regression coverage in [`tests/test_diff.py`](tests/test_diff.py). **Live** re-plan (`pamUserNestedRotation` smoke, exit **0** post-apply) remains the telling bar before narrowing preview gates — [`docs/DSK_NEXT_WORK.md`](docs/DSK_NEXT_WORK.md).
+- **Exports / RBI:** `pamRemoteBrowser` discover maps **`rbiUrl` ↔ manifest `url`**; docs smoke README + **COMMANDER** RBI buckets aligned with DA Phase 3 evidence targets.
+- **Operator ergonomics:** [`AGENTS.md`](AGENTS.md) documents **`git bundle`** handoff when **`git push`** fails from a sandboxed shell; [`scripts/phase_harness/bundle_unpushed_commits.sh`](scripts/phase_harness/bundle_unpushed_commits.sh) creates the bundle.
+- **Orchestration (workspace):** `queue_runner.sh` in the operator’s **`~/.cursor-daybook-sync/scripts/`** tree chains **`phase_runner.sh`** queue items; **`--live`** + **`--env-file`** pair with **`ksm_creds.sh`** for Codex **`live_smoke`** profile (see **`queue_runner.README.md`** next to that script). Two lab identities — general Acme lab vs MSP parent — use separate **KSM** record pointers; operator-only env templates such as **`~/Downloads/dsk-queue.live.env`** / **`dsk-queue-msp.live.env`** stay outside this repo.
+- **MSP family:** **`msp-environment.v1`** schema + registry on **`main`**; mock **`import`** adoption path + **`validate --online`** discover (`CommanderCliProvider`); **Commander apply/import for MSP** still unsupported — [`docs/MSP_FAMILY_DESIGN.md`](docs/MSP_FAMILY_DESIGN.md), [`docs/V2_DECISIONS.md`](docs/V2_DECISIONS.md) Q5.
+
 ## Capability scope
 
 | Area                 | v1.0 coverage                        | Roadmap                      |
@@ -106,7 +116,7 @@ feature. Canonical rationale: [`docs/V2_DECISIONS.md`](docs/V2_DECISIONS.md)
 | Platform capability | Typical Commander / product surface | Why DSK does not touch it | What to use instead |
 |---------------------|--------------------------------------|---------------------------|---------------------|
 | Posture as declarative state | BreachWatch posture, compliance baselines, continuous audit as a manifest family | **P15 dropped-design** — surfaces are read-only / one-shot; remediation is per-record user action, not an idempotent manifest reconcile (V2 Q1). | Shipped: `dsk report password-report`, `compliance-report`, `security-audit-report`. Still Commander-direct until wrapped at the same bar: e.g. `breachwatch-list`, richer `enterprise-reports`. |
-| MSP / distributor | MSP tree, distributor-only flows | **Q5 watch-only** — no schema until MSP test tenant + customer ask; Q3 keeps wrappers off until product re-opens. | Drift tracking in matrix/snapshot only; operate via Commander. |
+| MSP / distributor | MSP tree, `msp-info`, managed-company lifecycle | **In scope for declarative MSP** as of 2026-04-27 (V2 Q5): parent lab tenant + design memo `docs/MSP_FAMILY_DESIGN.md`; first slice `msp-environment.v1` — not GA like PAM until live-proof + matrix bar. | Commander today for undeclared paths; `dsk validate --online` MSP arms when wired; lab harness `keeper-vault-rbi-pam-testenv/scripts/msp_smoke.py` for read-only envelopes. |
 | Auth factor enrollment | `two_fa` enrollment-style flows | **Q3** — out of scope for both `dsk run` and `dsk report` until reversed. | Commander direct. |
 | Vault repair / migration | `verify_records`, `convert` | **Q3 + V2 out-of-scope** — explicit non-goals for v2.0+. | Commander direct. |
 | Debug / graph writers | `pam_debug` and similar | **Q3** — not treated as end-user SDK surface. | Commander direct. |

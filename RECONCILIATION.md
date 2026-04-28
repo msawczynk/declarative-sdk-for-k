@@ -12,7 +12,7 @@ This is for human + agent review. Per-folder maps live in `<dir>/SCAFFOLD.md`.
 ## TL;DR
 
 - **Zero remaining v1.0.0 GA blockers.** Tag policy decided: annotated only — distribution is GitHub-only (no PyPI, no `git verify-tag` consumer flow); GPG/SSH signing not required. Upgrade path if supply-chain requirements change → sigstore/cosign `dist/*` in `publish.yml` (OIDC, no maintainer key).
-- **Open clean-re-plan work** (not GA blockers): nested-`pamUser` rotation (P2.1 / issue #4) — apply + rotation edit OK; **offline** `diff` now handles parent `pam_settings` overlay + `managed` bool skew (`CHANGELOG` [Unreleased]) — **live re-plan exit 0** must be re-proven on Acme-lab. **P3** `pamRemoteBrowser` E2E smoke is **green** (2026-04-28); per-field *supported* still tracks **#5** + DA.
+- **Open clean-re-plan work** (not GA blockers): nested-`pamUser` rotation (P2.1 / issue #4) — apply + rotation edit OK; **offline** `diff` now handles parent `pam_settings` overlay + `managed` bool skew (`CHANGELOG` [Unreleased]) — **live re-plan exit 0** must be re-proven on Acme-lab. **P3 / #5** `pamRemoteBrowser` closeout evidence is doc-ready (2026-04-28 smoke + COMMANDER P3.1 + DA Phase 3); dirty/list/audio subfields stay bucketed.
 - **Three v1.1 deferrals tracked + accepted:** adoption smoke against unmanaged records, field-drift→UPDATE smoke, two-writer ownership-marker race smoke.
 - **One v2 deferral:** module rename `keeper_sdk` → `declarative_sdk_k` (will ship compat shim).
 - **Nothing has been silently dropped.** Every preview-gated key fails loud at apply via `_detect_unsupported_capabilities` + plan-surface CONFLICT rows (C3 fix; H6 regression test).

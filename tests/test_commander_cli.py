@@ -996,6 +996,7 @@ def test_unsupported_default_rotation_schedule_has_precise_hook(
 def test_unsupported_nested_rotation_settings_gate_stays_closed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.delenv("DSK_EXPERIMENTAL_ROTATION_APPLY", raising=False)
     provider = _provider(monkeypatch)
 
     reasons = provider.unsupported_capabilities(_rotation_manifest())
