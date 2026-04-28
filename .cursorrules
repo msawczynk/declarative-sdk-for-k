@@ -28,3 +28,60 @@ Hard rules:
 - Preserve preview/provider gates until reviewed live proof passes.
 - Do not write direct Keeper DAG state from SDK or lab scripts; route live mutation through Commander surfaces.
 - Keep tests focused to the touched area first; run broad checks only when risk or release scope requires it.
+
+## Router-mode (cheap-orch primary, premium escalation)
+
+**Recommended chat primary: `composer-2`** (cheap-orch tier per
+`~/.cursor-daybook-sync/docs/orchestration/CHEAP_ORCH_DESIGN.md`). Switch via
+Cursor model picker; current session telemetry surfaces in boot
+`orch_tier_distribution`. Target: T0 + T1 ≥ 95 % of session spend, T3 ≤ 5 %.
+
+**Worker routing order** (apply per task; cheapest viable wins):
+
+1. **T0 free** — Codex CLI (`codex_offline_bg.sh` / `codex_live.sh`), local
+   scripts (`audit_efficiency.py`, repo gate scripts), built-in `explore`
+   subagent. **First reflex** for any read / mechanical / sandbox-fit work.
+2. **T1 cheap** — `fmt-fixer` (nano), `bulk-reader` (nano), `schema-dumper`
+   (nano), `pytest-writer` (composer-2), `cheap-writer` (composer-2),
+   `verifier` (gpt-5-mini, distinct vendor for skeptical 2nd opinion).
+3. **T2 managed** — Cursor `Auto` pool when none of T0/T1 fits and parent
+   judgment isn't required.
+4. **T3 premium (escalate, never default)** — `Task(subagent_type=generalPurpose, model=opus)`
+   one-shot consult with `consult envelope` (digest + question + expected
+   output shape). Triggers in `AGENT_PREAMBLE.md` §0c.
+
+**Multi-step delegation default:** `~/.cursor-daybook-sync/scripts/phase_runner.sh`
+with YAML spec (use `--author-spec` so cheap-writer authors the YAML from a
+30-line outcome stub — parent does not draft long specs at premium rate).
+
+**Hard-fail drift gates (already wired into `stop` hook):**
+
+- `parent_action_check.sh` → exits 1 if parent emits >30-line YAML or >50-line
+  spec markdown without prior delegate, >3 consecutive `Read` calls without
+  delegate, premium-judgment language without `Task`/`codex`, or **GH-issue /
+  trivial-fix bait** without `bulk-reader` first (§0c trigger 6).
+- `agent_pre_claim.sh` → wraps `parent_action_check.sh` + clobber-risk; ≥2
+  axes flagged → mandatory T3 escalation before "done"/gate-lift/support
+  claim hits chat.
+
+**Escalation cheat-sheet** (any one fires → `Task(model=opus)` one-shot or
+flip primary to Opus):
+
+- 3-patch trip on same failure mode.
+- Worker `BLOCKER` / cross-rule reconciliation needed.
+- Pre-claim ≥2 axes flagged.
+- User intent verbs: `why|should-I|architect|gate-lift|support claim|recommend|trade-off`.
+- Novel error with no LESSONS tag match after one `bulk-reader` pass.
+- **GH-issue trivial-fix bait** spanning >1 module / schema / contract / test.
+- Iterative debug >3 round-trips on same bug.
+
+**Router lockdown:** if you're chat primary on a cheap tier and a single-file
+write >30 lines is required, route to `cheap-writer`. If >2 files, route to
+`phase_runner.sh`. Direct edits to `keeper_sdk/` / `tests/` from chat primary
+without a prior `Task` / `codex` call in same session is the
+parent-as-implementer drift the audit checklist (#17) catches.
+
+**Target queue (not `V1_GA_CHECKLIST.md` — that shipped 2026-04-24):**
+[`docs/DSK_NEXT_WORK.md`](./docs/DSK_NEXT_WORK.md) priority stack +
+[`docs/SDK_DA_COMPLETION_PLAN.md`](./docs/SDK_DA_COMPLETION_PLAN.md)
+support classifications.
