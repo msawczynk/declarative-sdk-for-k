@@ -449,6 +449,7 @@ def run_smoke(
             app_uid=sb["ksm_app_uid"],
             folder_uid=resolved_sf_uid,
             profile=run_context.profile,
+            password=admin_password,
         )
         _mark(state, "resources folder shared to KSM app")
 
@@ -1017,11 +1018,14 @@ def _share_ksm_app_folder(
     app_uid: str,
     folder_uid: str,
     profile: identity.SmokeProfile | None = None,
+    password: str | None = None,
 ) -> None:
     smoke_profile = profile if profile is not None else identity.DEFAULT_PROFILE
     config_path = str(smoke_profile.admin_commander_config)
     env = dict(os.environ)
-    password = getattr(admin_params, "password", None) or _load_admin_password(smoke_profile)
+    password = (
+        password or getattr(admin_params, "password", None) or _load_admin_password(smoke_profile)
+    )
     env["KEEPER_PASSWORD"] = password
     cmd = [
         "keeper",
