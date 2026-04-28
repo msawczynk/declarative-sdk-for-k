@@ -1,12 +1,14 @@
 # Vault L1 — design (slice 1)
 
-**Status:** `DRAFT` — technical body **complete** for implementation (PR-V1+).
-Remove the `DRAFT` label and fill **§7** after integrator + reviewer sign-off.
+**Status:** L1 `login` slice implemented and live-proofed for the scalar record
+lifecycle. Broader vault surfaces remain governed by the scope and caveats
+below.
 
 **Links:** (multi-session PR-train / orchestration prose: outside this repo — see root [`AGENTS.md`](../AGENTS.md) § “Where orchestration lives”.)
 [PAM_PARITY_PROGRAM.md](./PAM_PARITY_PROGRAM.md) ·
 [CONVENTIONS.md](../keeper_sdk/core/schemas/CONVENTIONS.md) ·
-[`keeper-vault.v1.schema.json`](../keeper_sdk/core/schemas/keeper-vault/keeper-vault.v1.schema.json)
+[`keeper-vault.v1.schema.json`](../keeper_sdk/core/schemas/keeper-vault/keeper-vault.v1.schema.json) ·
+[`keeper-vault.v1.91119c4.sanitized.json`](./live-proof/keeper-vault.v1.91119c4.sanitized.json)
 
 ---
 
@@ -149,8 +151,12 @@ should assume:
 - **Commander pin / tenant policy skew** — unit tests encode expectations for the
   pinned Commander JSON shape; other versions or enterprise flags may differ.
 
-A **clean** `plan` / `diff` / `validate --online` is **evidence**, not a formal
-correctness proof, until **G6** live transcripts and matrix rows cover the slice.
+For the supported L1 `login` slice, the sanitized `vaultOneLogin` transcript
+under `docs/live-proof/` is the committed evidence for create, verify, clean
+re-plan, destroy, and empty re-discover. A clean `plan` / `diff` /
+`validate --online` remains **evidence**, not a formal correctness proof, for
+duplicate labels, structured field values, non-`login` record types, and any
+Commander shape not covered by that transcript.
 
 ### Concurrent edits vs `validate --online`
 
@@ -197,12 +203,15 @@ This design **recommends Option A** long-term; Option B is acceptable only as a
 
 ---
 
-## 7. Sign-off
+## 7. Live-proof sign-off
 
-| Role | Name | Date |
-|------|------|------|
-| Integrator | | |
-| Reviewer | | |
+| Item | Value |
+|------|-------|
+| Evidence | [`docs/live-proof/keeper-vault.v1.91119c4.sanitized.json`](./live-proof/keeper-vault.v1.91119c4.sanitized.json) |
+| Scenario | `python3 scripts/smoke/smoke.py --scenario vaultOneLogin --login-helper env` |
+| Commander pin | `91119c4e4f08139eec810ea6550abf92f8e79240` |
+| Result | `SMOKE PASSED: create->verify->destroy cycle clean`; includes clean re-plan and empty re-discover |
+| Scope | One L1 scalar `login` record; see §1 and §4 limits |
 
 ---
 
@@ -234,3 +243,4 @@ This design **recommends Option A** long-term; Option B is acceptable only as a
 | 2026-04-26 | PR-V1: `vault_models.py` + tests (sign-off still pending on §7). |
 | 2026-04-27 | §8: `validate --online` / `vault_online` JSON mode (PR-V4+); no §7 sign-off. |
 | 2026-04-27 | §4: semantic `login` diff limits, concurrent-edit caveat, Commander UPDATE / `CapabilityError` guard (no §7 sign-off). |
+| 2026-04-28 | Aligned §7 with committed `vaultOneLogin` live-proof artifact and live-proof README contract. |

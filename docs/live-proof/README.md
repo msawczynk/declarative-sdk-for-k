@@ -1,7 +1,7 @@
 # Live-proof artifacts (`docs/live-proof/`)
 
 **Audience:** maintainer, agent, or CI **explicitly granted** live access to a
-lab tenant for this repo (same bar as [`AGENTS.md`](../AGENTS.md) § Autonomous
+lab tenant for this repo (same bar as [`AGENTS.md`](../../AGENTS.md) § Autonomous
 execution). Read this before changing `x-keeper-live-proof.status` on a family
 schema.
 
@@ -40,7 +40,7 @@ After sanitization, prefer:
 docs/live-proof/<family>.v<major>.<commander-pin-abbrev>.sanitized.json
 ```
 
-Example: `keeper-vault.v1.89047920.sanitized.json` (use the first 7–8 hex
+Example: `keeper-vault.v1.91119c4.sanitized.json` (use the first 7–8 hex
 chars of the pin for humans; `since_pin` in the schema stays **full 40**).
 
 Use `.sanitized.` in the basename so reviewers grep for it in PRs.
@@ -77,25 +77,31 @@ transcript helpers (`keeper_sdk.cli._live.transcript`). When in doubt, keep
 7. **Open PR** with a one-line “clean re-plan” or equivalent proof statement in
    the description (SDK_DA completion gates).
 
-## V8 prep (not live evidence)
+## Vault L1 template + sample
 
-**Template JSON (shape only):** [`keeper-vault.v1.sanitized.template.json`](./keeper-vault.v1.sanitized.template.json) — `template: true`; safe to commit. After a tenant run, produce a real `*.sanitized.json` per the naming rule above, redact, then point `x-keeper-live-proof.evidence` at that file.
+**Live evidence:** [`keeper-vault.v1.91119c4.sanitized.json`](./keeper-vault.v1.91119c4.sanitized.json) — `vaultOneLogin` through the committed smoke harness; create -> verify -> clean re-plan -> destroy -> empty re-discover. Interpret it with the scalar `login` limits and race caveats in [`VAULT_L1_DESIGN.md`](../VAULT_L1_DESIGN.md) §4.
 
-**Sample manifest (one `login`):** [`../examples/scaffold_only/vaultOneLogin.yaml`](../examples/scaffold_only/vaultOneLogin.yaml) — edit `uid_ref` / title / field values for your lab folder; keep non-production credentials only.
+**Template JSON (shape only):** [`keeper-vault.v1.sanitized.template.json`](./keeper-vault.v1.sanitized.template.json) — `template: true`; safe to commit and reuse for future vault L1 re-runs. After a tenant run, produce a real `*.sanitized.json` per the naming rule above, redact, remove template-only keys, then point `x-keeper-live-proof.evidence` at that file.
 
-## Current placeholders
+**Sample manifest (one `login`):** [`../../examples/scaffold_only/vaultOneLogin.yaml`](../../examples/scaffold_only/vaultOneLogin.yaml) — edit `uid_ref` / title / field values for your lab folder; keep non-production credentials only.
+
+## Current evidence index
 
 | Family | Schema status | Evidence pointer |
 |--------|---------------|------------------|
-| `keeper-vault.v1` | `scaffold-only` | Commander L1 + `validate --online` in code; commit a **sanitized** transcript (see template + checklist §6) before `supported` |
-| `keeper-vault-sharing.v1` | `scaffold-only` | This README until a transcript lands |
+| `keeper-vault.v1` | `supported` (L1 `login` slice) | [`keeper-vault.v1.91119c4.sanitized.json`](./keeper-vault.v1.91119c4.sanitized.json) — `vaultOneLogin` 2026-04-27; scope remains one scalar `login` record per `VAULT_L1_DESIGN.md` §1/§4 |
+| `keeper-vault-sharing.v1` | `scaffold-only` / partial proof | [`keeper-vault-sharing.v1.535e03f.folderlifecycle.sanitized.json`](./keeper-vault-sharing.v1.535e03f.folderlifecycle.sanitized.json) — folder lifecycle only; not a full status flip |
 | `keeper-enterprise.v1` | `scaffold-only` | This README until a transcript lands |
 | `keeper-pam-environment.v1` (RBI slice) | `supported` (E2E smoke) | [`keeper-pam-environment.v1.89047920.rbi.sanitized.json`](./keeper-pam-environment.v1.89047920.rbi.sanitized.json) — `pamRemoteBrowser` 2026-04-28; see also machine transcript |
 
-When a real file exists, point `evidence` at that file path instead of this
-README.
+When a real file exists and covers the family bar, point `evidence` at that file
+path instead of this README. Partial transcripts may live here without changing
+schema status.
 
 ## Live proof sequence
 
 Run one live writer per tenant profile, commit only sanitized transcripts, and
-update the relevant schema evidence pointer after the proof passes.
+update the relevant schema evidence pointer after the proof passes. When a
+committed smoke scenario exists (for example `vaultOneLogin`), that smoke
+scenario is the primary proof path; one-off `dsk validate --online` / `plan`
+captures are supporting evidence only.

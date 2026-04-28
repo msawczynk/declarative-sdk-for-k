@@ -1,10 +1,23 @@
 {
   "family": "keeper-vault.v1",
   "template": true,
-  "purpose": "Shape-only placeholder for V8 L1. After a lab run, copy to keeper-vault.v1.<pin-abbrev>.sanitized.json with real redacted content; remove template and purpose keys. See docs/live-proof/README.md checklist.",
+  "purpose": "Shape-only template for future vault L1 re-runs. After a lab run, copy to keeper-vault.v1.<pin-abbrev>.sanitized.json with real redacted content; remove template and purpose keys. See docs/live-proof/README.md checklist and docs/VAULT_L1_DESIGN.md section 4.",
+  "live_proof_bar": "Use the committed vaultOneLogin smoke path when available; sanitized evidence must show create -> verify -> clean re-plan -> destroy -> empty re-discover for the L1 scalar login slice.",
   "suggested_commands": [
+    "python3 scripts/smoke/smoke.py --scenario vaultOneLogin --login-helper env",
     "dsk --provider commander --folder-uid <FOLDER_UID> validate examples/scaffold_only/vaultOneLogin.yaml --online --json",
     "dsk --provider commander --folder-uid <FOLDER_UID> plan examples/scaffold_only/vaultOneLogin.yaml --json"
+  ],
+  "required_transcript_events": [
+    "validate",
+    "plan",
+    "apply",
+    "discover",
+    "verify",
+    "re-plan",
+    "destroy plan",
+    "destroy apply",
+    "re-discover"
   ],
   "placeholder_validate_online": {
     "ok": true,

@@ -6,11 +6,17 @@
   "since_pin": "91119c4e4f08139eec810ea6550abf92f8e79240",
   "keepercommander_version": "17.2.13",
   "tenant_fqdn": "keepersecurity.com",
-  "tenant_account_redacted": "msawczyn+lab@acme-demo.com",
+  "tenant_account_redacted": "<admin_email>",
   "scenario_command": "python3 scripts/smoke/smoke.py --scenario vaultOneLogin --login-helper env",
   "auth_path": "public EnvLoginHelper env path",
   "generated_at": "2026-04-27T04:43:58Z",
   "smoke_final_line": "SMOKE PASSED: create->verify->destroy cycle clean",
+  "live_proof_bar": {
+    "readme": "docs/live-proof/README.md",
+    "design": "docs/VAULT_L1_DESIGN.md#4-plan--apply-semantics",
+    "scope": "L1 scalar login record lifecycle",
+    "required_result": "create -> verify -> clean re-plan -> destroy -> empty re-discover"
+  },
   "phase_results": [
     {
       "phase": "validate",
@@ -50,13 +56,14 @@
     }
   ],
   "record_uid_prefixes": [
-    "J94-61O0"
+    "<uid_prefix>"
   ],
   "marker_manager": "keeper-pam-declarative",
   "notes": [
     "L1 live pass.",
     "vaultOneLogin create->verify->destroy clean.",
-    "Record UID prefix only.",
+    "Record UID prefix redacted.",
+    "Artifact follows docs/live-proof README contract and VAULT_L1_DESIGN section 4 bar for the L1 scalar login slice.",
     "Fixes in run: in-process ls/get ignore sync spinner; vault destroy manifest keeps stem; sandbox cleanup uses forced marker-guarded rm."
   ]
 }
