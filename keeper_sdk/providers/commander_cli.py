@@ -74,6 +74,8 @@ from keeper_sdk.providers._commander_cli_helpers import (
     _uses_reference_existing,
 )
 
+ConflictError = CollisionError
+
 
 def _is_keeper_fill_change(change: Change) -> bool:
     """Detect whether a vault diff Change targets the keeper_fill block.
@@ -113,6 +115,12 @@ _MSP_APPLY_UNSUPPORTED_REASON = (
     "MSP managed-company apply is not implemented on CommanderCliProvider "
     "(Commander: `msp-add` / `msp-update` / `msp-remove`; see docs/COMMANDER.md)"
 )
+_MSP_CREATE_ONLY_UNSUPPORTED_REASON = (
+    "CommanderCliProvider only implements MSP managed-company create via "
+    "`msp-add`; update/delete/import marker writes remain unsupported"
+)
+_MSP_MANAGED_COMPANY_RESOURCE_TYPES = {"managed_company", "managedCompany"}
+_MSP_UNLIMITED_SEATS = 1_000_000_000
 
 
 def _msp_plan_slug_from_product_id(product_id: Any) -> str:
@@ -181,6 +189,58 @@ def _commander_mc_dict_to_sdk_row(mc: Mapping[str, Any]) -> dict[str, Any]:
     if eid is not None:
         out["mc_enterprise_id"] = eid
     return out
+
+
+def _msp_plan_changes(plan: Plan) -> list[Change]:
+    ordered = plan.ordered()
+    seen = {id(change) for change in ordered}
+    return ordered + [change for change in plan.changes if id(change) not in seen]
+
+
+def _msp_change_name(change: Change) -> str:
+    for payload in (change.after, change.before):
+        value = payload.get("name")
+        if value is not None:
+            return str(value)
+    return str(change.uid_ref or change.title)
+
+
+def _msp_commander_seats(value: Any) -> int:
+    seats = int(value)
+    return -1 if seats >= _MSP_UNLIMITED_SEATS else seats
+
+
+def _msp_addon_arg(addon: Mapping[str, Any]) -> str:
+    name = str(addon["name"])
+    seats = _msp_commander_seats(addon.get("seats", 0))
+    return f"{name}:{seats}" if seats else name
+
+
+def _msp_add_command_kwargs(change: Change) -> dict[str, Any]:
+    after = change.after
+    name = after.get("name") or change.uid_ref or change.title
+    if not name:
+        raise CapabilityError(
+            reason="MSP managed-company create change is missing after.name",
+            uid_ref=change.uid_ref,
+            resource_type=change.resource_type,
+            next_action="rebuild the MSP plan from a valid msp-environment.v1 manifest",
+        )
+    kwargs: dict[str, Any] = {"name": str(name)}
+    if after.get("plan") is not None:
+        kwargs["plan"] = str(after["plan"])
+    if after.get("seats") is not None:
+        kwargs["seats"] = _msp_commander_seats(after["seats"])
+    if after.get("file_plan") not in (None, ""):
+        kwargs["file_plan"] = str(after["file_plan"])
+    if after.get("node") not in (None, ""):
+        kwargs["node"] = str(after["node"])
+    addons = after.get("addons")
+    if isinstance(addons, list):
+        addon_args = [_msp_addon_arg(addon) for addon in addons if isinstance(addon, Mapping)]
+        if addon_args:
+            kwargs["addon"] = addon_args
+    return kwargs
 
 
 def _semver_tuple_at_least(installed: tuple[int, ...], minimum: tuple[int, ...]) -> bool:
@@ -956,7 +1016,124 @@ class CommanderCliProvider(Provider):
         return outcomes
 
     def apply_msp_plan(self, plan: Plan, *, dry_run: bool = False) -> list[ApplyOutcome]:
-        raise CapabilityError(_MSP_APPLY_UNSUPPORTED_REASON)
+        changes = _msp_plan_changes(plan)
+        if not changes:
+            raise CapabilityError(_MSP_APPLY_UNSUPPORTED_REASON)
+
+        unsupported = [
+            change
+            for change in changes
+            if change.kind is not ChangeKind.CREATE
+            or change.resource_type not in _MSP_MANAGED_COMPANY_RESOURCE_TYPES
+        ]
+        if unsupported:
+            first = unsupported[0]
+            raise CapabilityError(
+                reason=_MSP_CREATE_ONLY_UNSUPPORTED_REASON,
+                uid_ref=first.uid_ref,
+                resource_type=first.resource_type,
+                next_action=(
+                    "apply only create managed_company rows with Commander for now; "
+                    "use mock provider for offline MSP update/delete tests"
+                ),
+            )
+
+        _ensure_keepercommander_version_for_apply()
+        outcomes: list[ApplyOutcome] = []
+        for change in changes:
+            name = _msp_change_name(change)
+            existing = next(
+                (
+                    row
+                    for row in self.discover_managed_companies()
+                    if str(row.get("name", "")).casefold() == name.casefold()
+                ),
+                None,
+            )
+            if existing is not None:
+                raise ConflictError(
+                    reason=f"managed company {name!r} already exists; refusing create",
+                    uid_ref=change.uid_ref or name,
+                    resource_type=change.resource_type,
+                    live_identifier=str(
+                        existing.get("mc_enterprise_id") or existing.get("name") or name
+                    ),
+                    next_action="refresh plan from live MSP state or rename the managed company",
+                    context={"live": existing},
+                )
+
+            if dry_run:
+                outcomes.append(
+                    ApplyOutcome(
+                        uid_ref=change.uid_ref or name,
+                        keeper_uid="",
+                        action="create",
+                        details={"dry_run": True},
+                    )
+                )
+                continue
+
+            try:
+                from keepercommander.commands.msp import MSPAddCommand  # type: ignore
+            except (ImportError, AttributeError) as exc:
+                # MSPAddCommand.execute(params, name=<str>, plan=<str>, seats=<int>,
+                # file_plan=<str>, addon=list["addon[:seats]"], node=<str>) is the
+                # required Commander hook when available in keepercommander.
+                raise CapabilityError(
+                    reason=f"Commander MSPAddCommand is unavailable: {exc}",
+                    uid_ref=change.uid_ref or name,
+                    resource_type=change.resource_type,
+                    next_action="upgrade keepercommander to a version that provides keepercommander.commands.msp.MSPAddCommand",
+                ) from exc
+
+            kwargs = _msp_add_command_kwargs(change)
+
+            def _run_create() -> Any:
+                params = self._get_keeper_params()
+                command = MSPAddCommand()
+                if not hasattr(command, "execute"):
+                    raise CapabilityError(
+                        reason="Commander MSPAddCommand has no execute(params, **kwargs) API",
+                        uid_ref=change.uid_ref or name,
+                        resource_type=change.resource_type,
+                        next_action=(
+                            "need MSPAddCommand.execute(params, name, plan, seats, "
+                            "file_plan, addon, node)"
+                        ),
+                    )
+                return command.execute(params, **kwargs)
+
+            try:
+                mc_id = self._with_keeper_session_refresh(_run_create)
+            except CapabilityError:
+                raise
+            except Exception as exc:
+                raise CapabilityError(
+                    reason=f"MSP managed-company create failed: {type(exc).__name__}: {exc}",
+                    uid_ref=change.uid_ref or name,
+                    resource_type=change.resource_type,
+                    next_action="verify MSP admin permissions, plan/file_plan/addon permits, and root node access",
+                ) from exc
+
+            if mc_id is None:
+                raise CapabilityError(
+                    reason="Commander MSPAddCommand returned no managed-company id",
+                    uid_ref=change.uid_ref or name,
+                    resource_type=change.resource_type,
+                    next_action=(
+                        "inspect Commander warnings for invalid plan/file_plan/addon permits "
+                        "or missing MSP root node"
+                    ),
+                )
+            outcomes.append(
+                ApplyOutcome(
+                    uid_ref=change.uid_ref or name,
+                    keeper_uid=str(mc_id),
+                    action="create",
+                    details={"dry_run": False, "mc_enterprise_id": mc_id, "kwargs": kwargs},
+                )
+            )
+        return outcomes
 
     def _apply_vault_plan(self, plan: Plan, *, dry_run: bool = False) -> list[ApplyOutcome]:
         """Apply ``keeper-vault.v1`` slice-1 (``login``) via record-add + marker + ``rm``."""

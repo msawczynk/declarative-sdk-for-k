@@ -20,6 +20,8 @@ from keeper_sdk.core.errors import CapabilityError, SchemaError
 
 def apply_semantic_rules(document: dict[str, Any]) -> None:
     """Run cheap post-schema checks. Raises on failure."""
+    _reject_vault_duplicate_field_labels(document)
+
     for gateway in document.get("gateways") or []:
         if gateway.get("mode") == "create" and not gateway.get("ksm_application_name"):
             raise CapabilityError(
@@ -97,4 +99,35 @@ def apply_semantic_rules(document: dict[str, Any]) -> None:
                 uid_ref=resource.get("uid_ref"),
                 resource_type=resource_type,
                 next_action="remove rotation from pam_settings.options",
+            )
+
+
+def _reject_vault_duplicate_field_labels(document: dict[str, Any]) -> None:
+    if document.get("schema") != "keeper-vault.v1":
+        return
+
+    for record in document.get("records") or []:
+        if not isinstance(record, dict):
+            continue
+
+        seen: set[str] = set()
+        duplicates: list[str] = []
+        for field in record.get("fields") or []:
+            if not isinstance(field, dict):
+                continue
+            label = field.get("label")
+            if not isinstance(label, str):
+                continue
+            if label in seen and label not in duplicates:
+                duplicates.append(label)
+            seen.add(label)
+
+        if duplicates:
+            labels = ", ".join(duplicates)
+            title = record.get("title") or record.get("uid_ref") or "<unknown>"
+            raise SchemaError(
+                reason=(
+                    f"record '{title}': duplicate field labels: {labels}. "
+                    "Rename fields to unique labels"
+                ),
             )

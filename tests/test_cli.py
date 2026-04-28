@@ -335,6 +335,33 @@ def test_apply_dry_run_equivalent_to_plan(
     assert result_plan.output == result_apply.output
 
 
+def test_apply_dry_run_vault_summary_equivalent_to_plan(tmp_path: Path) -> None:
+    manifest_path = tmp_path / "vault-one.yaml"
+    manifest_path.write_text(
+        "schema: keeper-vault.v1\n"
+        "records:\n"
+        "  - uid_ref: cli.v.login\n"
+        "    type: login\n"
+        "    title: CLI Vault Login\n",
+        encoding="utf-8",
+    )
+
+    result_plan = _run(["plan", str(manifest_path)])
+    result_apply = _run(["apply", str(manifest_path), "--dry-run"])
+
+    assert result_plan.exit_code == EXIT_CHANGES, result_plan.output
+    assert result_apply.exit_code == EXIT_CHANGES, result_apply.output
+    assert _plan_summary_line(result_apply.output) == _plan_summary_line(result_plan.output)
+
+
+def _plan_summary_line(output: str) -> str:
+    return next(
+        line.strip()
+        for line in output.splitlines()
+        if " create," in line and " update," in line and " conflict," in line
+    )
+
+
 def test_import_adopts_unmanaged_title_match(
     minimal_manifest_path: Path,
     monkeypatch: pytest.MonkeyPatch,

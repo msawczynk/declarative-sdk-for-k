@@ -2,16 +2,20 @@
 
 from __future__ import annotations
 
+import sys
+import types
 from typing import Any
 
 import pytest
 
 from keeper_sdk.core.diff import Change, ChangeKind
+from keeper_sdk.core.errors import CapabilityError
 from keeper_sdk.core.msp_diff import compute_msp_diff
 from keeper_sdk.core.msp_graph import msp_apply_order
 from keeper_sdk.core.msp_models import MspManifestV1, load_msp_manifest
 from keeper_sdk.core.planner import Plan, build_plan
 from keeper_sdk.providers import MockProvider
+from keeper_sdk.providers.commander_cli import CommanderCliProvider, ConflictError
 
 
 def _manifest(*managed_companies: dict[str, Any]) -> MspManifestV1:
@@ -243,3 +247,100 @@ def test_no_marker_field_written_for_managed_company() -> None:
     provider.apply_msp_plan(_plan(_manifest(_mc("Acme")), provider))
 
     assert "custom_fields" not in provider.discover_managed_companies()[0]
+
+
+def _commander_provider_for_msp(
+    monkeypatch: pytest.MonkeyPatch,
+) -> tuple[CommanderCliProvider, object]:
+    provider = CommanderCliProvider.__new__(CommanderCliProvider)
+    params = object()
+    monkeypatch.setattr(provider, "_get_keeper_params", lambda: params)
+    monkeypatch.setattr(provider, "_with_keeper_session_refresh", lambda operation: operation())
+    return provider, params
+
+
+def test_commander_msp_create_mc_calls_msp_add_command(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider, params = _commander_provider_for_msp(monkeypatch)
+    monkeypatch.setattr(provider, "discover_managed_companies", lambda: [])
+    calls: list[tuple[object, dict[str, Any]]] = []
+
+    class FakeMSPAddCommand:
+        def execute(self, params_arg: object, **kwargs: Any) -> int:
+            calls.append((params_arg, kwargs))
+            return 456
+
+    module = types.ModuleType("keepercommander.commands.msp")
+    module.MSPAddCommand = FakeMSPAddCommand
+    monkeypatch.setitem(sys.modules, "keepercommander.commands.msp", module)
+    change = Change(
+        kind=ChangeKind.CREATE,
+        uid_ref="Acme",
+        resource_type="managed_company",
+        title="Acme",
+        after=_mc(
+            "Acme",
+            seats=7,
+            file_plan="enterprise",
+            addons=[
+                {"name": "connection_manager", "seats": 3},
+                {"name": "remote_browser_isolation", "seats": 0},
+            ],
+        ),
+    )
+
+    outcomes = provider.apply_msp_plan(_custom_plan(change))
+
+    assert [outcome.action for outcome in outcomes] == ["create"]
+    assert outcomes[0].keeper_uid == "456"
+    assert outcomes[0].details["mc_enterprise_id"] == 456
+    assert calls == [
+        (
+            params,
+            {
+                "name": "Acme",
+                "plan": "business",
+                "seats": 7,
+                "file_plan": "enterprise",
+                "addon": ["connection_manager:3", "remote_browser_isolation"],
+            },
+        )
+    ]
+
+
+def test_commander_msp_create_mc_duplicate_name_guard(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider, _params = _commander_provider_for_msp(monkeypatch)
+    monkeypatch.setattr(
+        provider,
+        "discover_managed_companies",
+        lambda: [{"name": "acme", "mc_enterprise_id": 123}],
+    )
+    change = Change(
+        kind=ChangeKind.CREATE,
+        uid_ref="Acme",
+        resource_type="managedCompany",
+        title="Acme",
+        after=_mc("Acme"),
+    )
+
+    with pytest.raises(ConflictError, match="already exists"):
+        provider.apply_msp_plan(_custom_plan(change))
+
+
+def test_commander_msp_non_create_kind_still_raises_capability_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider, _params = _commander_provider_for_msp(monkeypatch)
+    change = Change(
+        kind=ChangeKind.UPDATE,
+        uid_ref="Acme",
+        resource_type="managed_company",
+        title="Acme",
+        after=_mc("Acme", seats=9),
+    )
+
+    with pytest.raises(CapabilityError, match="only implements MSP managed-company create"):
+        provider.apply_msp_plan(_custom_plan(change))

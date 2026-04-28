@@ -12,6 +12,8 @@ from keeper_sdk.core.interfaces import LiveRecord
 from keeper_sdk.core.metadata import MANAGER_NAME, MARKER_FIELD_LABEL, MARKER_VERSION
 from keeper_sdk.core.models import Manifest
 
+ConflictError = CollisionError
+
 
 class ChangeKind(StrEnum):
     """Classification of a single planned change.
@@ -704,13 +706,20 @@ def _raise_live_record_collisions(live_records: list[LiveRecord]) -> None:
     for (resource_type, title), matches in title_matches.items():
         if len(matches) < 2:
             continue
-        if any((live.marker or {}).get("uid_ref") for live in matches):
+        marker_uids = [(live.marker or {}).get("uid_ref") for live in matches]
+        if all(uid for uid in marker_uids) and len(set(marker_uids)) == len(marker_uids):
             continue
-        raise CollisionError(
-            reason=f"live tenant has {len(matches)} {resource_type} records titled '{title}' with no ownership markers",
+        reason = f"duplicate titles found for '{title}' — cannot safely resolve; rename one"
+        if not any(marker_uids):
+            reason = (
+                f"{reason}; live tenant has {len(matches)} {resource_type} "
+                f"records titled '{title}' with no ownership markers"
+            )
+        raise ConflictError(
+            reason=reason,
             uid_ref=None,
             resource_type=resource_type,
-            next_action="rename duplicates or add ownership markers so matching is unambiguous",
+            next_action="rename one duplicate title before planning",
             context={"live_identifiers": [live.keeper_uid for live in matches]},
         )
 
@@ -751,4 +760,4 @@ def _field_diff(before: dict[str, Any], after: dict[str, Any]) -> list[str]:
     return sorted(changed)
 
 
-__all__ = ["Change", "ChangeKind", "compute_diff", "CollisionError"]
+__all__ = ["Change", "ChangeKind", "compute_diff", "CollisionError", "ConflictError"]

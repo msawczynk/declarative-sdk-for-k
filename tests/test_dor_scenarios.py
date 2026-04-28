@@ -7,7 +7,7 @@ from typing import Any, cast
 import pytest
 
 from keeper_sdk.core import compute_diff
-from keeper_sdk.core.diff import Change, ChangeKind
+from keeper_sdk.core.diff import Change, ChangeKind, ConflictError
 from keeper_sdk.core.errors import CapabilityError
 from keeper_sdk.core.interfaces import LiveRecord
 from keeper_sdk.core.manifest import load_manifest_string
@@ -63,6 +63,68 @@ def test_adoption_race_unmanaged_record_emits_conflict() -> None:
         assert target.kind is ChangeKind.CONFLICT
         assert target.keeper_uid == "LIVE-X"
         assert "unmanaged record with matching title" in (target.reason or "")
+
+
+def test_duplicate_title_guard_blocks_ambiguous_commander_diff() -> None:
+    manifest = _manifest("res.x", "X")
+    live = [
+        LiveRecord(
+            keeper_uid="LIVE-X-1",
+            title="X",
+            resource_type="pamMachine",
+            payload={"title": "X"},
+            marker=None,
+        ),
+        LiveRecord(
+            keeper_uid="LIVE-X-2",
+            title="X",
+            resource_type="pamMachine",
+            payload={"title": "X"},
+            marker=encode_marker(
+                uid_ref="other.x",
+                manifest="other-manifest",
+                resource_type="pamMachine",
+            ),
+        ),
+    ]
+
+    with pytest.raises(ConflictError) as exc_info:
+        compute_diff(manifest, live, adopt=False)
+
+    assert (
+        "duplicate titles found for 'X' — cannot safely resolve; rename one"
+        in exc_info.value.reason
+    )
+
+
+def test_duplicate_title_guard_skips_when_all_distinct_uid_ref_markers() -> None:
+    manifest = _manifest("res.x", "X")
+    live = [
+        LiveRecord(
+            keeper_uid="LIVE-X-1",
+            title="X",
+            resource_type="pamMachine",
+            payload={"title": "X"},
+            marker=encode_marker(
+                uid_ref="res.x",
+                manifest="dor-scenarios",
+                resource_type="pamMachine",
+            ),
+        ),
+        LiveRecord(
+            keeper_uid="LIVE-X-2",
+            title="X",
+            resource_type="pamMachine",
+            payload={"title": "X"},
+            marker=encode_marker(
+                uid_ref="other.x",
+                manifest="dor-scenarios",
+                resource_type="pamMachine",
+            ),
+        ),
+    ]
+
+    compute_diff(manifest, live, adopt=False)
 
 
 def test_ksm_rotation_mid_apply_does_not_invalidate_session(
