@@ -25,7 +25,12 @@ Shipped and proven:
 
 Not yet supported:
 
-- Nested `resources[].users[].rotation_settings`: apply reaches marker
+- Nested `resources[].users[].rotation_settings`: **UPSTREAM-GAP** (2026-04-28)
+  Offline fix (`compute_diff` overlay normalization v2, 964 tests green) proven.
+  Live re-plan blocked: Commander `pam user ls` ParseError on UID positional arg.
+  DSK code is sound; awaiting Commander CLI fix.
+  Classification: `preview-gated` until Commander release.
+- Nested `resources[].users[].rotation_settings` (original — kept for context): apply reaches marker
   verification; ``compute_diff`` now treats common Commander readback shape drift
   on ``pamUser.rotation_settings`` (e.g. ``enabled`` bool vs tri-state string,
   extra ``schedule`` keys with the same CRON) as NOOP. A live re-plan for
