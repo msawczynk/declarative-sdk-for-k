@@ -29,6 +29,18 @@ Hard rules:
 - Do not write direct Keeper DAG state from SDK or lab scripts; route live mutation through Commander surfaces.
 - Keep tests focused to the touched area first; run broad checks only when risk or release scope requires it.
 
+## Grandparent / parent / child hierarchy (enforced 2026-04-28)
+
+| Tier | Who | Owns |
+|------|-----|------|
+| **Grandparent** | Human user | Strategic only: GA tag, public GH issue close, irresolvable design fork |
+| **Parent** | Cursor chat primary | Full loop: queue dispatch, phase_runner, pre-claim, `git push`, live smoke routing, amber triage |
+| **Child** | T0 Codex workers (offline + `codex_live.sh` live) | Code/test/doc/gate/live smoke execution |
+
+Parent escalates to grandparent ONLY at those three triggers. T0 child via `codex_live.sh` owns live smoke (`smoke.py`) — network + KSM env fully available. Parent never waits for user on routine work.
+
+See `AGENT_PREAMBLE.md` §0b for full contract.
+
 ## Router-mode (cheap-orch primary, premium escalation)
 
 **Recommended chat primary: `composer-2`** (cheap-orch tier per
