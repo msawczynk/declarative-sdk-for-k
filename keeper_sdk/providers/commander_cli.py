@@ -116,8 +116,8 @@ _MSP_APPLY_UNSUPPORTED_REASON = (
     "(Commander: `msp-add` / `msp-update` / `msp-remove`; see docs/COMMANDER.md)"
 )
 _MSP_CREATE_ONLY_UNSUPPORTED_REASON = (
-    "CommanderCliProvider only implements MSP managed-company create via "
-    "`msp-add`; update/delete/import marker writes remain unsupported"
+    "CommanderCliProvider MSP apply only supports managed-company create/update/delete via "
+    "`msp-add`, `msp-update`, and `msp-remove`; import marker writes remain unsupported"
 )
 _MSP_MANAGED_COMPANY_RESOURCE_TYPES = {"managed_company", "managedCompany"}
 _MSP_UNLIMITED_SEATS = 1_000_000_000
@@ -240,6 +240,166 @@ def _msp_add_command_kwargs(change: Change) -> dict[str, Any]:
         addon_args = [_msp_addon_arg(addon) for addon in addons if isinstance(addon, Mapping)]
         if addon_args:
             kwargs["addon"] = addon_args
+    return kwargs
+
+
+def _msp_mc_id_from_payload(payload: Mapping[str, Any]) -> str | None:
+    value = payload.get("mc_enterprise_id")
+    if value in (None, ""):
+        return None
+    return str(value)
+
+
+def _msp_target_mc(change: Change, existing: Mapping[str, Any] | None = None) -> str:
+    for value in (
+        change.keeper_uid,
+        _msp_mc_id_from_payload(change.before),
+        _msp_mc_id_from_payload(change.after),
+        _msp_mc_id_from_payload(existing or {}),
+    ):
+        if value not in (None, ""):
+            return str(value)
+    return _msp_change_name(change)
+
+
+def _msp_same_mc(row: Mapping[str, Any], *, target_id: str | None, target_names: set[str]) -> bool:
+    row_id = _msp_mc_id_from_payload(row)
+    if target_id is not None and row_id == target_id:
+        return True
+    row_name = str(row.get("name") or "")
+    return row_name.casefold() in target_names
+
+
+def _msp_find_target(
+    live_rows: list[dict[str, Any]],
+    change: Change,
+    *,
+    name: str,
+) -> dict[str, Any] | None:
+    target_ids = {
+        value
+        for value in (
+            change.keeper_uid,
+            _msp_mc_id_from_payload(change.before),
+            _msp_mc_id_from_payload(change.after),
+        )
+        if value not in (None, "")
+    }
+    if target_ids:
+        existing = next(
+            (
+                row
+                for row in live_rows
+                if _msp_mc_id_from_payload(row) in {str(value) for value in target_ids}
+            ),
+            None,
+        )
+        if existing is not None:
+            return existing
+
+    target_names = {
+        str(value).casefold()
+        for value in (
+            change.before.get("name"),
+            change.after.get("name"),
+            change.uid_ref,
+            change.title,
+            name,
+        )
+        if value not in (None, "")
+    }
+    return next(
+        (row for row in live_rows if str(row.get("name") or "").casefold() in target_names),
+        None,
+    )
+
+
+def _msp_guard_update_name_collision(
+    *,
+    live_rows: list[dict[str, Any]],
+    change: Change,
+    existing: Mapping[str, Any] | None,
+    name: str,
+) -> None:
+    new_name = str(change.after.get("name") or name)
+    target_id = _msp_mc_id_from_payload(existing or {}) or change.keeper_uid
+    target_names = {
+        str(value).casefold()
+        for value in (
+            (existing or {}).get("name"),
+            change.before.get("name"),
+            change.uid_ref,
+            change.title,
+            name,
+        )
+        if value not in (None, "")
+    }
+    conflict = next(
+        (
+            row
+            for row in live_rows
+            if str(row.get("name") or "").casefold() == new_name.casefold()
+            and not _msp_same_mc(row, target_id=target_id, target_names=target_names)
+        ),
+        None,
+    )
+    if conflict is None:
+        return
+    raise ConflictError(
+        reason=f"managed company {new_name!r} already exists; refusing update rename",
+        uid_ref=change.uid_ref or name,
+        resource_type=change.resource_type,
+        live_identifier=str(conflict.get("mc_enterprise_id") or conflict.get("name") or new_name),
+        next_action="refresh plan from live MSP state or choose a unique managed-company name",
+        context={"live": conflict},
+    )
+
+
+def _msp_addons_by_name(addons: Any) -> dict[str, Mapping[str, Any]]:
+    if not isinstance(addons, list):
+        return {}
+    return {
+        str(addon["name"]).casefold(): addon
+        for addon in addons
+        if isinstance(addon, Mapping) and addon.get("name") is not None
+    }
+
+
+def _msp_update_command_kwargs(
+    change: Change,
+    existing: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    after = change.after
+    kwargs: dict[str, Any] = {"mc": _msp_target_mc(change, existing)}
+    if after.get("name") not in (None, ""):
+        kwargs["name"] = str(after["name"])
+    if after.get("plan") is not None:
+        kwargs["plan"] = str(after["plan"])
+    if after.get("seats") is not None:
+        kwargs["seats"] = _msp_commander_seats(after["seats"])
+    if after.get("file_plan") not in (None, ""):
+        kwargs["file_plan"] = str(after["file_plan"])
+    if after.get("node") not in (None, ""):
+        kwargs["node"] = str(after["node"])
+
+    before_addons = _msp_addons_by_name(change.before.get("addons"))
+    after_addons = _msp_addons_by_name(after.get("addons"))
+    add_addon = [
+        _msp_addon_arg(addon)
+        for key, addon in sorted(after_addons.items())
+        if key not in before_addons
+        or _msp_commander_seats(before_addons[key].get("seats", 0))
+        != _msp_commander_seats(addon.get("seats", 0))
+    ]
+    remove_addon = [
+        str(addon["name"])
+        for key, addon in sorted(before_addons.items())
+        if key not in after_addons
+    ]
+    if add_addon:
+        kwargs["add_addon"] = add_addon
+    if remove_addon:
+        kwargs["remove_addon"] = remove_addon
     return kwargs
 
 
@@ -1023,8 +1183,7 @@ class CommanderCliProvider(Provider):
         unsupported = [
             change
             for change in changes
-            if change.kind is not ChangeKind.CREATE
-            or change.resource_type not in _MSP_MANAGED_COMPANY_RESOURCE_TYPES
+            if change.resource_type not in _MSP_MANAGED_COMPANY_RESOURCE_TYPES
         ]
         if unsupported:
             first = unsupported[0]
@@ -1033,8 +1192,8 @@ class CommanderCliProvider(Provider):
                 uid_ref=first.uid_ref,
                 resource_type=first.resource_type,
                 next_action=(
-                    "apply only create managed_company rows with Commander for now; "
-                    "use mock provider for offline MSP update/delete tests"
+                    "apply only managed_company create/update/delete rows with Commander; "
+                    "use mock provider for unsupported MSP family rows"
                 ),
             )
 
@@ -1042,97 +1201,263 @@ class CommanderCliProvider(Provider):
         outcomes: list[ApplyOutcome] = []
         for change in changes:
             name = _msp_change_name(change)
-            existing = next(
-                (
-                    row
-                    for row in self.discover_managed_companies()
-                    if str(row.get("name", "")).casefold() == name.casefold()
-                ),
-                None,
-            )
-            if existing is not None:
-                raise ConflictError(
-                    reason=f"managed company {name!r} already exists; refusing create",
-                    uid_ref=change.uid_ref or name,
-                    resource_type=change.resource_type,
-                    live_identifier=str(
-                        existing.get("mc_enterprise_id") or existing.get("name") or name
-                    ),
-                    next_action="refresh plan from live MSP state or rename the managed company",
-                    context={"live": existing},
-                )
 
-            if dry_run:
+            if change.kind is ChangeKind.CONFLICT:
                 outcomes.append(
                     ApplyOutcome(
                         uid_ref=change.uid_ref or name,
-                        keeper_uid="",
-                        action="create",
-                        details={"dry_run": True},
+                        keeper_uid=change.keeper_uid or "",
+                        action="conflict",
+                        details={"reason": change.reason or ""},
                     )
                 )
                 continue
 
-            try:
-                from keepercommander.commands.msp import MSPAddCommand  # type: ignore
-            except (ImportError, AttributeError) as exc:
-                # MSPAddCommand.execute(params, name=<str>, plan=<str>, seats=<int>,
-                # file_plan=<str>, addon=list["addon[:seats]"], node=<str>) is the
-                # required Commander hook when available in keepercommander.
-                raise CapabilityError(
-                    reason=f"Commander MSPAddCommand is unavailable: {exc}",
-                    uid_ref=change.uid_ref or name,
-                    resource_type=change.resource_type,
-                    next_action="upgrade keepercommander to a version that provides keepercommander.commands.msp.MSPAddCommand",
-                ) from exc
+            if change.kind not in (ChangeKind.CREATE, ChangeKind.UPDATE, ChangeKind.DELETE):
+                details: dict[str, Any] = {"dry_run": dry_run}
+                if change.reason is not None:
+                    details["reason"] = change.reason
+                outcomes.append(
+                    ApplyOutcome(
+                        uid_ref=change.uid_ref or name,
+                        keeper_uid=change.keeper_uid or "",
+                        action="noop",
+                        details=details,
+                    )
+                )
+                continue
 
-            kwargs = _msp_add_command_kwargs(change)
+            live_rows = self.discover_managed_companies()
+            existing = _msp_find_target(live_rows, change, name=name)
 
-            def _run_create() -> Any:
-                params = self._get_keeper_params()
-                command = MSPAddCommand()
-                if not hasattr(command, "execute"):
+            if change.kind is ChangeKind.CREATE:
+                duplicate = next(
+                    (
+                        row
+                        for row in live_rows
+                        if str(row.get("name", "")).casefold() == name.casefold()
+                    ),
+                    None,
+                )
+                if duplicate is not None:
+                    raise ConflictError(
+                        reason=f"managed company {name!r} already exists; refusing create",
+                        uid_ref=change.uid_ref or name,
+                        resource_type=change.resource_type,
+                        live_identifier=str(
+                            duplicate.get("mc_enterprise_id") or duplicate.get("name") or name
+                        ),
+                        next_action="refresh plan from live MSP state or rename the managed company",
+                        context={"live": duplicate},
+                    )
+
+                kwargs = _msp_add_command_kwargs(change)
+                if dry_run:
+                    outcomes.append(
+                        ApplyOutcome(
+                            uid_ref=change.uid_ref or name,
+                            keeper_uid="",
+                            action="create",
+                            details={"dry_run": True, "kwargs": kwargs},
+                        )
+                    )
+                    continue
+
+                try:
+                    from keepercommander.commands.msp import MSPAddCommand  # type: ignore
+                except (ImportError, AttributeError) as exc:
                     raise CapabilityError(
-                        reason="Commander MSPAddCommand has no execute(params, **kwargs) API",
+                        reason=f"Commander MSPAddCommand is unavailable: {exc}",
+                        uid_ref=change.uid_ref or name,
+                        resource_type=change.resource_type,
+                        next_action="upgrade keepercommander to a version that provides keepercommander.commands.msp.MSPAddCommand",
+                    ) from exc
+
+                def _run_create() -> Any:
+                    params = self._get_keeper_params()
+                    command = MSPAddCommand()
+                    if not hasattr(command, "execute"):
+                        raise CapabilityError(
+                            reason="Commander MSPAddCommand has no execute(params, **kwargs) API",
+                            uid_ref=change.uid_ref or name,
+                            resource_type=change.resource_type,
+                            next_action=(
+                                "need MSPAddCommand.execute(params, name, plan, seats, "
+                                "file_plan, addon, node)"
+                            ),
+                        )
+                    return command.execute(params, **kwargs)
+
+                try:
+                    mc_id = self._with_keeper_session_refresh(_run_create)
+                except CapabilityError:
+                    raise
+                except Exception as exc:
+                    raise CapabilityError(
+                        reason=f"MSP managed-company create failed: {type(exc).__name__}: {exc}",
                         uid_ref=change.uid_ref or name,
                         resource_type=change.resource_type,
                         next_action=(
-                            "need MSPAddCommand.execute(params, name, plan, seats, "
-                            "file_plan, addon, node)"
+                            "verify MSP admin permissions, plan/file_plan/addon permits, "
+                            "and root node access"
+                        ),
+                    ) from exc
+
+                if mc_id is None:
+                    raise CapabilityError(
+                        reason="Commander MSPAddCommand returned no managed-company id",
+                        uid_ref=change.uid_ref or name,
+                        resource_type=change.resource_type,
+                        next_action=(
+                            "inspect Commander warnings for invalid plan/file_plan/addon permits "
+                            "or missing MSP root node"
                         ),
                     )
-                return command.execute(params, **kwargs)
-
-            try:
-                mc_id = self._with_keeper_session_refresh(_run_create)
-            except CapabilityError:
-                raise
-            except Exception as exc:
-                raise CapabilityError(
-                    reason=f"MSP managed-company create failed: {type(exc).__name__}: {exc}",
-                    uid_ref=change.uid_ref or name,
-                    resource_type=change.resource_type,
-                    next_action="verify MSP admin permissions, plan/file_plan/addon permits, and root node access",
-                ) from exc
-
-            if mc_id is None:
-                raise CapabilityError(
-                    reason="Commander MSPAddCommand returned no managed-company id",
-                    uid_ref=change.uid_ref or name,
-                    resource_type=change.resource_type,
-                    next_action=(
-                        "inspect Commander warnings for invalid plan/file_plan/addon permits "
-                        "or missing MSP root node"
-                    ),
+                outcomes.append(
+                    ApplyOutcome(
+                        uid_ref=change.uid_ref or name,
+                        keeper_uid=str(mc_id),
+                        action="create",
+                        details={"dry_run": False, "mc_enterprise_id": mc_id, "kwargs": kwargs},
+                    )
                 )
-            outcomes.append(
-                ApplyOutcome(
-                    uid_ref=change.uid_ref or name,
-                    keeper_uid=str(mc_id),
-                    action="create",
-                    details={"dry_run": False, "mc_enterprise_id": mc_id, "kwargs": kwargs},
+
+            elif change.kind is ChangeKind.UPDATE:
+                _msp_guard_update_name_collision(
+                    live_rows=live_rows,
+                    change=change,
+                    existing=existing,
+                    name=name,
                 )
-            )
+                kwargs = _msp_update_command_kwargs(change, existing)
+                mc_id = _msp_target_mc(change, existing)
+                if dry_run:
+                    outcomes.append(
+                        ApplyOutcome(
+                            uid_ref=change.uid_ref or name,
+                            keeper_uid=mc_id,
+                            action="update",
+                            details={"dry_run": True, "kwargs": kwargs},
+                        )
+                    )
+                    continue
+
+                try:
+                    from keepercommander.commands.msp import MSPUpdateCommand  # type: ignore
+                except (ImportError, AttributeError) as exc:
+                    raise CapabilityError(
+                        reason=f"Commander MSPUpdateCommand is unavailable: {exc}",
+                        uid_ref=change.uid_ref or name,
+                        resource_type=change.resource_type,
+                        next_action="upgrade keepercommander to a version that provides keepercommander.commands.msp.MSPUpdateCommand",
+                    ) from exc
+
+                def _run_update() -> Any:
+                    params = self._get_keeper_params()
+                    command = MSPUpdateCommand()
+                    if not hasattr(command, "execute"):
+                        raise CapabilityError(
+                            reason="Commander MSPUpdateCommand has no execute(params, **kwargs) API",
+                            uid_ref=change.uid_ref or name,
+                            resource_type=change.resource_type,
+                            next_action=(
+                                "need MSPUpdateCommand.execute(params, mc, name, plan, seats, "
+                                "file_plan, add_addon, remove_addon, node)"
+                            ),
+                        )
+                    return command.execute(params, **kwargs)
+
+                try:
+                    self._with_keeper_session_refresh(_run_update)
+                except CapabilityError:
+                    raise
+                except Exception as exc:
+                    raise CapabilityError(
+                        reason=f"MSP managed-company update failed: {type(exc).__name__}: {exc}",
+                        uid_ref=change.uid_ref or name,
+                        resource_type=change.resource_type,
+                        next_action=(
+                            "verify MSP admin permissions, target managed-company id/name, "
+                            "and plan/file_plan/addon permits"
+                        ),
+                    ) from exc
+
+                outcomes.append(
+                    ApplyOutcome(
+                        uid_ref=change.uid_ref or name,
+                        keeper_uid=mc_id,
+                        action="update",
+                        details={"dry_run": False, "mc_enterprise_id": mc_id, "kwargs": kwargs},
+                    )
+                )
+
+            elif change.kind is ChangeKind.DELETE:
+                if getattr(plan, "allow_delete", True) is False:
+                    raise CapabilityError(
+                        reason="MSP managed-company delete requires allow_delete=True",
+                        uid_ref=change.uid_ref or name,
+                        resource_type=change.resource_type,
+                        next_action="rerun plan/apply with --allow-delete before deleting MSP managed companies",
+                    )
+
+                kwargs = {"mc": _msp_target_mc(change, existing), "force": True}
+                mc_id = str(kwargs["mc"])
+                if dry_run:
+                    outcomes.append(
+                        ApplyOutcome(
+                            uid_ref=change.uid_ref or name,
+                            keeper_uid=mc_id,
+                            action="delete",
+                            details={"dry_run": True, "kwargs": kwargs},
+                        )
+                    )
+                    continue
+
+                try:
+                    from keepercommander.commands.msp import MSPRemoveCommand  # type: ignore
+                except (ImportError, AttributeError) as exc:
+                    raise CapabilityError(
+                        reason=f"Commander MSPRemoveCommand is unavailable: {exc}",
+                        uid_ref=change.uid_ref or name,
+                        resource_type=change.resource_type,
+                        next_action="upgrade keepercommander to a version that provides keepercommander.commands.msp.MSPRemoveCommand",
+                    ) from exc
+
+                def _run_delete() -> Any:
+                    params = self._get_keeper_params()
+                    command = MSPRemoveCommand()
+                    if not hasattr(command, "execute"):
+                        raise CapabilityError(
+                            reason="Commander MSPRemoveCommand has no execute(params, **kwargs) API",
+                            uid_ref=change.uid_ref or name,
+                            resource_type=change.resource_type,
+                            next_action="need MSPRemoveCommand.execute(params, mc, force)",
+                        )
+                    return command.execute(params, **kwargs)
+
+                try:
+                    self._with_keeper_session_refresh(_run_delete)
+                except CapabilityError:
+                    raise
+                except Exception as exc:
+                    raise CapabilityError(
+                        reason=f"MSP managed-company delete failed: {type(exc).__name__}: {exc}",
+                        uid_ref=change.uid_ref or name,
+                        resource_type=change.resource_type,
+                        next_action=(
+                            "verify MSP admin permissions and target managed-company id/name "
+                            "before retrying with --allow-delete"
+                        ),
+                    ) from exc
+
+                outcomes.append(
+                    ApplyOutcome(
+                        uid_ref=change.uid_ref or name,
+                        keeper_uid=mc_id,
+                        action="delete",
+                        details={"dry_run": False, "mc_enterprise_id": mc_id, "kwargs": kwargs},
+                    )
+                )
         return outcomes
 
     def _apply_vault_plan(self, plan: Plan, *, dry_run: bool = False) -> list[ApplyOutcome]:

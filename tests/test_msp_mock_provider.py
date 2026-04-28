@@ -61,8 +61,10 @@ def _plan(
     )
 
 
-def _custom_plan(*changes: Change) -> Plan:
-    return build_plan("msp-mock-test", list(changes), [change.uid_ref or "" for change in changes])
+def _custom_plan(*changes: Change, allow_delete: bool = True) -> Plan:
+    plan = build_plan("msp-mock-test", list(changes), [change.uid_ref or "" for change in changes])
+    setattr(plan, "allow_delete", allow_delete)
+    return plan
 
 
 def test_empty_manifest_and_empty_live_apply_returns_no_changes() -> None:
@@ -330,17 +332,120 @@ def test_commander_msp_create_mc_duplicate_name_guard(
         provider.apply_msp_plan(_custom_plan(change))
 
 
-def test_commander_msp_non_create_kind_still_raises_capability_error(
+def test_commander_msp_update_mc_calls_msp_update_command(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    provider, _params = _commander_provider_for_msp(monkeypatch)
+    provider, params = _commander_provider_for_msp(monkeypatch)
+    monkeypatch.setattr(
+        provider,
+        "discover_managed_companies",
+        lambda: [{"name": "Acme", "mc_enterprise_id": 123}],
+    )
+    calls: list[tuple[object, dict[str, Any]]] = []
+
+    class FakeMSPUpdateCommand:
+        def execute(self, params_arg: object, **kwargs: Any) -> None:
+            calls.append((params_arg, kwargs))
+
+    module = types.ModuleType("keepercommander.commands.msp")
+    module.MSPUpdateCommand = FakeMSPUpdateCommand
+    monkeypatch.setitem(sys.modules, "keepercommander.commands.msp", module)
     change = Change(
         kind=ChangeKind.UPDATE,
         uid_ref="Acme",
         resource_type="managed_company",
         title="Acme",
-        after=_mc("Acme", seats=9),
+        keeper_uid="123",
+        before=_mc(
+            "Acme",
+            seats=5,
+            addons=[
+                {"name": "connection_manager", "seats": 2},
+                {"name": "old_addon", "seats": 0},
+            ],
+        ),
+        after=_mc(
+            "Acme",
+            seats=9,
+            file_plan="enterprise",
+            addons=[
+                {"name": "connection_manager", "seats": 3},
+                {"name": "remote_browser_isolation", "seats": 0},
+            ],
+        ),
     )
 
-    with pytest.raises(CapabilityError, match="only implements MSP managed-company create"):
-        provider.apply_msp_plan(_custom_plan(change))
+    outcomes = provider.apply_msp_plan(_custom_plan(change))
+
+    assert [outcome.action for outcome in outcomes] == ["update"]
+    assert outcomes[0].keeper_uid == "123"
+    assert calls == [
+        (
+            params,
+            {
+                "mc": "123",
+                "name": "Acme",
+                "plan": "business",
+                "seats": 9,
+                "file_plan": "enterprise",
+                "add_addon": ["connection_manager:3", "remote_browser_isolation"],
+                "remove_addon": ["old_addon"],
+            },
+        )
+    ]
+
+
+def test_commander_msp_delete_mc_calls_msp_remove_command_with_force(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider, params = _commander_provider_for_msp(monkeypatch)
+    monkeypatch.setattr(
+        provider,
+        "discover_managed_companies",
+        lambda: [{"name": "Old", "mc_enterprise_id": 123}],
+    )
+    calls: list[tuple[object, dict[str, Any]]] = []
+
+    class FakeMSPRemoveCommand:
+        def execute(self, params_arg: object, **kwargs: Any) -> None:
+            calls.append((params_arg, kwargs))
+
+    module = types.ModuleType("keepercommander.commands.msp")
+    module.MSPRemoveCommand = FakeMSPRemoveCommand
+    monkeypatch.setitem(sys.modules, "keepercommander.commands.msp", module)
+    change = Change(
+        kind=ChangeKind.DELETE,
+        uid_ref="Old",
+        resource_type="managed_company",
+        title="Old",
+        keeper_uid="123",
+        before=_mc("Old"),
+    )
+
+    outcomes = provider.apply_msp_plan(_custom_plan(change, allow_delete=True))
+
+    assert [outcome.action for outcome in outcomes] == ["delete"]
+    assert outcomes[0].keeper_uid == "123"
+    assert calls == [(params, {"mc": "123", "force": True})]
+
+
+def test_commander_msp_delete_mc_requires_allow_delete_context(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider, _params = _commander_provider_for_msp(monkeypatch)
+    monkeypatch.setattr(
+        provider,
+        "discover_managed_companies",
+        lambda: [{"name": "Old", "mc_enterprise_id": 123}],
+    )
+    change = Change(
+        kind=ChangeKind.DELETE,
+        uid_ref="Old",
+        resource_type="managed_company",
+        title="Old",
+        keeper_uid="123",
+        before=_mc("Old"),
+    )
+
+    with pytest.raises(CapabilityError, match="allow_delete=True"):
+        provider.apply_msp_plan(_custom_plan(change, allow_delete=False))
