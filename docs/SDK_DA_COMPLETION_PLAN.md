@@ -30,6 +30,11 @@ Shipped and proven:
   proof (`vaultOneLogin` smoke PASSED create→verify→destroy; scalar field diff +
   apply converges). Full vault record-type surface elsewhere remains phased per
   `VAULT_L1_DESIGN` / parity tables.
+- **MSP discover / `msp-environment.v1`:** 2026-04-28 live proof:
+  `dsk validate --online` + `dsk plan` exit 0 against lab tenant using
+  `tests/fixtures/examples/msp/01-minimal-msp.yaml`. Read-only discover + plan
+  path confirmed. Apply blocked by CapabilityError (P5/P6 create_mc wired
+  2026-04-28, but live apply not tested yet).
 
 Not yet supported:
 
