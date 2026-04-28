@@ -14,7 +14,7 @@ This is the contract layer — every behaviour change here ripples into provider
 | `vault_models.py` | 92 | `keeper-vault.v1` slice-1 Pydantic + `load_vault_manifest`; L1 `login`-only. | `VaultManifestV1`, `VaultRecord`, `load_vault_manifest`, `VAULT_MANIFEST_FAMILY` |
 | `vault_graph.py` | 87 | Vault dep DAG: duplicate `uid_ref`, `folder_ref` → synthetic prerequisite nodes; `vault_record_apply_order` strips folder nodes. | `build_vault_graph`, `vault_record_apply_order` |
 | `vault_diff.py` | 848 | Vault desired-vs-live; field-level match to Commander-flattened scalars. | `compute_vault_diff` |
-| `diff.py` | 643 | `compute_diff` PAM: `_index_live` + `_classify_desired` + `_classify_orphans`. Owns `_DIFF_IGNORED_FIELDS`. Nested-`pamUser` `rotation_settings` equality (P2.1). | `Change`, `ChangeKind`, `compute_diff` |
+| `diff.py` | 754 | `compute_diff` PAM: `_index_live` + `_classify_desired` + `_classify_orphans`. Owns `_DIFF_IGNORED_FIELDS`. P2.1 (2026-04-28): `pam_settings.options` treated as overlay (inner keys merged, not wholesale replace); `managed` bool normalized before compare. Nested-`pamUser` `rotation_settings` equality. | `Change`, `ChangeKind`, `compute_diff` |
 | `sharing_models.py` | 229 | `keeper-vault-sharing.v1` Pydantic + loaders. | Sharing manifest types |
 | `sharing_diff.py` | 1300 | Sharing desired-vs-live; large single file — see LESSONS threshold-driven split decision before fan-out refactors. | `compute_sharing_diff` (export name per `__init__`) |
 | `msp_models.py` | 110 | `msp-environment.v1` Pydantic + load helper. | MSP manifest types |
@@ -60,5 +60,5 @@ This is the contract layer — every behaviour change here ripples into provider
 ## Known gaps (per `docs/SDK_DA_COMPLETION_PLAN.md`)
 
 - Top-level `pamUser` standalone shape — schema/model open, planner unsupported (preview-gated → v1.1).
-- Nested `pamUser.rotation_settings` — apply OK; clean re-plan still parent-verified (P2.1 in flight; offline anchor in `tests/test_diff.py::test_diff_nested_pam_user_rotation_drift_surfaces_rotation_settings_key`).
-- RBI `pam_settings.options` — DAG merge into manifest shape via `_merge_rbi_dag_options_into_pam_settings` in `providers/_commander_cli_helpers.py`; clean re-plan parent-verified gate (P3).
+- Nested `pamUser.rotation_settings` — P2.1 offline fix PROVEN (2026-04-28, 964 tests): `pam_settings.options` overlay + `managed` bool normalized in `diff.py`. Live re-plan = **upstream-gap** (Commander CLI `pam user ls <uid>` ParseError). Preview gates remain; await Commander fix.
+- RBI `pam_settings.options` — P3 RESOLVED (2026-04-28): `_enrich_pam_remote_browser_dag_options` in `providers/commander_cli.py` merges TunnelDAG `allowedSettings` → `pam_settings.options`; E2E smoke passed; P3.1 bucket table in `docs/COMMANDER.md`.
