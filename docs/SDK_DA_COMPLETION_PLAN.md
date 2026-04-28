@@ -26,6 +26,10 @@ Shipped and proven:
   reuse path from admin vault record — no re-enrollment needed.
 - Provider capability gaps surface as plan conflicts; `validate --online` now
   fails on provider capability gaps.
+- **`keeper-vault.v1` L1 (scalar `login` slice): `supported`** — 2026-04-28 live
+  proof (`vaultOneLogin` smoke PASSED create→verify→destroy; scalar field diff +
+  apply converges). Full vault record-type surface elsewhere remains phased per
+  `VAULT_L1_DESIGN` / parity tables.
 
 Not yet supported:
 

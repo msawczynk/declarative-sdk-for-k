@@ -36,6 +36,13 @@ from typing import Any
 
 from keeper_sdk.core.diff import ChangeKind
 from keeper_sdk.core.metadata import MANAGER_NAME
+from keeper_sdk.core.schema import SHARING_FAMILY
+from keeper_sdk.core.sharing_diff import (
+    _RECORD_SHARE_RESOURCE,
+    _SHARE_FOLDER_RESOURCE,
+    _SHARED_FOLDER_RESOURCE,
+    _SHARING_FOLDER_RESOURCE,
+)
 from keeper_sdk.core.vault_diff import compute_vault_diff
 
 ExpectedRecord = tuple[str, str]
@@ -468,6 +475,32 @@ def all_vault_scenarios() -> list[VaultScenarioSpec]:
     return [_VAULT_SCENARIOS[name] for name in vault_names()]
 
 
+_SHARING_BLOCKS = (
+    "folders",
+    "shared_folders",
+    "share_records",
+    "share_folders",
+)
+_SHARING_ROW_TO_BLOCK: dict[str, str] = {
+    _SHARING_FOLDER_RESOURCE: "folders",
+    _SHARED_FOLDER_RESOURCE: "shared_folders",
+    _RECORD_SHARE_RESOURCE: "share_records",
+    _SHARE_FOLDER_RESOURCE: "share_folders",
+}
+
+
+def _sharing_flat_rows_to_document(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    document: dict[str, Any] = {"schema": SHARING_FAMILY, **dict.fromkeys(_SHARING_BLOCKS)}
+    for block in _SHARING_BLOCKS:
+        document[block] = []
+    for row in rows:
+        block = _SHARING_ROW_TO_BLOCK.get(str(row.get("resource_type") or ""))
+        if block is None:
+            continue
+        document[block].append({k: v for k, v in row.items() if k != "resource_type"})
+    return document
+
+
 @dataclass(frozen=True)
 class SharingScenarioSpec:
     """One keeper-vault-sharing.v1 live-smoke scenario.
@@ -480,6 +513,13 @@ class SharingScenarioSpec:
     resources_factory: Callable[[str, str], list[dict[str, Any]]]
     verifier: Callable[[Sequence[Any]], None]
     description: str = ""
+
+    def build_manifest(self, title_prefix: str, sf_uid: str) -> dict[str, Any]:
+        return _sharing_flat_rows_to_document(self.resources_factory(title_prefix, sf_uid))
+
+    def verify(self, typed: Any, live: Sequence[Any], title_prefix: str) -> None:
+        del typed, title_prefix
+        self.verifier(live)
 
 
 def _sharing_lifecycle_context(primary: str, secondary: str | None) -> tuple[str, str]:
@@ -665,3 +705,21 @@ VAULT_SHARING_LIFECYCLE = SharingScenarioSpec(
         "shared-folder share row."
     ),
 )
+
+_SHARING_SCENARIOS: dict[str, SharingScenarioSpec] = {
+    "vaultSharingLifecycle": VAULT_SHARING_LIFECYCLE,
+}
+
+
+def sharing_get(name: str) -> SharingScenarioSpec:
+    """Look up a sharing smoke scenario by name; raise :class:`KeyError` if absent."""
+    try:
+        return _SHARING_SCENARIOS[name]
+    except KeyError as exc:
+        available = ", ".join(sorted(_SHARING_SCENARIOS))
+        raise KeyError(f"unknown sharing smoke scenario {name!r}; available: {available}") from exc
+
+
+def sharing_names() -> list[str]:
+    """Return all registered sharing smoke scenario names, sorted alphabetically."""
+    return sorted(_SHARING_SCENARIOS)

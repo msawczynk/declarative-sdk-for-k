@@ -205,7 +205,8 @@ def test_scenario_constant_contract() -> None:
     assert callable(spec.resources_factory)
     assert callable(spec.verifier)
     assert isinstance(spec.description, str)
-    assert not hasattr(spec, "build_manifest")
+    assert callable(spec.build_manifest)
+    assert callable(spec.verify)
     assert not hasattr(spec, "build_resources")
 
 
