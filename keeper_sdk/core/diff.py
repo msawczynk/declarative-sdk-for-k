@@ -199,6 +199,20 @@ def _dict_overlay_matches(live: dict[str, Any], desired: dict[str, Any]) -> bool
     return True
 
 
+def _strip_unowned_pam_settings_options(
+    live_ps: dict[str, Any], desired_ps: dict[str, Any]
+) -> dict[str, Any]:
+    """Drop Commander-injected ``options`` when the manifest owns no option keys."""
+    desired_options = desired_ps.get("options")
+    if isinstance(desired_options, dict) and any(
+        value is not None for value in desired_options.values()
+    ):
+        return live_ps
+    if "options" not in live_ps:
+        return live_ps
+    return {k: v for k, v in live_ps.items() if k != "options"}
+
+
 def _pam_resource_settings_equivalent(live_ps: Any, desired_ps: Any) -> bool:
     """``pam_settings`` for ``pamMachine`` / ``pamDatabase`` / ``pamDirectory`` — overlay match.
 
@@ -209,6 +223,7 @@ def _pam_resource_settings_equivalent(live_ps: Any, desired_ps: Any) -> bool:
     if not isinstance(desired_ps, dict):
         return live_ps == desired_ps
     live_ps = live_ps if isinstance(live_ps, dict) else {}
+    live_ps = _strip_unowned_pam_settings_options(live_ps, desired_ps)
     for section in ("options", "connection", "port_forward"):
         desired_sec = desired_ps.get(section)
         if not isinstance(desired_sec, dict):

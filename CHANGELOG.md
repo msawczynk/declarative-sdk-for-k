@@ -7,6 +7,8 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Fixed
+- **PAM plan/diff (P2.1 / issue #4)** — `pamMachine.pam_settings` now ignores Commander-injected
+  `options` defaults when the manifest only declares `pam_settings.connection`.
 - **Tests —** `test_unsupported_nested_rotation_settings_gate_stays_closed` clears
   `DSK_EXPERIMENTAL_ROTATION_APPLY` so a shell-exported opt-in cannot silently empty the nested
   rotation unsupported hit; bundle smoke skips when `main` is not ahead of `origin` even if the
