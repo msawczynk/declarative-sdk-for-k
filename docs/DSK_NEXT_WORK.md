@@ -22,8 +22,8 @@ implementation is at the wheel.
 | Focus | What “done” needs | Next command / doc |
 |-------|-------------------|-------------------|
 | **P3 — `pamRemoteBrowser` / RBI** | Evidence + **COMMANDER P3.1** + **DA §Phase 3** text on `main`. **Next:** close/update GitHub **#5** (maintainer) | [`COMMANDER` § Post-import / RBI](COMMANDER.md#post-import-connection--rbi-tuning-field-map) |
-| **P2.1 — nested `pamUser` rotation** | **Offline (2026-04-28):** `diff` now treats parent `pam_settings` as overlay + normalizes `pamUser.managed` (see `CHANGELOG` [Unreleased] / `tests/test_diff.py`). **Live:** re-run `pamUserNestedRotation` smoke — need **re-plan exit 0** to narrow preview gates. | `DSK_PREVIEW=1` + `DSK_EXPERIMENTAL_ROTATION_APPLY=1`, `scripts/smoke/README.md` |
-| **KSM** — bootstrap + `KsmLoginHelper` live | **2026-04-28:** `pytest tests/live/test_ksm_bootstrap_smoke.py` **green** (lab KSM + `KEEPER_LIVE_TENANT=1`). Wider PAM+KSM loop = smoke + runbook. | `docs/LIVE_TEST_RUNBOOK.md`, `tests/live/test_ksm_bootstrap_smoke.py` |
+| **P2.1 — nested `pamUser` rotation** | **2026-04-28 UPSTREAM-GAP confirmed by live:** offline diff fix proven (pam_settings overlay + pamUser.managed normalization). Live re-plan shows persistent update diff — Commander CLI cannot write rotation pam_settings → apply does not converge. Smoke exit 2 on re-plan (expected). No further code changes possible until upstream Commander fix. | `DSK_PREVIEW=1` + `DSK_EXPERIMENTAL_ROTATION_APPLY=1`, `scripts/smoke/README.md` |
+| **KSM** — bootstrap + `KsmLoginHelper` live | **2026-04-28 COMPLETE:** `pytest tests/live/test_ksm_bootstrap_smoke.py` green + full `pamMachine` smoke PASSED (`create→verify→destroy`). Admin KSM auth via profile (`~/.config/dsk/profiles/default.json` + `~/.keeper/ksm-config.json`). Testuser2 reuse path via admin vault record — no re-enrollment needed. See `docs/LIVE_TEST_RUNBOOK.md` § KSM Profile Setup. | **DONE** |
 | **Vault L1, MSP, etc.** | Per DA classification — separate matrix | `SDK_DA` rows; not PAM-bar unless stated |
 
 ## Every local session (before push)

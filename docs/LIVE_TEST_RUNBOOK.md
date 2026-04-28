@@ -41,6 +41,22 @@ this runbook or [`scripts/smoke/README.md`](../scripts/smoke/README.md).
 4. Confirm `.commander-pin` matches `keepercommander` installed
    version: `pip show keepercommander | rg Version`.
 
+### KSM Profile Setup (one-time)
+
+Required for `--login-helper profile` smoke runs:
+
+1. **Smoke profile** — create `~/.config/dsk/profiles/default.json` based on `scripts/smoke/profiles/default.example.json`. Set:
+   - `default_admin_record_uid`: lab admin KSM record UID (ask maintainer)
+   - `ksm_config`: path to lab `ksm-config.json` (e.g. `~/.keeper/ksm-config.json`)
+   - `admin_email`: lab admin email
+   - `pam_config_title`: title of the `sdk-smoke-pam-config` PAM configuration in the tenant
+
+2. **KSM config** — `ksm-config.json` must be in the location specified by `ksm_config` above. The lab config is available from the lab KSM app (see `AGENTS.md` workspace rule for record UIDs).
+
+3. **Target user** — `ensure_sdktest_identity()` uses the "reuse path": if the admin vault contains a login record for the target email with all fields (login, password, oneTimeCode), no `DSK_SMOKE_TARGET_PASSWORD` env var is needed.
+
+4. **PAM configuration fixture** — `sdk-smoke-pam-config` must exist in the tenant (created once via `keeper pam config new --title sdk-smoke-pam-config`).
+
 ## Run a single live test (recommended for first proof)
 
 ```bash

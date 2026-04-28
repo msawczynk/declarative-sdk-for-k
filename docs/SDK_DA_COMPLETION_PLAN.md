@@ -20,6 +20,10 @@ Shipped and proven:
 - Commander-backed GA PAM lifecycle for non-preview manifests.
 - `EnvLoginHelper` full `pamMachine` create -> verify -> clean re-plan ->
   destroy live proof.
+- **KSM / `KsmLoginHelper`:** 2026-04-28 COMPLETE: `pamMachine` smoke PASSED
+  end-to-end with `--login-helper profile`. Profile setup:
+  `~/.config/dsk/profiles/default.json` + `~/.keeper/ksm-config.json`. Testuser2
+  reuse path from admin vault record — no re-enrollment needed.
 - Provider capability gaps surface as plan conflicts; `validate --online` now
   fails on provider capability gaps.
 
@@ -127,6 +131,8 @@ to confirm the remaining gap (if any) is `rotation_settings` / commander
 readback only.
 
 ### P2.1 Diagnose Rotation Drift
+
+**Live status:** 2026-04-28 live smoke run: upstream gap CONFIRMED. Re-plan exit 2 after apply (pam_settings null in tenant vs overlay in manifest). Commander CLI limitation — cannot write rotation pam_settings. No SDK code change can fix this until upstream Commander supports the write path.
 
 Questions:
 
