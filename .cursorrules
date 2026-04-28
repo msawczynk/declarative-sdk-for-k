@@ -41,57 +41,52 @@ Parent escalates to grandparent ONLY at those three triggers. T0 child via `code
 
 See `AGENT_PREAMBLE.md` §0b for full contract.
 
-## Router-mode (cheap-orch primary, premium escalation)
+## Router-mode (Sonnet executor + Opus advisor, 2026-04-28)
 
-**Recommended chat primary: `composer-2`** (cheap-orch tier per
-`~/.cursor-daybook-sync/docs/orchestration/CHEAP_ORCH_DESIGN.md`). Switch via
-Cursor model picker; current session telemetry surfaces in boot
-`orch_tier_distribution`. Target: T0 + T1 ≥ 95 % of session spend, T3 ≤ 5 %.
+**Parent chat primary: `claude-sonnet-4-6`** (Sonnet 4.6 executor). Sonnet drives
+end-to-end — faster, cheaper ($3/$15), no adaptive-thinking underestimate problem.
+Target: T0 + T1 ≥ 95% of session spend. T3 Opus = advisor only (one-shot when stuck).
 
-**Worker routing order** (apply per task; cheapest viable wins):
+**Worker routing order** (cheapest viable wins):
 
 1. **T0 free** — Codex CLI (`codex_offline_bg.sh` / `codex_live.sh`), local
-   scripts (`audit_efficiency.py`, repo gate scripts), built-in `explore`
-   subagent. **First reflex** for any read / mechanical / sandbox-fit work.
+   scripts, built-in `explore`. **First reflex** for all child work including
+   live smoke (`smoke.py` via `codex_live.sh` — network + KSM env available).
 2. **T1 cheap** — `fmt-fixer` (nano), `bulk-reader` (nano), `schema-dumper`
    (nano), `pytest-writer` (composer-2), `cheap-writer` (composer-2),
-   `verifier` (gpt-5-mini, distinct vendor for skeptical 2nd opinion).
-3. **T2 managed** — Cursor `Auto` pool when none of T0/T1 fits and parent
-   judgment isn't required.
-4. **T3 premium (escalate, never default)** — `Task(subagent_type=generalPurpose, model=opus)`
-   one-shot consult with `consult envelope` (digest + question + expected
-   output shape). Triggers in `AGENT_PREAMBLE.md` §0c.
+   `verifier` (fast, distinct vendor from Sonnet parent).
+3. **T2 managed** — Cursor `Auto` pool when T0/T1 don't fit.
+4. **T3 advisor** — `/advisor` or `Task` → `advisor` subagent (`claude-4-7-opus`,
+   `~/.cursor/agents/advisor.md`) with consult envelope when parent is stuck.
+   Returns `ADVICE` (continue) or `ESCALATE` (needs grandparent). See `AGENT_PREAMBLE.md §0b`.
 
 **Multi-step delegation default:** `~/.cursor-daybook-sync/scripts/phase_runner.sh`
-with YAML spec (use `--author-spec` so cheap-writer authors the YAML from a
-30-line outcome stub — parent does not draft long specs at premium rate).
+with YAML spec (`--author-spec` so cheap-writer authors the YAML from an outcome stub).
 
-**Hard-fail drift gates (already wired into `stop` hook):**
+**Hard-fail drift gates (wired into `stop` hook):**
 
 - `parent_action_check.sh` → exits 1 if parent emits >30-line YAML or >50-line
-  spec markdown without prior delegate, >3 consecutive `Read` calls without
-  delegate, premium-judgment language without `Task`/`codex`, or **GH-issue /
-  trivial-fix bait** without `bulk-reader` first (§0c trigger 6).
-- `agent_pre_claim.sh` → wraps `parent_action_check.sh` + clobber-risk; ≥2
-  axes flagged → mandatory T3 escalation before "done"/gate-lift/support
-  claim hits chat.
+  spec without prior delegate, >3 consecutive `Read` calls without delegate,
+  or **GH-issue trivial-fix bait** without `bulk-reader` first.
+- `agent_pre_claim.sh` → wraps above + clobber-risk; ≥2 axes → advisor consult
+  before "done"/gate-lift/support claim hits chat.
 
-**Escalation cheat-sheet** (any one fires → `Task(model=opus)` one-shot or
-flip primary to Opus):
+**Stuck triggers** (any one → invoke `/advisor` first, not grandparent):
 
 - 3-patch trip on same failure mode.
 - Worker `BLOCKER` / cross-rule reconciliation needed.
 - Pre-claim ≥2 axes flagged.
-- User intent verbs: `why|should-I|architect|gate-lift|support claim|recommend|trade-off`.
 - Novel error with no LESSONS tag match after one `bulk-reader` pass.
-- **GH-issue trivial-fix bait** spanning >1 module / schema / contract / test.
 - Iterative debug >3 round-trips on same bug.
+- User intent: `why|should-I|architect|gate-lift|support claim|recommend|trade-off`.
+- **GH-issue trivial-fix bait** spanning >1 module / schema / contract / test.
 
-**Router lockdown:** if you're chat primary on a cheap tier and a single-file
-write >30 lines is required, route to `cheap-writer`. If >2 files, route to
-`phase_runner.sh`. Direct edits to `keeper_sdk/` / `tests/` from chat primary
-without a prior `Task` / `codex` call in same session is the
-parent-as-implementer drift the audit checklist (#17) catches.
+**Grandparent (human) only when advisor returns ESCALATE** or: GA tag,
+public GH issue close, irresolvable design fork with external impact.
+
+**Router lockdown:** single-file write >30 lines → `cheap-writer`. >2 files →
+`phase_runner.sh`. Direct edits to `keeper_sdk/`/`tests/` from chat primary
+without prior `Task`/`codex` call = parent-as-implementer drift (audit checklist #17).
 
 **Target queue (not `V1_GA_CHECKLIST.md` — that shipped 2026-04-24):**
 [`docs/DSK_NEXT_WORK.md`](./docs/DSK_NEXT_WORK.md) priority stack +
