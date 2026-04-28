@@ -202,14 +202,22 @@ def _dict_overlay_matches(live: dict[str, Any], desired: dict[str, Any]) -> bool
 def _strip_unowned_pam_settings_options(
     live_ps: dict[str, Any], desired_ps: dict[str, Any]
 ) -> dict[str, Any]:
-    """Drop Commander-injected ``options`` when the manifest owns no option keys."""
+    """Drop Commander-injected ``options`` keys the manifest does not own."""
     desired_options = desired_ps.get("options")
-    if isinstance(desired_options, dict) and any(
-        value is not None for value in desired_options.values()
-    ):
+    owned_option_keys = (
+        {key for key, value in desired_options.items() if value is not None}
+        if isinstance(desired_options, dict)
+        else set()
+    )
+    live_options = live_ps.get("options")
+    if not isinstance(live_options, dict):
         return live_ps
-    if "options" not in live_ps:
+    unowned_defaults = {"connections", "rotation"} - owned_option_keys
+    if not unowned_defaults or not any(key in live_options for key in unowned_defaults):
         return live_ps
+    stripped_options = {k: v for k, v in live_options.items() if k not in unowned_defaults}
+    if stripped_options:
+        return {**live_ps, "options": stripped_options}
     return {k: v for k, v in live_ps.items() if k != "options"}
 
 

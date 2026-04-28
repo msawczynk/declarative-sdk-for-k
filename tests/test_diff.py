@@ -486,6 +486,52 @@ def test_diff_pam_machine_connection_only_ignores_live_default_options(
     assert machine_change.kind is ChangeKind.NOOP
 
 
+def test_diff_pam_machine_connection_only_live_default_options_stay_out_of_diff(
+    minimal_manifest_path: Path,
+) -> None:
+    """Manifest-owned ``connection`` must not surface live default ``options`` in updates."""
+    manifest0 = load_manifest(minimal_manifest_path)
+    data = manifest0.model_dump(mode="python", exclude_none=True)
+    machine0 = next(r for r in data["resources"] if r["uid_ref"] == "acme-lab-linux1")
+    connection = deepcopy(machine0["pam_settings"]["connection"])
+    machine_d = {**deepcopy(machine0), "pam_settings": {"connection": connection}}
+    resources = [
+        machine_d if r["uid_ref"] == "acme-lab-linux1" else deepcopy(r) for r in data["resources"]
+    ]
+    manifest = Manifest.model_validate({**data, "resources": resources})
+    machine = next(
+        r
+        for r in manifest.model_dump(mode="python", exclude_none=True)["resources"]
+        if r["uid_ref"] == "acme-lab-linux1"
+    )
+    live_machine = {
+        **deepcopy(machine),
+        "host": "10.16.9.11",
+        "pam_settings": {
+            "options": {"connections": "on", "rotation": "on"},
+            "connection": deepcopy(connection),
+        },
+    }
+    live = [
+        LiveRecord(
+            keeper_uid="LIVE_MACHINE",
+            title="lab-linux-1",
+            resource_type="pamMachine",
+            payload=live_machine,
+            marker=encode_marker(
+                uid_ref="acme-lab-linux1",
+                manifest=manifest.name,
+                resource_type="pamMachine",
+            ),
+        )
+    ]
+    changes = compute_diff(manifest, live_records=live)
+    machine_change = next(c for c in changes if c.uid_ref == "acme-lab-linux1")
+    assert machine_change.kind is ChangeKind.UPDATE
+    assert machine_change.before == {"host": "10.16.9.11"}
+    assert machine_change.after == {"host": "10.16.9.10"}
+
+
 def test_diff_pam_machine_pam_settings_nested_options_live_extra_inner_keys_is_noop(
     minimal_manifest_path: Path,
 ) -> None:
