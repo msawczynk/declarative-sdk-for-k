@@ -60,5 +60,5 @@ This is the contract layer — every behaviour change here ripples into provider
 ## Known gaps (per `docs/SDK_DA_COMPLETION_PLAN.md`)
 
 - Top-level `pamUser` standalone shape — schema/model open, planner unsupported (preview-gated → v1.1).
-- Nested `pamUser.rotation_settings` — P2.1 offline fix PROVEN (2026-04-28, 964 tests): `pam_settings.options` overlay + `managed` bool normalized in `diff.py`. Live re-plan = **upstream-gap** (Commander CLI `pam user ls <uid>` ParseError). Preview gates remain; await Commander fix.
+- Nested `pamUser.rotation_settings` — **UPSTREAM-GAP confirmed 2026-04-28 by live smoke**: offline diff fix PROVEN (`pam_settings.options` overlay + `managed` bool normalized in `diff.py`). Re-plan exit 2 after apply; Commander cannot write rotation `pam_settings`; no SDK code change until upstream Commander fix. Preview gates remain.
 - RBI `pam_settings.options` — P3 RESOLVED (2026-04-28): `_enrich_pam_remote_browser_dag_options` in `providers/commander_cli.py` merges TunnelDAG `allowedSettings` → `pam_settings.options`; E2E smoke passed; P3.1 bucket table in `docs/COMMANDER.md`.

@@ -58,7 +58,7 @@ Every modeled capability must classify as `supported` / `preview-gated` / `upstr
 | `pamDatabase` GA fields | supported | shipped | offline-green; live-green | scenario | – |
 | `pamDirectory` GA fields | supported | shipped | offline-green; live-green | scenario | – |
 | `pamRemoteBrowser` connection fields | supported | shipped | offline-green | scenario | – |
-| `pamRemoteBrowser` RBI tri-state / audio (DAG-backed) | preview-gated | DAG → manifest merge shipped | reviewed gate (P3) | open | `_merge_rbi_dag_options_into_pam_settings`; `tests/test_rbi_readback.py` |
+| `pamRemoteBrowser` RBI tri-state / audio (DAG-backed) | preview-gated | DAG → manifest merge shipped | green | ✅ | ✅ E2E smoke rc=0 (2026-04-28). DAG-backed subfields (tri-state, audio) remain `preview-gated`. |
 | Nested `pamUser` shape (in `resources[].users[]`) | supported (shape) | shipped | green | scenario | `pamUserNested` |
 | Nested `pamUser.rotation_settings` | preview-gated | apply lands | reviewed gate (P2.1) | open | offline diff anchor in `tests/test_diff.py` |
 | Top-level `users[].rotation_settings` | preview-gated | guarded | – | – | gate-lift rule: stays blocked even after nested clears |
@@ -69,7 +69,9 @@ Every modeled capability must classify as `supported` / `preview-gated` / `upstr
 | Top-level `projects[]` | preview-gated / design-only | guarded | – | – | same |
 | KSM application provisioning (`dsk bootstrap-ksm`) | supported | shipped | live-green (bootstrap+login) | low | 2026-04-28: `tests/live/test_ksm_bootstrap_smoke.py` with `KEEPER_LIVE_TENANT=1` + KSM config — see `LIVE_TEST_RUNBOOK`. Also `docs/KSM_BOOTSTRAP.md` + 89 unit tests. Full PAM apply+KSM remains via committed smoke, not this pytest alone. |
 | `KsmLoginHelper` (Commander credentials read from KSM) | supported | shipped | live: exercised on bootstrap+login path per same pytest | low | `keeper_sdk/auth/helper.py` + 175+ unit tests; `docs/KSM_INTEGRATION.md`. |
-| Phase B inter-agent KSM bus (`secrets/bus.py`) | preview-gated / skeleton | sealed (raises `CapabilityError`) | – | – | Bootstrap already provisions the directory record via `--with-bus`; client implementation deferred. Wire format + CAS semantics + implementation checklist frozen in module docstring. |
+| `keeper-vault.v1` L1 (login CRUD) | `preview-gated` | – | – | ❌ | Live proof pending — UPDATE path exists in code; `VAULT_L1_DESIGN` §7 acceptance needed before gate lift |
+| KSM inter-agent bus (`secrets/bus.py`) | `preview-gated` / skeleton | sealed (raises `CapabilityError`) | – | ❌ | Wire format frozen; client implementation deferred to v1.1 |
+| MSP discover (`msp-environment.v1`) | `preview-gated` | – | – | ❌ | Requires MSP admin session; `dsk validate --online` Commander path only; apply/import unsupported |
 
 DA Definition-of-Done compliance:
 - ✅ GitHub install path works (git URL + release wheel/sdist).
