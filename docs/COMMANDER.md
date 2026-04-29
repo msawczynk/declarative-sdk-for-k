@@ -9,12 +9,12 @@ have on disk, and the subset of Commander capabilities the SDK relies on.
 
 | artefact | version | reference |
 |----------|---------|-----------|
-| Python module (`keepercommander`) | `17.2.13` tag + ~40 commits on `upstream/release` | `../Commander/keepercommander/__init__.py::__version__`; HEAD `63150540` ("Pam Remote Browser Get JSON response data added") at time of pin |
+| Python module (`keepercommander`) | `17.2.16` tag + ~40 commits on `upstream/release` | `../Commander/keepercommander/__init__.py::__version__`; HEAD `6574827` ("Pam Remote Browser Get JSON response data added") at time of pin |
 | Bundled macOS `keeper` binary at `/Applications/Keeper Commander.app/Contents/Resources/app.asar/node_modules/.../keeper` | `17.1.14` | some operator workstations still have the older binary installed via the signed DMG |
 | Upstream repo | [`Keeper-Security/Commander`](https://github.com/Keeper-Security/Commander) | branch `release` is the canonical source-of-truth for this pin |
 
 The SDK works with any `keeper` binary ≥ `17.1.14`, but **requires the Python
-module at `17.2.13` or newer** for the in-process code paths (`pam project
+module at `17.2.16` or newer** for the in-process code paths (`pam project
 import`/`extend`, `_write_marker`). `CommanderCliProvider.apply_plan()` reads
 `importlib.metadata.version("keepercommander")` and raises `CapabilityError`
 before mutating the tenant when the installed wheel is below that floor (see
@@ -27,7 +27,7 @@ that gate even when the `keeper` binary is newer.
 Three concrete deltas that the SDK has to work around:
 
 1. **`record-update`** — Commander `17.1.14` (binary) does **not** ship a
-   `record-update` command. `17.2.13` adds it but the typed-field syntax
+   `record-update` command. `17.2.16` adds it but the typed-field syntax
    (`-cf label=value`) is unstable across patch releases. The SDK bypasses
    the subcommand entirely: `_write_marker` calls `record_management.
    update_record` through the in-process Python API instead.
@@ -36,7 +36,7 @@ Three concrete deltas that the SDK has to work around:
    re-prompt for `User(Email):` mid-run). The SDK routes them through
    `PAMProjectImportCommand.execute(params, ...)` in-process.
 3. **`pam gateway list` / `pam config list --format json`** — only
-   available on `17.2.13+` (release branch). Older binaries fall back to
+   available on `17.2.16+` (release branch). Older binaries fall back to
    ASCII tables, which the SDK no longer parses. If a downgrade is
    required, re-add `_parse_ascii_table` from git history
    (commit `31a8014^`).
@@ -52,8 +52,8 @@ Three concrete deltas that the SDK has to work around:
 | `mkdir -uf <path>` | scaffolding the `PAM Environments` tree | user-folder flag |
 | `mkdir -sf --manage-users --manage-records --can-edit --can-share <path>` | per-project Resources/Users shared folders | shared-folder flag |
 | `secrets-manager share add --app <app> --secret <sf_uid> --editable` | bind scaffolded shared folders to the gateway's KSM app | |
-| `pam gateway list --format json` | resolve `mode: reference_existing` gateway UID / KSM app UID | ships in `17.2.13+` |
-| `pam config list --format json` | resolve reference-existing PAM configuration UID | ships in `17.2.13+` |
+| `pam gateway list --format json` | resolve `mode: reference_existing` gateway UID / KSM app UID | ships in `17.2.16+` |
+| `pam config list --format json` | resolve reference-existing PAM configuration UID | ships in `17.2.16+` |
 | `rm --force <uid>` | delete orphaned managed records in `apply --allow-delete` | `--force` skips the interactive confirm |
 
 ### In-process (via `keepercommander` Python module)
@@ -179,7 +179,7 @@ Status vocabulary:
 
 | command | reason |
 |---------|--------|
-| `pam project export` | **does not exist** in `17.2.13+` (confirmed: `commands.py::commands` registers only `import` and `extend`). Export is synthesised by iterating `get` + `ls`. |
+| `pam project export` | **does not exist** in `17.2.16+` (confirmed: `commands.py::commands` registers only `import` and `extend`). Export is synthesised by iterating `get` + `ls`. |
 | `pam project remove` / `destroy` | **does not exist**. Destroy is per-record via `rm --force`. |
 | `record-update` via subprocess | version-fragile (see above); in-process API used instead. |
 | Interactive `keeper login` / `keeper sync-down` | subprocess would prompt; `deploy_watcher.keeper_login()` handles both via `KeeperParams`. |
@@ -188,10 +188,10 @@ Status vocabulary:
 
 ```bash
 # 1. The binary must be on PATH and respond to --version
-keeper --version  # expect ≥ 17.1.14, preferably 17.2.13+
+keeper --version  # expect ≥ 17.1.14, preferably 17.2.16+
 
 # 2. The Python module must match (install with pipx so CLI still works)
-python3 -m keepercommander --version  # expect 17.2.13+
+python3 -m keepercommander --version  # expect 17.2.16+
 
 # 3. JSON output must be wired for PAM listings
 keeper pam gateway list --format json | jq .gateways | head
