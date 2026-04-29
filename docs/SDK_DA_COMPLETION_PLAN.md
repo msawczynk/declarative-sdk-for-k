@@ -56,8 +56,9 @@ Shipped and proven:
 - **Operator reports (`dsk report compliance-report`):** 2026-04-29 live attempt:
   requested `--sanitize-uids --quiet` path hit the Commander empty-cache
   stdout/error shape; `--rebuild` probe emitted the expected JSON envelope.
-  The SDK wrapper now retries no-rebuild empty/error output with `--rebuild`,
-  strips rebuild stdout artifacts, and emits the normal redacted JSON envelope.
+  The SDK wrapper now retries no-rebuild empty stdout, empty JSON, or Commander
+  error output with `--rebuild`, strips rebuild stdout artifacts, and emits the
+  normal redacted JSON envelope.
 
 **Acceptance (export / diff / password-report / security-audit-report /
 compliance-report)** — satisfied 2026-04-29 on lab tenant plus offline
@@ -380,7 +381,7 @@ Status (2026-04-29, v1.3.0):
 | KSM application create | `supported` for `bootstrap-ksm`; general declarative app mutation remains a capability gap / `preview-gated` | 2026-04-29 live proof: `tests/live/test_ksm_bootstrap_smoke.py` exit 0 (1 passed); bootstrap create/bind/share, config redemption, login probe, and transcript leak check were clean. Offline bootstrap sequence has 3 cases. `tests/test_ksm_app_lifecycle.py` pins the current declarative boundary: `keeper-ksm.v1` validates as schema-only, rejects `ksm_apps`, and `plan` exits capability until a typed model/provider exists. | Needs declarative schema, typed loader, graph/diff/apply support, clean re-plan, and cleanup proof before claiming full KSM app lifecycle support. |
 | KSM inter-agent bus | sealed stub / unsupported | `keeper_sdk/secrets/bus.py` exposes the API and frozen wire-format notes, but public methods raise `NotImplementedError` / `CapabilityError` with `next_action`. | No publish/subscribe support claim until protocol implementation and live proof land. |
 | Teams/roles read-only validate | `preview-gated` | Offline validation rejects unknown PAM team/role resource types and accepts empty `keeper-enterprise.v1` team/role stubs. 2026-04-29 offline worker fixture: `tests/fixtures/teams_roles_manifest.yaml`; write-path decision: `docs/TEAMS_ROLES_WRITE_DESIGN.md`. No live tenant evidence was produced in that offline/no-network slice; current `dsk validate --online` for `keeper-enterprise.v1` remains a capability error before enterprise discovery. | Wire read-only `keeper-enterprise.v1` online discovery (`enterprise-info -t/-r --format json` or `api.query_enterprise`), run sanctioned live list/compare proof, then reconsider read-only support. Writes stay unsupported until an ownership model and approval gates are proven. |
-| Compliance/security-audit reports | `supported` | 2026-04-29 `security-audit-report --sanitize-uids --quiet` live proof exited 0 with a JSON envelope. `compliance-report --sanitize-uids --quiet` hit Commander empty/non-JSON cache output; `--rebuild` emitted the expected envelope, and the SDK wrapper now auto-retries no-rebuild empty/error output with `--rebuild` while emitting the normal envelope. Offline report command coverage includes compliance/security-audit sanitization plus compliance empty-cache retry cases. | Keep leak checks, UID sanitization, and the empty-cache retry behavior green on future Commander pins. |
+| Compliance/security-audit reports | `supported` | 2026-04-29 `security-audit-report --sanitize-uids --quiet` live proof exited 0 with a JSON envelope. `compliance-report --sanitize-uids --quiet` hit Commander empty/non-JSON cache output; `--rebuild` emitted the expected envelope, and the SDK wrapper now auto-retries no-rebuild empty/error output with `--rebuild` while emitting the normal envelope. Offline report command coverage includes compliance/security-audit sanitization plus compliance empty-cache retry cases for empty stdout, empty JSON, and Commander errors. | Keep leak checks, UID sanitization, and the empty-cache retry behavior green on future Commander pins. |
 | Password report | `supported` | 2026-04-29 live proof: `dsk report password-report` exit 0, sanitized envelope clean. | Keep leak checks and UID sanitization green on future Commander pins. |
 
 P21-P24 acceptance checkpoints:

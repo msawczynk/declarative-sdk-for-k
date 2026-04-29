@@ -10,6 +10,7 @@ from click.testing import CliRunner
 
 from keeper_sdk.cli import main
 from keeper_sdk.cli.main import EXIT_GENERIC
+from keeper_sdk.core.errors import CapabilityError
 
 
 def _run(args: list[str]):
@@ -26,6 +27,24 @@ def _install_fake_report(
         if calls is not None:
             calls.append(argv)
         return json.dumps(rows)
+
+    monkeypatch.setattr("keeper_sdk.cli._report.runner.run_keeper_batch", fake_run_keeper_batch)
+
+
+def _install_fake_report_raw(
+    monkeypatch: pytest.MonkeyPatch,
+    responses: list[str | BaseException],
+    calls: list[list[str]] | None = None,
+) -> None:
+    def fake_run_keeper_batch(argv: list[str], **_kwargs: object) -> str:
+        if calls is not None:
+            calls.append(argv)
+        if not responses:
+            raise AssertionError("no fake report response queued")
+        response = responses.pop(0)
+        if isinstance(response, BaseException):
+            raise response
+        return response
 
     monkeypatch.setattr("keeper_sdk.cli._report.runner.run_keeper_batch", fake_run_keeper_batch)
 
@@ -49,6 +68,76 @@ def test_compliance_report_sanitize_uids_fingerprints_uid_values(
     assert payload["meta"]["sanitize_uids"] is True
     assert row["record_uid"].startswith("<uid:")
     assert row["note"].startswith("created keeper://<uid:")
+
+
+def test_compliance_report_auto_rebuilds_after_empty_stdout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[list[str]] = []
+    _install_fake_report_raw(
+        monkeypatch,
+        ["", json.dumps([{"record_uid": "rec-1", "title": "after rebuild"}])],
+        calls,
+    )
+
+    result = _run(["report", "compliance-report", "--quiet"])
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["meta"]["rebuild"] is False
+    assert payload["rows"][0]["title"] == "after rebuild"
+    assert len(calls) == 2
+    assert "--rebuild" not in calls[0]
+    assert "--rebuild" in calls[1]
+
+
+def test_compliance_report_auto_rebuilds_after_empty_json_array(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[list[str]] = []
+    _install_fake_report_raw(
+        monkeypatch,
+        [
+            "[]",
+            'rebuilding cache\n[{"record_uid": "rec-2", "title": "from rebuilt cache"}]\n',
+        ],
+        calls,
+    )
+
+    result = _run(["report", "compliance-report", "--sanitize-uids"])
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["meta"]["rebuild"] is False
+    assert payload["rows"][0]["title"] == "from rebuilt cache"
+    assert len(calls) == 2
+    assert "--rebuild" in calls[1]
+
+
+def test_compliance_report_auto_rebuilds_after_commander_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[list[str]] = []
+    _install_fake_report_raw(
+        monkeypatch,
+        [
+            CapabilityError(
+                reason="keeper compliance report failed (rc=1)",
+                next_action="rebuild the compliance cache",
+            ),
+            json.dumps([{"record_uid": "rec-3", "title": "error recovered"}]),
+        ],
+        calls,
+    )
+
+    result = _run(["report", "compliance-report"])
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["meta"]["rebuild"] is False
+    assert payload["rows"][0]["title"] == "error recovered"
+    assert len(calls) == 2
+    assert "--rebuild" in calls[1]
 
 
 def test_compliance_report_refuses_raw_uid_when_leak_check_flags_it(

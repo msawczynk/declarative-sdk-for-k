@@ -96,15 +96,22 @@ _SILENT_FAIL_COMMANDS = {
     ("pam", "project", "extend"),
     ("pam", "connection", "edit"),
     ("pam", "rbi", "edit"),
+    ("compliance", "report"),
     ("ls",),
     ("get",),
     ("record-update",),
     ("rm",),
 }
+_COMPLIANCE_EMPTY_CACHE_MARKERS = (
+    "Cache last update: NONE",
+    "compliance-report --rebuild",
+    "to build the cache",
+)
 _SILENT_FAIL_MARKERS = (
     "Project name is required",
     "No such folder or record",
     "cannot be resolved",
+    *_COMPLIANCE_EMPTY_CACHE_MARKERS,
 )
 _SESSION_EXPIRED_CODE = "session_token_expired"
 _ROTATION_APPLY_ENV_VAR = "DSK_EXPERIMENTAL_ROTATION_APPLY"

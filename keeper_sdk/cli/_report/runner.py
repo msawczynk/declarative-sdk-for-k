@@ -2,12 +2,33 @@
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
 
 # Keep in sync with ``CommanderCliProvider`` session retry heuristics.
 _SESSION_EXPIRED_CODE = "session_token_expired"
+
+
+def extract_json_array_stdout(stdout: str) -> str:
+    """Return the first JSON array embedded in Commander stdout, if present."""
+    text = (stdout or "").strip()
+    if not text:
+        return ""
+    if text.startswith("[") and text.endswith("]"):
+        return text
+    decoder = json.JSONDecoder()
+    for index, char in enumerate(text):
+        if char != "[":
+            continue
+        try:
+            parsed, end = decoder.raw_decode(text[index:])
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, list):
+            return text[index : index + end].strip()
+    return text
 
 
 def _is_retryable_keeper_session_text(stdout: str | None, stderr: str | None) -> bool:
