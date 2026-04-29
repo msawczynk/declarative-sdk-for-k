@@ -46,9 +46,19 @@ Shipped and proven:
   exit **0**, 11-row output envelope, **`--sanitize-uids`** run clean (no UID
   leak signal). Redaction/leak-contract surface accepted for guarded reporting
   use.
+- **Operator reports (`dsk report security-audit-report`):** 2026-04-29 live
+  proof: `--sanitize-uids --quiet` exit **0**, JSON output envelope emitted, and
+  first safe output line was `{`.
+- **Operator reports (`dsk report compliance-report`):** 2026-04-29 live attempt:
+  requested `--sanitize-uids --quiet` path exited **5** because Commander
+  returned empty/non-JSON stdout; `--rebuild` probe emitted the expected JSON
+  envelope. Keep the no-rebuild compliance path out of `supported` claims until
+  the wrapper handles this Commander cache shape or the exact command returns
+  JSON.
 
-**Acceptance (export / diff / password-report)** — satisfied 2026-04-29 on lab
-tenant (see bullets above); no pending “needs live proof” for these CLI paths.
+**Acceptance (export / diff / password-report / security-audit-report)** —
+satisfied 2026-04-29 on lab tenant (see bullets above). `compliance-report`
+still needs exact-command proof for the no-rebuild path.
 
 Not yet supported:
 
