@@ -1488,6 +1488,7 @@ class CommanderCliProvider(Provider):
                 reason="keeper-vault apply requires a shared folder uid (discover scope)",
                 next_action="pass --folder-uid or set KEEPER_DECLARATIVE_FOLDER",
             )
+        self._vault_guard_shared_folder_membership_removals(plan)
 
         outcomes: list[ApplyOutcome] = []
         now = utc_timestamp()
@@ -1743,9 +1744,35 @@ class CommanderCliProvider(Provider):
     def _vault_shared_folder_role_permissions(role: Any) -> tuple[bool, bool]:
         if role == "manage":
             return True, True
-        if role == "edit":
+        if role in {"edit", "manage_records"}:
             return True, False
+        if role == "manage_users":
+            return False, True
         return False, False
+
+    @staticmethod
+    def _vault_shared_folder_member_permission(member: Mapping[str, Any]) -> str:
+        permission = member.get("permission")
+        if permission is not None:
+            return str(permission).strip()
+        role = str(member.get("role") or "").strip()
+        if role == "read":
+            return "read_only"
+        if role == "edit":
+            return "manage_records"
+        if role:
+            return role
+        if "manage_records" in member or "manage_users" in member:
+            manage_records = bool(member.get("manage_records"))
+            manage_users = bool(member.get("manage_users"))
+            if manage_records and manage_users:
+                return "manage"
+            if manage_records:
+                return "manage_records"
+            if manage_users:
+                return "manage_users"
+            return "read_only"
+        return ""
 
     @staticmethod
     def _vault_shared_folder_members_by_email(members: Any) -> dict[str, dict[str, str]]:
@@ -1756,10 +1783,56 @@ class CommanderCliProvider(Provider):
             if not isinstance(member, Mapping):
                 continue
             email = str(member.get("email") or "").strip()
-            role = str(member.get("role") or "").strip()
-            if email and role:
-                out[email.casefold()] = {"email": email, "role": role}
+            permission = CommanderCliProvider._vault_shared_folder_member_permission(member)
+            if email and permission:
+                out[email.casefold()] = {"email": email, "permission": permission}
         return out
+
+    @staticmethod
+    def _vault_shared_folder_removed_member_count(
+        before_members: Any,
+        after_members: Any,
+    ) -> int:
+        if not isinstance(before_members, list) or not isinstance(after_members, list):
+            return 0
+        before_by_email = CommanderCliProvider._vault_shared_folder_members_by_email(before_members)
+        after_by_email = CommanderCliProvider._vault_shared_folder_members_by_email(after_members)
+        return len(set(before_by_email) - set(after_by_email))
+
+    def _vault_guard_shared_folder_membership_removals(self, plan: Plan) -> None:
+        removed_count = 0
+        first_change: Change | None = None
+        for change in plan.ordered():
+            if (
+                change.kind is not ChangeKind.UPDATE
+                or change.resource_type != _VAULT_SHARED_FOLDER_RESOURCE_TYPE
+            ):
+                continue
+            count = self._vault_shared_folder_removed_member_count(
+                change.before.get("members"),
+                change.after.get("members"),
+            )
+            if count:
+                removed_count += count
+                first_change = first_change or change
+        if not removed_count:
+            return
+        setattr(plan, "requires_allow_delete", True)
+        if getattr(plan, "allow_delete", False) is True:
+            return
+        assert first_change is not None
+        raise CapabilityError(
+            reason="shared_folder membership removal requires --allow-delete",
+            uid_ref=first_change.uid_ref,
+            resource_type=first_change.resource_type,
+            next_action=(
+                "rerun plan/apply with --allow-delete before removing shared-folder members"
+            ),
+            context={
+                "requires_allow_delete": True,
+                "removed_member_count": removed_count,
+            },
+        )
 
     def _vault_add_shared_folder(self, after: dict[str, Any]) -> str:
         """Create a Keeper shared folder using Commander's folder-add equivalent."""
@@ -1881,6 +1954,8 @@ class CommanderCliProvider(Provider):
         before_members: Any,
         after_members: Any,
     ) -> dict[str, int]:
+        if not isinstance(after_members, list):
+            return {"members_granted": 0, "members_removed": 0}
         before_by_email = self._vault_shared_folder_members_by_email(before_members)
         after_by_email = self._vault_shared_folder_members_by_email(after_members)
         granted = 0
@@ -1897,7 +1972,7 @@ class CommanderCliProvider(Provider):
             if before_by_email.get(key) == desired:
                 continue
             manage_records, manage_users = self._vault_shared_folder_role_permissions(
-                desired["role"]
+                desired["permission"]
             )
             self._share_folder_to_grantee(
                 shared_folder_uid=keeper_uid,

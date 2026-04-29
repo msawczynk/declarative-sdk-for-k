@@ -42,12 +42,14 @@ def _provider(monkeypatch: pytest.MonkeyPatch) -> CommanderCliProvider:
     )
 
 
-def _plan(*changes: Change) -> Plan:
-    return Plan(
+def _plan(*changes: Change, allow_delete: bool = False) -> Plan:
+    plan = Plan(
         manifest_name="vault-shared-folder",
         changes=list(changes),
         order=[change.uid_ref or change.title for change in changes],
     )
+    setattr(plan, "allow_delete", allow_delete)
+    return plan
 
 
 def _payload(
@@ -191,6 +193,92 @@ def test_commander_apply_updates_shared_folder_membership(
             "SF_UID",
         ]
     ]
+
+
+@pytest.mark.parametrize(
+    ("before_permission", "after_permission", "manage_records", "manage_users"),
+    [
+        ("read_only", "manage_records", "on", "off"),
+        ("manage_records", "manage_users", "off", "on"),
+        ("manage_users", "read_only", "off", "off"),
+    ],
+)
+def test_commander_apply_updates_shared_folder_member_permission_field(
+    monkeypatch: pytest.MonkeyPatch,
+    before_permission: str,
+    after_permission: str,
+    manage_records: str,
+    manage_users: str,
+) -> None:
+    _disable_apply_version_gate(monkeypatch)
+    provider = _provider(monkeypatch)
+    calls: list[list[str]] = []
+    monkeypatch.setattr(
+        CommanderCliProvider,
+        "_run_cmd",
+        lambda self, args: calls.append(args) or "",
+    )
+
+    outcomes = provider.apply_plan(
+        _plan(
+            _change(
+                ChangeKind.UPDATE,
+                keeper_uid="SF_UID",
+                before=_payload(
+                    members=[{"email": "alice@example.com", "permission": before_permission}]
+                ),
+                after={"members": [{"email": "alice@example.com", "permission": after_permission}]},
+            )
+        )
+    )
+
+    assert outcomes[0].action == "update"
+    assert outcomes[0].details["members_granted"] == 1
+    assert calls == [
+        [
+            "share-folder",
+            "-a",
+            "grant",
+            "-e",
+            "alice@example.com",
+            "-f",
+            "-p",
+            manage_records,
+            "-o",
+            manage_users,
+            "SF_UID",
+        ]
+    ]
+
+
+def test_commander_apply_blocks_shared_folder_member_removal_without_allow_delete(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _disable_apply_version_gate(monkeypatch)
+    provider = _provider(monkeypatch)
+    monkeypatch.setattr(
+        CommanderCliProvider,
+        "_run_cmd",
+        lambda self, args: pytest.fail(f"remove must be blocked before command: {args}"),
+    )
+    plan = _plan(
+        _change(
+            ChangeKind.UPDATE,
+            keeper_uid="SF_UID",
+            before=_payload(
+                members=[
+                    {"email": "alice@example.com", "role": "manage"},
+                    {"email": "bob@example.com", "role": "read"},
+                ]
+            ),
+            after={"members": [{"email": "alice@example.com", "role": "manage"}]},
+        )
+    )
+
+    with pytest.raises(CapabilityError, match="membership removal requires --allow-delete"):
+        provider.apply_plan(plan)
+
+    assert getattr(plan, "requires_allow_delete") is True
 
 
 def test_commander_apply_blocks_shared_folder_delete_without_allow_delete(

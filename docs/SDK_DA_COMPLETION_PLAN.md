@@ -375,7 +375,7 @@ Status (2026-04-29, v1.2.0 active):
 
 | Surface | Classification | Evidence | Remaining bar |
 |---------|----------------|----------|---------------|
-| Shared-folder validate / sharing lifecycle | `preview-gated` | Offline validation covers the manifest surface; P35 mock lifecycle proves shared-folder member create/delete/update planning plus mocked Commander share call without a second Keeper account. | Live membership proof is blocked pending a second Keeper account; keep support preview-gated until that create -> re-plan -> delete path is live-proven. |
+| Shared-folder validate / sharing lifecycle | `preview-gated` | Offline validation covers the manifest surface; P35 mock lifecycle proves shared-folder member create/delete/update planning plus mocked Commander share call without a second Keeper account. P34 adds offline Commander membership-removal `--allow-delete` guard proof. | Live membership proof is blocked pending a second Keeper account; keep support preview-gated until that create -> re-plan -> delete path is live-proven. |
 | KSM application `reference_existing` | `supported` for gateway read/validate only | Gateway read path is proven for existing app references. | No SDK-owned app mutation is implied by this support claim. |
 | KSM application create | `supported` for `bootstrap-ksm`; general declarative app mutation remains `preview-gated` | 2026-04-29 live proof: `tests/live/test_ksm_bootstrap_smoke.py` exit 0 (1 passed); bootstrap create/bind/share, config redemption, login probe, and transcript leak check were clean. Offline bootstrap sequence has 3 cases. | Needs declarative manifest clean re-plan and cleanup proof before claiming full KSM app lifecycle support. |
 | Teams/roles read-only validate | `preview-gated` | Offline read-only validation rejects unknown team/role types. | Writes stay out of support until upstream-safe surfaces and approval gates are modeled. |
@@ -390,6 +390,7 @@ P21-P24 acceptance checkpoints:
 | P22 module rename shim | ACCEPTED | `declarative_sdk_k` compatibility shim, `tests/test_compat_shim.py`, `pyproject.toml`, and `V1_GA_CHECKLIST.md` hardening row checked. | Keep `keeper_sdk` import shim for one minor cycle; breaking removal waits for v2.0.0. |
 | P23 KSM app create proof | ACCEPTED for `bootstrap-ksm` | 2026-04-29 live bootstrap smoke passed: create/bind/share, config redemption, login probe, transcript leak check. | Full declarative KSM app lifecycle still needs clean re-plan and cleanup proof. |
 | P24 docs / scaffold final sync | ACCEPTED | `SCAFFOLD.md`, `keeper_sdk/core/SCAFFOLD.md`, `RECONCILIATION.md`, and this plan reflect Phase 7 state. | Keep future sprint memos and operator orchestration out of `docs/`. |
+| P34 SharedFolder destructive guard / permission breadth | ACCEPTED offline | `tests/test_shared_folder_commander.py` covers membership removal requiring `--allow-delete` and member `permission` transitions across `read_only`, `manage_records`, and `manage_users`. | Live readback proof remains required before full shared-folder lifecycle support. |
 
 Order:
 
@@ -405,7 +406,7 @@ Order:
    - create/update,
    - memberships,
    - permission diffs,
-   - destructive changes require explicit flags.
+   - destructive changes require explicit flags (membership removal guard offline-proven in P34).
 4. KSM applications:
    - reference existing,
    - app create,
