@@ -227,5 +227,6 @@ def test_round_trip_section_4_examples(tmp_path) -> None:
 
 def test_unsupported_family_message_includes_msp() -> None:
     with pytest.raises(UnsupportedFamilyError) as exc:
-        load_declarative_manifest_string('{"schema": "keeper-ksm.v1"}', suffix=".json")
+        load_declarative_manifest_string('{"schema": "keeper-epm.v1"}', suffix=".json")
     assert "msp-environment.v1" in exc.value.reason
+    assert "keeper-ksm.v1" in exc.value.reason

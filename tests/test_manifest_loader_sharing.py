@@ -54,7 +54,7 @@ def test_load_declarative_manifest_string_accepts_sharing() -> None:
 
 
 def test_load_declarative_manifest_string_rejects_unplanned_family_names_all_supported() -> None:
-    raw = '{"schema": "keeper-ksm.v1"}'
+    raw = '{"schema": "keeper-epm.v1"}'
 
     with pytest.raises(ManifestError) as exc:
         load_declarative_manifest_string(raw, suffix=".json")
@@ -63,6 +63,7 @@ def test_load_declarative_manifest_string_rejects_unplanned_family_names_all_sup
     assert "pam-environment.v1" in reason
     assert "keeper-vault.v1" in reason
     assert SHARING_FAMILY in reason
+    assert "keeper-ksm.v1" in reason
 
 
 def test_load_manifest_string_rejects_sharing_as_pam_only() -> None:

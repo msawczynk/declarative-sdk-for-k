@@ -35,11 +35,13 @@ import click
 from keeper_sdk.auth import KsmLoginHelper, LoginHelper, load_helper_from_path
 from keeper_sdk.cli.renderer import RichRenderer
 from keeper_sdk.core import (
+    IDENTITY_FAMILY,
     MSP_FAMILY,
     VAULT_MANIFEST_FAMILY,
     CapabilityError,
     Change,
     ChangeKind,
+    IdentityManifestV1,
     Manifest,
     ManifestError,
     MspManifestV1,
@@ -51,6 +53,7 @@ from keeper_sdk.core import (
     build_plan,
     build_vault_graph,
     compute_diff,
+    compute_identity_diff,
     compute_msp_diff,
     compute_sharing_diff,
     compute_vault_diff,
@@ -65,6 +68,7 @@ from keeper_sdk.core import (
 )
 from keeper_sdk.core.interfaces import ApplyOutcome, LiveRecord
 from keeper_sdk.core.manifest import read_manifest_document
+from keeper_sdk.core.models_ksm import KSM_FAMILY, KsmManifestV1
 from keeper_sdk.core.planner import Plan
 from keeper_sdk.core.preview import assert_preview_keys_allowed
 from keeper_sdk.core.schema import PAM_FAMILY, SHARING_FAMILY, validate_manifest
@@ -201,6 +205,7 @@ class PlanLoadBundle:
     vault: VaultManifestV1 | None
     sharing: SharingManifestV1 | None
     msp: MspManifestV1 | None
+    identity: IdentityManifestV1 | None
     manifest_name: str
     order: list[str]
     live: list[LiveRecord]
@@ -1005,7 +1010,9 @@ def apply(
 def _build_plan(ctx: click.Context, manifest_path: Path, *, allow_delete: bool) -> Plan:
     bundle = _load_plan_context(ctx, manifest_path)
     ctx.obj["_plan_bundle"] = bundle
-    capability_subject: Manifest | VaultManifestV1 | SharingManifestV1 | MspManifestV1
+    capability_subject: (
+        Manifest | VaultManifestV1 | SharingManifestV1 | MspManifestV1 | IdentityManifestV1
+    )
     try:
         if bundle.pam is not None:
             changes = compute_diff(
@@ -1038,6 +1045,20 @@ def _build_plan(ctx: click.Context, manifest_path: Path, *, allow_delete: bool) 
                 allow_delete=allow_delete,
             )
             capability_subject = bundle.sharing
+        elif bundle.identity is not None:
+            changes = compute_identity_diff(
+                bundle.identity,
+                {},
+                manifest_name=bundle.manifest_name,
+                allow_delete=allow_delete,
+            )
+            raise CapabilityError(
+                reason=(
+                    f"{IDENTITY_FAMILY} plan/apply is not supported "
+                    "(offline schema/model/diff only; no Commander write API confirmed)"
+                ),
+                next_action="use `dsk validate` for schema checks; apply waits on a Commander writer",
+            )
         else:
             raise CapabilityError(
                 "plan is not supported for this manifest family; "
@@ -1102,10 +1123,14 @@ def _load_plan_context(ctx: click.Context, manifest_path: Path) -> PlanLoadBundl
     vault: VaultManifestV1 | None = typed if isinstance(typed, VaultManifestV1) else None
     sharing: SharingManifestV1 | None = typed if isinstance(typed, SharingManifestV1) else None
     msp: MspManifestV1 | None = typed if isinstance(typed, MspManifestV1) else None
+    identity: IdentityManifestV1 | None = typed if isinstance(typed, IdentityManifestV1) else None
+    ksm: KsmManifestV1 | None = typed if isinstance(typed, KsmManifestV1) else None
     if pam is not None:
         manifest_name = pam.name
     elif msp is not None:
         manifest_name = msp.name
+    elif identity is not None:
+        manifest_name = IDENTITY_FAMILY
     else:
         manifest_name = manifest_path.stem
 
@@ -1120,6 +1145,22 @@ def _load_plan_context(ctx: click.Context, manifest_path: Path) -> PlanLoadBundl
             order = msp_apply_order(msp)
         elif sharing is not None:
             order = _sharing_apply_order(sharing)
+        elif identity is not None:
+            raise CapabilityError(
+                reason=(
+                    f"{IDENTITY_FAMILY} plan/apply is not supported "
+                    "(offline schema/model/diff only; no Commander write API confirmed)"
+                ),
+                next_action="use `dsk validate` for schema checks; apply waits on a Commander writer",
+            )
+        elif ksm is not None:
+            raise CapabilityError(
+                reason=(
+                    f"typed plan/load supports {KSM_FAMILY} for offline validation only; "
+                    "plan/apply are not supported for this manifest family yet"
+                ),
+                next_action="use `dsk validate` for keeper-ksm.v1 schema checks",
+            )
         else:
             raise CapabilityError(
                 "plan is not supported for this manifest family; "
@@ -1157,6 +1198,7 @@ def _load_plan_context(ctx: click.Context, manifest_path: Path) -> PlanLoadBundl
         vault=vault,
         sharing=sharing,
         msp=msp,
+        identity=identity,
         manifest_name=manifest_name,
         order=order,
         live=live,

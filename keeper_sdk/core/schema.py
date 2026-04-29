@@ -20,6 +20,8 @@ from keeper_sdk.core.errors import SchemaError
 
 PAM_FAMILY = "pam-environment.v1"
 ENTERPRISE_FAMILY = "keeper-enterprise.v1"
+IDENTITY_FAMILY = "keeper-integrations-identity.v1"
+KSM_FAMILY = "keeper-ksm.v1"
 SHARING_FAMILY = "keeper-vault-sharing.v1"
 PAM_SCHEMA_FILENAME = "pam-environment.v1.schema.json"
 
@@ -31,10 +33,8 @@ SCHEMA_RESOURCE_BY_FAMILY: dict[str, str] = {
     "keeper-integrations-events.v1": (
         "keeper-integrations-events/keeper-integrations-events.v1.schema.json"
     ),
-    "keeper-integrations-identity.v1": (
-        "keeper-integrations-identity/keeper-integrations-identity.v1.schema.json"
-    ),
-    "keeper-ksm.v1": "keeper-ksm/keeper-ksm.v1.schema.json",
+    IDENTITY_FAMILY: "integrations/identity.v1.schema.json",
+    KSM_FAMILY: "ksm/ksm.v1.schema.json",
     "keeper-pam-extended.v1": "keeper-pam-extended/keeper-pam-extended.v1.schema.json",
     "keeper-security-posture.v1": (
         "keeper-security-posture/keeper-security-posture.v1.schema.json"

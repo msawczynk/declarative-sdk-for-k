@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/msawczynk/declarative-sdk-for-k/schemas/ksm/v1.json",
+  "title": "keeper-ksm.v1",
+  "description": "KSM declarative manifest v1 for offline modeling of applications, client tokens, record shares, and config-output redemption. Schema, typed load, graph, and diff are supported offline; online plan/apply remain preview-gated.",
+  "x-keeper-live-proof": {
+    "status": "preview-gated",
+    "evidence": "pending",
+    "since_pin": "89047920a0df857e01fb59adcb0bfb9fa6db70bf",
+    "notes": "W6a offline foundation: JSON Schema + typed models + uid_ref graph + field-level diff for apps, tokens, record shares, and config outputs. Commander/KSM apply remains unsupported until live discovery/write/readback contracts land."
+  },
+  "type": "object",
+  "required": ["schema"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "keeper-ksm.v1"
+    },
+    "apps": {
+      "type": "array",
+      "default": [],
+      "items": { "$ref": "#/$defs/app" }
+    },
+    "tokens": {
+      "type": "array",
+      "default": [],
+      "items": { "$ref": "#/$defs/token" }
+    },
+    "record_shares": {
+      "type": "array",
+      "default": [],
+      "items": { "$ref": "#/$defs/record_share" }
+    },
+    "config_outputs": {
+      "type": "array",
+      "default": [],
+      "items": { "$ref": "#/$defs/config_output" }
+    }
+  },
+  "$defs": {
+    "uid_ref": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "app_ref": {
+      "type": "string",
+      "pattern": "^keeper-ksm:apps:[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "record_ref": {
+      "type": "string",
+      "pattern": "^keeper-vault:records:[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "non_empty_string": {
+      "type": "string",
+      "minLength": 1
+    },
+    "app": {
+      "type": "object",
+      "required": ["uid_ref", "name"],
+      "additionalProperties": false,
+      "properties": {
+        "uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "name": { "$ref": "#/$defs/non_empty_string" },
+        "scopes": {
+          "type": "array",
+          "default": [],
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/non_empty_string" }
+        },
+        "allowed_ips": {
+          "type": "array",
+          "default": [],
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/non_empty_string" }
+        }
+      }
+    },
+    "token": {
+      "type": "object",
+      "required": ["uid_ref", "name", "app_uid_ref"],
+      "additionalProperties": false,
+      "properties": {
+        "uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "name": { "$ref": "#/$defs/non_empty_string" },
+        "app_uid_ref": { "$ref": "#/$defs/app_ref" },
+        "one_time": {
+          "type": "boolean",
+          "default": true
+        },
+        "expiry": { "$ref": "#/$defs/non_empty_string" }
+      }
+    },
+    "record_share": {
+      "type": "object",
+      "required": ["record_uid_ref", "app_uid_ref"],
+      "additionalProperties": false,
+      "properties": {
+        "record_uid_ref": { "$ref": "#/$defs/record_ref" },
+        "app_uid_ref": { "$ref": "#/$defs/app_ref" },
+        "editable": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "config_output": {
+      "type": "object",
+      "required": ["app_uid_ref", "format", "output_path"],
+      "additionalProperties": false,
+      "properties": {
+        "app_uid_ref": { "$ref": "#/$defs/app_ref" },
+        "format": {
+          "type": "string",
+          "enum": ["json", "base64"]
+        },
+        "output_path": { "$ref": "#/$defs/non_empty_string" }
+      }
+    }
+  }
+}

@@ -15,6 +15,8 @@ Stable public surface:
     - MspManifestV1, load_msp_manifest (core.msp_models) — MSP slice 1
     - build_msp_graph, msp_apply_order (core.msp_graph) — MSP slice 1
     - compute_msp_diff (core.msp_diff) — MSP slice 1
+    - IdentityManifestV1, load_identity_manifest, compute_identity_diff
+      (core.models_integrations_identity / core.integrations_identity_diff) — W14 offline
     - build_graph, execution_order (core.graph)
     - compute_diff, Change (core.diff)
     - build_plan, Plan (core.planner)
@@ -37,6 +39,7 @@ from keeper_sdk.core.errors import (
     UnsupportedFamilyError,
 )
 from keeper_sdk.core.graph import build_graph, execution_order
+from keeper_sdk.core.integrations_identity_diff import compute_identity_diff
 from keeper_sdk.core.interfaces import MetadataStore, Provider, Renderer
 from keeper_sdk.core.manifest import (
     dump_manifest,
@@ -58,6 +61,15 @@ from keeper_sdk.core.models import (
     Project,
     SharedFolderBlock,
     SharedFoldersBlock,
+)
+from keeper_sdk.core.models_integrations_identity import (
+    IDENTITY_FAMILY,
+    IdentityDomain,
+    IdentityManifestV1,
+    IdentityOutboundEmail,
+    IdentityScimProvisioning,
+    IdentitySsoProvider,
+    load_identity_manifest,
 )
 from keeper_sdk.core.msp_diff import compute_msp_diff
 from keeper_sdk.core.msp_graph import build_msp_graph, msp_apply_order
@@ -124,9 +136,16 @@ __all__ = [
     "SharedFolderBlock",
     "SharedFoldersBlock",
     "MSP_FAMILY",
+    "IDENTITY_FAMILY",
     "MspManifestV1",
+    "IdentityDomain",
+    "IdentityManifestV1",
+    "IdentityOutboundEmail",
+    "IdentityScimProvisioning",
+    "IdentitySsoProvider",
     "ManagedCompany",
     "Addon",
+    "load_identity_manifest",
     "load_msp_manifest",
     "load_manifest",
     "load_declarative_manifest",
@@ -145,6 +164,7 @@ __all__ = [
     "ChangeKind",
     "compute_diff",
     "compute_msp_diff",
+    "compute_identity_diff",
     "compute_vault_diff",
     "compute_sharing_diff",
     "Plan",
