@@ -6,6 +6,23 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- **Phase 7 tests** — shared-folder `validate` coverage and KSM app
+  `reference_existing` tests.
+- **RichRenderer snapshots** — six layout snapshot cases in
+  `tests/test_renderer_snapshots.py`.
+- **Performance guard** — `tests/test_perf.py` now asserts peak RSS stays below
+  192 MiB.
+- **Vault custom-field diffs** — five add / change / remove diff cases.
+- **Vault apply ordering** — multi-record topological ordering coverage in
+  `tests/test_vault_mock_provider.py`.
+- **Teams / roles validate** — six offline validation tests, including
+  unknown-type rejection and future xfail coverage.
+- **Report commands** — five offline tests for compliance / security-audit UID
+  sanitization.
+- **KSM app create** — three bootstrap sequence tests.
+- **Redaction patterns** — bearer-token, JWT, and KSM URL test coverage.
+
 ## [1.2.0] - 2026-04-29
 
 ### Fixed

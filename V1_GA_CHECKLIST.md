@@ -125,10 +125,12 @@ and `tests/test_smoke_scenarios.py`.
       `CapabilityError`.
 - [x] Read `gateway.ksm_application_name` in `reference_existing`
       mode (currently parsed and dropped).
-- [x] Snapshot tests for `RichRenderer` table layouts.
-- [x] Expand `redact()` patterns (bearer tokens, JWTs, KSM URLs).
-- [x] `tests/test_perf.py` → add `resource.getrusage` memory
-      assertions (currently prints only).
+- [x] Snapshot tests for `RichRenderer` table layouts
+      (`tests/test_renderer_snapshots.py`, 6 cases).
+- [x] Expand `redact()` patterns (bearer tokens, JWTs, KSM URLs;
+      covered in `tests/test_redact.py`).
+- [x] `tests/test_perf.py` → add `resource.getrusage` peak-RSS
+      assertion (`<192 MiB`).
 - [x] Map DOR `TEST_PLAN.md` scenarios to SDK tests (`tests/test_dor_scenarios.py`
       plus `tests/test_commander_cli.py` for Commander-specific apply paths).
       Partial-apply outcomes + `keepercommander` floor gate are covered in

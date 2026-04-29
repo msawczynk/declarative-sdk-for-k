@@ -74,6 +74,10 @@ _PATTERNS: tuple[tuple[re.Pattern[str], _Replacement], ...] = (
         _redact_ksm_url,
     ),
     (
+        re.compile(r"(?i)\b(?P<host>keeper://[^/\s?#;]+)(?P<suffix>(?:/[^\s?;]*)?(?:\?[^\s;]*)?)"),
+        _redact_ksm_url,
+    ),
+    (
         re.compile(r"\b(KEEPER_(?:PASSWORD|TOTP_SECRET|EMAIL)=)([^\s;]+)"),
         _redact_env_assignment,
     ),

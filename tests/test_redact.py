@@ -68,6 +68,10 @@ def test_patterns_are_exported_for_introspection() -> None:
             "load ksm://keeper.example/*** now",
         ),
         (
+            "load keeper://keeper.example/records/abc?field=password&title=x now",
+            "load keeper://keeper.example/*** now",
+        ),
+        (
             "jwt eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.signature done",
             "jwt eyJhbG*** done",
         ),
