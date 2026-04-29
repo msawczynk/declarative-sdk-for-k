@@ -26,9 +26,9 @@ Reconciliation against `V1_GA_CHECKLIST.md` + `docs/SDK_DA_COMPLETION_PLAN.md` +
 
 ## Current baseline
 
-- **v1.2.0 local gates:** 1024 tests / 87% coverage.
-- **Phase 7:** in progress for broader Keeper surface: shared folders, KSM app create/reference, teams/roles read-only validate, and report hardening.
-- **New Phase 7 / v1.2 tests:** `tests/test_ksm_app_create.py`, `tests/test_teams_roles_validate.py`, `tests/test_report_commands.py`, `tests/test_vault_custom_fields.py`, `tests/test_vault_update_smoke.py`, `tests/test_adoption_smoke.py`, `tests/test_two_writer.py`, `tests/test_msp_apply.py`, `tests/test_vault_shared_folder.py`, `tests/test_ksm_app_reference.py`, `tests/test_shared_folder_model.py`, `tests/test_compat_shim.py`.
+- **v1.3.0.dev0 local gates:** 1037 tests / 87% coverage.
+- **Phase 7:** in progress for broader Keeper surface: shared-folder Commander create/update is wired, KSM bus is documented as a sealed stub, and KSM app create/reference, teams/roles read-only validate, and report hardening remain tracked.
+- **New Phase 7 / v1.2-v1.3 tests:** `tests/test_ksm_app_create.py`, `tests/test_teams_roles_validate.py`, `tests/test_report_commands.py`, `tests/test_vault_custom_fields.py`, `tests/test_vault_update_smoke.py`, `tests/test_adoption_smoke.py`, `tests/test_two_writer.py`, `tests/test_msp_apply.py`, `tests/test_vault_shared_folder.py`, `tests/test_ksm_app_reference.py`, `tests/test_shared_folder_model.py`, `tests/test_shared_folder_commander.py`, `tests/test_ksm_bus_stub.py`, `tests/test_compat_shim.py`.
 - **New examples:** `examples/vault/login-record.yaml`, `examples/vault/shared-folder.yaml`, `examples/msp/02-with-modules.yaml`.
 - **Import-path rename:** `declarative_sdk_k` forward-compatible shim is present; `keeper_sdk` remains the v1.x canonical package and removal stays deferred to v2.0.
 

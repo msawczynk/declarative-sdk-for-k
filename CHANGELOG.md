@@ -13,6 +13,12 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 - **Phase 7 — shared-folder apply path** — MockProvider apply coverage now
   exercises shared-folder create/update/noop/delete guardrails and
   `keeper-vault-sharing.v1` CLI apply -> clean mock-plan convergence.
+- **Phase 7 — shared-folder Commander write path** — Commander provider now
+  wires shared-folder create/update and membership grant paths with delete
+  guardrails while broader permission diff/readback proof remains gated.
+- **Phase 7 — KSM inter-agent bus stub** — `keeper_sdk.secrets.bus` documents
+  the future publish/subscribe surface and raises `NotImplementedError` with
+  `next_action` until the protocol and live proof land.
 - **Phase 7 — KSM bootstrap live path** — `bootstrap-ksm` coverage now tracks
   the live bootstrap flow through application provisioning, one-time token
   redemption, local KSM config materialization, and login-helper verification.

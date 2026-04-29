@@ -157,6 +157,13 @@ and `tests/test_smoke_scenarios.py`.
 - [x] Module rename from `keeper_sdk` → `declarative_sdk_k` (breaking, v2.0.0;
       will ship a shim module so `import keeper_sdk` keeps working for
       one minor cycle; shim delivered).
+- [x] SharedFolder Commander write path create/update wiring landed with
+      membership grant coverage and delete guardrails; full support lift still
+      waits for broader permission diff/readback proof.
+- [x] KSM inter-agent bus documented as a sealed design stub:
+      `keeper_sdk/secrets/bus.py` exposes `BusClient` / `KsmBus` but raises
+      `NotImplementedError` with `next_action` until protocol and live proof
+      land.
 
 ## Release gating
 

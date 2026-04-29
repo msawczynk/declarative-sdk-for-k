@@ -115,6 +115,8 @@ Rows added for the v1.2 state and first Phase 7 landing slice:
 | P25 shared-folder MockProvider apply | SHIPPED v1.3.dev0 (offline) | `tests/test_shared_folder_apply.py`, `tests/test_cli_sharing_dispatch.py`, `tests/test_sharing_mock_provider.py`, `tests/test_sharing_mock_provider_siblings.py` | Mock apply covers create/update/noop/delete guardrails and `keeper-vault-sharing.v1` apply -> clean mock-plan convergence; Commander live support remains preview-gated until write/readback proof. |
 | P26 v1.3.0.dev0 baseline | SHIPPED dev baseline | `pyproject.toml`, `CHANGELOG.md` | Package metadata is on `1.3.0.dev0`; the `declarative_sdk_k` shim remains the v1.x bridge and breaking `keeper_sdk` removal waits for v2.0.0. |
 | P27 blockers table + v1.3 roadmap | SHIPPED docs/index | `docs/DSK_NEXT_WORK.md` | The queue now records blockers and v1.3 roadmap items for shared-folder write support, KSM app create proof, module rename timing, and teams/roles live validate. |
+| P30 shared-folder Commander create/update | SHIPPED v1.3.dev0 (offline) | `keeper_sdk/providers/commander_cli.py`, `tests/test_shared_folder_commander.py` | Commander provider now wires shared-folder create/update and membership grant paths with delete guardrails; full support lift still needs broader permission diff/readback proof. |
+| P31 KSM inter-agent bus stub | SHIPPED documented stub | `keeper_sdk/secrets/bus.py`, `tests/test_ksm_bus_stub.py`, `docs/KSM_INTEGRATION.md` | `BusClient` / `KsmBus` import and method surfaces are documented but sealed with `NotImplementedError` + `next_action`; no bus support claim yet. |
 
 ---
 
