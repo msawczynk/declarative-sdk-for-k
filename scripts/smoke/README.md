@@ -2,12 +2,23 @@
 
 This smoke is an autonomous, no-human-input harness for proving the SDK against a live Keeper tenant through Commander CLI 17.x, while honoring the current "no DAG writes" moratorium by routing all tenant mutations through Commander rather than direct `keeper_dag` writes. Profile-backed KSM/helper auth and the public `EnvLoginHelper` path are wired into the same plan -> apply -> verify -> destroy harness.
 
-The `pamRemoteBrowser` and `pamUserNestedRotation` scenarios are proof harnesses, not automatic support claims for Issues #5 and #4. **RBI (2026-04-28):** Acme-lab `pamRemoteBrowser` smoke **SMOKE PASSED** (create → post-apply re-plan clean → destroy) after `discover()` maps Commander field `rbiUrl` to manifest `url` (`docs/SDK_COMPLETION_PLAN` § issue #5). In-process TunnelDAG merge still backfills `pam_settings.options` tri-states for verification when the graph is available. **Rotation:** nested `pamUserNestedRotation` reaches apply and marker verification after `pam rotation edit`. **Offline (2026-04-28):** `compute_diff` now treats parent `pam_settings` as a declared-key overlay and normalizes `pamUser.managed` scalars — reduces spurious parent/nested UPDATE rows on re-plan. **Live re-plan** (post-overlay diff) still must be re-run against Acme-lab; keep preview/experimental gates per `docs/SDK_DA_COMPLETION_PLAN.md` until re-plan is exit 0. **Pre-merge contract:** do not lift preview gates in schema/docs without parent-reviewed live proof and DA alignment.
+The `pamRemoteBrowser` and `pamUserNestedRotation` scenarios are proof harnesses
+for the supported slices named in `docs/SDK_DA_COMPLETION_PLAN.md`. **RBI
+(2026-04-28):** Acme-lab `pamRemoteBrowser` smoke **SMOKE PASSED** (create →
+post-apply re-plan clean → destroy) after `discover()` maps Commander field
+`rbiUrl` to manifest `url` (`docs/SDK_COMPLETION_PLAN` § issue #5). In-process
+TunnelDAG merge still backfills `pam_settings.options` tri-states for
+verification when the graph is available. **Rotation:** nested
+`pamUserNestedRotation` is supported for the
+`resources[].users[].rotation_settings` slice on Commander 17.2.16+ through
+`pam rotation edit` plus `pam rotation list --record-uid --format json`
+readback. Top-level `users[].rotation_settings`, resource-level rotation, and
+`default_rotation_schedule` remain blocked.
 
 ## Prerequisites
 
 - **Telling proof for the SDK** is this smoke (and `tests/live/` with `KEEPER_LIVE_TENANT=1`). Agent **daybook** / JOURNAL hooks: [`../daybook/README.md`](../daybook/README.md) — separate; do not treat as a substitute for live tenant runs.
-- Keeper Commander >= 17.2.13 on PATH (`keeper --version`)
+- Keeper Commander >= 17.2.16 on PATH (`keeper --version`)
 - `pip` packages installed: `keepercommander`, `pyotp`, `keeper_secrets_manager_core`, `pyyaml`
 - External profile JSON at `~/.config/dsk/profiles/default.json` or the path named by `DSK_SMOKE_PROFILE`
 - Admin KSM config and Commander config paths populated in the external profile
@@ -36,7 +47,7 @@ python3 scripts/smoke/smoke.py --scenario pamRemoteBrowser
 python3 scripts/smoke/smoke.py --scenario pamUserNested # machine + nested users[]
 python3 scripts/smoke/smoke.py --login-helper env --scenario pamMachine
 python3 scripts/smoke/smoke.py --login-helper env --scenario pamRemoteBrowser # #5; see `docs/COMMANDER.md` P3.1
-DSK_PREVIEW=1 DSK_EXPERIMENTAL_ROTATION_APPLY=1 python3 scripts/smoke/smoke.py --login-helper env --scenario pamUserNestedRotation
+python3 scripts/smoke/smoke.py --login-helper env --scenario pamUserNestedRotation
 ```
 
 Operator-side sequential or parallel matrix runners live outside this public
@@ -53,9 +64,9 @@ round-trip.
 | `pamMachine` | supported | Default two-host Linux machine cycle. |
 | `pamDatabase` | supported | Postgres cycle. |
 | `pamDirectory` | supported | OpenLDAP cycle. |
-| `pamRemoteBrowser` | lab smoke green (2026-04-28) | Full “supported” gate still #5 + `docs/live-proof` + DA alignment. |
+| `pamRemoteBrowser` | lab smoke green (2026-04-28) | Supported rows are bucketed in `docs/COMMANDER.md` P3.1; dirty/list/audio fields stay gated. |
 | `pamUserNested` | supported nested shape | Machine with `resources[].users[]`; not standalone top-level user support. |
-| `pamUserNestedRotation` | experimental preview | Requires `DSK_PREVIEW` plus `DSK_EXPERIMENTAL_ROTATION_APPLY`; offline diff overlay landed 2026-04-28; live re-plan exit 0 still open (issue #4). |
+| `pamUserNestedRotation` | supported (Commander 17.2.16+) | Nested `resources[].users[].rotation_settings` only; top-level users, resource-level rotation, and `default_rotation_schedule` remain blocked. |
 
 Not-supported-yet smoke coverage belongs in `docs/SDK_DA_COMPLETION_PLAN.md` § Phase 0 until it is registered in `scripts/smoke/scenarios.py` and live-proofed.
 

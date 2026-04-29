@@ -11,7 +11,7 @@ This is the contract layer — every behaviour change here ripples into provider
 | `schema.py` | 114 | JSON-schema loader + `validate_manifest`. | `load_schema`, `validate_manifest` |
 | `models.py` | 469 | Pydantic models for the manifest surface (Manifest, Gateway, PamConfiguration, PamMachine, PamDatabase, PamDirectory, PamRemoteBrowser, PamUser, LoginRecord, Project, SharedFolderBlock, SharedFoldersBlock). `extra="allow"` neither widened nor narrowed. | All resource models |
 | `graph.py` | 178 | Build dep DAG + topo `execution_order`; walks `shared_folders`, `projects`, resource `pam_configuration_uid_ref` edges. | `build_graph`, `execution_order` |
-| `vault_models.py` | 179 | `keeper-vault.v1` slice-1 Pydantic + `load_vault_manifest`; L1 `login` records plus offline `VaultSharedFolder` / `diff_shared_folder` skeleton. JSON schema + Commander write support for shared folders remain preview-gated. | `VaultManifestV1`, `VaultRecord`, `load_vault_manifest`, `VAULT_MANIFEST_FAMILY` |
+| `vault_models.py` | 179 | `keeper-vault.v1` slice-1 Pydantic + `load_vault_manifest`; L1 `login` records plus offline `VaultSharedFolder` / `diff_shared_folder` skeleton. Shared-folder Commander write primitives are wired, but full sharing lifecycle support remains preview-gated pending second-account live proof. | `VaultManifestV1`, `VaultRecord`, `load_vault_manifest`, `VAULT_MANIFEST_FAMILY` |
 | `vault_graph.py` | 87 | Vault dep DAG: duplicate `uid_ref`, `folder_ref` → synthetic prerequisite nodes; `vault_record_apply_order` strips folder nodes. | `build_vault_graph`, `vault_record_apply_order` |
 | `vault_diff.py` | 848 | Vault desired-vs-live; field-level match to Commander-flattened scalars. | `compute_vault_diff` |
 | `diff.py` | 763 | `compute_diff` PAM: `_index_live` + `_classify_desired` + `_classify_orphans`. Owns `_DIFF_IGNORED_FIELDS`. P2.1 (2026-04-28): `pam_settings.options` treated as overlay (inner keys merged, not wholesale replace); `managed` bool normalized before compare. Nested-`pamUser` `rotation_settings` equality. | `Change`, `ChangeKind`, `compute_diff` |
@@ -26,7 +26,7 @@ This is the contract layer — every behaviour change here ripples into provider
 | `metadata.py` | 99 | Marker encode/decode; `MANAGER_NAME = "keeper-pam-declarative"`; field label `keeper_declarative_manager`. `utc_timestamp()` single source of truth. | `encode_marker`, `decode_marker`, `MARKER_FIELD_LABEL` |
 | `normalize.py` | 305 | Manifest ↔ Commander `pam_import` JSON shape. `to_pam_import_json` / `from_pam_import_json`. Commander field-name leakage confined here. | `to_pam_import_json`, `from_pam_import_json` |
 | `redact.py` | 133 | Redaction patterns (passwords, tokens, JWTs, KSM URLs, `keeper://` URLs added 2026-04-29, bearer); applied at renderer + error layers. | `redact` |
-| `preview.py` | 129 | `DSK_PREVIEW=1` guard for unsupported schema surface (`rotation_settings`, `jit_settings`, `gateway.mode: create`, top-level `projects[]`). 14 cases in `tests/test_preview_gate.py`. | (preview helper APIs) |
+| `preview.py` | 129 | `DSK_PREVIEW=1` guard for unsupported schema surface (`jit_settings`, `gateway.mode: create`, top-level `projects[]`, `default_rotation_schedule`, and unsupported rotation locations). Nested `resources[].users[].rotation_settings` is not preview-gated. | (preview helper APIs) |
 | `rules.py` | 82 | Semantic validation beyond JSON schema: requires `pam_configuration_uid_ref` when configs exist; `pamRemoteBrowser` cannot carry `jit_settings`; `rotation` only on `pamMachine|pamDatabase|pamDirectory`. | (rule registry) |
 | `schemas/pam-environment.v1.schema.json` | – | Packaged JSON schema (v1). | – |
 
@@ -38,7 +38,7 @@ This is the contract layer — every behaviour change here ripples into provider
 | New semantic rule | `rules.py` | existing `pamRemoteBrowser`-no-`jit_settings` rule |
 | New ignored drift field | `diff.py::_DIFF_IGNORED_FIELDS` | `pam_configuration_uid_ref` entry |
 | New error variant | `errors.py` | `CapabilityError` (carries `next_action`) |
-| New preview-gated key | `preview.py` + `tests/test_preview_gate.py` | `rotation_settings` block |
+| New preview-gated key | `preview.py` + `tests/test_preview_gate.py` | `default_rotation_schedule` block |
 | New marker payload field | `metadata.py` + DOR `METADATA_OWNERSHIP.md` first | `first_applied_at` field |
 
 ## Hard rules
@@ -60,6 +60,6 @@ This is the contract layer — every behaviour change here ripples into provider
 ## Known gaps (per `docs/SDK_DA_COMPLETION_PLAN.md`)
 
 - Top-level `pamUser` standalone shape — schema/model open, planner unsupported (preview-gated → v1.1).
-- Nested `pamUser.rotation_settings` — **UPSTREAM-GAP confirmed 2026-04-28 by live smoke**: offline diff fix PROVEN (`pam_settings.options` overlay + `managed` bool normalized in `diff.py`). Re-plan exit 2 after apply; Commander cannot write rotation `pam_settings`; no SDK code change until upstream Commander fix. Preview gates remain.
+- Nested `pamUser.rotation_settings` — **supported on Commander 17.2.16+** for `resources[].users[]`: `pam rotation edit` apply plus `pam rotation list --record-uid --format json` readback. Top-level users, resource-level rotation, and `default_rotation_schedule` remain blocked.
 - RBI `pam_settings.options` — P3 RESOLVED (2026-04-28): `_enrich_pam_remote_browser_dag_options` in `providers/commander_cli.py` merges TunnelDAG `allowedSettings` → `pam_settings.options`; E2E smoke passed; P3.1 bucket table in `docs/COMMANDER.md`.
-- `keeper-vault.v1` shared-folder rows — `VaultSharedFolder` / `diff_shared_folder` are modeled offline, and `SharingSharedFolder` is modeled in `keeper-vault-sharing.v1`; JSON schema acceptance and Commander write support for create/update/memberships/permissions remain preview-gated.
+- `keeper-vault.v1` shared-folder rows — `VaultSharedFolder` / `diff_shared_folder` are modeled offline, and `SharingSharedFolder` is modeled in `keeper-vault-sharing.v1`; Commander write primitives for create/update/memberships/permissions are wired, while full lifecycle support remains preview-gated pending second-account live proof.

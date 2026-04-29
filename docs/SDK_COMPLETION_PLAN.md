@@ -271,20 +271,16 @@ Live proof:
 - Verify in tenant/Commander that rotation config changed.
 - Only then remove gate for supported slice.
 
-Latest live evidence:
+Latest evidence:
 
-- Experimental `pamUserNestedRotation` now reaches `pam rotation edit` with
-  real record/config/resource UIDs after Users-folder discover and unique-title
+- `pamUserNestedRotation` reaches `pam rotation edit` with real
+  record/config/resource UIDs after Users-folder discover and unique-title
   matching fixes.
-- After routing rotation edit through the in-process Commander session, apply
-  and marker verification pass. **2026-04-28 Acme-lab** `pamUserNestedRotation`
-  smoke: re-plan was `exit 2` with `update` rows (e.g. `pam_settings` on the
-  parent `pamMachine`, `managed` on the nested `pamUser`) — **offline follow-up
-  (same day):** `compute_diff` overlay for parent `pam_settings` + `managed`
-  normalization (`keeper_sdk/core/diff.py`); re-run live smoke to see whether
-  re-plan is clean or drift is now **rotation readback** / `rotation_settings`
-  only. End-to-end support is still not proven until live re-plan is clean; issue
-  **#4** remains the tracker.
+- Commander 17.2.16 adds `pam rotation list --record-uid --format json`; the
+  SDK hydrates nested `pamUser.rotation_settings` from that readback and treats
+  parent `pam_settings` as a declared-key overlay. The supported slice is
+  nested `resources[].users[].rotation_settings`; top-level users,
+  resource-level rotation, and `default_rotation_schedule` remain blocked.
 
 ### P2.3 Rotation Gate Lift
 
@@ -297,7 +293,7 @@ Tasks:
 
 Acceptance:
 
-- Manifest with supported `users[].rotation_settings` validates without `DSK_PREVIEW`.
+- Manifest with supported `resources[].users[].rotation_settings` validates without `DSK_PREVIEW`.
 - Unsupported schedule/config/default cases still conflict clearly.
 
 ## Phase 3: Post-Import Connection / RBI Tuning

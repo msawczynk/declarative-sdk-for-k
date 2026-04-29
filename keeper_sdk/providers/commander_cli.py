@@ -110,7 +110,7 @@ _SESSION_EXPIRED_CODE = "session_token_expired"
 _ROTATION_APPLY_ENV_VAR = "DSK_EXPERIMENTAL_ROTATION_APPLY"
 _TRUTHY_ENV_VALUES = {"1", "true", "yes", "on"}
 # In-process PAM import / marker writes require a floor documented in docs/COMMANDER.md.
-_MIN_KEEPERCOMMANDER_VERSION = (17, 2, 13)
+_MIN_KEEPERCOMMANDER_VERSION = (17, 2, 16)
 _MSP_APPLY_UNSUPPORTED_REASON = (
     "MSP managed-company apply is not implemented on CommanderCliProvider "
     "(Commander: `msp-add` / `msp-update` / `msp-remove`; see docs/COMMANDER.md)"
@@ -451,7 +451,7 @@ def _ensure_keepercommander_version_for_apply() -> None:
     if not installed:
         raise CapabilityError(
             reason="keepercommander Python package is not installed",
-            next_action="pip install 'keepercommander>=17.2.13,<18'",
+            next_action="pip install 'keepercommander>=17.2.16,<18'",
         )
     if not _semver_tuple_at_least(installed, _MIN_KEEPERCOMMANDER_VERSION):
         iv = ".".join(str(x) for x in installed)
@@ -462,7 +462,7 @@ def _ensure_keepercommander_version_for_apply() -> None:
                 "CommanderCliProvider in-process apply paths"
             ),
             next_action=(
-                "upgrade with pip install -U 'keepercommander>=17.2.13,<18' "
+                "upgrade with pip install -U 'keepercommander>=17.2.16,<18' "
                 "and read docs/COMMANDER.md for the pin rationale"
             ),
             context={"installed": installed, "required": _MIN_KEEPERCOMMANDER_VERSION},
@@ -622,7 +622,7 @@ class CommanderCliProvider(Provider):
         except ImportError as exc:
             raise CapabilityError(
                 reason=f"MSP discover requires keepercommander: {exc}",
-                next_action="pip install 'keepercommander>=17.2.13,<18'",
+                next_action="pip install 'keepercommander>=17.2.16,<18'",
             ) from exc
 
         def _run_discover() -> list[dict[str, Any]]:
@@ -3231,7 +3231,7 @@ class CommanderCliProvider(Provider):
     def _pam_gateway_rows(self) -> list[dict[str, str]]:
         """Return gateway rows using Commander's JSON output.
 
-        Commander release `17.2.13+` exposes ``pam gateway list --format json``
+        Commander release `17.2.16+` exposes ``pam gateway list --format json``
         (``keepercommander/commands/discoveryrotation.py`` L1373-1606). The
         response is ``{"gateways": [{gateway_name, gateway_uid, ksm_app_name,
         ksm_app_uid, ksm_app_accessible, status, gateway_version, ...}, ...]}``.
@@ -3334,7 +3334,7 @@ class CommanderCliProvider(Provider):
     def _pam_config_rows(self) -> list[dict[str, str]]:
         """Return PAM configuration rows using Commander's JSON output.
 
-        Commander release `17.2.13+` exposes ``pam config list --format json``
+        Commander release `17.2.16+` exposes ``pam config list --format json``
         (``keepercommander/commands/discoveryrotation.py`` L1729-1967).
         Response: ``{"configurations": [{uid, config_name, config_type,
         shared_folder: {name, uid}, gateway_uid, resource_record_uids,
@@ -3369,7 +3369,7 @@ class CommanderCliProvider(Provider):
 
         Prefer the in-process Commander vault API — the bundled macOS
         `keeper` binary (17.1.14) doesn't know `record-update`, and Commander
-        17.2.13's CLI uses a field-syntax (`custom.label=value`) that's
+        17.2.16's CLI uses a field-syntax (`custom.label=value`) that's
         fragile across versions. We already have KeeperParams available for
         the pam project import/extend path; reuse them.
         """
@@ -3463,7 +3463,7 @@ class CommanderCliProvider(Provider):
         # Commander binary drops back to an interactive `Email:` prompt even
         # with a warmed config + KEEPER_PASSWORD set. Root cause: the bundled
         # macOS binary at /usr/local/bin/keeper is 17.1.14 (doesn't know
-        # `pam project extend`) and `python3 -m keepercommander` 17.2.13 in
+        # `pam project extend`) and `python3 -m keepercommander` 17.2.16 in
         # subprocess can't resume the session for this specific subcommand.
         # In-process invocation via the Commander Python API works cleanly
         # once we've done one api.login() with full TOTP, so we delegate.
@@ -3488,7 +3488,7 @@ class CommanderCliProvider(Provider):
         # against ``/usr/local/bin/keeper`` uses ``~/.keeper/commander-config.json``
         # which can hold a stale device_token (e.g. on dev workstations) and
         # then fails to resync just-applied records on a post-apply re-plan
-        # — even though the in-process Commander 17.2.13 session that ran
+        # — even though the in-process Commander 17.2.16 session that ran
         # the apply itself is fresh. Route through the same in-process
         # session when login config is detectable so discover() shares the
         # apply-time auth context. Falls through to subprocess when no
@@ -4394,11 +4394,9 @@ def build_pam_rotation_edit_argvs(
 ) -> list[list[str]]:
     """Build Commander argv for nested ``pamUser`` rotation settings.
 
-    Pure resolver: it never calls Keeper. ``apply_plan`` only uses it behind
-    the Commander-only ``DSK_EXPERIMENTAL_ROTATION_APPLY`` opt-in while the
-    public provider-capability and preview gates remain in place. Nested users
-    need three proven live UIDs before a rotation edit is safe: the user
-    record, the parent resource record, and the PAM config.
+    Pure resolver: it never calls Keeper. Nested users need three proven live
+    UIDs before a rotation edit is safe: the user record, the parent resource
+    record, and the PAM config.
     """
     source = _manifest_dict(manifest)
     _reject_top_level_user_rotation(source)
@@ -4880,8 +4878,9 @@ def _build_pam_rotation_edit_args(
 ) -> list[str]:
     """Map declarative rotation settings to Commander's `pam rotation edit` argv.
 
-    Pure helper only. `apply_plan` calls it only behind the Commander-only
-    `DSK_EXPERIMENTAL_ROTATION_APPLY` opt-in.
+    Pure helper only. `apply_plan` runs nested pamUser rotation by default on
+    Commander 17.2.16+ pins; `DSK_EXPERIMENTAL_ROTATION_APPLY=0` remains a
+    kill switch for operators who need to disable this slice during triage.
     """
     data = _model_dump_dict(settings)
     args = ["pam", "rotation", "edit", "--record", record_uid]
@@ -4911,7 +4910,7 @@ def _build_pam_rotation_edit_args(
 def _detect_unsupported_capabilities(
     manifest: Any,
     *,
-    allow_nested_rotation: bool = False,
+    allow_nested_rotation: bool = True,
 ) -> list[str]:
     """Return human-readable reasons the manifest exceeds this provider.
 
@@ -4958,9 +4957,9 @@ def _detect_unsupported_capabilities(
         )
     if _has_nested_user_rotation(source) and not allow_nested_rotation:
         hits.append(
-            "resources[].users[].rotation_settings is not implemented "
+            "resources[].users[].rotation_settings is disabled for this provider run "
             "(Commander hook: `pam rotation edit --record / --resource / --schedulecron / --on-demand`; "
-            f"offline experimental path requires {_ROTATION_APPLY_ENV_VAR}=1)"
+            f"unset {_ROTATION_APPLY_ENV_VAR} or set {_ROTATION_APPLY_ENV_VAR}=1 to enable)"
         )
 
     for needle, human, hook in _UNSUPPORTED_CAPABILITY_HINTS:
@@ -4971,7 +4970,9 @@ def _detect_unsupported_capabilities(
 
 
 def _rotation_apply_is_enabled() -> bool:
-    raw = os.environ.get(_ROTATION_APPLY_ENV_VAR, "")
+    raw = os.environ.get(_ROTATION_APPLY_ENV_VAR)
+    if raw is None or not raw.strip():
+        return True
     return raw.strip().lower() in _TRUTHY_ENV_VALUES
 
 

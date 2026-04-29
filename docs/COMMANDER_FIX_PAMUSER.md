@@ -2,15 +2,23 @@
 
 ### Problem
 
-`PAMListRecordRotationCommand` (`discoveryrotation.py:1220`) has no `--record-uid` filter and no `--format json`. Any UID passed as a positional argument raises `ParseError`. `pam access user list` raises `CommandError: not yet implemented`.
+`PAMListRecordRotationCommand` (`discoveryrotation.py:1220`) formerly had no
+`--record-uid` filter and no `--format json`. Any UID passed as a positional
+argument raised `ParseError`. `pam access user list` raised `CommandError: not
+yet implemented`.
 
 ### SDK impact
 
-Nested `pamUser.rotation_settings` re-plan is blocked; `preview-gated` classification holds until Commander ships the fix.
+Resolved in Commander 17.2.16 (pin
+`6574827cf2993d2a54484516c2f4cc33238f98c9`): nested
+`resources[].users[].rotation_settings` can now be read with
+`pam rotation list --record-uid --format json`, and the SDK hydrates that state
+during discover. Top-level `users[].rotation_settings`,
+`resources[].rotation_settings`, and `default_rotation_schedule` remain blocked.
 
 **Offline gate:** `tests/test_diff.py::test_diff_nested_pam_user_rotation_drift_surfaces_rotation_settings_key`
 
-### Proposed Commander patch
+### Commander patch
 
 Additive argparse extension to `PAMListRecordRotationCommand`:
 
@@ -19,9 +27,11 @@ parser.add_argument("--record-uid", "-r", dest="record_uid", required=False)
 parser.add_argument("--format", dest="output_format", choices=["table","json"], default="table")
 ```
 
-### SDK-side wiring (after Commander fix)
+### SDK-side wiring
 
-Add in-process dispatch for `["pam", "rotation", "list", "--record-uid", uid, "--format", "json"]` in `commander_cli.py`, mirroring the `pam config list` / `pam gateway list` pattern.
+Implemented in `commander_cli.py`: in-process dispatch for
+`["pam", "rotation", "list", "--record-uid", uid, "--format", "json"]`,
+mirroring the `pam config list` / `pam gateway list` pattern.
 
 ### GH#35 comment posted
 
@@ -29,4 +39,4 @@ Add in-process dispatch for `["pam", "rotation", "list", "--record-uid", uid, "-
 
 ### Status
 
-Waiting for upstream keepercommander release. No SDK workaround (table parsing too fragile).
+Closed for the nested `resources[].users[]` slice on Commander 17.2.16+.

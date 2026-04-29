@@ -21,7 +21,7 @@ Implement `keeper_sdk.core.interfaces.Provider`. Two ship today.
 | `pam config list --format json` | scaffold + stage-5 binding | JSON contract pinned |
 | `pam project import` (in-process) | bootstrap | subprocess re-prompts login → forced in-process via `PAMProjectImportCommand` |
 | `pam project extend` (in-process) | add resources | same subprocess limitation |
-| `pam rotation edit` | nested-`pamUser` rotation (preview) | apply path lands; clean re-plan = open gate (SDK_DA P2) |
+| `pam rotation edit` / `pam rotation list --record-uid` | nested-`pamUser` rotation | supported for `resources[].users[]` on Commander 17.2.16+; top-level/resource rotation stays blocked |
 | `record-update` (in-process `record_management.update_record`) | marker writeback | macOS `keeper` 17.1.14 has no `record-update` subcmd; `-cf` syntax fragile across versions |
 
 ## In-process API (when subprocess can't auth)
@@ -32,7 +32,7 @@ the `EnvLoginHelper` env-var fallback) and calls Commander commands directly.
 stdout/stderr captured via `contextlib.redirect_stdout` so callers that grep
 output (e.g. `access_token=`) keep working.
 
-Floor: `keepercommander>=17.2.13,<18`. Enforced at `apply_plan` start via
+Floor: `keepercommander>=17.2.16,<18`. Enforced at `apply_plan` start via
 `importlib.metadata.version("keepercommander")`. Test:
 `tests/test_commander_cli.py::test_apply_rejects_keepercommander_below_minimum`.
 

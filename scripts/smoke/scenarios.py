@@ -331,10 +331,10 @@ _SCENARIOS: dict[str, ScenarioSpec] = {
         build_resources=_pam_user_nested_rotation_resources,
         verify=_verify_pam_user_nested,
         description=(
-            "Experimental nested admin pamUser rotation shape with the parent "
-            "admin credential bound through pam_settings.connection. Requires "
-            "DSK_PREVIEW plus DSK_EXPERIMENTAL_ROTATION_APPLY; not a live "
-            "support claim."
+            "Nested admin pamUser rotation shape with the parent admin "
+            "credential bound through pam_settings.connection. Supported on "
+            "Commander 17.2.16+ for the resources[].users[] slice; standalone "
+            "top-level pamUser rotation remains outside this support claim."
         ),
     ),
 }

@@ -23,9 +23,9 @@ tenant. The only sanctioned path for live mutation. No ad-hoc CLI.
 | `pamMachine` | `pamMachine` | live-verified | Reference scenario (W-series live proof, 2026-04-24/25). |
 | `pamDatabase` | `pamDatabase` | scenario shipped + offline-tested | Live cmd: `--scenario pamDatabase`. |
 | `pamDirectory` | `pamDirectory` | scenario shipped + offline-tested | Live cmd: `--scenario pamDirectory`. |
-| `pamRemoteBrowser` | `pamRemoteBrowser` | preview-gated (P3) | Discover passes manifest source for DAG → `pam_settings.options` merge; clean re-plan parent-verified gate. |
+| `pamRemoteBrowser` | `pamRemoteBrowser` | bucketed support (P3) | Supported rows are in `docs/COMMANDER.md` P3.1; dirty/list/audio fields stay gated. |
 | `pamUserNested` | `pamMachine` w/ nested `users[]` | shipped offline | Proves nested-user shape through schema/model/planner/normalize. |
-| `pamUserNestedRotation` | nested `pamUser` w/ `rotation_settings` | preview (P2.1) | Apply lands; clean re-plan = open gate. |
+| `pamUserNestedRotation` | nested `pamUser` w/ `rotation_settings` | supported on Commander 17.2.16+ | `resources[].users[]` rotation only; top-level/resource rotation stays blocked. |
 
 ## Where to land new work
 

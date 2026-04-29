@@ -487,7 +487,7 @@ def test_run_cmd_routes_get_in_process_when_login_helper_set(
 def test_run_cmd_ls_in_process_uses_returned_json_not_sync_spinner(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Commander 17.2.13 returns JSON from ``FolderListCommand.execute``.
+    """Commander 17.2.16 returns JSON from ``FolderListCommand.execute``.
 
     ``api.sync_down`` can print progress noise; discover must parse only the
     command result, not the sync spinner.
@@ -993,26 +993,35 @@ def test_unsupported_default_rotation_schedule_has_precise_hook(
     assert "--schedule-config only reads config default" in reasons[0]
 
 
-def test_unsupported_nested_rotation_settings_gate_stays_closed(
+def test_nested_rotation_settings_are_supported_by_default(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.delenv("DSK_EXPERIMENTAL_ROTATION_APPLY", raising=False)
     provider = _provider(monkeypatch)
 
-    reasons = provider.unsupported_capabilities(_rotation_manifest())
-
-    assert len(reasons) == 1
-    assert "resources[].users[].rotation_settings" in reasons[0]
-    assert "pam rotation edit" in reasons[0]
+    assert provider.unsupported_capabilities(_rotation_manifest()) == []
 
 
-def test_unsupported_nested_rotation_settings_opens_with_experimental_env(
+def test_nested_rotation_settings_remain_supported_with_experimental_env(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     provider = _provider(monkeypatch)
     monkeypatch.setenv("DSK_EXPERIMENTAL_ROTATION_APPLY", "1")
 
     assert provider.unsupported_capabilities(_rotation_manifest()) == []
+
+
+def test_nested_rotation_settings_can_be_disabled_with_experimental_env_false(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = _provider(monkeypatch)
+    monkeypatch.setenv("DSK_EXPERIMENTAL_ROTATION_APPLY", "0")
+
+    reasons = provider.unsupported_capabilities(_rotation_manifest())
+
+    assert len(reasons) == 1
+    assert "resources[].users[].rotation_settings is disabled" in reasons[0]
+    assert "pam rotation edit" in reasons[0]
 
 
 def test_unsupported_top_level_rotation_stays_closed_with_experimental_env(
@@ -1285,7 +1294,7 @@ def test_apply_runs_nested_rotation_after_post_import_discovery(
     monkeypatch.setattr(
         "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
     )
-    monkeypatch.setenv("DSK_EXPERIMENTAL_ROTATION_APPLY", "1")
+    monkeypatch.delenv("DSK_EXPERIMENTAL_ROTATION_APPLY", raising=False)
     calls: list[list[str]] = []
     monkeypatch.setattr(
         CommanderCliProvider,
@@ -1580,13 +1589,13 @@ def test_apply_rotation_dry_run_does_not_execute_rotation(
     }
 
 
-def test_apply_rotation_dry_run_stays_blocked_without_experimental_env(
+def test_apply_rotation_dry_run_can_be_disabled_with_experimental_env_false(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
         "keeper_sdk.providers.commander_cli.shutil.which", lambda _bin: "/usr/bin/keeper"
     )
-    monkeypatch.delenv("DSK_EXPERIMENTAL_ROTATION_APPLY", raising=False)
+    monkeypatch.setenv("DSK_EXPERIMENTAL_ROTATION_APPLY", "0")
     monkeypatch.setattr(
         CommanderCliProvider,
         "_run_cmd",
@@ -1597,7 +1606,7 @@ def test_apply_rotation_dry_run_stays_blocked_without_experimental_env(
     with pytest.raises(CapabilityError) as exc_info:
         provider.apply_plan(_rotation_apply_plan(), dry_run=True)
 
-    assert "resources[].users[].rotation_settings is not implemented" in exc_info.value.reason
+    assert "resources[].users[].rotation_settings is disabled" in exc_info.value.reason
     assert "DSK_EXPERIMENTAL_ROTATION_APPLY=1" in exc_info.value.reason
 
 
@@ -3518,7 +3527,7 @@ def test_apply_rejects_keepercommander_below_minimum(
     )
     monkeypatch.setattr(
         "keeper_sdk.providers.commander_cli._keepercommander_installed_tuple",
-        lambda: (17, 2, 12),
+        lambda: (17, 2, 15),
     )
     provider = CommanderCliProvider(folder_uid="folder-uid")
     plan = Plan(manifest_name="empty", changes=[], order=[])

@@ -22,7 +22,6 @@ sys.path.insert(0, str(_SMOKE_DIR))
 import scenarios as smoke_scenarios  # noqa: E402
 
 from keeper_sdk.core.diff import compute_diff  # noqa: E402
-from keeper_sdk.core.errors import SchemaError  # noqa: E402
 from keeper_sdk.core.graph import build_graph, execution_order  # noqa: E402
 from keeper_sdk.core.manifest import load_manifest  # noqa: E402
 from keeper_sdk.core.models import PamMachine  # noqa: E402
@@ -185,7 +184,7 @@ def test_pamuser_nested_scenario_exercises_full_offline_path(tmp_path: Path) -> 
     assert converted_user["login"] == "sdk-smoke-user"
 
 
-def test_pamuser_nested_rotation_scenario_is_preview_only_offline(
+def test_pamuser_nested_rotation_scenario_validates_without_preview(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     spec = smoke_scenarios.get("pamUserNestedRotation")
@@ -199,10 +198,6 @@ def test_pamuser_nested_rotation_scenario_is_preview_only_offline(
     path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
 
     monkeypatch.delenv("DSK_PREVIEW", raising=False)
-    with pytest.raises(SchemaError, match="preview keys"):
-        load_manifest(path)
-
-    monkeypatch.setenv("DSK_PREVIEW", "1")
     manifest = load_manifest(path)
     resource = cast(PamMachine, manifest.resources[0])
     assert resource.pam_settings is not None

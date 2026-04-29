@@ -3,10 +3,10 @@
 Pins three invariants:
 
 1. With ``DSK_PREVIEW`` unset, a manifest carrying a preview key
-   (``rotation_settings``, ``jit_settings``, gateway ``mode: create``,
-   ``default_rotation_schedule``, top-level ``projects[]``) is rejected
-   at load time with :class:`SchemaError` and a remediation that names
-   the env var.
+   (unsupported rotation locations, ``jit_settings``, gateway ``mode:
+   create``, ``default_rotation_schedule``, top-level ``projects[]``) is
+   rejected at load time with :class:`SchemaError` and a remediation that
+   names the env var.
 2. With ``DSK_PREVIEW=1``, the same manifest loads cleanly.
 3. The detector is pure and does not consult the env var.
 
@@ -107,7 +107,6 @@ def preview_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
 @pytest.mark.parametrize(
     ("raw", "needle"),
     [
-        (_MANIFEST_WITH_ROTATION, "rotation_settings"),
         (_MANIFEST_WITH_GATEWAY_CREATE, "mode: create"),
         (_MANIFEST_WITH_PROJECTS, "top-level projects[]"),
     ],
@@ -139,6 +138,14 @@ def test_gate_accepts_preview_key_with_opt_in(
     assert expected_ref in refs
 
 
+def test_nested_rotation_is_supported_without_preview(preview_disabled: None) -> None:
+    manifest = load_manifest_string(_MANIFEST_WITH_ROTATION, suffix=".yaml")
+
+    resource = manifest.resources[0]
+    assert resource.users
+    assert resource.users[0].rotation_settings is not None
+
+
 def test_gate_is_noop_for_clean_manifest(preview_disabled: None) -> None:
     manifest = load_manifest_string(_MANIFEST_CLEAN, suffix=".yaml")
     assert manifest.resources[0].uid_ref == "res-db"
@@ -149,13 +156,29 @@ def test_detector_is_pure_and_ignores_env(preview_enabled: None) -> None:
         {
             "gateways": [{"uid_ref": "gw.new", "mode": "create"}],
             "projects": [{"uid_ref": "proj.lab", "project": "lab"}],
-            "resources": [{"users": [{"rotation_settings": {}}]}],
+            "users": [{"uid_ref": "usr.top", "rotation_settings": {}}],
         }
     )
     joined = " ".join(hits)
     assert "mode: create" in joined
     assert "top-level projects[]" in joined
     assert "rotation_settings" in joined
+
+
+def test_detector_ignores_supported_nested_rotation(preview_disabled: None) -> None:
+    hits = detect_preview_keys(
+        {
+            "resources": [
+                {
+                    "uid_ref": "res.db",
+                    "type": "pamMachine",
+                    "users": [{"uid_ref": "usr.db", "rotation_settings": {}}],
+                }
+            ],
+        }
+    )
+
+    assert hits == []
 
 
 def test_detector_uses_exact_keys_for_default_rotation(preview_enabled: None) -> None:
@@ -198,5 +221,7 @@ def test_assert_helper_matches_gate(preview_disabled: None) -> None:
     # Direct call raises for preview-containing docs, no-ops for clean ones
     with pytest.raises(SchemaError):
         assert_preview_keys_allowed({"users": [{"rotation_settings": {}}]})
-    assert_preview_keys_allowed({"resources": [{"type": "pamMachine"}]})
+    assert_preview_keys_allowed(
+        {"resources": [{"type": "pamMachine", "users": [{"rotation_settings": {}}]}]}
+    )
     assert os.environ.get(PREVIEW_ENV_VAR) is None
