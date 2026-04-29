@@ -9,6 +9,25 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 ## [2.0.0] - 2026-04-29
 
 ### Added
+- **GitHub Actions integration** — `.github/actions/dsk-plan/` composite action runs
+  `dsk plan --json` on PR diff and posts a plan summary comment; `.github/actions/dsk-drift/`
+  runs on schedule for drift detection. Example workflow in `.github/workflows/dsk-example.yml`.
+- **Commander service-mode provider** — `CommanderServiceProvider` targets the Commander
+  Service Mode REST API (`/api/v2/executecommand-async`). Covers submit/poll/result,
+  FILEDATA inline import, 429 retry with backoff, and mocked tests; see `docs/COMMANDER_SERVICE_MODE.md`.
+- **DSK MCP server** — `keeper_sdk.mcp.server` exposes validate, plan, apply, diff, export,
+  report, and KSM bus tools over stdio JSON-RPC for AI agent clients. Config example in
+  `docs/mcp-config-example.json`; design in `docs/MCP_SERVER.md`.
+- **Commander coverage extractor** — `scripts/coverage/commander_coverage.py` scrapes the
+  Commander mirror to build a capability matrix; baseline in `.sync_baseline` and
+  `docs/COMMANDER_COVERAGE.md`.
+- **Back-compat shims** — `declarative_sdk_k/` package re-exports `keeper_sdk` symbols with
+  a one-shot deprecation warning; `scripts/sync_upstream.py` audits CLI API drift against
+  the baseline.
+- **EPM schema foundation** — `keeper-epm.v1` with watchlists, elevation policies, approvers,
+  and audit configuration; `keeper_sdk.core.models_epm`, `epm_diff`, and offline tests.
+- **KSM mock provider** — `KsmMockProvider` adds full plan/apply lifecycle for `keeper-ksm.v1`
+  including ownership markers and convergence; `keeper_sdk.core.ksm_diff` extended.
 - **Schema-family coverage** — v2.0.0 packages the expanded declarative surface:
   `keeper-ksm.v1`, `keeper-enterprise.v1`,
   `keeper-integrations-identity.v1`, `keeper-integrations-events.v1`,
