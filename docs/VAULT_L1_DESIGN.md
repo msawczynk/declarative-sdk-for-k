@@ -213,6 +213,16 @@ This design **recommends Option A** long-term; Option B is acceptable only as a
 | Result | `SMOKE PASSED: create->verify->destroy cycle clean`; includes clean re-plan and empty re-discover |
 | Scope | One L1 scalar `login` record; see §1 and §4 limits |
 
+### Known gap: `vaultSharingLifecycle`
+
+- The `vaultSharingLifecycle` gate requires `--parallel-profile` backed by a
+  second Keeper account so share grant/revoke behavior can be observed from an
+  independent principal.
+- This is a lab design constraint, not a code bug in the L1 scalar `login`
+  lifecycle.
+- Gate lift is deferred until the lab provisions the second Keeper account and
+  its profile.
+
 ---
 
 ## 8. Implementation pointer (PR-V1)
@@ -244,3 +254,4 @@ This design **recommends Option A** long-term; Option B is acceptable only as a
 | 2026-04-27 | §8: `validate --online` / `vault_online` JSON mode (PR-V4+); no §7 sign-off. |
 | 2026-04-27 | §4: semantic `login` diff limits, concurrent-edit caveat, Commander UPDATE / `CapabilityError` guard (no §7 sign-off). |
 | 2026-04-28 | Aligned §7 with committed `vaultOneLogin` live-proof artifact and live-proof README contract. |
+| 2026-04-29 | §7: documented `vaultSharingLifecycle` second-account / `--parallel-profile` gate constraint. |

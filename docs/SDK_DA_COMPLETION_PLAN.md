@@ -283,6 +283,10 @@ Tasks:
 
 Acceptance:
 
+- [x] Add two-writer race coverage (`tests/test_two_writer.py` — 3 cases, 982
+  pass under the local gate run).
+- [x] Add field-drift UPDATE smoke (`tests/test_vault_update_smoke.py`).
+- [x] Add adoption lifecycle smoke (`tests/test_adoption_smoke.py`).
 - `tests/test_dor_scenarios.py` has no stale expected deferrals.
 - CLI docs match actual dry-run behavior.
 - Race conditions fail closed.

@@ -1,6 +1,6 @@
 # RECONCILIATION — design vs tree
 
-Written: 2026-04-26 (agent scaffold pass; refreshed 2026-04-28 for KSM live + rotation/RBI + P2.1 `diff` queue).
+Written: 2026-04-26 (agent scaffold pass; refreshed 2026-04-29 for KSM live + rotation/RBI + P2.1 `diff` queue + v1.1 offline quality smokes).
 Source of truth: `main` at time of last doc edit (exact SHA: `git rev-parse HEAD`).
 Cross-checks against `V1_GA_CHECKLIST.md`, `docs/SDK_DA_COMPLETION_PLAN.md`,
 `AUDIT.md`, `REVIEW.md`, and DOR pointers in `keeper-pam-declarative/`.
@@ -13,7 +13,7 @@ This is for human + agent review. Per-folder maps live in `<dir>/SCAFFOLD.md`.
 
 - **Zero remaining v1.0.0 GA blockers.** Tag policy decided: annotated only — distribution is GitHub-only (no PyPI, no `git verify-tag` consumer flow); GPG/SSH signing not required. Upgrade path if supply-chain requirements change → sigstore/cosign `dist/*` in `publish.yml` (OIDC, no maintainer key).
 - **Open clean-re-plan work** (not GA blockers): nested-`pamUser` rotation (P2.1 / issue #4) — apply + rotation edit OK; **offline** `diff` now handles parent `pam_settings` overlay + `managed` bool skew (`CHANGELOG` [Unreleased]) — **live re-plan exit 0** must be re-proven on Acme-lab. **P3 / #5** `pamRemoteBrowser` closeout evidence is doc-ready (2026-04-28 smoke + COMMANDER P3.1 + DA Phase 3); dirty/list/audio subfields stay bucketed.
-- **Three v1.1 deferrals tracked + accepted:** adoption smoke against unmanaged records, field-drift→UPDATE smoke, two-writer ownership-marker race smoke.
+- **Three v1.1 offline quality gaps closed:** adoption smoke against unmanaged records, field-drift->UPDATE smoke, two-writer ownership-marker race smoke.
 - **One v2 deferral:** module rename `keeper_sdk` → `declarative_sdk_k` (will ship compat shim).
 - **Nothing has been silently dropped.** Every preview-gated key fails loud at apply via `_detect_unsupported_capabilities` + plan-surface CONFLICT rows (C3 fix; H6 regression test).
 
@@ -42,7 +42,7 @@ This is for human + agent review. Per-folder maps live in `<dir>/SCAFFOLD.md`.
 | 6 | `pamMachine` cycle live | SHIPPED + LIVE-GREEN | `AUDIT.md` 2026-04-24/25 |
 | 6 | `pamDatabase`/`pamDirectory`/`pamRemoteBrowser` registered + offline-tested | SHIPPED | `scripts/smoke/scenarios.py`, `tests/test_smoke_scenarios.py` |
 | 6 | Nested `pamUser` shape | SHIPPED (offline) | `pamUserNested` scenario |
-| 6 | Adoption / field-drift / two-writer smokes | DEFERRED v1.1 | tracked in checklist |
+| 6 | Adoption / field-drift / two-writer smokes | SHIPPED v1.1 (offline) | `tests/test_adoption_smoke.py`, `tests/test_vault_update_smoke.py`, `tests/test_two_writer.py` |
 
 **GA verdict:** all gates green. Tag whenever maintainer wants.
 
@@ -85,6 +85,18 @@ DA Definition-of-Done compliance:
 
 ---
 
+## v1.1 Quality-Gap Refresh
+
+Rows added for the v1.1 items that landed after the last reconciliation pass:
+
+| Item | Status | Evidence in tree | Notes |
+|---|---|---|---|
+| Adoption lifecycle smoke (`dsk import` offline) | SHIPPED v1.1 (offline) | `tests/test_adoption_smoke.py` | Covers unmanaged-record adoption plan/apply lifecycle and ownership-marker convergence without live tenant access. |
+| Field-drift UPDATE vault smoke | SHIPPED v1.1 (offline) | `tests/test_vault_update_smoke.py` | Covers scalar `login` field change -> plan UPDATE -> apply -> clean re-plan. |
+| Two-writer ownership-marker coverage | SHIPPED v1.1 (offline) | `tests/test_two_writer.py` | Covers same resource with different manager -> CONFLICT, same manager -> noop, and post-release adopt path. |
+
+---
+
 ## Has anything been DROPPED?
 
 Cross-checking the 2026-04-24 AUDIT scope (W1–W20), DOR contract, and REVIEW deferrals:
@@ -98,7 +110,7 @@ Cross-checking the 2026-04-24 AUDIT scope (W1–W20), DOR contract, and REVIEW d
 | `DeleteUnsupportedError` | KEPT as compat shim | Subclass of `CapabilityError`. Test in `tests/test_errors.py`. |
 | Phase 2.1 (nested rotation) full close | NOT dropped — IN FLIGHT | Apply ✅ marker verify ✅ clean re-plan ⏳ (parent-verified gate). |
 | Phase 3 (RBI) full close | NOT dropped — IN FLIGHT | DAG merge shipped; clean re-plan ⏳. |
-| Adoption smoke / field-drift smoke / two-writer smoke | DEFERRED v1.1 (explicit) | `V1_GA_CHECKLIST.md` § 6 marks them. |
+| Adoption smoke / field-drift smoke / two-writer smoke | SHIPPED v1.1 (offline) | See `v1.1 Quality-Gap Refresh` above. |
 | Module rename `keeper_sdk` → `declarative_sdk_k` | DEFERRED v2.0 (explicit) | Hardening row. Ship via compat shim. |
 | Multi-project manifests | OUT OF SCOPE per AUDIT | `Project` 0..1 per manifest per `SCHEMA_CONTRACT.md` L98. |
 | DAG-level dependency checks on delete | OUT OF SCOPE per AUDIT | Project invariant: no direct DAG access. Commander itself refuses dependent `rm`. |
