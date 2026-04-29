@@ -42,7 +42,7 @@ PRs that close them so the next agent can tell at a glance what's left.
 ### 3. CI + release plumbing
 - [x] MIT `LICENSE`, `CHANGELOG.md`, `SECURITY.md`.
 - [x] GitHub Actions: ruff + mypy + pytest 3.11/3.12/3.13.
-- [x] `pyproject.toml` pins `keepercommander>=17.2.13,<18`.
+- [x] `pyproject.toml` pins `keepercommander>=17.2.16,<18`.
 - [x] First green CI run on `main` (`fb6fb8b`).
 - [x] GitHub Release asset workflow (`on: release: published`) in
       `.github/workflows/publish.yml`: builds `dist/*`, `twine check`, uploads
@@ -119,6 +119,19 @@ and `tests/test_smoke_scenarios.py`.
 - `80614e5` — CI pinning hardened with full Commander SHA + `fetch-depth: 0`.
 
 ## Hardening (non-blocking but tracked)
+
+### v1.3.0 readiness note (2026-04-29)
+
+Phase 7 hardening is complete for the v1.3.0 release bar: Commander is pinned
+to 17.2.16, nested `resources[].users[].rotation_settings` is default-enabled
+for the proven readback slice, KSM bootstrap / `KsmLoginHelper` are
+live-proven, the KSM bus is explicitly sealed, shared-folder Commander
+write primitives have destructive-change guards, and report caveats are
+documented. Remaining non-GA blockers are deliberately post-release: gateway
+`mode: create` / top-level `projects[]` deferred to v2 design, full
+`vaultSharingLifecycle` live proof pending a second account, general
+declarative KSM app lifecycle pending clean re-plan/cleanup proof, and the
+no-rebuild `compliance-report` cache shape.
 
 - [x] Retained `DeleteUnsupportedError` as a public compat shim subclassing
       `CapabilityError`; provider delete/capability failures flow through

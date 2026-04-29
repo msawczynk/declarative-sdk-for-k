@@ -1,6 +1,6 @@
 # RECONCILIATION — design vs tree
 
-Written: 2026-04-26 (agent scaffold pass; refreshed 2026-04-29 for KSM live + rotation/RBI + P2.1 `diff` queue + v1.1 offline quality smokes + v1.2/Phase 7 entry/final pass + v1.3.dev0 final pass).
+Written: 2026-04-26 (agent scaffold pass; refreshed 2026-04-29 for KSM live + rotation/RBI + P2.1 `diff` queue + v1.1 offline quality smokes + v1.2/Phase 7 entry/final pass + v1.3.0 release).
 Source of truth: `main` at time of last doc edit (exact SHA: `git rev-parse HEAD`).
 Cross-checks against `V1_GA_CHECKLIST.md`, `docs/SDK_DA_COMPLETION_PLAN.md`,
 `AUDIT.md`, `REVIEW.md`, and DOR pointers in `keeper-pam-declarative/`.
@@ -13,7 +13,7 @@ This is for human + agent review. Per-folder maps live in `<dir>/SCAFFOLD.md`.
 
 - **Zero remaining v1.0.0 GA blockers.** Tag policy decided: annotated only — distribution is GitHub-only (no PyPI, no `git verify-tag` consumer flow); GPG/SSH signing not required. Upgrade path if supply-chain requirements change → sigstore/cosign `dist/*` in `publish.yml` (OIDC, no maintainer key).
 - **GH #35 resolved in Commander 17.2.16:** nested-`pamUser` rotation readback is unblocked by `pam rotation list --record-uid --format json`; the SDK now hydrates nested `pamUser.rotation_settings` during discover. **P3 / #5** `pamRemoteBrowser` closeout evidence is doc-ready (2026-04-28 smoke + COMMANDER P3.1 + DA Phase 3); dirty/list/audio subfields stay bucketed.
-- **v1.3.0.dev0 baseline:** v1.2.0 is shipped; the dev line now tracks Phase 7 shared-folder MockProvider apply, the `declarative_sdk_k` rename shim, KSM bootstrap live proof, and `DSK_NEXT_WORK` blockers / v1.3 roadmap.
+- **v1.3.0 release:** Phase 7 hardening is cut on `main`: Commander 17.2.16 floor, nested `resources[].users[].rotation_settings` default-enabled, shared-folder write primitives + destructive guards, KSM bootstrap live proof, KSM bus sealed stub, MSP discover/validate, and report caveats.
 - **Three v1.1 offline quality gaps closed:** adoption smoke against unmanaged records, field-drift->UPDATE smoke, two-writer ownership-marker race smoke.
 - **One v2 deferral:** breaking removal of `keeper_sdk`; `declarative_sdk_k` forward-compatible shim has landed.
 - **Nothing has been silently dropped.** Every preview-gated key fails loud at apply via `_detect_unsupported_capabilities` + plan-surface CONFLICT rows (C3 fix; H6 regression test).
@@ -31,7 +31,7 @@ This is for human + agent review. Per-folder maps live in `<dir>/SCAFFOLD.md`.
 | 2 | DOR reconciliation (7 contradictions) | SHIPPED + SUPERSEDED 2026-04-24 | `AUDIT.md` D-5, `REVIEW.md` |
 | 3 | LICENSE + CHANGELOG + SECURITY | SHIPPED | root files |
 | 3 | CI matrix (ruff + mypy + pytest 3.11/3.12/3.13) | SHIPPED | `.github/workflows/ci.yml` |
-| 3 | `keepercommander>=17.2.13,<18` pin | SHIPPED | `pyproject.toml` |
+| 3 | `keepercommander>=17.2.16,<18` pin | SHIPPED | `pyproject.toml`, `.commander-pin` |
 | 3 | First green `main` CI | SHIPPED | `fb6fb8b` |
 | 3 | GitHub Release asset workflow (no PyPI) | SHIPPED | `.github/workflows/publish.yml`, `docs/RELEASING.md` |
 | 3 | `v1.0.0` release tag | SHIPPED-by-policy | annotated tag only; GitHub-only repo, no PyPI / no downstream `git verify-tag`; GPG/SSH signing not required (sigstore/cosign of `dist/*` in `publish.yml` is the cheap upgrade path if requirements change) |
@@ -59,9 +59,9 @@ Every modeled capability must classify as `supported` / `preview-gated` / `upstr
 | `pamDatabase` GA fields | supported | shipped | offline-green; live-green | scenario | – |
 | `pamDirectory` GA fields | supported | shipped | offline-green; live-green | scenario | – |
 | `pamRemoteBrowser` connection fields | supported | shipped | offline-green | scenario | – |
-| `pamRemoteBrowser` RBI tri-state / audio (DAG-backed) | preview-gated | DAG → manifest merge shipped | green | ✅ | ✅ E2E smoke rc=0 (2026-04-28). DAG-backed subfields (tri-state, audio) remain `preview-gated`. |
+| `pamRemoteBrowser` RBI buckets | mixed | DAG → manifest merge shipped | green for supported rows | ✅ | ✅ E2E smoke rc=0 (2026-04-28). URL and typed boolean rows are supported / import-supported per `docs/COMMANDER.md`; list/audio/upstream-gap rows stay gated. |
 | Nested `pamUser` shape (in `resources[].users[]`) | supported (shape) | shipped | green | scenario | `pamUserNested` |
-| Nested `pamUser.rotation_settings` | supported (Commander 17.2.16+) | shipped | unblocked | parent smoke pending | GH #35 added `pam rotation list --record-uid --format json`; SDK discover readback is wired offline. |
+| Nested `pamUser.rotation_settings` | supported (Commander 17.2.16+) | shipped | green | supported | GH #35 added `pam rotation list --record-uid --format json`; SDK discover readback hydrates the nested slice. |
 | Top-level `users[].rotation_settings` | preview-gated | guarded | – | – | gate-lift rule: stays blocked even after nested clears |
 | `default_rotation_schedule` | preview-gated | guarded | – | – | needs separate setter/readback proof |
 | `jit_settings` | upstream-gap | guarded | – | – | `docs/ISSUE_6_JIT_SUPPORT_BOUNDARY.md` |
@@ -71,15 +71,15 @@ Every modeled capability must classify as `supported` / `preview-gated` / `upstr
 | KSM application provisioning (`dsk bootstrap-ksm`) | supported | shipped | live-green (bootstrap+login) | low | 2026-04-28: `tests/live/test_ksm_bootstrap_smoke.py` with `KEEPER_LIVE_TENANT=1` + KSM config — see `LIVE_TEST_RUNBOOK`. Also `docs/KSM_BOOTSTRAP.md` + 89 unit tests. Full PAM apply+KSM remains via committed smoke, not this pytest alone. |
 | `KsmLoginHelper` (Commander credentials read from KSM) | supported | shipped | live: exercised on bootstrap+login path per same pytest | low | `keeper_sdk/auth/helper.py` + 175+ unit tests; `docs/KSM_INTEGRATION.md`. |
 | `keeper-vault.v1` L1 (login CRUD) | supported | shipped | green | green | 2026-04-28 `vaultOneLogin` smoke passed create -> verify -> destroy; scalar field diff + apply converges. |
-| KSM inter-agent bus (`secrets/bus.py`) | `preview-gated` / skeleton | sealed (raises `CapabilityError`) | – | ❌ | Wire format frozen; client implementation deferred to v1.1 |
-| MSP discover/apply (`msp-environment.v1`) | supported | shipped | green | green | 2026-04-29 lab proof: `validate --online` exit 0 and post-apply plan converged; import remains unsupported. |
+| KSM inter-agent bus (`secrets/bus.py`) | sealed stub / unsupported | sealed (raises `CapabilityError` / `NotImplementedError`) | – | ❌ | Wire format frozen; no publish/subscribe support claim. |
+| MSP discover / validate (`msp-environment.v1`) | supported | shipped | green | green | Commander MSP `validate --online` / discover is supported for MSP admin sessions; Commander import/apply remain unsupported. |
 
 DA Definition-of-Done compliance:
 - ✅ GitHub install path works (git URL + release wheel/sdist).
 - ✅ Full local checks + GitHub CI green on `main`.
 - ✅ All modeled keys classify into one bucket.
 - ✅ No preview-gated key silently applies or silently drops (`_detect_unsupported_capabilities` + plan CONFLICT rows; C3 + D-4 + H6).
-- ⚠️ Live smoke matrix green for **all** supported mutating surfaces — yes for machine/db/dir; RBI remains **preview-gated**. Nested rotation now requires Commander 17.2.16+ readback and a parent-run live proof capture.
+- ⚠️ Live smoke matrix green for **all** supported mutating surfaces — yes for machine/db/dir and bucketed P3 RBI rows. Nested rotation is supported for `resources[].users[]` on Commander 17.2.16+; top-level/resource rotation remains blocked.
 - ✅ Unsupported capabilities fail with clear `next_action`.
 - ✅ Docs + scaffold match current behaviour.
 - ✅ GitHub issue state matches behaviour.
@@ -112,10 +112,10 @@ Rows added for the v1.2 state and first Phase 7 landing slice:
 | `declarative_sdk_k` compatibility shim | SHIPPED v1.2/P22 | `declarative_sdk_k/__init__.py`, `tests/test_compat_shim.py`, `pyproject.toml` | New package name forwards to `keeper_sdk`; breaking removal of `keeper_sdk` remains v2.0. |
 | Renderer snapshot coverage | SHIPPED v1.2 (offline) | `tests/test_renderer_snapshots.py`, `tests/fixtures/renderer_snapshots/` | Six layout snapshots lock CLI table shape for current renderers. |
 | Perf memory assertion | SHIPPED v1.2 (offline) | `tests/test_perf.py` | Local gate asserts peak RSS stays under **192 MiB** for the covered workload. |
-| P25 shared-folder MockProvider apply | SHIPPED v1.3.dev0 (offline) | `tests/test_shared_folder_apply.py`, `tests/test_cli_sharing_dispatch.py`, `tests/test_sharing_mock_provider.py`, `tests/test_sharing_mock_provider_siblings.py` | Mock apply covers create/update/noop/delete guardrails and `keeper-vault-sharing.v1` apply -> clean mock-plan convergence; Commander live support remains preview-gated until write/readback proof. |
-| P26 v1.3.0.dev0 baseline | SHIPPED dev baseline | `pyproject.toml`, `CHANGELOG.md` | Package metadata is on `1.3.0.dev0`; the `declarative_sdk_k` shim remains the v1.x bridge and breaking `keeper_sdk` removal waits for v2.0.0. |
+| P25 shared-folder MockProvider apply | SHIPPED v1.3.0 (offline) | `tests/test_shared_folder_apply.py`, `tests/test_cli_sharing_dispatch.py`, `tests/test_sharing_mock_provider.py`, `tests/test_sharing_mock_provider_siblings.py` | Mock apply covers create/update/noop/delete guardrails and `keeper-vault-sharing.v1` apply -> clean mock-plan convergence; Commander live support remains preview-gated until write/readback proof. |
+| P26 v1.3.0 baseline | SHIPPED release baseline | `pyproject.toml`, `CHANGELOG.md` | Package metadata is on `1.3.0`; the `declarative_sdk_k` shim remains the v1.x bridge and breaking `keeper_sdk` removal waits for v2.0.0. |
 | P27 blockers table + v1.3 roadmap | SHIPPED docs/index | `docs/DSK_NEXT_WORK.md` | The queue now records blockers and v1.3 roadmap items for shared-folder write support, KSM app create proof, module rename timing, and teams/roles live validate. |
-| P30 shared-folder Commander create/update | SHIPPED v1.3.dev0 (offline) | `keeper_sdk/providers/commander_cli.py`, `tests/test_shared_folder_commander.py` | Commander provider now wires shared-folder create/update and membership grant paths with delete guardrails; full support lift still needs broader permission diff/readback proof. |
+| P30 shared-folder Commander create/update | SHIPPED v1.3.0 (offline) | `keeper_sdk/providers/commander_cli.py`, `tests/test_shared_folder_commander.py` | Commander provider now wires shared-folder create/update and membership grant paths with delete guardrails; full support lift still needs broader permission diff/readback proof. |
 | P31 KSM inter-agent bus stub | SHIPPED documented stub | `keeper_sdk/secrets/bus.py`, `tests/test_ksm_bus_stub.py`, `docs/KSM_INTEGRATION.md` | `BusClient` / `KsmBus` import and method surfaces are documented but sealed with `NotImplementedError` + `next_action`; no bus support claim yet. |
 
 ---
@@ -166,8 +166,8 @@ Operator-side tooling is not part of this SDK and is not documented here.
 2. `sdk-live-smoke` branch — rename / delete / leave as snapshot?
 3. `DSK_PREVIEW=1` discoverability — one-line in error vs dedicated doc page?
 4. Gateway `mode: create` + `projects[]` — design done; needs Commander source audit + `projects[]` provider conflict hardening + disposable-infra live proof.
-5. Post-import RBI tuning — design readback/re-plan semantics before lifting `preview-gated` to `supported`.
-6. Nested `pamUser` rotation — close P2.1 by proving clean re-plan + destroy on a parent-run live smoke.
+5. Post-import RBI tuning — bucketed in `docs/COMMANDER.md`; only lift additional dirty/list/audio rows after focused readback proof.
+6. Nested `pamUser` rotation — supported for `resources[].users[]` on Commander 17.2.16+; keep top-level/resource rotation blocked until a separate writer/readback proof exists.
 7. ~~Signed `v1.0.0` tag~~ — RESOLVED 2026-04-26: annotated tag only by policy (GitHub-only repo). Sigstore/cosign of `dist/*` is the cheap upgrade path if supply-chain requirements ever appear.
 
 ---

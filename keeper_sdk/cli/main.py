@@ -684,7 +684,7 @@ def validate(
     help="Write YAML to file (else stdout)",
 )
 def export_cmd(commander_json: Path, name: str | None, output: Path | None) -> None:
-    """Lift a ``keeper pam project export`` JSON document into a manifest."""
+    """Lift a Commander-shaped PAM project JSON document into a manifest."""
     data = json.loads(commander_json.read_text(encoding="utf-8"))
     manifest_dict = from_pam_import_json(data, name=name or commander_json.stem)
     # validate + type
@@ -1283,7 +1283,7 @@ def _load_commander_config_params():
     except ImportError as exc:
         raise CapabilityError(
             reason=f"keepercommander is required for bootstrap-ksm commander login mode: {exc}",
-            next_action="pip install keepercommander>=17.2.13,<18",
+            next_action="pip install keepercommander>=17.2.16,<18",
         ) from exc
 
     config_path = Path.home() / ".keeper" / "config.json"

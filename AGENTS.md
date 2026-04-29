@@ -38,7 +38,7 @@ pip install git+https://github.com/msawczynk/declarative-sdk-for-k.git@main
 # or a release tag / wheel from GitHub Releases — see docs/RELEASING.md
 ```
 
-Python 3.11+. Requires `keepercommander>=17.2.13,<18` installed and a
+Python 3.11+. Requires `keepercommander>=17.2.16,<18` installed and a
 reachable Keeper tenant for the `commander` provider. The `mock`
 provider runs fully offline and is the recommended starting point for
 agents.
@@ -52,7 +52,7 @@ agents.
 | `dsk diff PATH`     | manifest             | field-level diff (same vault `login` semantics as `plan`) | —                     |
 | `dsk apply PATH`    | manifest             | outcomes table         | `--dry-run`           |
 | `dsk import PATH`   | manifest             | adoption plan          | `--dry-run`           |
-| `dsk export JSON`   | `pam project export` | manifest YAML          | `-o FILE`             |
+| `dsk export JSON`   | Commander-shaped PAM project JSON file | manifest YAML          | `-o FILE`             |
 | `dsk report password-report` | Commander session | redacted JSON envelope | `--sanitize-uids` (fingerprint UIDs in values); `--quiet` (also fingerprint `record_uid` / `shared_folder_uid` keys); leak check → exit **1** |
 | `dsk report compliance-report` | Commander session | redacted JSON envelope | `--sanitize-uids`, `--quiet`, `--node`, `--rebuild`; leak check → exit **1** |
 | `dsk report security-audit-report` | Commander session | redacted JSON envelope | `--record-details`, `--sanitize-uids`, `--quiet`, `--node`; leak check → exit **1** |
@@ -192,8 +192,9 @@ already belongs to another `manager` string, it shows as CONFLICT and
 ### C. "Recreate this environment somewhere else"
 
 ```bash
-keeper pam project export --output project.json  # upstream Commander
-dsk export project.json -o env.yaml          # lift to a manifest
+# project.json is Commander-shaped PAM project JSON. Commander 17.2.16 has no
+# native `pam project export`; produce it with the supported helper/export path.
+dsk export project.json -o env.yaml          # lift the JSON file to a manifest
 dsk validate env.yaml
 dsk apply env.yaml                           # on the new tenant
 ```

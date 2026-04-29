@@ -10,7 +10,7 @@ Gaps surfaced by the 2026-04-24 devil's-advocate review:
 4. ``utc_timestamp`` shape — ISO-8601 ``Z`` suffix must not drift.
 5. ``pam gateway list`` / ``pam config list`` JSON parsers (D-3) —
    contract tests using the exact shape documented on Commander
-   release branch (``17.2.13+``).
+   release branch (``17.2.16+``).
 """
 
 from __future__ import annotations

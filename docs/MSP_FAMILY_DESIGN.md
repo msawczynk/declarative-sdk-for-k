@@ -11,7 +11,7 @@ wires into `dsk validate`) ·
 [CONVENTIONS.md](../keeper_sdk/core/schemas/CONVENTIONS.md)
 
 **Upstream Commander surface (studied):** `keepercommander.commands.msp` in a local
-`Commander` checkout; SDK dependency pin: `keepercommander>=17.2.13,<18` (developer
+`Commander` checkout; SDK dependency pin: `keepercommander>=17.2.16,<18` (developer
 `pip show` in this repo: **17.2.15** at time of writing). Class and argv details
 in §6.
 
@@ -396,7 +396,7 @@ step unless `query_enterprise` is insufficient in practice (open question).
 
 **Pinned version:** this memo was written against the Commander module layout in
 `keepercommander` **17.2.15** (installed) within the project’s
-**`>=17.2.13,<18`** range. Re-verify signatures before merge if the pin drifts.
+**`>=17.2.16,<18`** range. Re-verify signatures before merge if the pin drifts.
 
 ---
 

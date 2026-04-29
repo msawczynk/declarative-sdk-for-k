@@ -81,7 +81,7 @@ class Provider(Protocol):
         Default for providers that implement everything the schema accepts:
         return ``[]``. See :class:`MockProvider` for the trivial case and
         :meth:`CommanderCliProvider.unsupported_capabilities` for the
-        Commander-release-17.2.13 list (rotation, JIT, gateway mode:create,
+        Commander-release-17.2.16 list (rotation, JIT, gateway mode:create,
         …).
         """
         ...

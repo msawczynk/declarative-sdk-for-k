@@ -5,8 +5,10 @@
 > `validate` / `plan` / `apply` / `discover` on mock + Commander for the
 > PAM lifecycle (machines, databases, directories, nested users, remote
 > browsers, shared folders, gateways, configurations). Rotation settings, JIT,
-> gateway `mode: create`, and RBI tuning remain preview-gated until live proof
-> completes.
+> gateway `mode: create`, and RBI tuning are split by proof: nested
+> `resources[].users[].rotation_settings` is supported on Commander 17.2.16+;
+> top-level/resource rotation, JIT, gateway `mode: create`, and dirty RBI fields
+> stay gated or upstream-gap.
 >
 > **Other manifest families** (`keeper-vault`, `keeper-enterprise`, …) ship as
 > **packaged JSON Schema** for design, CI, and agent ergonomics; they are **not**
@@ -30,27 +32,28 @@ and [`docs/SDK_COMPLETION_PLAN.md`](docs/SDK_COMPLETION_PLAN.md).
 
 ### Progress snapshot (2026-04)
 
-Already on **`main`** (see **[`CHANGELOG.md`](CHANGELOG.md)** [**Unreleased**] for detail):
+Already on **`v1.3.0` / `main`** (see **[`CHANGELOG.md`](CHANGELOG.md)** [**1.3.0**] for detail):
 
-- **P2.1 (nested rotation drift):** offline `compute_diff` treats `pam_settings` on `pamMachine` / `pamDatabase` / `pamDirectory` as an overlay (Commander may add extra keys) and normalizes `pamUser.managed` string/boolean skew — regression coverage in [`tests/test_diff.py`](tests/test_diff.py). **Live** re-plan (`pamUserNestedRotation` smoke, exit **0** post-apply) remains the telling bar before narrowing preview gates — [`docs/DSK_NEXT_WORK.md`](docs/DSK_NEXT_WORK.md).
+- **P2.1 / GH#4 (nested rotation):** Commander 17.2.16 adds `pam rotation list --record-uid --format json`; the SDK now hydrates nested `pamUser.rotation_settings` on discover and defaults the nested `resources[].users[]` apply path on. Top-level users, resource-level rotation, and `default_rotation_schedule` remain blocked.
 - **Exports / RBI:** `pamRemoteBrowser` discover maps **`rbiUrl` ↔ manifest `url`**; docs smoke README + **COMMANDER** RBI buckets aligned with DA Phase 3 evidence targets.
+- **Phase 7:** KSM bootstrap is live-proven, the KSM inter-agent bus is a sealed stub, shared-folder Commander create/update/membership wiring is offline-proven with destructive-change guards, and MSP discover/validate is wired while Commander MSP mutation stays unsupported.
 - **Operator ergonomics:** [`AGENTS.md`](AGENTS.md) documents **`git bundle`** handoff when **`git push`** fails from a sandboxed shell; [`scripts/phase_harness/bundle_unpushed_commits.sh`](scripts/phase_harness/bundle_unpushed_commits.sh) creates the bundle.
 - **Orchestration (workspace):** `queue_runner.sh` in the operator’s **`~/.cursor-daybook-sync/scripts/`** tree chains **`phase_runner.sh`** queue items; **`--live`** + **`--env-file`** pair with **`ksm_creds.sh`** for Codex **`live_smoke`** profile (see **`queue_runner.README.md`** next to that script). Two lab identities — general Acme lab vs MSP parent — use separate **KSM** record pointers; operator-only env templates such as **`~/Downloads/dsk-queue.live.env`** / **`dsk-queue-msp.live.env`** stay outside this repo.
 - **MSP family:** **`msp-environment.v1`** schema + registry on **`main`**; mock **`import`** adoption path + **`validate --online`** discover (`CommanderCliProvider`); **Commander apply/import for MSP** still unsupported — [`docs/MSP_FAMILY_DESIGN.md`](docs/MSP_FAMILY_DESIGN.md), [`docs/V2_DECISIONS.md`](docs/V2_DECISIONS.md) Q5.
 
 ## Capability scope
 
-| Area                 | v1.0 coverage                        | Roadmap                      |
-|----------------------|--------------------------------------|------------------------------|
-| PAM resources        | machines, databases, directories, nested users, remote-browsers (GA lifecycle; preview-gated tuning gaps called out below) | rotation settings, standalone users, JIT, gateway `mode: create` (behind `DSK_PREVIEW=1`) |
+| Area                 | v1.3.0 coverage                        | Roadmap                      |
+|----------------------|----------------------------------------|------------------------------|
+| PAM resources        | machines, databases, directories, nested users, remote-browsers; nested `resources[].users[].rotation_settings` on Commander 17.2.16+ | standalone/top-level users, JIT, resource-level rotation, gateway `mode: create` |
 | Gateways             | `reference_existing` mode            | `create` mode                |
-| Shared folders       | scope + membership refs              | permissions matrix           |
-| KSM applications     | reference_existing + share-bindings; **`dsk bootstrap-ksm` provisions an app + admin-record share + one-time client token + redeemed `ksm-config.json`**; `KsmLoginHelper` pulls Commander credentials *from* KSM (close the loop). Phase B inter-agent bus directory is provisioned but the client is sealed (`secrets/bus.py` raises `CapabilityError`). | client-token rotation; bus client implementation |
+| Shared folders       | typed model, MockProvider lifecycle, Commander create/update/membership wiring, `--allow-delete` guards for destructive membership changes | live second-account readback proof before full sharing support |
+| KSM applications     | reference_existing + share-bindings; **`dsk bootstrap-ksm` provisions an app + admin-record share + one-time client token + redeemed `ksm-config.json`**; `KsmLoginHelper` pulls Commander credentials *from* KSM (close the loop). Phase B inter-agent bus API is sealed (`secrets/bus.py` raises `CapabilityError` / `NotImplementedError`). | declarative app lifecycle; client-token rotation; bus client implementation |
 | Ownership markers    | read + write + adopt                 | multi-manager arbitration    |
 | Vault records (non-PAM) | typed-model read/write via `login` resource | generic records, file records |
 | Teams / roles        | discover surface only                | full declarative lifecycle   |
-| Enterprise config    | scaffold + partial slices (see matrix) | SSO, SCIM, richer nodes     |
-| Compliance / audit   | read-only `dsk report` verbs (password, compliance, security-audit) | extra report verbs; **no** posture-as-manifest (V2) |
+| MSP / enterprise config | `msp-environment.v1` schema + Commander `validate --online` discover for MSP admin sessions; Commander MSP import/apply unsupported | SSO, SCIM, richer nodes, MSP mutation contract |
+| Compliance / audit   | read-only `dsk report password-report` and `security-audit-report` live-proven; `compliance-report --rebuild` has JSON-envelope proof but no-rebuild stays gated | extra report verbs; **no** posture-as-manifest (V2) |
 
 The schema stays stable across capability additions — new top-level
 blocks join `pam-environment.v1` rather than bumping the version. See
@@ -70,6 +73,7 @@ packaged schema alone as GA.
 | `keeper-vault.v1` | yes | **No** — `scaffold-only` live proof + matrix bar; **yes** L1 Commander slice (`login` discover/apply **UPDATE** on **record version 3** JSON), `validate --online`, and semantic `plan`/`diff` for scalar `login` `fields[]` vs Commander-flattened payloads (see **Honest limits** below) |
 | `keeper-vault-sharing.v1` | yes | **No** — scaffold-only |
 | `keeper-enterprise.v1` | yes | **No** — scaffold / partial design only |
+| `msp-environment.v1` | yes | **No** — Commander discover/validate is supported, Commander import/apply is not implemented |
 | `keeper-integrations-identity.v1` | yes | **No** — scaffold-only |
 | `keeper-integrations-events.v1` | yes | **No** — scaffold-only |
 | `keeper-ksm.v1` | yes | **No** — KSM bootstrap + helpers exist; declarative family not wired end-to-end |
@@ -77,8 +81,10 @@ packaged schema alone as GA.
 | `keeper-epm.v1` | yes | **No** — watchlist per V2 Q5 |
 | `keeper-security-posture.v1` | yes (trap) | **N/A** — `dropped-design`; use `dsk report` verbs |
 
-Separate runtime: **`dsk report`** verbs (password / compliance / security-audit)
-are production read paths; they are not manifest families.
+Separate runtime: **`dsk report`** verbs are not manifest families. In v1.3.0,
+`password-report` and `security-audit-report` are live-proven production read
+paths; `compliance-report` remains preview-gated for the no-rebuild cache shape
+until Commander returns JSON or the wrapper handles that empty-output case.
 
 ### Honest limits — vault L1 (devil’s-advocate bar)
 
@@ -161,10 +167,10 @@ AGENTS.md                            # agent-first operating manual
 ```bash
 pip install -e '.[dev]'
 # pinned version from GitHub (no PyPI package for this repo):
-pip install git+https://github.com/msawczynk/declarative-sdk-for-k.git@v1.0.0
+pip install git+https://github.com/msawczynk/declarative-sdk-for-k.git@v1.3.0
 ```
 
-Requires Python 3.11+. `keepercommander>=17.2.13,<18` is pulled in
+Requires Python 3.11+. `keepercommander>=17.2.16,<18` is pulled in
 automatically — only exercised when you hit the `commander` provider;
 the mock provider works standalone.
 
@@ -208,10 +214,18 @@ end-to-end story (bootstrap → `ksm-config.json` → `KsmLoginHelper` →
 fully credential-free SDK runs).
 The built-in `EnvLoginHelper` is live-proven for a full `pamMachine`
 validate -> plan -> apply -> verify -> destroy cycle. `KsmLoginHelper` is
-green offline (264 unit tests in the KSM stack) and is the recommended
-production helper once `dsk bootstrap-ksm` has produced a config.
-Preview-gated surfaces such as RBI tuning and nested `pamUser` rotation
-still need their own live proof before they become support claims.
+live-proven on the bootstrap/login path and is the recommended production
+helper once `dsk bootstrap-ksm` has produced a config. Preview-gated surfaces
+such as dirty RBI fields, standalone/top-level `pamUser` rotation, and gateway
+`mode: create` still need their own proof before they become support claims.
+
+### Export
+
+`dsk export INPUT.json -o env.yaml` lifts a Commander-shaped PAM project JSON
+document into a manifest. Commander 17.2.16 does **not** provide a native
+`pam project export` command; operators produce the JSON by a supported
+Commander/project export helper or by iterating `keeper get` / `keeper ls`, and
+`dsk export` reads that file path.
 
 ### Quick start (KSM bootstrap)
 
@@ -229,7 +243,7 @@ dsk --provider commander --login-helper ksm validate examples/pamMachine.yaml --
 The legacy `pamform` and `keeper-sdk` CLI names remain installed as
 aliases for one major version so existing pipelines do not break.
 
-## Status (main, 2026-04-27)
+## Status (v1.3.0, 2026-04-29)
 
 Core + mock: complete. Commander provider: discover, plan, apply
 (create / update / delete via `keeper rm`, gated behind
@@ -239,21 +253,19 @@ capability check. **`keeper-vault.v1` L1** adds Commander discover/apply
 vault, and semantic vault diff for scalar logins — still **not** “PAM-bar
 GA” until live proof and the readiness gates in
 [`docs/PAM_PARITY_PROGRAM.md`](docs/PAM_PARITY_PROGRAM.md) are complete.
-Capability gaps (rotation, JIT, gateway `mode: create`)
+Capability gaps (top-level/resource rotation, JIT, gateway `mode: create`)
 surface as plan-time CONFLICT rows rather than silent drops, so the CLI's
 `plan` and `apply --dry-run` agree before any mutation runs.
 KSM is now a first-class SDK feature: `dsk bootstrap-ksm` provisions an
 app + share + client token + `ksm-config.json` end-to-end, and
 `KsmLoginHelper` reads Commander credentials back out of that vault — so
-the SDK can authenticate without any plaintext env vars on the host.
-Current local suite: **491 passed / 1 skipped**; line coverage is
-CI-ratcheted (see `pyproject.toml` / workflows); core modules
-`redact`, `schema`, `normalize` at 100%.
-Live `EnvLoginHelper` smoke proved full apply for `pamMachine`; Issue #5
-RBI readback and Issue #4 nested-user rotation remain preview-gated until
-their live create -> verify -> clean re-plan -> destroy loops pass.
-`KsmLoginHelper` + `dsk bootstrap-ksm` are green offline; the live
-end-to-end bootstrap → login → apply loop is the next gate.
+the SDK can authenticate without any plaintext env vars on the host. The KSM
+bus surface is a documented sealed stub, not publish/subscribe support.
+Current local gate: **1047 passed / 2 skipped / 1 xfailed**. Live
+`EnvLoginHelper` smoke proved full apply for `pamMachine`; P3 RBI proof is
+bucketed in `docs/COMMANDER.md`; nested `resources[].users[].rotation_settings`
+is supported on Commander 17.2.16+ while top-level users and default rotation
+schedules remain blocked.
 
 ## Exit codes
 

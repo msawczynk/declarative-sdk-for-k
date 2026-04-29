@@ -24,7 +24,7 @@ runs `bash scripts/daybook/harness.sh` (no `~/.cursor-daybook-sync` required for
 | `test_renderer_snapshots.py` | 228 | RichRenderer plan/diff/outcomes byte-snapshots in `tests/fixtures/renderer_snapshots/`. |
 | `test_interfaces.py` | 9 | Protocol shape conformance. |
 | `test_providers.py` | 66 | Provider protocol + common-provider behaviour. |
-| `test_preview_gate.py` | 202 | 14 cases — `DSK_PREVIEW=1` gates `rotation_settings`/`jit_settings`/`gateway.mode: create`/`projects[]`. |
+| `test_preview_gate.py` | 202 | Preview gates unsupported rotation locations, `jit_settings`, `gateway.mode: create`, `default_rotation_schedule`, and `projects[]`; nested `resources[].users[].rotation_settings` validates without preview. |
 | `test_uid_ref_gate.py` | 22 | `pam_configuration_uid_ref` cross-manifest gate (stage 3 fail). |
 | `test_perf.py` | 73 | 500 `pamMachine` validate→graph→diff→plan inside 5 s budget; `resource.getrusage` mem assert. `@pytest.mark.slow`. |
 | `test_cli.py` | 297 | Click commands; exit codes; `apply --dry-run == plan` byte equivalence (W3/W10). |
@@ -52,7 +52,7 @@ runs `bash scripts/daybook/harness.sh` (no `~/.cursor-daybook-sync` required for
 | New CLI verb test | `test_cli.py` | `import` command tests |
 | New provider behaviour | `test_commander_cli.py` (giant; group by topic) | nearby helper test |
 | New semantic rule | `test_rules.py` | RBI-no-JIT |
-| New preview-gated key | `test_preview_gate.py` | rotation case |
+| New preview-gated key | `test_preview_gate.py` | gateway/default-rotation cases |
 | New live-smoke scenario shape | `test_smoke_scenarios.py` | `pamRemoteBrowser` shape test |
 | New stage-5 binding | `test_stage_5_bindings.py` | gateway pairing case |
 | New DOR scenario mapping | `test_dor_scenarios.py` | partial-apply row |

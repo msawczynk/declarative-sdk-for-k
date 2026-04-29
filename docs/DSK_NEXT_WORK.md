@@ -1,55 +1,45 @@
 # DSK next work (product orchestration queue)
 
-**Audience:** maintainer or any **credentialed** agent driving **this repo** (model
-/ role agnostic for live, per `LIVE_TEST_RUNBOOK`). Per-session
-coordination, sprint memos, and JOURNAL excerpts stay **out of tree** — see
-[`AGENTS.md`](../AGENTS.md) (where “orchestration” lives) and
+**Audience:** maintainer or any **credentialed** agent driving **this repo**
+(model / role agnostic for live, per `LIVE_TEST_RUNBOOK`). Per-session
+coordination, sprint memos, and JOURNAL excerpts stay **out of tree**; see
+[`AGENTS.md`](../AGENTS.md) and
 `~/.cursor-daybook-sync/docs/orchestration/dsk/`.
 
 **Binding contracts (read before gate lifts):**
 [`docs/SDK_DA_COMPLETION_PLAN.md`](./SDK_DA_COMPLETION_PLAN.md),
-[`RECONCILIATION.md`](../RECONCILIATION.md),
+[`RECONCILIATION.md`](../RECONCILIATION.md), and
 [`docs/SDK_COMPLETION_PLAN.md`](./SDK_COMPLETION_PLAN.md).
 
-**Live access (resolve “no access” fallacy):** **any** credentialed session
-(follow [`LIVE_TEST_RUNBOOK.md`](./LIVE_TEST_RUNBOOK.md) + [`AGENTS.md`](../AGENTS.md)
-**Autonomous execution**) may run the committed live harnesses — not only a
-“primary” chat. The bar is **KSM/Commander env in effect**, not which agent
-implementation is at the wheel.
+**Live access:** any credentialed session following
+[`LIVE_TEST_RUNBOOK.md`](./LIVE_TEST_RUNBOOK.md) and `AGENTS.md` may run the
+committed live harnesses. The bar is KSM/Commander env in effect, not which
+agent implementation is at the wheel.
 
-## Priority stack (high → lower)
+## Priority stack (post-v1.3.0)
 
-| Focus | What “done” needs | Next command / doc |
-|-------|-------------------|-------------------|
-| **v1.3.0.dev0 baseline** | **2026-04-29 current:** local collection is **1037 tests / 87% coverage**. Phase 7 has shared-folder Commander create/update wired and the KSM inter-agent bus documented as a sealed `NotImplementedError` stub. | `bash scripts/phase_harness/run_local_gates.sh`; `docs/SDK_DA_COMPLETION_PLAN.md` § Phase 7 |
-| **Phase 7 in progress — broader Keeper surface** | Keep full shared-folder lifecycle claims, full declarative KSM app lifecycle, teams/roles, and no-rebuild compliance-report claims preview-gated until each has upstream-safe write/readback or live read proof. Password-report, security-audit-report, KSM bootstrap, and shared-folder Commander create/update are live/offline-proven to their documented bars. | `docs/SDK_DA_COMPLETION_PLAN.md` § Phase 7; `docs/SCAFFOLD.md` test anchors |
-| **vaultSharingLifecycle live proof** | **BLOCKED:** needs a second Keeper account before sharing lifecycle can be proven live. Offline coverage is not enough for a mutating support lift. | `docs/LIVE_TEST_RUNBOOK.md`; relevant vault sharing smoke once account exists |
-| **Standalone `pamUser`** | **BLOCKED by GH #35:** Commander `pam user ls` ParseError on UID positional arg blocks the safe read path. Do not add more SDK-side workaround code until upstream fixes it. | GitHub **#35**; `DSK_PREVIEW=1` + `DSK_EXPERIMENTAL_ROTATION_APPLY=1` |
-| **KSM app lifecycle live proof** | `bootstrap-ksm` is live-proven 2026-04-29; next bar is declarative app create -> bind/share -> clean re-plan -> cleanup. | `docs/SDK_DA_COMPLETION_PLAN.md` § Phase 7; KSM bootstrap/live-smoke docs |
-| **Shared folder Commander write modeling** | Create/update and membership grant wiring has landed. Remaining support-lift bar is permission diff breadth, destructive-change flags, and live readback proof before claiming full mutating support. | `docs/SDK_DA_COMPLETION_PLAN.md` § Phase 7; `tests/test_shared_folder_commander.py` |
-| **Module rename for v2.0.0** | `declarative_sdk_k` shim is present for the v1.x bridge. Breaking removal of `keeper_sdk` waits for v2.0.0. | `V1_GA_CHECKLIST.md` Hardening |
-| **Closed / monitor only** | MSP apply live proof passed; P3/RBI evidence is on `main`; KSM bootstrap + `KsmLoginHelper` live passed; `keeper-vault.v1` L1 login CRUD is supported; `dsk export` / `dsk diff` / `dsk report password-report` / `dsk report security-audit-report` live proof accepted. | `docs/SDK_DA_COMPLETION_PLAN.md`; `docs/LIVE_TEST_RUNBOOK.md`; [`COMMANDER` § Post-import / RBI](COMMANDER.md#post-import-connection--rbi-tuning-field-map) |
+| Focus | What "done" needs | Next command / doc |
+|---|---|---|
+| **v1.3.0 release baseline** | Local gate is green at 1047 passed / 2 skipped / 1 xfailed. Commander floor is `keepercommander>=17.2.16,<18`, nested `resources[].users[].rotation_settings` is supported, and Phase 7 docs are aligned. | `bash scripts/phase_harness/run_local_gates.sh`; `CHANGELOG.md` |
+| **vaultSharingLifecycle live proof** | Second Keeper account sharing create -> clean re-plan -> guarded delete -> cleanup. Offline lifecycle tests are not enough for full mutating support. | `docs/LIVE_TEST_RUNBOOK.md`; `tests/test_vault_shared_folder.py` |
+| **Declarative KSM app lifecycle** | Manifest-driven app create -> bind/share -> clean re-plan -> cleanup. `bootstrap-ksm` is supported; general declarative app mutation remains gated. | `docs/SDK_DA_COMPLETION_PLAN.md` Phase 7; `docs/KSM_INTEGRATION.md` |
+| **Teams / roles live validate** | Read-only live validate with enterprise scope, then a separate write-design decision before any mutation support claim. | `docs/SDK_DA_COMPLETION_PLAN.md` Phase 7 |
+| **Compliance report no-rebuild path** | `dsk report compliance-report --sanitize-uids --quiet` returns a valid redacted JSON envelope without `--rebuild`, or wrapper handling covers Commander empty-cache output. | `docs/SDK_DA_COMPLETION_PLAN.md` Phase 7 |
+| **Gateway create / projects / JIT** | Source-backed design + provider conflicts for every unsupported key. Gateway `mode: create`, top-level `projects[]`, and JIT remain v2/upstream-gap work. | `docs/ISSUE_7_GATEWAY_CREATE_PROJECTS_DESIGN.md`; `docs/V2_DECISIONS.md` |
+| **KSM inter-agent bus** | Protocol implementation + CAS semantics + live proof. v1.3.0 only ships a sealed API/wire-format stub that raises `CapabilityError` / `NotImplementedError`. | `keeper_sdk/secrets/bus.py`; `docs/KSM_INTEGRATION.md` |
+| **Module rename for v2.0.0** | Keep `declarative_sdk_k` shim through v1.x; breaking removal of `keeper_sdk` waits for v2.0.0. | `V1_GA_CHECKLIST.md` |
 
-## Blockers
+## Closed / Monitor
 
-| Item | Status | Unblocker / next action |
-|------|--------|-------------------------|
-| vaultSharingLifecycle live | BLOCKED | Needs a second Keeper account before sharing lifecycle can be proven live. |
-| `pamUser` standalone | BLOCKED | GH **#35** upstream `pam user ls` ParseError blocks the safe read path. |
-| gateway create | DESIGN | SDK-owned provisioning vs operator-scaffolded `reference_existing` flow pending decision. |
-| KSM inter-agent bus | DOCUMENTED STUB | `keeper_sdk/secrets/bus.py` raises `NotImplementedError` with `next_action`; do not claim bus support until protocol and live proof land. |
-
-## v1.3 Roadmap Outline
-
-- SharedFolder Commander write path: create/update and membership grant wiring
-  has landed; permission diff breadth, destructive-change flags, and live
-  readback proof remain the next gate.
-- KSM app declarative lifecycle proof: create -> bind/share -> clean re-plan
-  -> cleanup after bootstrap live proof.
-- Module rename `keeper_sdk` -> `declarative_sdk_k`: keep the one-minor
-  compatibility shim in v1.3; breaking removal waits for v2.0.0.
-- Teams/roles live validate: needs enterprise read scope before read-only live
-  proof can be accepted.
+| Item | Status | Evidence |
+|---|---|---|
+| Nested `resources[].users[].rotation_settings` | Supported on Commander 17.2.16+ | `tests/test_pam_rotation_readback.py`; `keeper_sdk/providers/commander_cli.py` |
+| Shared-folder Commander write primitives | Supported as command wiring, not full lifecycle | `tests/test_shared_folder_commander.py`; DA Phase 7 |
+| KSM bootstrap + `KsmLoginHelper` | Supported | `docs/KSM_BOOTSTRAP.md`; `docs/KSM_INTEGRATION.md` |
+| MSP discover / `validate --online` | Supported for MSP admin sessions | `docs/COMMANDER.md` MSP section |
+| MSP Commander import / apply | Unsupported | `CommanderCliProvider.apply_msp_plan` raises `CapabilityError` |
+| `dsk export`, `dsk diff`, `password-report`, `security-audit-report` | Live-proof accepted | `docs/SDK_DA_COMPLETION_PLAN.md` Current Truth |
+| P3 / RBI | Bucketed and smoke-proven for supported rows | [`COMMANDER` § Post-import / RBI](COMMANDER.md#post-import-connection--rbi-tuning-field-map) |
 
 ## Every local session (before push)
 
@@ -57,27 +47,25 @@ implementation is at the wheel.
 bash scripts/phase_harness/run_local_gates.sh
 ```
 
-Optional release hygiene: `python3 -m build && python3 -m twine check dist/*` (see
-[`docs/SDK_COMPLETION_PLAN.md`](./SDK_COMPLETION_PLAN.md) Current Baseline).
+Release hygiene:
 
-## Multi-step implementation (workers / Codex)
+```bash
+python3 -m build
+python3 -m twine check dist/*
+```
 
-Use the **workspace** harness (YAML spec + gates), **not** a second copy in-tree:
+## Multi-step implementation
+
+Use the workspace harness, not a second copy in-tree:
 
 ```bash
 bash ~/.cursor-daybook-sync/scripts/phase_runner.sh /path/to/phase-spec.yaml
 ```
 
-Copy-paste starting point + in-repo **parent** gates:
-[`scripts/phase_harness/phase-spec.dsk.example.yaml`](../scripts/phase_harness/phase-spec.dsk.example.yaml) — set `repo_root` to your clone.
-
-## Live proof (telling bar)
-
-Unit + offline tests do **not** replace tenant proof for mutating surfaces.
-[`docs/LIVE_TEST_RUNBOOK.md`](./LIVE_TEST_RUNBOOK.md). Daybook boot/append is
-**continuity** only — [`scripts/daybook/README.md`](../scripts/daybook/README.md).
+Copy-paste starting point + in-repo parent gates:
+[`scripts/phase_harness/phase-spec.dsk.example.yaml`](../scripts/phase_harness/phase-spec.dsk.example.yaml).
 
 ## Drift
 
-Refresh this queue when `SDK_COMPLETION_PLAN` / `RECONCILIATION` / `SDK_DA` change
-meaningfully. It is a **summarizing index**, not a second source of truth.
+Refresh this queue when `SDK_COMPLETION_PLAN`, `RECONCILIATION`, or `SDK_DA`
+changes meaningfully. It is a summarizing index, not a second source of truth.

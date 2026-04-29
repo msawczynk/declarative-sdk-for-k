@@ -36,12 +36,13 @@ Shipped and proven:
 - **MSP discover / `msp-environment.v1`:** 2026-04-28 live proof:
   `dsk validate --online` + `dsk plan` exit 0 against lab tenant using
   `tests/fixtures/examples/msp/01-minimal-msp.yaml`. Read-only discover + plan
-  path confirmed. Apply blocked by CapabilityError (P5/P6 create_mc wired
-  2026-04-28, but live apply not tested yet).
-- **CLI export / manifest lift (`dsk export`):** 2026-04-29 live proof: `pam
-  project export` → `dsk export` → `dsk validate` exit **0** (`ok:
-  dsk-export-test (2 uid_refs)`). Read path + manifest round-trip accepted for
-  support claims tied to AGENTS/export docs.
+  path confirmed. Commander `import` / `apply` for MSP remain unsupported and
+  fail with `CapabilityError` until a committed write/marker contract exists.
+- **CLI export / manifest lift (`dsk export`):** 2026-04-29 live proof:
+  Commander-shaped PAM project JSON → `dsk export` → `dsk validate` exit **0**
+  (`ok: dsk-export-test (2 uid_refs)`). Commander 17.2.16 has no native
+  `pam project export`; the SDK reads a JSON file produced by the supported
+  helper/export path.
 - **Vault/plan drift view (`dsk diff`):** 2026-04-29 live proof vs lab tenant:
   exit **2** when changes present (informational exit contract); renderer/path
   accepted live.
@@ -73,12 +74,10 @@ Recently unblocked:
   outside this lift.
 
 Not yet supported:
-- Post-import RBI tuning: Commander still persists RBI tri-state primarily on
-  the TunnelDAG vertex; the provider **merges** `allowedSettings` into
-  manifest-shaped `pam_settings.options` when `discover()` has an in-process
-  session **and** `manifest_source` lists `resources` (smoke passes the temp
-  manifest). A clean RBI re-plan remains required before any gate lift from
-  `preview-gated` to `supported`.
+- Post-import RBI fields outside the P3.1 supported buckets: URL and proven
+  typed booleans are supported / import-supported per `docs/COMMANDER.md`;
+  list-shaped, audio-only, and upstream-gap rows stay explicitly out of
+  supported claims.
 - Standalone top-level `pamUser`.
 - JIT writes.
 - Gateway `mode: create` and top-level `projects[]`.
@@ -157,14 +156,16 @@ Acceptance:
 
 2026-04-29 update: Commander GH#35 is resolved in 17.2.16 with
 `pam rotation list --record-uid --format json`; the SDK now wires that readback
-into `discover()` for nested `pamUser.rotation_settings`. Parent-run live smoke
-still needs to capture the clean re-plan / destroy transcript for release notes.
+into `discover()` for nested `pamUser.rotation_settings`. The nested
+`resources[].users[]` slice is default-enabled without `DSK_PREVIEW` or
+`DSK_EXPERIMENTAL_ROTATION_APPLY`.
 
 ### P2.1 Diagnose Rotation Drift
 
-**Status:** 2026-04-29 offline SDK readback is wired. The former upstream
-blocker was GH#35 (`pam rotation list` lacked UID filtering + JSON output);
-Commander 17.2.16 unblocks the read path.
+**Status:** 2026-04-29 supported for nested
+`resources[].users[].rotation_settings` on Commander 17.2.16+. The former
+upstream blocker was GH#35 (`pam rotation list` lacked UID filtering + JSON
+output); Commander 17.2.16 unblocks the read path.
 
 Questions:
 
@@ -187,7 +188,8 @@ Tasks:
    with a focused regression test.
 4. If fields are real rotation settings, design readback before any gate lift.
    Readback is now implemented through `pam rotation list --record-uid --format
-   json`; keep the parent live smoke as the final proof bar.
+   json`; keep future live smoke transcripts as regression evidence, not as a
+   gate on the already-supported nested slice.
 5. Fix smoke cleanup if the managed Resources folder UID becomes stale after
    failed re-plan; cleanup must resolve by project name as fallback.
 
@@ -200,8 +202,7 @@ Focused tests:
 Live proof:
 
 ```bash
-DSK_PREVIEW=1 DSK_EXPERIMENTAL_ROTATION_APPLY=1 \
-  python3 scripts/smoke/smoke.py --login-helper env --scenario pamUserNestedRotation
+python3 scripts/smoke/smoke.py --login-helper env --scenario pamUserNestedRotation
 ```
 
 Acceptance:
@@ -370,13 +371,15 @@ Acceptance:
 
 Do not hand-code broad support from memory. Mirror upstream first.
 
-Status (2026-04-29, v1.2.0 active):
+Status (2026-04-29, v1.3.0):
 
 | Surface | Classification | Evidence | Remaining bar |
 |---------|----------------|----------|---------------|
 | Shared-folder validate / sharing lifecycle | `preview-gated` | Offline validation covers the manifest surface; P35 mock lifecycle proves shared-folder member create/delete/update planning plus mocked Commander share call without a second Keeper account. P34 adds offline Commander membership-removal `--allow-delete` guard proof. | Live membership proof is blocked pending a second Keeper account; keep support preview-gated until that create -> re-plan -> delete path is live-proven. |
+| Shared-folder Commander write primitives | `supported` for create/update/membership command wiring; not full lifecycle support | P30/P34 provider tests cover create/update, membership grant/remove, permission breadth, and destructive-change `--allow-delete` guards. | Full shared-folder lifecycle support still needs second-account live readback proof. |
 | KSM application `reference_existing` | `supported` for gateway read/validate only | Gateway read path is proven for existing app references. | No SDK-owned app mutation is implied by this support claim. |
 | KSM application create | `supported` for `bootstrap-ksm`; general declarative app mutation remains `preview-gated` | 2026-04-29 live proof: `tests/live/test_ksm_bootstrap_smoke.py` exit 0 (1 passed); bootstrap create/bind/share, config redemption, login probe, and transcript leak check were clean. Offline bootstrap sequence has 3 cases. | Needs declarative manifest clean re-plan and cleanup proof before claiming full KSM app lifecycle support. |
+| KSM inter-agent bus | sealed stub / unsupported | `keeper_sdk/secrets/bus.py` exposes the API and frozen wire-format notes, but public methods raise `NotImplementedError` / `CapabilityError` with `next_action`. | No publish/subscribe support claim until protocol implementation and live proof land. |
 | Teams/roles read-only validate | `preview-gated` | Offline read-only validation rejects unknown team/role types. | Writes stay out of support until upstream-safe surfaces and approval gates are modeled. |
 | Compliance/security-audit reports | `supported` for `security-audit-report`; `preview-gated` for no-rebuild `compliance-report` | 2026-04-29 `security-audit-report --sanitize-uids --quiet` live proof exited 0 with a JSON envelope. `compliance-report --sanitize-uids --quiet` exited 5 on empty/non-JSON Commander stdout; `--rebuild` emitted the expected envelope. Offline report command coverage has 5 compliance/security-audit cases. | Keep no-rebuild `compliance-report` out of supported claims until the exact command returns JSON or wrapper handling covers the Commander cache shape. |
 | Password report | `supported` | 2026-04-29 live proof: `dsk report password-report` exit 0, sanitized envelope clean. | Keep leak checks and UID sanitization green on future Commander pins. |

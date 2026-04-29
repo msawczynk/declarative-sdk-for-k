@@ -9,7 +9,7 @@ have on disk, and the subset of Commander capabilities the SDK relies on.
 
 | artefact | version | reference |
 |----------|---------|-----------|
-| Python module (`keepercommander`) | `17.2.16` tag + ~40 commits on `upstream/release` | `../Commander/keepercommander/__init__.py::__version__`; HEAD `6574827` ("Pam Remote Browser Get JSON response data added") at time of pin |
+| Python module (`keepercommander`) | `17.2.16` tag + ~40 commits on `upstream/release` | `../Commander/keepercommander/__init__.py::__version__`; HEAD `6574827cf2993d2a54484516c2f4cc33238f98c9` ("Pam Remote Browser Get JSON response data added") at time of pin |
 | Bundled macOS `keeper` binary at `/Applications/Keeper Commander.app/Contents/Resources/app.asar/node_modules/.../keeper` | `17.1.14` | some operator workstations still have the older binary installed via the signed DMG |
 | Upstream repo | [`Keeper-Security/Commander`](https://github.com/Keeper-Security/Commander) | branch `release` is the canonical source-of-truth for this pin |
 

@@ -6,6 +6,8 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-04-29
+
 ### Added
 - **Phase 7 — shared-folder model** — shared-folder manifests now have a
   typed offline model and validation coverage, including `reference_existing`
@@ -16,6 +18,12 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 - **Phase 7 — shared-folder Commander write path** — Commander provider now
   wires shared-folder create/update and membership grant paths with delete
   guardrails while broader permission diff/readback proof remains gated.
+- **Phase 7 — shared-folder destructive-change flags** — membership removal now
+  requires `--allow-delete`, and permission diffs cover `read_only`,
+  `manage_records`, and `manage_users` transitions.
+- **Phase 7 — vaultSharing lifecycle offline proof** — mocked Commander sharing
+  tests cover member create, guarded delete, and permission update while the
+  live lift remains blocked on a second Keeper account.
 - **Phase 7 — KSM inter-agent bus stub** — `keeper_sdk.secrets.bus` documents
   the future publish/subscribe surface and raises `NotImplementedError` with
   `next_action` until the protocol and live proof land.
@@ -25,9 +33,17 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 - **Phase 7 — teams / roles** — teams and roles schema/model coverage landed
   with offline validation for accepted shapes, unknown-type rejection, and
   forward-looking xfail cases.
+- **Phase 7 — MSP model** — `msp-environment.v1` discover/validate coverage is
+  wired for Commander MSP admin sessions while mutating Commander import/apply
+  stays unsupported.
 - **Phase 7 — report commands** — `password-report`, `compliance-report`, and
   `security-audit-report` now share the redacted JSON-envelope contract with
   UID sanitization / quiet-mode coverage.
+- **Phase 7 — gateway create design** — gateway `mode: create` remains a v2
+  upstream/design gap with the operator-scaffolded `reference_existing` flow as
+  the supported path.
+- **Phase 7 — Commander pamUser fix tracker** — `docs/COMMANDER_FIX_PAMUSER.md`
+  records the GH#35 / Commander 17.2.16 rotation readback fix.
 - **Phase 7 — example manifests** — scaffold-only manifests now exercise the
   Phase 7 families so CI can validate and mock-plan the new declarative shapes.
 - **Phase 7 — module rename shim** — packaged `declarative_sdk_k` as the 1.x
@@ -55,6 +71,16 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 - **Module rename prep** — packaging now includes both `keeper_sdk*` and
   `declarative_sdk_k*`, keeping the 1.x import path stable while exposing the
   future package name for early adopters.
+- **Commander runtime floor** — package metadata now requires
+  `keepercommander>=17.2.16,<18` and `.commander-pin` points at full upstream SHA
+  `6574827cf2993d2a54484516c2f4cc33238f98c9`.
+- **Nested pamUser rotation** — `resources[].users[].rotation_settings` is now
+  default-enabled for the Commander 17.2.16+ readback path; top-level
+  `users[].rotation_settings`, resource-level rotation, and
+  `default_rotation_schedule` remain blocked.
+- **Agent operating docs** — `AGENTS.md` now carries the orchestration hierarchy
+  and advisor contract, including the tier-routing guard used by autonomous
+  workers.
 
 ### Fixed
 - **Redaction patterns** — `keeper://` references are covered by the
