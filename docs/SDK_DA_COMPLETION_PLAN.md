@@ -23,7 +23,10 @@ Shipped and proven:
 - **KSM / `KsmLoginHelper`:** 2026-04-28 COMPLETE: `pamMachine` smoke PASSED
   end-to-end with `--login-helper profile`. Profile setup:
   `~/.config/dsk/profiles/default.json` + `~/.keeper/ksm-config.json`. Testuser2
-  reuse path from admin vault record — no re-enrollment needed.
+  reuse path from admin vault record — no re-enrollment needed. 2026-04-29
+  bootstrap smoke also live-proven: `tests/live/test_ksm_bootstrap_smoke.py`
+  exit **0** (1 passed), with create/bind/share, config redemption, login probe,
+  and transcript leak check clean.
 - Provider capability gaps surface as plan conflicts; `validate --online` now
   fails on provider capability gaps.
 - **`keeper-vault.v1` L1 (scalar `login` slice): `supported`** — 2026-04-28 live
@@ -376,7 +379,7 @@ Status (2026-04-29, v1.2.0 active):
 | KSM application `reference_existing` | `supported` for gateway read/validate only | Gateway read path is proven for existing app references. | No SDK-owned app mutation is implied by this support claim. |
 | KSM application create | `supported` for `bootstrap-ksm`; general declarative app mutation remains `preview-gated` | 2026-04-29 live proof: `tests/live/test_ksm_bootstrap_smoke.py` exit 0 (1 passed); bootstrap create/bind/share, config redemption, login probe, and transcript leak check were clean. Offline bootstrap sequence has 3 cases. | Needs declarative manifest clean re-plan and cleanup proof before claiming full KSM app lifecycle support. |
 | Teams/roles read-only validate | `preview-gated` | Offline read-only validation rejects unknown team/role types. | Writes stay out of support until upstream-safe surfaces and approval gates are modeled. |
-| Compliance/security-audit reports | `preview-gated` | Offline report command coverage has 5 compliance/security-audit cases. | Live compliance-report and security-audit-report proof is still pending (P19 running). |
+| Compliance/security-audit reports | `supported` for `security-audit-report`; `preview-gated` for no-rebuild `compliance-report` | 2026-04-29 `security-audit-report --sanitize-uids --quiet` live proof exited 0 with a JSON envelope. `compliance-report --sanitize-uids --quiet` exited 5 on empty/non-JSON Commander stdout; `--rebuild` emitted the expected envelope. Offline report command coverage has 5 compliance/security-audit cases. | Keep no-rebuild `compliance-report` out of supported claims until the exact command returns JSON or wrapper handling covers the Commander cache shape. |
 | Password report | `supported` | 2026-04-29 live proof: `dsk report password-report` exit 0, sanitized envelope clean. | Keep leak checks and UID sanitization green on future Commander pins. |
 
 P21-P24 acceptance checkpoints:
@@ -413,8 +416,9 @@ Order:
    - write only with upstream-safe surfaces and strong approval gates.
 6. Compliance/reporting:
    - password-report is live-proven and supported,
-   - compliance-report and security-audit-report are offline-covered but remain
-     preview-gated until live proof completes.
+   - security-audit-report is live-proven for the sanitized quiet envelope,
+   - compliance-report remains preview-gated until the no-rebuild path returns
+     JSON or wrapper handling covers the Commander cache shape.
 
 Acceptance:
 

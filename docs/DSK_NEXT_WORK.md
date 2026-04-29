@@ -21,14 +21,14 @@ implementation is at the wheel.
 
 | Focus | What “done” needs | Next command / doc |
 |-------|-------------------|-------------------|
-| **v1.2.0 shipped baseline** | **2026-04-29 SHIPPED:** current local baseline is **1017 tests / 87% coverage**. Phase 7 is active: shared-folder validate, KSM app `reference_existing`, KSM app create offline bootstrap cases, teams/roles read-only validate, and report command hardening. | `bash scripts/phase_harness/run_local_gates.sh`; `docs/SDK_DA_COMPLETION_PLAN.md` § Phase 7 |
-| **Phase 7 in progress — broader Keeper surface** | Keep shared folders, KSM app create, teams/roles, and compliance/security-audit report claims preview-gated until each has upstream-safe write/readback or live read proof. Password-report is already live-proven. | `docs/SDK_DA_COMPLETION_PLAN.md` § Phase 7; `docs/SCAFFOLD.md` test anchors |
+| **v1.2.0 shipped baseline** | **2026-04-29 SHIPPED:** current local baseline is **1017 tests / 87% coverage**. Phase 7 is active: shared-folder validate, KSM app `reference_existing`, KSM bootstrap live proof, teams/roles read-only validate, and report command hardening. | `bash scripts/phase_harness/run_local_gates.sh`; `docs/SDK_DA_COMPLETION_PLAN.md` § Phase 7 |
+| **Phase 7 in progress — broader Keeper surface** | Keep shared folders, full declarative KSM app lifecycle, teams/roles, and no-rebuild compliance-report claims preview-gated until each has upstream-safe write/readback or live read proof. Password-report, security-audit-report, and KSM bootstrap are live-proven. | `docs/SDK_DA_COMPLETION_PLAN.md` § Phase 7; `docs/SCAFFOLD.md` test anchors |
 | **vaultSharingLifecycle live proof** | **BLOCKED:** needs a second Keeper account before sharing lifecycle can be proven live. Offline coverage is not enough for a mutating support lift. | `docs/LIVE_TEST_RUNBOOK.md`; relevant vault sharing smoke once account exists |
 | **Standalone `pamUser`** | **BLOCKED by GH #35:** Commander `pam user ls` ParseError on UID positional arg blocks the safe read path. Do not add more SDK-side workaround code until upstream fixes it. | GitHub **#35**; `DSK_PREVIEW=1` + `DSK_EXPERIMENTAL_ROTATION_APPLY=1` |
-| **KSM app create live proof** | Bootstrap sequence is covered offline; next bar is lab proof for create -> bind/share -> clean re-plan -> cleanup. | `docs/SDK_DA_COMPLETION_PLAN.md` § Phase 7; KSM bootstrap/live-smoke docs |
+| **KSM app lifecycle live proof** | `bootstrap-ksm` is live-proven 2026-04-29; next bar is declarative app create -> bind/share -> clean re-plan -> cleanup. | `docs/SDK_DA_COMPLETION_PLAN.md` § Phase 7; KSM bootstrap/live-smoke docs |
 | **Shared folder Commander write modeling** | Phase 7 item: model create/update, memberships, permission diffs, and destructive-change flags before any mutating support claim. | `docs/SDK_DA_COMPLETION_PLAN.md` § Phase 7 |
 | **Module rename for v2.0.0** | Rename `keeper_sdk` -> `declarative_sdk_k` with a one-minor compatibility shim for `import keeper_sdk`. Breaking release only. | `V1_GA_CHECKLIST.md` Hardening |
-| **Closed / monitor only** | MSP apply live proof passed; P3/RBI evidence is on `main`; KSM bootstrap + `KsmLoginHelper` live passed; `keeper-vault.v1` L1 login CRUD is supported; `dsk export` / `dsk diff` / `dsk report password-report` live proof accepted. | `docs/SDK_DA_COMPLETION_PLAN.md`; `docs/LIVE_TEST_RUNBOOK.md`; [`COMMANDER` § Post-import / RBI](COMMANDER.md#post-import-connection--rbi-tuning-field-map) |
+| **Closed / monitor only** | MSP apply live proof passed; P3/RBI evidence is on `main`; KSM bootstrap + `KsmLoginHelper` live passed; `keeper-vault.v1` L1 login CRUD is supported; `dsk export` / `dsk diff` / `dsk report password-report` / `dsk report security-audit-report` live proof accepted. | `docs/SDK_DA_COMPLETION_PLAN.md`; `docs/LIVE_TEST_RUNBOOK.md`; [`COMMANDER` § Post-import / RBI](COMMANDER.md#post-import-connection--rbi-tuning-field-map) |
 
 ## Blockers
 
@@ -43,8 +43,8 @@ implementation is at the wheel.
 
 - SharedFolder Commander write path: create/update, memberships, permission
   diffs, and destructive-change flags.
-- KSM app create live proof: declarative create -> bind/share -> clean re-plan
-  -> cleanup.
+- KSM app declarative lifecycle proof: create -> bind/share -> clean re-plan
+  -> cleanup after bootstrap live proof.
 - Module rename `keeper_sdk` -> `declarative_sdk_k`: keep the one-minor
   compatibility shim in v1.3; breaking removal waits for v2.0.0.
 - Teams/roles live validate: needs enterprise read scope before read-only live
