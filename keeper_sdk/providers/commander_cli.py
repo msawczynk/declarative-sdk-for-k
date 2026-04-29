@@ -501,6 +501,7 @@ _SHARING_RESOURCE_TYPES = {
     "sharing_record_share",
     "sharing_share_folder",
 }
+_VAULT_SHARED_FOLDER_RESOURCE_TYPE = "shared_folder"
 _SHARING_PAYLOAD_FIELD_LABEL = "keeper_declarative_payload"
 _SHARING_MARKER_TITLE_PREFIX = "DSK sharing marker"
 
@@ -1504,6 +1505,22 @@ class CommanderCliProvider(Provider):
                     continue
                 if change.resource_type == "record_type":
                     self._vault_apply_record_type_reject()
+                if change.resource_type == _VAULT_SHARED_FOLDER_RESOURCE_TYPE:
+                    keeper_uid = self._vault_add_shared_folder(change.after or {})
+                    membership = self._vault_apply_shared_folder_membership_update(
+                        keeper_uid,
+                        before_members=[],
+                        after_members=change.after.get("members") if change.after else None,
+                    )
+                    outcomes.append(
+                        ApplyOutcome(
+                            uid_ref=change.uid_ref or "",
+                            keeper_uid=keeper_uid,
+                            action="create",
+                            details={"marker_written": False, **membership},
+                        )
+                    )
+                    continue
                 if _is_keeper_fill_change(change):
                     keeper_uid = self._vault_apply_keeper_fill_create(change.after or {})
                     outcomes.append(
@@ -1556,6 +1573,34 @@ class CommanderCliProvider(Provider):
                 if change.resource_type == "record_type":
                     self._vault_apply_record_type_reject()
                 patch = dict(change.after or {})
+                if change.resource_type == _VAULT_SHARED_FOLDER_RESOURCE_TYPE:
+                    membership = self._vault_apply_shared_folder_membership_update(
+                        keeper_uid,
+                        before_members=change.before.get("members"),
+                        after_members=patch.get("members"),
+                    )
+                    default_permissions_updated = (
+                        self._vault_apply_shared_folder_permissions_update(
+                            keeper_uid,
+                            patch.get("permissions"),
+                        )
+                    )
+                    if patch.get("title") not in (None, ""):
+                        self._run_cmd(["rndir", "-n", str(patch["title"]), keeper_uid])
+                    outcomes.append(
+                        ApplyOutcome(
+                            uid_ref=change.uid_ref or "",
+                            keeper_uid=keeper_uid,
+                            action="update",
+                            details={
+                                "marker_written": False,
+                                "record_updated": bool(patch),
+                                **membership,
+                                "default_permissions_updated": default_permissions_updated,
+                            },
+                        )
+                    )
+                    continue
                 if _is_keeper_fill_change(change):
                     self._vault_apply_keeper_fill_update(keeper_uid, patch)
                     outcomes.append(
@@ -1599,6 +1644,42 @@ class CommanderCliProvider(Provider):
                         },
                     )
                 )
+                continue
+            if change.resource_type == _VAULT_SHARED_FOLDER_RESOURCE_TYPE:
+                if getattr(plan, "allow_delete", False) is not True:
+                    raise CapabilityError(
+                        reason="shared_folder delete requires --allow-delete",
+                        uid_ref=change.uid_ref,
+                        resource_type=change.resource_type,
+                        next_action="rerun plan/apply with --allow-delete before deleting shared folders",
+                    )
+                if dry_run:
+                    outcomes.append(
+                        ApplyOutcome(
+                            uid_ref=change.uid_ref or "",
+                            keeper_uid=change.keeper_uid,
+                            action="delete",
+                            details={
+                                "dry_run": True,
+                                "keeper_uid": change.keeper_uid,
+                                "warning": "dependency checks are enforced by Keeper CLI/server, not client-side",
+                            },
+                        )
+                    )
+                    continue
+                outcome = ApplyOutcome(
+                    uid_ref=change.uid_ref or "",
+                    keeper_uid=change.keeper_uid,
+                    action="delete",
+                    details={
+                        "keeper_uid": change.keeper_uid,
+                        "removed": False,
+                        "warning": "dependency checks are enforced by Keeper CLI/server, not client-side",
+                    },
+                )
+                outcomes.append(outcome)
+                self._delete_folder(path_or_uid=change.keeper_uid)
+                outcome.details["removed"] = True
                 continue
             if dry_run:
                 outcomes.append(
@@ -1649,6 +1730,200 @@ class CommanderCliProvider(Provider):
                 )
             )
         return outcomes
+
+    @staticmethod
+    def _vault_shared_folder_permissions(
+        permissions: Any,
+    ) -> tuple[bool, bool]:
+        if not isinstance(permissions, Mapping):
+            return False, False
+        return bool(permissions.get("manage_records")), bool(permissions.get("manage_users"))
+
+    @staticmethod
+    def _vault_shared_folder_role_permissions(role: Any) -> tuple[bool, bool]:
+        if role == "manage":
+            return True, True
+        if role == "edit":
+            return True, False
+        return False, False
+
+    @staticmethod
+    def _vault_shared_folder_members_by_email(members: Any) -> dict[str, dict[str, str]]:
+        if not isinstance(members, list):
+            return {}
+        out: dict[str, dict[str, str]] = {}
+        for member in members:
+            if not isinstance(member, Mapping):
+                continue
+            email = str(member.get("email") or "").strip()
+            role = str(member.get("role") or "").strip()
+            if email and role:
+                out[email.casefold()] = {"email": email, "role": role}
+        return out
+
+    def _vault_add_shared_folder(self, after: dict[str, Any]) -> str:
+        """Create a Keeper shared folder using Commander's folder-add equivalent."""
+        title = str(after.get("title") or "").strip()
+        if not title:
+            raise CapabilityError(
+                reason="shared_folder create is missing after.title",
+                resource_type=_VAULT_SHARED_FOLDER_RESOURCE_TYPE,
+                next_action="rebuild the vault plan from a manifest with shared_folders[].title",
+            )
+        manage_records, manage_users = self._vault_shared_folder_permissions(
+            after.get("permissions")
+        )
+        try:
+            from keepercommander import api  # type: ignore
+            from keepercommander.commands import folder as folder_module  # type: ignore
+        except ImportError as exc:
+            raise CapabilityError(
+                reason=f"cannot create shared folder: keepercommander unavailable: {exc}",
+                next_action="install Commander Python package in the same interpreter as the SDK",
+            ) from exc
+
+        command_cls = getattr(folder_module, "FolderAddCommand", None) or getattr(
+            folder_module,
+            "FolderMakeCommand",
+            None,
+        )
+        if command_cls is None:
+            raise CapabilityError(
+                reason="Commander shared-folder create command is unavailable",
+                resource_type=_VAULT_SHARED_FOLDER_RESOURCE_TYPE,
+                next_action=(
+                    "upgrade keepercommander to a version with "
+                    "keepercommander.commands.folder.FolderMakeCommand"
+                ),
+            )
+
+        def _run_add() -> Any:
+            params = self._get_keeper_params()
+            api.sync_down(params)
+            old_current = getattr(params, "current_folder", None)
+            had_current = hasattr(params, "current_folder")
+            target_current = self._vault_shared_folder_create_parent(params)
+            setattr(params, "current_folder", target_current)
+            buf_out = io.StringIO()
+            buf_err = io.StringIO()
+            try:
+                with contextlib.redirect_stdout(buf_out), contextlib.redirect_stderr(buf_err):
+                    uid = command_cls().execute(
+                        params,
+                        folder=title,
+                        shared_folder=True,
+                        user_folder=False,
+                        grant=False,
+                        manage_records=manage_records,
+                        manage_users=manage_users,
+                        can_edit=False,
+                        can_share=False,
+                    )
+            finally:
+                if had_current:
+                    setattr(params, "current_folder", old_current)
+                elif hasattr(params, "current_folder"):
+                    delattr(params, "current_folder")
+            api.sync_down(params)
+            return uid
+
+        try:
+            uid = self._with_keeper_session_refresh(_run_add)
+        except CapabilityError:
+            raise
+        except Exception as exc:
+            raise CapabilityError(
+                reason=f"shared_folder create failed: {type(exc).__name__}: {exc}",
+                next_action="verify shared-folder create permission and Commander folder cache, then retry",
+            ) from exc
+
+        uid_str = ""
+        if isinstance(uid, str):
+            uid_str = uid.strip()
+        elif isinstance(uid, bytes):
+            uid_str = uid.decode("utf-8", errors="replace").strip()
+        elif uid is not None:
+            uid_str = str(uid).strip()
+        if not uid_str:
+            raise CapabilityError(
+                reason="Commander shared-folder create did not return a folder UID",
+                resource_type=_VAULT_SHARED_FOLDER_RESOURCE_TYPE,
+                next_action="inspect Commander folder-add/mkdir output and retry",
+            )
+        return uid_str
+
+    def _vault_shared_folder_create_parent(self, params: Any) -> str:
+        """Return a user/root folder parent for a new shared folder.
+
+        keeper-vault L1 uses ``folder_uid`` as the record scope, normally a
+        shared folder. Commander refuses nested shared folders, so create at
+        root unless the configured scope is visibly a user/root folder.
+        """
+        if not self._folder_uid:
+            return ""
+        folder_cache = getattr(params, "folder_cache", None)
+        if not isinstance(folder_cache, Mapping):
+            return ""
+        folder = folder_cache.get(self._folder_uid)
+        if folder is None:
+            return ""
+        folder_type = getattr(folder, "type", None)
+        if folder_type is None and isinstance(folder, Mapping):
+            folder_type = folder.get("type")
+        if folder_type in {"shared_folder", "shared_folder_folder"}:
+            return ""
+        return self._folder_uid
+
+    def _vault_apply_shared_folder_membership_update(
+        self,
+        keeper_uid: str,
+        *,
+        before_members: Any,
+        after_members: Any,
+    ) -> dict[str, int]:
+        before_by_email = self._vault_shared_folder_members_by_email(before_members)
+        after_by_email = self._vault_shared_folder_members_by_email(after_members)
+        granted = 0
+        removed = 0
+        for key in sorted(set(before_by_email) - set(after_by_email)):
+            self._revoke_folder_grantee(
+                shared_folder_uid=keeper_uid,
+                grantee_kind="user",
+                identifier=before_by_email[key]["email"],
+            )
+            removed += 1
+        for key in sorted(after_by_email):
+            desired = after_by_email[key]
+            if before_by_email.get(key) == desired:
+                continue
+            manage_records, manage_users = self._vault_shared_folder_role_permissions(
+                desired["role"]
+            )
+            self._share_folder_to_grantee(
+                shared_folder_uid=keeper_uid,
+                grantee_kind="user",
+                identifier=desired["email"],
+                manage_records=manage_records,
+                manage_users=manage_users,
+            )
+            granted += 1
+        return {"members_granted": granted, "members_removed": removed}
+
+    def _vault_apply_shared_folder_permissions_update(
+        self,
+        keeper_uid: str,
+        permissions: Any,
+    ) -> bool:
+        if not isinstance(permissions, Mapping):
+            return False
+        manage_records, manage_users = self._vault_shared_folder_permissions(permissions)
+        self._share_folder_to_grantee(
+            shared_folder_uid=keeper_uid,
+            grantee_kind="default",
+            manage_records=manage_records,
+            manage_users=manage_users,
+        )
+        return True
 
     @staticmethod
     def _sharing_delete_order(changes: list[Change]) -> list[Change]:
