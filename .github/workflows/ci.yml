@@ -56,7 +56,7 @@ jobs:
       # feature-complete coverage on the keeper-vault schema family. Raise
       # the floor when adding net-new tested surface; never lower it without
       # an explicit public rationale in the PR.
-      - run: pytest -q --cov=keeper_sdk --cov-report=term-missing --cov-fail-under=85
+      - run: pytest -q --cov=keeper_sdk --cov-report=term-missing --cov-fail-under=87
         env:
           # Offline-only; live-smoke against a real tenant runs via
           # scripts/smoke/smoke.py in a separate, credential-bearing

@@ -6,6 +6,8 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-04-29
+
 ### Fixed
 - **PAM plan/diff (P2.1 / issue #4)** — `pamMachine.pam_settings` now ignores Commander-injected
   `options` defaults when the manifest only declares `pam_settings.connection`.
