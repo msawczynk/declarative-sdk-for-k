@@ -16,7 +16,12 @@ sys.path.insert(0, str(_SMOKE_DIR))
 import scenarios as smoke_scenarios  # noqa: E402
 
 from keeper_sdk.cli import main  # noqa: E402
-from keeper_sdk.core import build_graph, build_plan, compute_diff, execution_order  # noqa: E402
+from keeper_sdk.core import (  # noqa: E402
+    build_graph,
+    build_plan,
+    compute_diff,
+    execution_order,
+)
 from keeper_sdk.core.diff import ChangeKind  # noqa: E402
 from keeper_sdk.core.manifest import load_manifest  # noqa: E402
 from keeper_sdk.providers import MockProvider  # noqa: E402

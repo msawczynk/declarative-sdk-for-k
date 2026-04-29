@@ -379,6 +379,15 @@ Status (2026-04-29, v1.2.0 active):
 | Compliance/security-audit reports | `preview-gated` | Offline report command coverage has 5 compliance/security-audit cases. | Live compliance-report and security-audit-report proof is still pending (P19 running). |
 | Password report | `supported` | 2026-04-29 live proof: `dsk report password-report` exit 0, sanitized envelope clean. | Keep leak checks and UID sanitization green on future Commander pins. |
 
+P21-P24 acceptance checkpoints:
+
+| Phase item | Acceptance | Evidence | Remaining bar |
+|------------|------------|----------|---------------|
+| P21 SharedFolder model / validate | ACCEPTED offline | `VaultSharedFolder` / `diff_shared_folder` model path plus `tests/test_shared_folder_model.py` and `tests/test_vault_shared_folder.py`. | Commander write path for create/update/memberships/permissions remains preview-gated. |
+| P22 module rename shim | ACCEPTED | `declarative_sdk_k` compatibility shim, `tests/test_compat_shim.py`, `pyproject.toml`, and `V1_GA_CHECKLIST.md` hardening row checked. | Keep `keeper_sdk` import shim for one minor cycle; breaking removal waits for v2.0.0. |
+| P23 KSM app create proof | ACCEPTED for `bootstrap-ksm` | 2026-04-29 live bootstrap smoke passed: create/bind/share, config redemption, login probe, transcript leak check. | Full declarative KSM app lifecycle still needs clean re-plan and cleanup proof. |
+| P24 docs / scaffold final sync | ACCEPTED | `SCAFFOLD.md`, `keeper_sdk/core/SCAFFOLD.md`, `RECONCILIATION.md`, and this plan reflect Phase 7 state. | Keep future sprint memos and operator orchestration out of `docs/`. |
+
 Order:
 
 1. Extend capability mirror:

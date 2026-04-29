@@ -11,7 +11,11 @@ from keeper_sdk.core.vault_graph import (
     build_vault_graph,
     vault_record_apply_order,
 )
-from keeper_sdk.core.vault_models import VaultManifestV1, VaultRecord, load_vault_manifest
+from keeper_sdk.core.vault_models import (
+    VaultManifestV1,
+    VaultRecord,
+    load_vault_manifest,
+)
 
 
 def _login(uid: str, *, folder_ref: str | None = None) -> dict:

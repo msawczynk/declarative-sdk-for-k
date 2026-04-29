@@ -10,7 +10,10 @@ from pydantic import ValidationError
 import keeper_sdk.core.schema as schema_module
 from keeper_sdk.core import UnsupportedFamilyError
 from keeper_sdk.core.errors import SchemaError
-from keeper_sdk.core.manifest import load_declarative_manifest, load_declarative_manifest_string
+from keeper_sdk.core.manifest import (
+    load_declarative_manifest,
+    load_declarative_manifest_string,
+)
 from keeper_sdk.core.msp_models import (
     MSP_FAMILY,
     Addon,

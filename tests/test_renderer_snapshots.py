@@ -17,7 +17,13 @@ from rich.console import Console
 from keeper_sdk.cli import renderer as renderer_module
 from keeper_sdk.cli.main import main
 from keeper_sdk.cli.renderer import RichRenderer
-from keeper_sdk.core import build_graph, build_plan, compute_diff, execution_order, load_manifest
+from keeper_sdk.core import (
+    build_graph,
+    build_plan,
+    compute_diff,
+    execution_order,
+    load_manifest,
+)
 from keeper_sdk.core.diff import Change, ChangeKind
 from keeper_sdk.core.interfaces import ApplyOutcome, LiveRecord
 from keeper_sdk.core.metadata import encode_marker

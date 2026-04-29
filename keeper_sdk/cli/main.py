@@ -1350,7 +1350,10 @@ def _plan_to_dict(plan_obj: Plan) -> dict:
 
 def _emit_report_json(payload: dict[str, Any]) -> None:
     """Print report envelope; exit 1 if ``secret_leak_check`` flags output."""
-    from keeper_sdk.cli._report.common import ReportOutputLeakError, serialize_report_payload
+    from keeper_sdk.cli._report.common import (
+        ReportOutputLeakError,
+        serialize_report_payload,
+    )
 
     try:
         click.echo(serialize_report_payload(payload))

@@ -10,10 +10,17 @@ from click.testing import CliRunner
 from keeper_sdk.cli.main import EXIT_CAPABILITY, EXIT_CHANGES
 from keeper_sdk.cli.main import main as cli
 from keeper_sdk.core.diff import Change, ChangeKind
-from keeper_sdk.core.errors import CapabilityError, ManifestError, UnsupportedFamilyError
+from keeper_sdk.core.errors import (
+    CapabilityError,
+    ManifestError,
+    UnsupportedFamilyError,
+)
 from keeper_sdk.core.planner import build_plan
 from keeper_sdk.providers import commander_cli as commander_cli_mod
-from keeper_sdk.providers.commander_cli import CommanderCliProvider, _is_keeper_fill_change
+from keeper_sdk.providers.commander_cli import (
+    CommanderCliProvider,
+    _is_keeper_fill_change,
+)
 
 # Mirrors tests/test_vault_diff_record_types.py::_record_type with uid_ref rt.svc-login.
 VAULT_WITH_RECORD_TYPE_YAML = """\

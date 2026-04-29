@@ -73,7 +73,9 @@ def _perform_commander_login(
         from keepercommander.config_storage.loader import (  # type: ignore[import-not-found]
             load_config_properties,
         )
-        from keepercommander.params import KeeperParams  # type: ignore[import-not-found]
+        from keepercommander.params import (
+            KeeperParams,  # type: ignore[import-not-found]
+        )
     except ImportError as exc:
         raise CapabilityError(
             reason=f"Commander login helper requires keepercommander + pyotp: {exc}",

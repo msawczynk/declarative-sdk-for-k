@@ -1,6 +1,12 @@
 from pathlib import Path
 
-from keeper_sdk.core import build_graph, build_plan, compute_diff, execution_order, load_manifest
+from keeper_sdk.core import (
+    build_graph,
+    build_plan,
+    compute_diff,
+    execution_order,
+    load_manifest,
+)
 from keeper_sdk.core.diff import ChangeKind
 
 

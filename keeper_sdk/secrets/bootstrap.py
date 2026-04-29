@@ -370,7 +370,9 @@ def _redeem_one_time_token(
     partial: dict[str, Any],
 ) -> None:
     try:
-        from keeper_secrets_manager_core import SecretsManager  # type: ignore[import-not-found]
+        from keeper_secrets_manager_core import (
+            SecretsManager,  # type: ignore[import-not-found]
+        )
         from keeper_secrets_manager_core.storage import (  # type: ignore[import-not-found]
             FileKeyValueStorage,
         )

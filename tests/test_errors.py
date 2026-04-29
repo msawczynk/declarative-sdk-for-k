@@ -1,5 +1,7 @@
 from keeper_sdk.core import CapabilityError, DeleteUnsupportedError
-from keeper_sdk.core.errors import DeleteUnsupportedError as DirectDeleteUnsupportedError
+from keeper_sdk.core.errors import (
+    DeleteUnsupportedError as DirectDeleteUnsupportedError,
+)
 
 
 def test_delete_unsupported_error_remains_public_capability_error() -> None:

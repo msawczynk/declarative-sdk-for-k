@@ -7,6 +7,22 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- **Phase 7 — shared-folder model** — shared-folder manifests now have a
+  typed offline model and validation coverage, including `reference_existing`
+  paths and schema-stage guardrails.
+- **Phase 7 — KSM bootstrap live path** — `bootstrap-ksm` coverage now tracks
+  the live bootstrap flow through application provisioning, one-time token
+  redemption, local KSM config materialization, and login-helper verification.
+- **Phase 7 — teams / roles** — teams and roles schema/model coverage landed
+  with offline validation for accepted shapes, unknown-type rejection, and
+  forward-looking xfail cases.
+- **Phase 7 — report commands** — `password-report`, `compliance-report`, and
+  `security-audit-report` now share the redacted JSON-envelope contract with
+  UID sanitization / quiet-mode coverage.
+- **Phase 7 — example manifests** — scaffold-only manifests now exercise the
+  Phase 7 families so CI can validate and mock-plan the new declarative shapes.
+- **Import-path preview** — packaged `declarative_sdk_k` as the 1.x compatibility
+  shim ahead of the planned 2.0 module rename from `keeper_sdk`.
 - **Phase 7 tests** — shared-folder `validate` coverage and KSM app
   `reference_existing` tests.
 - **RichRenderer snapshots** — six layout snapshot cases in
@@ -22,6 +38,16 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   sanitization.
 - **KSM app create** — three bootstrap sequence tests.
 - **Redaction patterns** — bearer-token, JWT, and KSM URL test coverage.
+
+### Changed
+- **Module rename prep** — packaging now includes both `keeper_sdk*` and
+  `declarative_sdk_k*`, keeping the 1.x import path stable while exposing the
+  future package name for early adopters.
+
+### Fixed
+- **Redaction patterns** — `keeper://` references are covered by the
+  sanitization pass so report output and transcripts do not leak Keeper locator
+  values.
 
 ## [1.2.0] - 2026-04-29
 

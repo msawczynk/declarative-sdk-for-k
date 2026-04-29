@@ -1264,7 +1264,9 @@ class CommanderCliProvider(Provider):
                     continue
 
                 try:
-                    from keepercommander.commands.msp import MSPAddCommand  # type: ignore
+                    from keepercommander.commands.msp import (
+                        MSPAddCommand,  # type: ignore
+                    )
                 except (ImportError, AttributeError) as exc:
                     raise CapabilityError(
                         reason=f"Commander MSPAddCommand is unavailable: {exc}",
@@ -1343,7 +1345,9 @@ class CommanderCliProvider(Provider):
                     continue
 
                 try:
-                    from keepercommander.commands.msp import MSPUpdateCommand  # type: ignore
+                    from keepercommander.commands.msp import (
+                        MSPUpdateCommand,  # type: ignore
+                    )
                 except (ImportError, AttributeError) as exc:
                     raise CapabilityError(
                         reason=f"Commander MSPUpdateCommand is unavailable: {exc}",
@@ -1414,7 +1418,9 @@ class CommanderCliProvider(Provider):
                     continue
 
                 try:
-                    from keepercommander.commands.msp import MSPRemoveCommand  # type: ignore
+                    from keepercommander.commands.msp import (
+                        MSPRemoveCommand,  # type: ignore
+                    )
                 except (ImportError, AttributeError) as exc:
                     raise CapabilityError(
                         reason=f"Commander MSPRemoveCommand is unavailable: {exc}",
@@ -2274,7 +2280,9 @@ class CommanderCliProvider(Provider):
             return
         try:
             from keepercommander import api  # type: ignore
-            from keepercommander.commands.recordv3 import RecordEditCommand  # type: ignore
+            from keepercommander.commands.recordv3 import (
+                RecordEditCommand,  # type: ignore
+            )
         except ImportError as exc:
             raise CapabilityError(
                 reason=f"cannot update vault record body: keepercommander unavailable: {exc}",
@@ -2352,7 +2360,9 @@ class CommanderCliProvider(Provider):
     def _vault_add_login_record(self, after: dict[str, Any]) -> str:
         """Create a vault ``login`` record in the configured shared folder (in-process)."""
         try:
-            from keepercommander.commands.recordv3 import RecordAddCommand  # type: ignore
+            from keepercommander.commands.recordv3 import (
+                RecordAddCommand,  # type: ignore
+            )
         except ImportError as exc:
             raise CapabilityError(
                 reason=f"cannot create vault record: keepercommander unavailable: {exc}",
@@ -2598,7 +2608,9 @@ class CommanderCliProvider(Provider):
     def _resolve_folder_uid_by_path(self, path: str) -> str:
         def resolve_once() -> str | None:
             from keepercommander import api  # type: ignore[import-not-found]
-            from keepercommander.subfolder import get_folder_uids  # type: ignore[import-not-found]
+            from keepercommander.subfolder import (
+                get_folder_uids,  # type: ignore[import-not-found]
+            )
 
             params = self._get_keeper_params()
             api.sync_down(params)

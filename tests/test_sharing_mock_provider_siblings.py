@@ -22,7 +22,11 @@ from keeper_sdk.core.sharing_diff import (
     _SHARING_FOLDER_RESOURCE,
     compute_sharing_diff,
 )
-from keeper_sdk.core.sharing_models import SHARING_FAMILY, SharingManifestV1, load_sharing_manifest
+from keeper_sdk.core.sharing_models import (
+    SHARING_FAMILY,
+    SharingManifestV1,
+    load_sharing_manifest,
+)
 from keeper_sdk.providers import MockProvider
 
 MANIFEST_NAME = "vault-sharing"

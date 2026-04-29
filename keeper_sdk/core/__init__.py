@@ -81,9 +81,7 @@ from keeper_sdk.core.schema import (
     validate_manifest,
 )
 from keeper_sdk.core.sharing_diff import compute_sharing_diff
-from keeper_sdk.core.sharing_models import (
-    SHARING_FAMILY as SHARING_MANIFEST_FAMILY,
-)
+from keeper_sdk.core.sharing_models import SHARING_FAMILY as SHARING_MANIFEST_FAMILY
 from keeper_sdk.core.sharing_models import (
     FolderGranteePermissions,
     Grantee,
@@ -97,9 +95,7 @@ from keeper_sdk.core.sharing_models import (
 )
 from keeper_sdk.core.vault_diff import compute_vault_diff
 from keeper_sdk.core.vault_graph import build_vault_graph, vault_record_apply_order
-from keeper_sdk.core.vault_models import (
-    VAULT_FAMILY as VAULT_MANIFEST_FAMILY,
-)
+from keeper_sdk.core.vault_models import VAULT_FAMILY as VAULT_MANIFEST_FAMILY
 from keeper_sdk.core.vault_models import (
     VaultManifestV1,
     VaultRecord,

@@ -30,6 +30,26 @@ implementation is at the wheel.
 | **Module rename for v2.0.0** | Rename `keeper_sdk` -> `declarative_sdk_k` with a one-minor compatibility shim for `import keeper_sdk`. Breaking release only. | `V1_GA_CHECKLIST.md` Hardening |
 | **Closed / monitor only** | MSP apply live proof passed; P3/RBI evidence is on `main`; KSM bootstrap + `KsmLoginHelper` live passed; `keeper-vault.v1` L1 login CRUD is supported; `dsk export` / `dsk diff` / `dsk report password-report` live proof accepted. | `docs/SDK_DA_COMPLETION_PLAN.md`; `docs/LIVE_TEST_RUNBOOK.md`; [`COMMANDER` § Post-import / RBI](COMMANDER.md#post-import-connection--rbi-tuning-field-map) |
 
+## Blockers
+
+| Item | Status | Unblocker / next action |
+|------|--------|-------------------------|
+| vaultSharingLifecycle live | BLOCKED | Needs a second Keeper account before sharing lifecycle can be proven live. |
+| `pamUser` standalone | BLOCKED | GH **#35** upstream `pam user ls` ParseError blocks the safe read path. |
+| gateway create | DESIGN | SDK-owned provisioning vs operator-scaffolded `reference_existing` flow pending decision. |
+| KSM inter-agent bus | NOT-IMPLEMENTED | `keeper_sdk/secrets/bus.py` raises `NotImplementedError`; do not claim bus support. |
+
+## v1.3 Roadmap Outline
+
+- SharedFolder Commander write path: create/update, memberships, permission
+  diffs, and destructive-change flags.
+- KSM app create live proof: declarative create -> bind/share -> clean re-plan
+  -> cleanup.
+- Module rename `keeper_sdk` -> `declarative_sdk_k`: keep the one-minor
+  compatibility shim in v1.3; breaking removal waits for v2.0.0.
+- Teams/roles live validate: needs enterprise read scope before read-only live
+  proof can be accepted.
+
 ## Every local session (before push)
 
 ```bash

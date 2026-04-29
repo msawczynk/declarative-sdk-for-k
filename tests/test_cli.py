@@ -18,7 +18,13 @@ from keeper_sdk.cli.main import (
     EXIT_REF,
     EXIT_SCHEMA,
 )
-from keeper_sdk.core import build_graph, build_plan, compute_diff, execution_order, load_manifest
+from keeper_sdk.core import (
+    build_graph,
+    build_plan,
+    compute_diff,
+    execution_order,
+    load_manifest,
+)
 from keeper_sdk.core.interfaces import LiveRecord
 from keeper_sdk.core.metadata import encode_marker
 from keeper_sdk.providers import MockProvider

@@ -17,7 +17,11 @@ sys.path.insert(0, str(_SMOKE_DIR))
 import scenarios as smoke_scenarios  # noqa: E402
 import smoke  # noqa: E402
 
-from keeper_sdk.core import build_plan, compute_vault_diff, vault_record_apply_order  # noqa: E402
+from keeper_sdk.core import (  # noqa: E402
+    build_plan,
+    compute_vault_diff,
+    vault_record_apply_order,
+)
 from keeper_sdk.core.diff import ChangeKind  # noqa: E402
 from keeper_sdk.core.interfaces import LiveRecord  # noqa: E402
 from keeper_sdk.core.manifest import load_declarative_manifest  # noqa: E402
