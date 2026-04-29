@@ -54,15 +54,14 @@ Shipped and proven:
   proof: `--sanitize-uids --quiet` exit **0**, JSON output envelope emitted, and
   first safe output line was `{`.
 - **Operator reports (`dsk report compliance-report`):** 2026-04-29 live attempt:
-  requested `--sanitize-uids --quiet` path exited **5** because Commander
-  returned empty/non-JSON stdout; `--rebuild` probe emitted the expected JSON
-  envelope. Keep the no-rebuild compliance path out of `supported` claims until
-  the wrapper handles this Commander cache shape or the exact command returns
-  JSON.
+  requested `--sanitize-uids --quiet` path hit the Commander empty-cache
+  stdout/error shape; `--rebuild` probe emitted the expected JSON envelope.
+  The SDK wrapper now retries no-rebuild empty/error output with `--rebuild`,
+  strips rebuild stdout artifacts, and emits the normal redacted JSON envelope.
 
-**Acceptance (export / diff / password-report / security-audit-report)** —
-satisfied 2026-04-29 on lab tenant (see bullets above). `compliance-report`
-still needs exact-command proof for the no-rebuild path.
+**Acceptance (export / diff / password-report / security-audit-report /
+compliance-report)** — satisfied 2026-04-29 on lab tenant plus offline
+empty-cache wrapper coverage (see bullets above).
 
 Recently unblocked:
 
@@ -378,10 +377,10 @@ Status (2026-04-29, v1.3.0):
 | Shared-folder validate / sharing lifecycle | `preview-gated` | Offline validation covers the manifest surface; P35 mock lifecycle proves shared-folder member create/delete/update planning plus mocked Commander share call without a second Keeper account. P34 adds offline Commander membership-removal `--allow-delete` guard proof. | Live membership proof is blocked pending a second Keeper account; keep support preview-gated until that create -> re-plan -> delete path is live-proven. |
 | Shared-folder Commander write primitives | `supported` for create/update/membership command wiring; not full lifecycle support | P30/P34 provider tests cover create/update, membership grant/remove, permission breadth, and destructive-change `--allow-delete` guards. | Full shared-folder lifecycle support still needs second-account live readback proof. |
 | KSM application `reference_existing` | `supported` for gateway read/validate only | Gateway read path is proven for existing app references. | No SDK-owned app mutation is implied by this support claim. |
-| KSM application create | `supported` for `bootstrap-ksm`; general declarative app mutation remains `preview-gated` | 2026-04-29 live proof: `tests/live/test_ksm_bootstrap_smoke.py` exit 0 (1 passed); bootstrap create/bind/share, config redemption, login probe, and transcript leak check were clean. Offline bootstrap sequence has 3 cases. | Needs declarative manifest clean re-plan and cleanup proof before claiming full KSM app lifecycle support. |
+| KSM application create | `supported` for `bootstrap-ksm`; general declarative app mutation remains a capability gap / `preview-gated` | 2026-04-29 live proof: `tests/live/test_ksm_bootstrap_smoke.py` exit 0 (1 passed); bootstrap create/bind/share, config redemption, login probe, and transcript leak check were clean. Offline bootstrap sequence has 3 cases. `tests/test_ksm_app_lifecycle.py` pins the current declarative boundary: `keeper-ksm.v1` validates as schema-only, rejects `ksm_apps`, and `plan` exits capability until a typed model/provider exists. | Needs declarative schema, typed loader, graph/diff/apply support, clean re-plan, and cleanup proof before claiming full KSM app lifecycle support. |
 | KSM inter-agent bus | sealed stub / unsupported | `keeper_sdk/secrets/bus.py` exposes the API and frozen wire-format notes, but public methods raise `NotImplementedError` / `CapabilityError` with `next_action`. | No publish/subscribe support claim until protocol implementation and live proof land. |
-| Teams/roles read-only validate | `preview-gated` | Offline read-only validation rejects unknown team/role types. | Writes stay out of support until upstream-safe surfaces and approval gates are modeled. |
-| Compliance/security-audit reports | `supported` for `security-audit-report`; `preview-gated` for no-rebuild `compliance-report` | 2026-04-29 `security-audit-report --sanitize-uids --quiet` live proof exited 0 with a JSON envelope. `compliance-report --sanitize-uids --quiet` exited 5 on empty/non-JSON Commander stdout; `--rebuild` emitted the expected envelope. Offline report command coverage has 5 compliance/security-audit cases. | Keep no-rebuild `compliance-report` out of supported claims until the exact command returns JSON or wrapper handling covers the Commander cache shape. |
+| Teams/roles read-only validate | `preview-gated` | Offline validation rejects unknown PAM team/role resource types and accepts empty `keeper-enterprise.v1` team/role stubs. 2026-04-29 offline worker fixture: `tests/fixtures/teams_roles_manifest.yaml`; write-path decision: `docs/TEAMS_ROLES_WRITE_DESIGN.md`. No live tenant evidence was produced in that offline/no-network slice; current `dsk validate --online` for `keeper-enterprise.v1` remains a capability error before enterprise discovery. | Wire read-only `keeper-enterprise.v1` online discovery (`enterprise-info -t/-r --format json` or `api.query_enterprise`), run sanctioned live list/compare proof, then reconsider read-only support. Writes stay unsupported until an ownership model and approval gates are proven. |
+| Compliance/security-audit reports | `supported` | 2026-04-29 `security-audit-report --sanitize-uids --quiet` live proof exited 0 with a JSON envelope. `compliance-report --sanitize-uids --quiet` hit Commander empty/non-JSON cache output; `--rebuild` emitted the expected envelope, and the SDK wrapper now auto-retries no-rebuild empty/error output with `--rebuild` while emitting the normal envelope. Offline report command coverage includes compliance/security-audit sanitization plus compliance empty-cache retry cases. | Keep leak checks, UID sanitization, and the empty-cache retry behavior green on future Commander pins. |
 | Password report | `supported` | 2026-04-29 live proof: `dsk report password-report` exit 0, sanitized envelope clean. | Keep leak checks and UID sanitization green on future Commander pins. |
 
 P21-P24 acceptance checkpoints:
@@ -390,7 +389,7 @@ P21-P24 acceptance checkpoints:
 |------------|------------|----------|---------------|
 | P21 SharedFolder model / validate + P35 vaultSharingLifecycle | ACCEPTED offline | `VaultSharedFolder` / `diff_shared_folder` model path plus `tests/test_shared_folder_model.py` and `tests/test_vault_shared_folder.py`; P35 adds offline member create, guarded delete, and permission-update lifecycle cases. | Live Commander membership proof is blocked pending a second Keeper account; Commander write support remains preview-gated until live proof passes. |
 | P22 module rename shim | ACCEPTED | `declarative_sdk_k` compatibility shim, `tests/test_compat_shim.py`, `pyproject.toml`, and `V1_GA_CHECKLIST.md` hardening row checked. | Keep `keeper_sdk` import shim for one minor cycle; breaking removal waits for v2.0.0. |
-| P23 KSM app create proof | ACCEPTED for `bootstrap-ksm` | 2026-04-29 live bootstrap smoke passed: create/bind/share, config redemption, login probe, transcript leak check. | Full declarative KSM app lifecycle still needs clean re-plan and cleanup proof. |
+| P23 KSM app create proof | ACCEPTED for `bootstrap-ksm` | 2026-04-29 live bootstrap smoke passed: create/bind/share, config redemption, login probe, transcript leak check. `tests/test_ksm_app_lifecycle.py` keeps declarative app lifecycle out of supported claims until the manifest family grows a typed planner/apply path. | Full declarative KSM app lifecycle still needs schema/model/provider implementation, clean re-plan, and cleanup proof. |
 | P24 docs / scaffold final sync | ACCEPTED | `SCAFFOLD.md`, `keeper_sdk/core/SCAFFOLD.md`, `RECONCILIATION.md`, and this plan reflect Phase 7 state. | Keep future sprint memos and operator orchestration out of `docs/`. |
 | P34 SharedFolder destructive guard / permission breadth | ACCEPTED offline | `tests/test_shared_folder_commander.py` covers membership removal requiring `--allow-delete` and member `permission` transitions across `read_only`, `manage_records`, and `manage_users`. | Live readback proof remains required before full shared-folder lifecycle support. |
 
@@ -420,8 +419,7 @@ Order:
 6. Compliance/reporting:
    - password-report is live-proven and supported,
    - security-audit-report is live-proven for the sanitized quiet envelope,
-   - compliance-report remains preview-gated until the no-rebuild path returns
-     JSON or wrapper handling covers the Commander cache shape.
+   - compliance-report is supported through the empty-cache auto-rebuild wrapper.
 
 Acceptance:
 

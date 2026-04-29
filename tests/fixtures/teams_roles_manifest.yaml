@@ -1,0 +1,5 @@
+# Phase 7 teams/roles read-only validation fixture.
+# Non-empty teams/roles remain future-slice until keeper-enterprise online discovery lands.
+schema: keeper-enterprise.v1
+teams: []
+roles: []
