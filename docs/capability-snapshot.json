@@ -1,6 +1,6 @@
 {
-  "commander_branch": "clean-pam-tunnel",
-  "commander_sha": "89047920",
+  "commander_branch": "master",
+  "commander_sha": "6574827c",
   "commands": [
     {
       "class": "GetEnterpriseDataCommand",
@@ -1597,7 +1597,7 @@
       "type": "BOOLEAN"
     }
   ],
-  "generated_at": "2026-04-26T21:57:03+00:00",
+  "generated_at": "2026-04-29T11:11:41+00:00",
   "groups": [
     {
       "class": "AutomatorCommand",
