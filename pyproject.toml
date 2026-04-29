@@ -76,7 +76,8 @@ keeper-sdk = "keeper_sdk.cli:main"
 include-package-data = true
 
 [tool.setuptools.packages.find]
-include = ["keeper_sdk*"]
+# v2.0.0: keeper_sdk will be removed; shim until then
+include = ["keeper_sdk*", "declarative_sdk_k*"]
 exclude = ["tests*"]
 
 [tool.setuptools.package-data]

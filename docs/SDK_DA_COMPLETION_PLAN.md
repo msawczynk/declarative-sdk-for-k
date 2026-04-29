@@ -374,7 +374,7 @@ Status (2026-04-29, v1.2.0 active):
 |---------|----------------|----------|---------------|
 | Shared-folder validate | `preview-gated` | Offline validation tests cover the manifest surface. | Commander write modeling for create/update/membership/permission diffs is not done. |
 | KSM application `reference_existing` | `supported` for gateway read/validate only | Gateway read path is proven for existing app references. | No SDK-owned app mutation is implied by this support claim. |
-| KSM application create | `preview-gated` | Bootstrap sequence has 3 offline cases. | Needs lab live proof for create -> bind/share -> clean re-plan -> cleanup before support. |
+| KSM application create | `supported` for `bootstrap-ksm`; general declarative app mutation remains `preview-gated` | 2026-04-29 live proof: `tests/live/test_ksm_bootstrap_smoke.py` exit 0 (1 passed); bootstrap create/bind/share, config redemption, login probe, and transcript leak check were clean. Offline bootstrap sequence has 3 cases. | Needs declarative manifest clean re-plan and cleanup proof before claiming full KSM app lifecycle support. |
 | Teams/roles read-only validate | `preview-gated` | Offline read-only validation rejects unknown team/role types. | Writes stay out of support until upstream-safe surfaces and approval gates are modeled. |
 | Compliance/security-audit reports | `preview-gated` | Offline report command coverage has 5 compliance/security-audit cases. | Live compliance-report and security-audit-report proof is still pending (P19 running). |
 | Password report | `supported` | 2026-04-29 live proof: `dsk report password-report` exit 0, sanitized envelope clean. | Keep leak checks and UID sanitization green on future Commander pins. |

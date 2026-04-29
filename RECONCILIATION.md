@@ -1,6 +1,6 @@
 # RECONCILIATION — design vs tree
 
-Written: 2026-04-26 (agent scaffold pass; refreshed 2026-04-29 for KSM live + rotation/RBI + P2.1 `diff` queue + v1.1 offline quality smokes + v1.2/Phase 7 entry).
+Written: 2026-04-26 (agent scaffold pass; refreshed 2026-04-29 for KSM live + rotation/RBI + P2.1 `diff` queue + v1.1 offline quality smokes + v1.2/Phase 7 entry/final pass).
 Source of truth: `main` at time of last doc edit (exact SHA: `git rev-parse HEAD`).
 Cross-checks against `V1_GA_CHECKLIST.md`, `docs/SDK_DA_COMPLETION_PLAN.md`,
 `AUDIT.md`, `REVIEW.md`, and DOR pointers in `keeper-pam-declarative/`.
@@ -13,9 +13,9 @@ This is for human + agent review. Per-folder maps live in `<dir>/SCAFFOLD.md`.
 
 - **Zero remaining v1.0.0 GA blockers.** Tag policy decided: annotated only — distribution is GitHub-only (no PyPI, no `git verify-tag` consumer flow); GPG/SSH signing not required. Upgrade path if supply-chain requirements change → sigstore/cosign `dist/*` in `publish.yml` (OIDC, no maintainer key).
 - **Open upstream blocker** (not GA blocker): nested-`pamUser` rotation (GH **#35**) — DSK offline `diff` work is done, but Commander `pam user ls` ParseError on UID positional arg blocks supported readback / clean re-plan proof. **P3 / #5** `pamRemoteBrowser` closeout evidence is doc-ready (2026-04-28 smoke + COMMANDER P3.1 + DA Phase 3); dirty/list/audio subfields stay bucketed.
-- **v1.2.0 shipped baseline:** `CHANGELOG.md` bumped; local gate baseline is **995 tests / 87% coverage**; Phase 7 entry work started.
+- **v1.2.0 shipped baseline:** `CHANGELOG.md` bumped; local gate baseline is **1024 tests / 87% coverage**; Phase 7 work is active.
 - **Three v1.1 offline quality gaps closed:** adoption smoke against unmanaged records, field-drift->UPDATE smoke, two-writer ownership-marker race smoke.
-- **One v2 deferral:** module rename `keeper_sdk` → `declarative_sdk_k` (will ship compat shim).
+- **One v2 deferral:** breaking removal of `keeper_sdk`; `declarative_sdk_k` forward-compatible shim has landed.
 - **Nothing has been silently dropped.** Every preview-gated key fails loud at apply via `_detect_unsupported_capabilities` + plan-surface CONFLICT rows (C3 fix; H6 regression test).
 
 ---
@@ -104,6 +104,12 @@ Rows added for the v1.2 state and first Phase 7 landing slice:
 |---|---|---|---|
 | Shared-folder validate | PHASE 7 STARTED (offline) | `tests/test_vault_shared_folder.py` | Validate/reference coverage only; no Commander write modeling or supported create/update claim yet. |
 | KSM app `reference_existing` | PHASE 7 STARTED (offline) | `tests/test_ksm_app_reference.py` | Gateway read path proven for existing app references; create model remains next work. |
+| KSM app create tests | PHASE 7 STARTED (offline) | `tests/test_ksm_app_create.py` | Bootstrap/create sequence covered offline; live create -> bind/share -> clean re-plan -> cleanup still required before support. |
+| `keeper://` redaction pattern | SHIPPED v1.2 (offline) | `keeper_sdk/core/redact.py`, `tests/test_redact.py`, `tests/test_report_commands.py` | `keeper://...` paths are masked like KSM URLs so report notes and logs do not leak record paths. |
+| Teams/roles offline validate | PHASE 7 STARTED (offline) | `tests/test_teams_roles_validate.py` | Read-only validation coverage; write support stays preview-gated. |
+| Report commands offline + live | MIXED v1.2 | `tests/test_report_commands.py`, `docs/SDK_DA_COMPLETION_PLAN.md` Phase 7 | Offline compliance/security-audit sanitization covered; password-report live proof accepted; compliance/security-audit live proof remains pending. |
+| Example manifests | SHIPPED v1.2 (offline) | `examples/vault/login-record.yaml`, `examples/vault/shared-folder.yaml`, `examples/msp/02-with-modules.yaml` | Adds minimal vault login, shared-folder placeholder, and MSP modules/addons examples to the validate-clean corpus. |
+| `declarative_sdk_k` compatibility shim | SHIPPED v1.2/P22 | `declarative_sdk_k/__init__.py`, `tests/test_compat_shim.py`, `pyproject.toml` | New package name forwards to `keeper_sdk`; breaking removal of `keeper_sdk` remains v2.0. |
 | Renderer snapshot coverage | SHIPPED v1.2 (offline) | `tests/test_renderer_snapshots.py`, `tests/fixtures/renderer_snapshots/` | Six layout snapshots lock CLI table shape for current renderers. |
 | Perf memory assertion | SHIPPED v1.2 (offline) | `tests/test_perf.py` | Local gate asserts peak RSS stays under **192 MiB** for the covered workload. |
 
@@ -123,7 +129,7 @@ Cross-checking the 2026-04-24 AUDIT scope (W1–W20), DOR contract, and REVIEW d
 | Phase 2.1 (nested rotation) full close | NOT dropped — UPSTREAM-GAP | Commander GH #35 ParseError blocks supported clean re-plan proof; DSK offline diff work is done. |
 | Phase 3 (RBI) full close | NOT dropped — DOC-READY | Live smoke + COMMANDER P3.1 + DA Phase 3 evidence is on `main`; maintainer issue close/update remains. |
 | Adoption smoke / field-drift smoke / two-writer smoke | SHIPPED v1.1 (offline) | See `v1.1 Quality-Gap Refresh` above. |
-| Module rename `keeper_sdk` → `declarative_sdk_k` | DEFERRED v2.0 (explicit) | Hardening row. Ship via compat shim. |
+| Module rename `keeper_sdk` → `declarative_sdk_k` | PARTLY SHIPPED / DEFERRED v2.0 | Compatibility shim landed; breaking removal of `keeper_sdk` remains a v2.0 action. |
 | Multi-project manifests | OUT OF SCOPE per AUDIT | `Project` 0..1 per manifest per `SCHEMA_CONTRACT.md` L98. |
 | DAG-level dependency checks on delete | OUT OF SCOPE per AUDIT | Project invariant: no direct DAG access. Commander itself refuses dependent `rm`. |
 

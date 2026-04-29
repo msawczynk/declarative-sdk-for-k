@@ -14,8 +14,9 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from keeper_sdk.core.diff import Change, ChangeKind
 from keeper_sdk.core.errors import SchemaError
 
 VAULT_FAMILY: Literal["keeper-vault.v1"] = "keeper-vault.v1"
@@ -40,6 +41,53 @@ class VaultRecord(_VaultModel):
     keeper_uid: str | None = None
 
 
+class VaultSharedFolder(_VaultModel):
+    """Offline model for a future Commander shared-folder write surface."""
+
+    title: str
+    uid_ref: str
+    manager: str
+    members: list[dict[str, Any]] = Field(default_factory=list)
+    permissions: dict[str, bool] = Field(
+        default_factory=lambda: {"manage_records": False, "manage_users": False}
+    )
+
+    @field_validator("members")
+    @classmethod
+    def _validate_members(cls, members: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        allowed_roles = {"read", "edit", "manage"}
+        out: list[dict[str, Any]] = []
+        for member in members:
+            if not isinstance(member, dict):
+                raise ValueError("shared-folder member must be an object")
+            email = member.get("email")
+            role = member.get("role")
+            if not isinstance(email, str) or not email:
+                raise ValueError("shared-folder member requires email")
+            if role not in allowed_roles:
+                raise ValueError("shared-folder member role must be read, edit, or manage")
+            out.append({"email": email, "role": role})
+        return out
+
+    @field_validator("permissions")
+    @classmethod
+    def _validate_permissions(cls, permissions: dict[str, bool]) -> dict[str, bool]:
+        required = {"manage_records", "manage_users"}
+        missing = required - set(permissions)
+        if missing:
+            raise ValueError("shared-folder permissions require manage_records and manage_users")
+        out: dict[str, bool] = {}
+        for key, value in permissions.items():
+            if key not in required:
+                raise ValueError(
+                    "shared-folder permissions only support manage_records and manage_users"
+                )
+            if not isinstance(value, bool):
+                raise ValueError("shared-folder permission flags must be booleans")
+            out[key] = value
+        return out
+
+
 class VaultManifestV1(_VaultModel):
     """Top-level ``keeper-vault.v1`` manifest (slice 1).
 
@@ -49,6 +97,7 @@ class VaultManifestV1(_VaultModel):
 
     vault_schema: Literal["keeper-vault.v1"] = Field(default=VAULT_FAMILY, alias="schema")
     records: list[VaultRecord] = Field(default_factory=list)
+    shared_folders: list[VaultSharedFolder] = Field(default_factory=list)
     record_types: list[dict[str, Any]] = Field(default_factory=list)
     attachments: list[dict[str, Any]] = Field(default_factory=list)
     keeper_fill: dict[str, Any] | None = None
@@ -67,6 +116,49 @@ class VaultManifestV1(_VaultModel):
     def iter_uid_refs(self) -> list[tuple[str, str]]:
         """Return ``(uid_ref, record_type)`` for each record (graph prelude)."""
         return [(r.uid_ref, r.type) for r in self.records]
+
+
+def _shared_folder_diff_payload(folder: VaultSharedFolder) -> dict[str, Any]:
+    payload = folder.model_dump(mode="python")
+    payload["members"] = sorted(
+        payload["members"],
+        key=lambda member: str(member.get("email") or "").casefold(),
+    )
+    return payload
+
+
+def diff_shared_folder(before: VaultSharedFolder, after: VaultSharedFolder) -> Change:
+    """Diff two shared-folder models as one offline planner row."""
+    before_payload = _shared_folder_diff_payload(before)
+    after_payload = _shared_folder_diff_payload(after)
+    diff_fields = [
+        key
+        for key in ("title", "manager", "members", "permissions")
+        if before_payload.get(key) != after_payload.get(key)
+    ]
+    if not diff_fields:
+        return Change(
+            kind=ChangeKind.NOOP,
+            uid_ref=after.uid_ref,
+            resource_type="shared_folder",
+            title=after.title,
+        )
+    return Change(
+        kind=ChangeKind.UPDATE,
+        uid_ref=after.uid_ref,
+        resource_type="shared_folder",
+        title=after.title,
+        before={key: before_payload.get(key) for key in diff_fields},
+        after={key: after_payload.get(key) for key in diff_fields},
+    )
+
+
+SharedFolder = VaultSharedFolder
+
+
+def diff_shared_folders(before: VaultSharedFolder, after: VaultSharedFolder) -> list[Change]:
+    """List-shaped wrapper for callers expecting planner rows."""
+    return [diff_shared_folder(before, after)]
 
 
 def load_vault_manifest(document: dict[str, Any]) -> VaultManifestV1:

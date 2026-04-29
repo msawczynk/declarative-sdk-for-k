@@ -154,9 +154,9 @@ and `tests/test_smoke_scenarios.py`.
       — structural denylist for orchestration / per-session
       path globs; only ADDS trip the fence (`--diff-filter=A`).
       Prevents the recurring orchestration-leak bug class. Delivered in PR #16.
-- [ ] Module rename from `keeper_sdk` → `declarative_sdk_k` (breaking, v2.0.0;
+- [x] Module rename from `keeper_sdk` → `declarative_sdk_k` (breaking, v2.0.0;
       will ship a shim module so `import keeper_sdk` keeps working for
-      one minor cycle).
+      one minor cycle; shim delivered).
 
 ## Release gating
 

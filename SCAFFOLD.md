@@ -24,6 +24,14 @@ Agent-first Python SDK + CLI (`dsk`) for deterministic `validate -> plan -> appl
 Reconciliation against `V1_GA_CHECKLIST.md` + `docs/SDK_DA_COMPLETION_PLAN.md` +
 `AUDIT.md` + `REVIEW.md` lives in [`RECONCILIATION.md`](./RECONCILIATION.md).
 
+## Current baseline
+
+- **v1.2.0 local gates:** 1024 tests / 87% coverage.
+- **Phase 7:** in progress for broader Keeper surface: shared folders, KSM app create/reference, teams/roles read-only validate, and report hardening.
+- **New Phase 7 / v1.2 tests:** `tests/test_ksm_app_create.py`, `tests/test_teams_roles_validate.py`, `tests/test_report_commands.py`, `tests/test_vault_custom_fields.py`, `tests/test_vault_update_smoke.py`, `tests/test_adoption_smoke.py`, `tests/test_two_writer.py`, `tests/test_msp_apply.py`, `tests/test_vault_shared_folder.py`, `tests/test_ksm_app_reference.py`, `tests/test_shared_folder_model.py`, `tests/test_compat_shim.py`.
+- **New examples:** `examples/vault/login-record.yaml`, `examples/vault/shared-folder.yaml`, `examples/msp/02-with-modules.yaml`.
+- **Import-path rename:** `declarative_sdk_k` forward-compatible shim is present; `keeper_sdk` remains the v1.x canonical package and removal stays deferred to v2.0.
+
 ## Tree
 
 Tree snapshot: refresh when layout shifts; exact commit: `git rev-parse HEAD`. Deeper per-area maps: `keeper_sdk/SCAFFOLD.md`, `docs/SCAFFOLD.md`, `tests/SCAFFOLD.md`. Full file list: `git ls-files`.
@@ -65,6 +73,9 @@ Tree snapshot: refresh when layout shifts; exact commit: `git rev-parse HEAD`. D
 │   ├── pamDirectory.yaml                   # Minimal directory example.
 │   ├── pamMachine.yaml                     # Minimal machine example.
 │   ├── pamRemoteBrowser.yaml               # Minimal remote-browser example.
+│   ├── msp/02-with-modules.yaml            # MSP modules/addons example.
+│   ├── vault/login-record.yaml             # Minimal keeper-vault login record example.
+│   ├── vault/shared-folder.yaml            # Phase 7 keeper-vault shared-folder placeholder.
 │   ├── sharing*.yaml / vault*.yaml         # Additional corpus (sharing, vault L1) — see `examples/SCAFFOLD.md`.
 │   └── scaffold_only/                      # Narrow fixtures for tests / docs.
 ├── keeper_sdk/                             # Stable 1.x import path; packaged SDK source.
@@ -171,11 +182,12 @@ Tree snapshot: refresh when layout shifts; exact commit: `git rev-parse HEAD`. D
 | 6. Live-smoke coverage | `pamMachine` / `pamDatabase` / `pamDirectory` / `pamRemoteBrowser` scenario registry shipped | SHIPPED | `scripts/smoke/scenarios.py`, `scripts/smoke/smoke.py`, `tests/test_smoke_scenarios.py` |
 | 6. Live-smoke coverage | Nested `pamUser` smoke shape shipped; standalone top-level `pamUser` remains unsupported | PREVIEW-GATED | `scripts/smoke/scenarios.py`, `tests/test_smoke_scenarios.py`, `docs/SDK_COMPLETION_PLAN.md` |
 | 6. Live-smoke coverage | Nested `pamUser` rotation (P2.1): offline diff fix proven in `diff.py`; live Commander path cannot converge rotation `pam_settings`. | UPSTREAM-GAP (live confirmed 2026-04-28) — Re-plan exit 2 after apply; Commander cannot write `pam_settings` rotation fields. Offline diff fix proven. No SDK code change possible until Commander upstream fix. | `scripts/smoke/scenarios.py`, `keeper_sdk/core/diff.py`, `docs/SDK_DA_COMPLETION_PLAN.md` |
-| 6. Live-smoke coverage | Adoption / field-drift / two-writer smokes not shipped yet | DEFERRED-1.1 | `V1_GA_CHECKLIST.md`, `scripts/smoke/scenarios.py` |
+| 6. Live-smoke coverage | Adoption / field-drift / two-writer smokes | SHIPPED v1.1 (offline) | `tests/test_adoption_smoke.py`, `tests/test_vault_update_smoke.py`, `tests/test_two_writer.py` |
 | Hardening | Dead `DeleteUnsupportedError` export/catches removed; provider failures use `CapabilityError` | SHIPPED | `keeper_sdk/cli/main.py`, `keeper_sdk/core/errors.py`, `tests/` |
 | Hardening | `gateway.ksm_application_name` in `reference_existing` enforced in tenant validation | SHIPPED | `V1_GA_CHECKLIST.md`, `keeper_sdk/providers/commander_cli.py`, `tests/test_stage_5_bindings.py` |
-| Hardening | Renderer snapshots, redact expansion, perf memory assertions shipped | SHIPPED | `tests/test_renderer_snapshots.py`, `tests/test_redact.py`, `tests/test_perf.py` |
-| Hardening | DOR `TEST_PLAN` scenario mapping shipped with two expected v1.1 deferrals; `keeper_sdk` rename remains v2 | MIXED | `tests/test_dor_scenarios.py`, `V1_GA_CHECKLIST.md`, `pyproject.toml`, `keeper_sdk/__init__.py` |
+| Hardening | Renderer snapshots, redact expansion, perf memory assertions shipped | SHIPPED | `tests/test_renderer_snapshots.py`, `tests/test_redact.py`, `tests/test_perf.py`, `keeper_sdk/core/redact.py` |
+| Phase 7 | Shared folders, KSM app create/reference, teams/roles validate, report command hardening, and example manifests | IN PROGRESS | `tests/test_vault_shared_folder.py`, `tests/test_ksm_app_create.py`, `tests/test_ksm_app_reference.py`, `tests/test_teams_roles_validate.py`, `tests/test_report_commands.py`, `examples/vault/login-record.yaml`, `examples/vault/shared-folder.yaml`, `examples/msp/02-with-modules.yaml` |
+| Hardening | DOR `TEST_PLAN` scenario mapping shipped; `declarative_sdk_k` shim landed while `keeper_sdk` removal remains v2 | MIXED | `tests/test_dor_scenarios.py`, `tests/test_compat_shim.py`, `V1_GA_CHECKLIST.md`, `pyproject.toml`, `keeper_sdk/__init__.py`, `declarative_sdk_k/__init__.py` |
 
 ## Open questions for next session
 
