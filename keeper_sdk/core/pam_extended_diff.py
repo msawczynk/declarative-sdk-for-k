@@ -17,13 +17,7 @@ _RESOURCE_BY_BLOCK = {
     "discovery_rules": "pam_extended_discovery_rule",
     "service_mappings": "pam_extended_service_mapping",
 }
-_KEY_FIELD_BY_BLOCK = {
-    "gateway_configs": "gateway_uid_ref",
-    "rotation_schedules": "uid_ref",
-    "discovery_rules": "uid_ref",
-    "service_mappings": "uid_ref",
-}
-_DELETE_SKIP_REASON = "unmanaged pam-extended object; pass allow_delete=True to remove"
+_DELETE_SKIP_REASON = "unmanaged PAM extended object; pass allow_delete=True to remove"
 _KIND_ORDER = {
     ChangeKind.CREATE: 0,
     ChangeKind.UPDATE: 1,
@@ -41,10 +35,10 @@ def compute_pam_extended_diff(
     manifest_name: str | None = None,
     allow_delete: bool = False,
 ) -> list[Change]:
-    """Classify desired advanced PAM state against an offline live snapshot."""
+    """Classify desired PAM extended state against an offline live snapshot."""
     desired = _index_objects(_payload_from_manifest(manifest))
     live, duplicate_live = _index_live(_payload_from_live(live_pam_extended))
-    manifest_name = manifest_name or manifest.name
+    manifest_name = manifest_name or "keeper-pam-extended"
 
     changes: list[Change] = []
     for key, desired_obj in desired.items():
@@ -121,7 +115,7 @@ def compute_pam_extended_diff(
                 resource_type=first.resource_type,
                 title=first.title,
                 before={"key": first.key, "count": len(rows)},
-                reason=f"duplicate live pam-extended object key: {first.key}",
+                reason=f"duplicate live PAM extended object key: {first.key}",
                 manifest_name=manifest_name,
             )
         )
@@ -134,10 +128,10 @@ class _PamExtendedObject:
         self.block = block
         self.payload = _normalise_payload(block, payload)
         self.resource_type = _RESOURCE_BY_BLOCK[block]
-        self.key_field = _KEY_FIELD_BY_BLOCK[block]
-        self.key = f"{block}:{self.payload[self.key_field]}"
-        self.uid_ref = str(self.payload[self.key_field])
-        self.title = str(self.payload.get("name") or self.uid_ref)
+        self.key_field = _key_field_for(block)
+        self.key = _key_for(block, self.payload)
+        self.uid_ref = _uid_ref_for(block, self.payload)
+        self.title = _title_for(block, self.payload)
         keeper_uid = self.payload.get("keeper_uid")
         self.keeper_uid = str(keeper_uid) if keeper_uid is not None else None
 
@@ -226,6 +220,30 @@ def _field_delta(
         before[key] = live_payload.get(key)
         after[key] = desired_payload.get(key)
     return before, after
+
+
+def _key_field_for(block: str) -> str:
+    if block == "gateway_configs":
+        return "gateway_uid_ref"
+    return "uid_ref"
+
+
+def _key_for(block: str, payload: dict[str, Any]) -> str:
+    if block == "gateway_configs":
+        return f"{block}:{payload['gateway_uid_ref']}"
+    return f"{block}:{payload['uid_ref']}"
+
+
+def _uid_ref_for(block: str, payload: dict[str, Any]) -> str:
+    if block == "gateway_configs":
+        return str(payload["gateway_uid_ref"])
+    return str(payload["uid_ref"])
+
+
+def _title_for(block: str, payload: dict[str, Any]) -> str:
+    if block == "gateway_configs":
+        return str(payload.get("network_segment") or payload["gateway_uid_ref"])
+    return str(payload.get("name") or payload["uid_ref"])
 
 
 def _change_sort_key(change: Change) -> tuple[int, int, str]:

@@ -73,6 +73,8 @@ from keeper_sdk.core.interfaces import ApplyOutcome, LiveRecord
 from keeper_sdk.core.manifest import read_manifest_document
 from keeper_sdk.core.models_integrations_events import EVENTS_FAMILY, EventsManifestV1
 from keeper_sdk.core.models_ksm import KSM_FAMILY, KsmManifestV1
+from keeper_sdk.core.models_pam_extended import PAM_EXTENDED_FAMILY, PamExtendedManifestV1
+from keeper_sdk.core.pam_extended_diff import compute_pam_extended_diff
 from keeper_sdk.core.planner import Plan
 from keeper_sdk.core.preview import assert_preview_keys_allowed
 from keeper_sdk.core.schema import PAM_FAMILY, SHARING_FAMILY, validate_manifest
@@ -210,6 +212,7 @@ class PlanLoadBundle:
     sharing: SharingManifestV1 | None
     msp: MspManifestV1 | None
     identity: IdentityManifestV1 | None
+    pam_extended: PamExtendedManifestV1 | None
     manifest_name: str
     order: list[str]
     live: list[LiveRecord]
@@ -1022,6 +1025,7 @@ def _build_plan(ctx: click.Context, manifest_path: Path, *, allow_delete: bool) 
         | MspManifestV1
         | IdentityManifestV1
         | EventsManifestV1
+        | PamExtendedManifestV1
     )
     try:
         if bundle.pam is not None:
@@ -1082,6 +1086,23 @@ def _build_plan(ctx: click.Context, manifest_path: Path, *, allow_delete: bool) 
                     "(offline schema/model/diff only; no Commander write API confirmed)"
                 ),
                 next_action="use `dsk validate` for schema checks; apply waits on a Commander writer",
+            )
+        elif bundle.pam_extended is not None:
+            changes = compute_pam_extended_diff(
+                bundle.pam_extended,
+                {},
+                manifest_name=bundle.manifest_name,
+                allow_delete=allow_delete,
+            )
+            raise CapabilityError(
+                reason=(
+                    f"{PAM_EXTENDED_FAMILY} plan/apply is preview-gated "
+                    "(offline schema/model/diff only; no Commander live proof)"
+                ),
+                next_action=(
+                    "use `dsk validate` for schema checks; apply waits on Commander "
+                    "write/readback proof"
+                ),
             )
         else:
             raise CapabilityError(
@@ -1148,6 +1169,9 @@ def _load_plan_context(ctx: click.Context, manifest_path: Path) -> PlanLoadBundl
     sharing: SharingManifestV1 | None = typed if isinstance(typed, SharingManifestV1) else None
     msp: MspManifestV1 | None = typed if isinstance(typed, MspManifestV1) else None
     identity: IdentityManifestV1 | None = typed if isinstance(typed, IdentityManifestV1) else None
+    pam_extended: PamExtendedManifestV1 | None = (
+        typed if isinstance(typed, PamExtendedManifestV1) else None
+    )
     events: EventsManifestV1 | None = typed if isinstance(typed, EventsManifestV1) else None
     ksm: KsmManifestV1 | None = typed if isinstance(typed, KsmManifestV1) else None
     if pam is not None:
@@ -1158,6 +1182,8 @@ def _load_plan_context(ctx: click.Context, manifest_path: Path) -> PlanLoadBundl
         manifest_name = IDENTITY_FAMILY
     elif events is not None:
         manifest_name = events.name
+    elif pam_extended is not None:
+        manifest_name = PAM_EXTENDED_FAMILY
     else:
         manifest_name = manifest_path.stem
 
@@ -1187,6 +1213,17 @@ def _load_plan_context(ctx: click.Context, manifest_path: Path) -> PlanLoadBundl
                     "(offline schema/model/diff only; no Commander write API confirmed)"
                 ),
                 next_action="use `dsk validate` for schema checks; apply waits on a Commander writer",
+            )
+        elif pam_extended is not None:
+            raise CapabilityError(
+                reason=(
+                    f"{PAM_EXTENDED_FAMILY} plan/apply is preview-gated "
+                    "(offline schema/model/diff only; no Commander live proof)"
+                ),
+                next_action=(
+                    "use `dsk validate` for schema checks; apply waits on Commander "
+                    "write/readback proof"
+                ),
             )
         elif ksm is not None:
             raise CapabilityError(
@@ -1234,6 +1271,7 @@ def _load_plan_context(ctx: click.Context, manifest_path: Path) -> PlanLoadBundl
         sharing=sharing,
         msp=msp,
         identity=identity,
+        pam_extended=pam_extended,
         manifest_name=manifest_name,
         order=order,
         live=live,

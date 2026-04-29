@@ -163,8 +163,7 @@ def redact(value: Any) -> Any:
                 k: (_redact_field_value(v) if k == "value" else redact(v)) for k, v in value.items()
             }
         return {
-            k: (_redact_secret_value(v) if _is_secret(k) else redact(v))
-            for k, v in value.items()
+            k: (_redact_secret_value(v) if _is_secret(k) else redact(v)) for k, v in value.items()
         }
     if isinstance(value, list):
         return [redact(item) for item in value]

@@ -44,16 +44,6 @@
       "items": {
         "$ref": "#/$defs/service_mapping"
       }
-    },
-    "saas_mappings": {
-      "$comment": "Reserved by V2_DECISIONS Q1/P14. No offline model or provider surface in W17.",
-      "type": "array",
-      "maxItems": 0,
-      "default": [],
-      "items": {
-        "type": "object",
-        "additionalProperties": false
-      }
     }
   },
   "$defs": {

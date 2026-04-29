@@ -17,6 +17,8 @@ Stable public surface:
     - compute_msp_diff (core.msp_diff) — MSP slice 1
     - IdentityManifestV1, load_identity_manifest, compute_identity_diff
       (core.models_integrations_identity / core.integrations_identity_diff) — W14 offline
+    - PamExtendedManifestV1, load_pam_extended_manifest, compute_pam_extended_diff
+      (core.models_pam_extended / core.pam_extended_diff) — W17 offline
     - build_graph, execution_order (core.graph)
     - compute_diff, Change (core.diff)
     - build_plan, Plan (core.planner)
@@ -71,6 +73,15 @@ from keeper_sdk.core.models_integrations_identity import (
     IdentitySsoProvider,
     load_identity_manifest,
 )
+from keeper_sdk.core.models_pam_extended import (
+    PAM_EXTENDED_FAMILY,
+    PamExtendedDiscoveryRule,
+    PamExtendedGatewayConfig,
+    PamExtendedManifestV1,
+    PamExtendedRotationSchedule,
+    PamExtendedServiceMapping,
+    load_pam_extended_manifest,
+)
 from keeper_sdk.core.msp_diff import compute_msp_diff
 from keeper_sdk.core.msp_graph import build_msp_graph, msp_apply_order
 from keeper_sdk.core.msp_models import (
@@ -81,6 +92,7 @@ from keeper_sdk.core.msp_models import (
     load_msp_manifest,
 )
 from keeper_sdk.core.normalize import from_pam_import_json, to_pam_import_json
+from keeper_sdk.core.pam_extended_diff import compute_pam_extended_diff
 from keeper_sdk.core.planner import Plan, build_plan
 from keeper_sdk.core.redact import redact
 from keeper_sdk.core.schema import (
@@ -137,15 +149,22 @@ __all__ = [
     "SharedFoldersBlock",
     "MSP_FAMILY",
     "IDENTITY_FAMILY",
+    "PAM_EXTENDED_FAMILY",
     "MspManifestV1",
     "IdentityDomain",
     "IdentityManifestV1",
     "IdentityOutboundEmail",
     "IdentityScimProvisioning",
     "IdentitySsoProvider",
+    "PamExtendedDiscoveryRule",
+    "PamExtendedGatewayConfig",
+    "PamExtendedManifestV1",
+    "PamExtendedRotationSchedule",
+    "PamExtendedServiceMapping",
     "ManagedCompany",
     "Addon",
     "load_identity_manifest",
+    "load_pam_extended_manifest",
     "load_msp_manifest",
     "load_manifest",
     "load_declarative_manifest",
@@ -165,6 +184,7 @@ __all__ = [
     "compute_diff",
     "compute_msp_diff",
     "compute_identity_diff",
+    "compute_pam_extended_diff",
     "compute_vault_diff",
     "compute_sharing_diff",
     "Plan",

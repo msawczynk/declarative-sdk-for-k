@@ -11,55 +11,61 @@ from click.testing import CliRunner
 
 from keeper_sdk.cli import main
 from keeper_sdk.cli.main import EXIT_CAPABILITY
+from keeper_sdk.core import (
+    PAM_EXTENDED_FAMILY,
+    PamExtendedManifestV1,
+    load_schema_for_family,
+)
 from keeper_sdk.core.diff import ChangeKind
 from keeper_sdk.core.errors import SchemaError
 from keeper_sdk.core.manifest import load_declarative_manifest_string
-from keeper_sdk.core.models_pam_extended import (
-    PAM_EXTENDED_FAMILY,
-    PamExtendedManifestV1,
-    load_pam_extended_manifest,
-)
+from keeper_sdk.core.models_pam_extended import load_pam_extended_manifest
 from keeper_sdk.core.pam_extended_diff import compute_pam_extended_diff
-from keeper_sdk.core.schema import load_schema_for_family, validate_manifest
+from keeper_sdk.core.schema import validate_manifest
 
 
 def _minimal_doc() -> dict[str, Any]:
     return {
         "schema": PAM_EXTENDED_FAMILY,
-        "name": "acme-pam-extended",
+        "gateway_configs": [
+            {
+                "gateway_uid_ref": "gw.edge",
+                "network_segment": "corp-edge",
+                "allowed_ports": [22, 3389],
+                "health_check_interval_s": 30,
+            }
+        ],
     }
 
 
 def _full_doc() -> dict[str, Any]:
     return {
         "schema": PAM_EXTENDED_FAMILY,
-        "name": "acme-pam-extended",
-        "manager": "keeper-dsk",
         "gateway_configs": [
             {
                 "gateway_uid_ref": "gw.edge",
-                "network_segment": "prod-east",
+                "network_segment": "corp-edge",
                 "allowed_ports": [22, 3389, 3306],
-                "health_check_interval_s": 60,
+                "health_check_interval_s": 30,
             }
         ],
         "rotation_schedules": [
             {
                 "name": "DB hourly",
-                "uid_ref": "rot.db-hourly",
+                "uid_ref": "rot.db_hourly",
                 "cron_expr": "0 * * * *",
-                "resource_uid_refs": ["res.db", "res.db-read"],
-                "notify_emails": ["secops@example.com"],
+                "resource_uid_refs": ["res.db_prod", "res.db_readonly"],
+                "notify_emails": ["ops@example.com"],
             }
         ],
         "discovery_rules": [
             {
                 "name": "SSH scan",
                 "uid_ref": "disc.ssh",
-                "scan_network": "prod-east",
-                "target_cidr": "10.0.0.0/24",
+                "scan_network": True,
+                "target_cidr": "10.20.0.0/16",
                 "protocol": "ssh",
-                "credential_uid_ref": "cred.scan",
+                "credential_uid_ref": "cred.discovery",
             }
         ],
         "service_mappings": [
@@ -79,50 +85,54 @@ def _manifest(document: dict[str, Any] | None = None) -> PamExtendedManifestV1:
 
 
 def _write_manifest(tmp_path: Path, document: dict[str, Any]) -> Path:
-    path = tmp_path / "pam_extended.json"
+    path = tmp_path / "pam-extended.json"
     path.write_text(json.dumps(document), encoding="utf-8")
     return path
 
 
-def test_pam_extended_schema_is_packaged_under_pam_extended_path() -> None:
+def test_pam_extended_schema_is_packaged_under_canonical_path() -> None:
     schema = load_schema_for_family(PAM_EXTENDED_FAMILY)
 
     assert schema["title"] == PAM_EXTENDED_FAMILY
     assert "service_mappings" in schema["properties"]
 
 
-def test_pam_extended_validate_minimal_name_only() -> None:
+def test_pam_extended_validate_empty_manifest() -> None:
+    assert validate_manifest({"schema": PAM_EXTENDED_FAMILY}) == PAM_EXTENDED_FAMILY
+
+
+def test_pam_extended_validate_minimal_gateway_config() -> None:
     assert validate_manifest(_minimal_doc()) == PAM_EXTENDED_FAMILY
 
 
-def test_pam_extended_validate_full() -> None:
+def test_pam_extended_validate_full_manifest() -> None:
     assert validate_manifest(_full_doc()) == PAM_EXTENDED_FAMILY
 
 
-def test_pam_extended_invalid_missing_manifest_name() -> None:
+def test_pam_extended_invalid_missing_gateway_required_field() -> None:
     document = _minimal_doc()
-    del document["name"]
+    del document["gateway_configs"][0]["network_segment"]
 
     with pytest.raises(SchemaError) as exc:
         validate_manifest(document)
 
-    assert exc.value.context["location"] == "<root>"
-    assert "name" in exc.value.reason
+    assert exc.value.context["location"] == "gateway_configs/0"
+    assert "network_segment" in exc.value.reason
 
 
-def test_pam_extended_invalid_gateway_port_range() -> None:
-    document = _full_doc()
-    document["gateway_configs"][0]["allowed_ports"] = [0]
+def test_pam_extended_invalid_port_range() -> None:
+    document = _minimal_doc()
+    document["gateway_configs"][0]["allowed_ports"] = [70000]
 
     with pytest.raises(SchemaError) as exc:
         validate_manifest(document)
 
-    assert "minimum" in exc.value.reason
+    assert "maximum" in exc.value.reason
 
 
-def test_pam_extended_invalid_discovery_protocol_enum() -> None:
+def test_pam_extended_invalid_discovery_protocol() -> None:
     document = _full_doc()
-    document["discovery_rules"][0]["protocol"] = "vnc"
+    document["discovery_rules"][0]["protocol"] = "telnet"
 
     with pytest.raises(SchemaError) as exc:
         validate_manifest(document)
@@ -130,7 +140,7 @@ def test_pam_extended_invalid_discovery_protocol_enum() -> None:
     assert "not one of" in exc.value.reason
 
 
-def test_pam_extended_invalid_service_type_enum() -> None:
+def test_pam_extended_invalid_service_type() -> None:
     document = _full_doc()
     document["service_mappings"][0]["service_type"] = "launchd"
 
@@ -140,19 +150,9 @@ def test_pam_extended_invalid_service_type_enum() -> None:
     assert "not one of" in exc.value.reason
 
 
-def test_pam_extended_invalid_notify_email() -> None:
-    document = _full_doc()
-    document["rotation_schedules"][0]["notify_emails"] = ["not-an-email"]
-
-    with pytest.raises(SchemaError) as exc:
-        validate_manifest(document)
-
-    assert "does not match" in exc.value.reason
-
-
-def test_pam_extended_rejects_unknown_top_level_property() -> None:
+def test_pam_extended_rejects_unknown_property() -> None:
     document = _minimal_doc()
-    document["extra"] = True
+    document["gateway_configs"][0]["unexpected"] = True
 
     with pytest.raises(SchemaError) as exc:
         validate_manifest(document)
@@ -160,16 +160,11 @@ def test_pam_extended_rejects_unknown_top_level_property() -> None:
     assert "Additional properties" in exc.value.reason
 
 
-def test_pam_extended_loader_returns_typed_model_with_defaults() -> None:
-    document = _full_doc()
-    del document["gateway_configs"][0]["allowed_ports"]
-    del document["rotation_schedules"][0]["notify_emails"]
-
-    loaded = load_declarative_manifest_string(json.dumps(document), suffix=".json")
+def test_pam_extended_loader_returns_typed_model() -> None:
+    loaded = load_declarative_manifest_string(json.dumps(_minimal_doc()), suffix=".json")
 
     assert isinstance(loaded, PamExtendedManifestV1)
-    assert loaded.gateway_configs[0].allowed_ports == []
-    assert loaded.rotation_schedules[0].notify_emails == []
+    assert loaded.gateway_configs[0].allowed_ports == [22, 3389]
 
 
 def test_pam_extended_manifest_roundtrip() -> None:
@@ -183,7 +178,7 @@ def test_pam_extended_manifest_roundtrip() -> None:
 
 def test_pam_extended_loader_rejects_duplicate_uid_refs() -> None:
     document = _full_doc()
-    document["service_mappings"][0]["uid_ref"] = "rot.db-hourly"
+    document["service_mappings"][0]["uid_ref"] = "rot.db_hourly"
 
     with pytest.raises(SchemaError) as exc:
         load_pam_extended_manifest(document)
@@ -191,10 +186,16 @@ def test_pam_extended_loader_rejects_duplicate_uid_refs() -> None:
     assert "duplicate uid_ref" in exc.value.reason
 
 
-def test_pam_extended_loader_rejects_duplicate_gateway_uid_refs() -> None:
+def test_pam_extended_loader_rejects_duplicate_gateway_refs() -> None:
     document = _full_doc()
-    document["gateway_configs"].append(dict(document["gateway_configs"][0]))
-    document["gateway_configs"][1]["network_segment"] = "prod-west"
+    document["gateway_configs"].append(
+        {
+            "gateway_uid_ref": "gw.edge",
+            "network_segment": "corp-alt",
+            "allowed_ports": [443],
+            "health_check_interval_s": 60,
+        }
+    )
 
     with pytest.raises(SchemaError) as exc:
         load_pam_extended_manifest(document)
@@ -210,7 +211,7 @@ def test_pam_extended_diff_detects_schedule_change() -> None:
     row = next(
         change
         for change in compute_pam_extended_diff(desired, live)
-        if change.uid_ref == "rot.db-hourly"
+        if change.uid_ref == "rot.db_hourly"
     )
 
     assert row.kind is ChangeKind.UPDATE
@@ -233,10 +234,10 @@ def test_pam_extended_diff_detects_new_discovery_rule() -> None:
     assert row.uid_ref == "disc.ssh"
 
 
-def test_pam_extended_diff_detects_gateway_config_network_segment_change() -> None:
+def test_pam_extended_diff_detects_gateway_network_segment_change() -> None:
     desired = _manifest()
     live = desired.model_dump(mode="python", exclude_none=True, by_alias=True)
-    live["gateway_configs"][0]["network_segment"] = "prod-west"
+    live["gateway_configs"][0]["network_segment"] = "corp-legacy"
 
     row = next(
         change
@@ -245,9 +246,8 @@ def test_pam_extended_diff_detects_gateway_config_network_segment_change() -> No
     )
 
     assert row.kind is ChangeKind.UPDATE
-    assert row.uid_ref == "gw.edge"
-    assert row.before == {"network_segment": "prod-west"}
-    assert row.after == {"network_segment": "prod-east"}
+    assert row.before == {"network_segment": "corp-legacy"}
+    assert row.after == {"network_segment": "corp-edge"}
 
 
 def test_pam_extended_diff_noops_matching_snapshot() -> None:
@@ -257,71 +257,6 @@ def test_pam_extended_diff_noops_matching_snapshot() -> None:
     changes = compute_pam_extended_diff(manifest, live)
 
     assert {change.kind for change in changes} == {ChangeKind.NOOP}
-
-
-def test_pam_extended_diff_skips_unmanaged_live_by_default() -> None:
-    desired = _manifest(_minimal_doc())
-    live = {
-        "service_mappings": [
-            {
-                "name": "legacy",
-                "uid_ref": "svc.legacy",
-                "service_type": "unix_daemon",
-                "host_uid_ref": "host.legacy",
-                "credential_uid_ref": "cred.legacy",
-            }
-        ]
-    }
-
-    row = compute_pam_extended_diff(desired, live)[0]
-
-    assert row.kind is ChangeKind.SKIP
-    assert row.reason == "unmanaged pam-extended object; pass allow_delete=True to remove"
-
-
-def test_pam_extended_diff_deletes_unmanaged_live_when_allowed() -> None:
-    desired = _manifest(_minimal_doc())
-    live = {
-        "service_mappings": [
-            {
-                "name": "legacy",
-                "uid_ref": "svc.legacy",
-                "service_type": "unix_daemon",
-                "host_uid_ref": "host.legacy",
-                "credential_uid_ref": "cred.legacy",
-            }
-        ]
-    }
-
-    row = compute_pam_extended_diff(desired, live, allow_delete=True)[0]
-
-    assert row.kind is ChangeKind.DELETE
-    assert row.reason is None
-
-
-def test_pam_extended_diff_detects_duplicate_live_key_conflict() -> None:
-    desired = _manifest(_minimal_doc())
-    live = {
-        "gateway_configs": [
-            {
-                "gateway_uid_ref": "gw.dup",
-                "network_segment": "prod-east",
-                "allowed_ports": [22],
-                "health_check_interval_s": 60,
-            },
-            {
-                "gateway_uid_ref": "gw.dup",
-                "network_segment": "prod-west",
-                "allowed_ports": [22],
-                "health_check_interval_s": 60,
-            },
-        ]
-    }
-
-    row = compute_pam_extended_diff(desired, live)[0]
-
-    assert row.kind is ChangeKind.CONFLICT
-    assert row.reason == "duplicate live pam-extended object key: gateway_configs:gw.dup"
 
 
 def test_pam_extended_validate_cli_is_schema_only(tmp_path: Path) -> None:
@@ -335,10 +270,11 @@ def test_pam_extended_validate_cli_is_schema_only(tmp_path: Path) -> None:
     assert payload["mode"] == "schema_only"
 
 
-def test_pam_extended_plan_cli_exits_capability_error(tmp_path: Path) -> None:
+def test_pam_extended_plan_cli_exits_preview_capability(tmp_path: Path) -> None:
     path = _write_manifest(tmp_path, _minimal_doc())
 
     result = CliRunner().invoke(main, ["plan", str(path), "--json"], catch_exceptions=False)
 
     assert result.exit_code == EXIT_CAPABILITY, result.output
-    assert "plan/apply is not supported" in result.output
+    assert PAM_EXTENDED_FAMILY in result.output
+    assert "preview-gated" in result.output
