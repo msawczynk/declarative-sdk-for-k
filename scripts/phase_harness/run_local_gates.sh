@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-shot merge-style gate: ruff (lint+format) + mypy + pytest.
+# One-shot merge-style gate: ruff (lint+format) + mypy + isort + pytest.
 # Replaces the removed in-tree `scripts/agent/phase0_gates.sh` (see AGENTS.md).
 # Safe for CI and local: no live tenant, no network by default.
 set -euo pipefail
@@ -14,4 +14,5 @@ fi
 python3 -m ruff check .
 python3 -m ruff format --check .
 python3 -m mypy keeper_sdk
+isort --check-only .
 python3 -m pytest -q
