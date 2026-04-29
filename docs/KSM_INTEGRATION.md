@@ -103,13 +103,30 @@ credential leakage and centralizes access review in Keeper. It adds the optional
 `keeper-secrets-manager-core` dependency and a KSM application to manage.
 Use `EnvLoginHelper` only for ad-hoc local debugging.
 
-## Known gaps
+## Inter-agent Bus
 
-The KSM inter-agent bus is not implemented. The sealed stub lives in
-[`keeper_sdk/secrets/bus.py`](../keeper_sdk/secrets/bus.py); every public bus
-method raises `NotImplementedError` with a `next_action` until the
-publish/subscribe protocol, cursor/CAS semantics, retention, and operator
-debug workflow are designed. Design doc placeholder: `docs/KSM_BUS.md`.
+`KsmBus` is a basic key/value coordination bus backed by custom text fields on
+one shared KSM record. Bootstrap can create the record with
+`--create-bus-directory`; share that record into every agent's KSM application.
+
+```python
+from keeper_sdk.secrets import KsmSecretStore
+from keeper_sdk.secrets.bus import KsmBus
+
+store = KsmSecretStore(config_path="~/.keeper/dsk-service-admin-ksm-config.json")
+bus = KsmBus(store, "<bus-record-uid>")
+
+bus.put("phase7.worker-a.status", "ready")
+status = bus.get("phase7.worker-a.status")
+```
+
+`get()` returns `None` when a key has no field yet. If the bus record UID is
+not configured, `KsmBus` keeps the sealed `NotImplementedError` fallback with a
+`next_action` string instead of writing to an unknown record.
+
+The richer publish/subscribe `BusClient` remains a sealed design stub until
+cursor/CAS semantics, retention, and operator debug workflow are designed and
+live-proven. Design doc placeholder: `docs/KSM_BUS.md`.
 
 ## Future work
 
