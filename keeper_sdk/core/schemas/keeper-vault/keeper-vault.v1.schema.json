@@ -101,7 +101,12 @@
         },
         "custom": {
           "type": "array",
-          "items": { "$ref": "#/$defs/typed_field" },
+          "items": {
+            "oneOf": [
+              { "$ref": "#/$defs/typed_field" },
+              { "$ref": "#/$defs/custom_key_value" }
+            ]
+          },
           "default": []
         },
         "keeper_uid": { "$ref": "#/$defs/keeper_uid" }
@@ -113,17 +118,19 @@
       "x-keeper-secret-field-types": [
         "password",
         "securityQuestion",
+        "secret_question",
         "pinCode",
         "secret",
         "keyPair",
         "bankAccount",
-        "paymentCard"
+        "paymentCard",
+        "file_ref",
+        "fileRef"
       ],
       "required": ["type", "value"],
       "properties": {
         "type": {
-          "type": "string",
-          "minLength": 1
+          "$ref": "#/$defs/field_type"
         },
         "label": {
           "type": "string",
@@ -134,6 +141,30 @@
           "items": { "$ref": "#/$defs/field_value" }
         }
       }
+    },
+    "field_type": {
+      "type": "string",
+      "enum": [
+        "login",
+        "password",
+        "url",
+        "email",
+        "phone",
+        "address",
+        "secret_question",
+        "securityQuestion",
+        "multiline",
+        "text",
+        "secret",
+        "pinCode",
+        "name",
+        "paymentCard",
+        "bankAccount",
+        "keyPair",
+        "host",
+        "file_ref",
+        "fileRef"
+      ]
     },
     "field_value": {
       "oneOf": [
@@ -147,7 +178,48 @@
         { "$ref": "#/$defs/payment_card_value" },
         { "$ref": "#/$defs/bank_account_value" },
         { "$ref": "#/$defs/key_pair_value" },
-        { "$ref": "#/$defs/host_value" }
+        { "$ref": "#/$defs/host_value" },
+        { "$ref": "#/$defs/file_ref_value" }
+      ]
+    },
+    "custom_key_value": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "value"],
+      "properties": {
+        "key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value": { "$ref": "#/$defs/custom_value" }
+      }
+    },
+    "custom_value": {
+      "oneOf": [
+        {
+          "type": ["string", "number", "boolean", "null"]
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": ["string", "number", "boolean", "null"]
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "type": ["string", "number", "boolean", "null"]
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": {
+              "type": ["string", "number", "boolean", "null"]
+            }
+          }
+        }
       ]
     },
     "security_question_value": {
@@ -235,6 +307,39 @@
       "properties": {
         "hostName": { "type": "string" },
         "port": { "$ref": "#/$defs/port" }
+      }
+    },
+    "file_ref_value": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "keeper_uid": { "$ref": "#/$defs/keeper_uid" },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mime_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "content_sha256": {
+          "type": "string",
+          "pattern": "^[A-Fa-f0-9]{64}$"
+        }
+      },
+      "x-keeper-live-proof": {
+        "status": "upstream-gap",
+        "notes": "file_ref values are declarative attachment stubs only. Plan/diff redacts them; no upload writer is claimed until size, redaction, and Commander upload policy land."
       }
     },
     "record_type": {

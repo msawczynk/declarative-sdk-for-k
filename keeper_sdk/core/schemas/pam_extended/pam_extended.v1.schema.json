@@ -1,0 +1,209 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/msawczynk/declarative-sdk-for-k/schemas/pam_extended/pam_extended.v1.schema.json",
+  "title": "keeper-pam-extended.v1",
+  "description": "Offline foundation for advanced PAM configuration surfaces outside pam-environment.v1: gateway configs, rotation schedules, discovery rules, and service mappings. Commander plan/apply remain preview-gated until live proof exists.",
+  "x-keeper-live-proof": {
+    "status": "preview-gated",
+    "evidence": "pending",
+    "since_pin": "89047920a0df857e01fb59adcb0bfb9fa6db70bf",
+    "notes": "W17 ships schema, typed models, and offline diff only. dsk validate is schema-only; dsk plan/apply intentionally exit capability."
+  },
+  "type": "object",
+  "required": ["schema"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "keeper-pam-extended.v1"
+    },
+    "gateway_configs": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/gateway_config"
+      }
+    },
+    "rotation_schedules": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/rotation_schedule"
+      }
+    },
+    "discovery_rules": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/discovery_rule"
+      }
+    },
+    "service_mappings": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/service_mapping"
+      }
+    },
+    "saas_mappings": {
+      "$comment": "Reserved by V2_DECISIONS Q1/P14. No offline model or provider surface in W17.",
+      "type": "array",
+      "maxItems": 0,
+      "default": [],
+      "items": {
+        "type": "object",
+        "additionalProperties": false
+      }
+    }
+  },
+  "$defs": {
+    "uid_ref": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "non_empty_string": {
+      "type": "string",
+      "minLength": 1
+    },
+    "email": {
+      "type": "string",
+      "minLength": 3,
+      "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+    },
+    "port": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535
+    },
+    "gateway_config": {
+      "type": "object",
+      "required": [
+        "gateway_uid_ref",
+        "network_segment",
+        "allowed_ports",
+        "health_check_interval_s"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "gateway_uid_ref": {
+          "$ref": "#/$defs/uid_ref"
+        },
+        "network_segment": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "allowed_ports": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/port"
+          },
+          "uniqueItems": true
+        },
+        "health_check_interval_s": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "rotation_schedule": {
+      "type": "object",
+      "required": ["name", "uid_ref", "cron_expr"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "uid_ref": {
+          "$ref": "#/$defs/uid_ref"
+        },
+        "cron_expr": {
+          "type": "string",
+          "minLength": 5
+        },
+        "resource_uid_refs": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/uid_ref"
+          }
+        },
+        "notify_emails": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/email"
+          }
+        }
+      }
+    },
+    "discovery_rule": {
+      "type": "object",
+      "required": [
+        "name",
+        "uid_ref",
+        "scan_network",
+        "target_cidr",
+        "protocol",
+        "credential_uid_ref"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "uid_ref": {
+          "$ref": "#/$defs/uid_ref"
+        },
+        "scan_network": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "$ref": "#/$defs/non_empty_string"
+            }
+          ]
+        },
+        "target_cidr": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "protocol": {
+          "type": "string",
+          "enum": ["ssh", "rdp", "database"]
+        },
+        "credential_uid_ref": {
+          "$ref": "#/$defs/uid_ref"
+        }
+      }
+    },
+    "service_mapping": {
+      "type": "object",
+      "required": [
+        "name",
+        "uid_ref",
+        "service_type",
+        "host_uid_ref",
+        "credential_uid_ref"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "uid_ref": {
+          "$ref": "#/$defs/uid_ref"
+        },
+        "service_type": {
+          "type": "string",
+          "enum": ["windows_service", "unix_daemon", "k8s_pod"]
+        },
+        "host_uid_ref": {
+          "$ref": "#/$defs/uid_ref"
+        },
+        "credential_uid_ref": {
+          "$ref": "#/$defs/uid_ref"
+        }
+      }
+    }
+  }
+}

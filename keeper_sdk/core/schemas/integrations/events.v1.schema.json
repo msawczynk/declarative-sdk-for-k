@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "keeper-integrations-events.v1",
+  "type": "object",
+  "required": ["schema", "name"],
+  "properties": {
+    "schema": {"type": "string", "const": "keeper-integrations-events.v1"},
+    "name": {"type": "string"},
+    "manager": {"type": "string"},
+    "automator_rules": {"type": "array", "items": {"$ref": "#/$defs/AutomatorRule"}, "default": []},
+    "audit_alerts": {"type": "array", "items": {"$ref": "#/$defs/AuditAlert"}, "default": []},
+    "api_keys": {"type": "array", "items": {"$ref": "#/$defs/ApiKey"}, "default": []},
+    "event_routes": {"type": "array", "items": {"$ref": "#/$defs/EventRoute"}, "default": []}
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "AutomatorRule": {
+      "type": "object", "required": ["uid_ref", "name", "trigger", "action", "endpoint_uid_ref"],
+      "properties": {
+        "uid_ref": {"type": "string"}, "name": {"type": "string"},
+        "trigger": {"type": "string", "enum": ["record_create","record_update","share","login"]},
+        "action": {"type": "string", "enum": ["webhook","email","slack"]},
+        "endpoint_uid_ref": {"type": "string"}, "filter_tags": {"type": "array", "items": {"type": "string"}, "default": []}
+      }
+    },
+    "AuditAlert": {
+      "type": "object", "required": ["uid_ref", "name", "event_types", "notify_emails"],
+      "properties": {
+        "uid_ref": {"type": "string"}, "name": {"type": "string"},
+        "event_types": {"type": "array", "items": {"type": "string"}},
+        "severity": {"type": "string", "enum": ["low","medium","high","critical"], "default": "medium"},
+        "notify_emails": {"type": "array", "items": {"type": "string", "format": "email"}}
+      }
+    },
+    "ApiKey": {
+      "type": "object", "required": ["uid_ref", "name"],
+      "properties": {
+        "uid_ref": {"type": "string"}, "name": {"type": "string"},
+        "scopes": {"type": "array", "items": {"type": "string"}, "default": []},
+        "expiry_days": {"type": "integer", "minimum": 1}, "ip_allowlist": {"type": "array", "items": {"type": "string"}, "default": []}
+      }
+    },
+    "EventRoute": {
+      "type": "object", "required": ["uid_ref", "name", "destination_type", "destination_uid_ref"],
+      "properties": {
+        "uid_ref": {"type": "string"}, "name": {"type": "string"},
+        "destination_type": {"type": "string", "enum": ["siem","webhook","email"]},
+        "destination_uid_ref": {"type": "string"},
+        "filter_severity": {"type": "string", "enum": ["low","medium","high","critical"]}
+      }
+    }
+  }
+}

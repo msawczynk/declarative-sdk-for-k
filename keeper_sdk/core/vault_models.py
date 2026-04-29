@@ -12,9 +12,9 @@ CLI + providers ship in ``keeper_sdk/cli`` and ``keeper_sdk.providers`` — see
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any, Literal, TypeAlias
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 from keeper_sdk.core.diff import Change, ChangeKind
 from keeper_sdk.core.errors import SchemaError
@@ -28,6 +28,145 @@ class _VaultModel(BaseModel):
     model_config = ConfigDict(extra="allow", populate_by_name=True, str_strip_whitespace=True)
 
 
+class _StrictVaultModel(BaseModel):
+    """Strict typed leaf blocks for manifest-owned Keeper field values."""
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True, str_strip_whitespace=True)
+
+
+VaultJsonScalar: TypeAlias = str | int | float | bool | None
+VaultCustomValue: TypeAlias = (
+    VaultJsonScalar
+    | list[VaultJsonScalar]
+    | dict[str, VaultJsonScalar]
+    | list[dict[str, VaultJsonScalar]]
+)
+
+
+class VaultSecurityQuestionValue(_StrictVaultModel):
+    question: str
+    answer: str | None = None
+
+
+class VaultNameValue(_StrictVaultModel):
+    first: str | None = None
+    middle: str | None = None
+    last: str | None = None
+
+
+class VaultAddressValue(_StrictVaultModel):
+    street1: str | None = None
+    street2: str | None = None
+    city: str | None = None
+    state: str | None = None
+    zip: str | None = None
+    country: str | None = None
+
+
+class VaultPhoneValue(_StrictVaultModel):
+    region: str | None = None
+    number: str | None = None
+    ext: str | None = None
+    type: str | None = None
+
+
+class VaultPaymentCardValue(_StrictVaultModel):
+    cardNumber: str | None = None
+    cardExpirationDate: str | None = None
+    cardSecurityCode: str | None = None
+
+
+class VaultBankAccountValue(_StrictVaultModel):
+    accountType: str | None = None
+    routingNumber: str | None = None
+    accountNumber: str | None = None
+    otherType: str | None = None
+
+
+class VaultKeyPairValue(_StrictVaultModel):
+    publicKey: str | None = None
+    privateKey: str | None = None
+
+
+class VaultHostValue(_StrictVaultModel):
+    hostName: str | None = None
+    port: int | str | None = None
+
+
+class VaultFileRefValue(_StrictVaultModel):
+    uid_ref: str | None = None
+    keeper_uid: str | None = None
+    name: str | None = None
+    title: str | None = None
+    mime_type: str | None = None
+    size: int | None = None
+    content_sha256: str | None = None
+
+
+VaultFieldValue: TypeAlias = (
+    VaultJsonScalar
+    | VaultSecurityQuestionValue
+    | VaultNameValue
+    | VaultAddressValue
+    | VaultPhoneValue
+    | VaultPaymentCardValue
+    | VaultBankAccountValue
+    | VaultKeyPairValue
+    | VaultHostValue
+    | VaultFileRefValue
+)
+
+
+class VaultTypedField(_StrictVaultModel):
+    """Manifest-owned Keeper typed field entry.
+
+    ``fields`` and ``custom`` still store plain dictionaries on ``VaultRecord``
+    for backwards compatibility, but both lists validate through this model.
+    """
+
+    type: Literal[
+        "login",
+        "password",
+        "url",
+        "email",
+        "phone",
+        "address",
+        "secret_question",
+        "securityQuestion",
+        "multiline",
+        "text",
+        "secret",
+        "pinCode",
+        "name",
+        "paymentCard",
+        "bankAccount",
+        "keyPair",
+        "host",
+        "file_ref",
+        "fileRef",
+    ]
+    value: list[VaultFieldValue]
+    label: str | None = None
+
+
+class VaultCustomKeyValue(_StrictVaultModel):
+    """Free-form custom key/value row accepted in ``records[].custom[]``."""
+
+    key: str
+    value: VaultCustomValue
+
+
+def _validate_typed_fields(fields: list[dict[str, Any]], *, allow_custom_kv: bool) -> None:
+    for field in fields:
+        try:
+            VaultTypedField.model_validate(field)
+            continue
+        except ValidationError:
+            if not allow_custom_kv:
+                raise
+        VaultCustomKeyValue.model_validate(field)
+
+
 class VaultRecord(_VaultModel):
     """One ``records[]`` entry (see ``keeper-vault.v1`` schema ``$defs.record``)."""
 
@@ -39,6 +178,18 @@ class VaultRecord(_VaultModel):
     fields: list[dict[str, Any]] = Field(default_factory=list)
     custom: list[dict[str, Any]] = Field(default_factory=list)
     keeper_uid: str | None = None
+
+    @field_validator("fields")
+    @classmethod
+    def _validate_fields(cls, fields: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        _validate_typed_fields(fields, allow_custom_kv=False)
+        return fields
+
+    @field_validator("custom")
+    @classmethod
+    def _validate_custom(cls, custom: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        _validate_typed_fields(custom, allow_custom_kv=True)
+        return custom
 
 
 class VaultSharedFolder(_VaultModel):

@@ -10,6 +10,9 @@ from typing import Any, TypeAlias
 _SECRET_TOKENS = (
     "password",
     "secret",
+    "api key",
+    "api_key",
+    "credential",
     "private_key",
     "private_pem_key",
     "client_secret",
@@ -18,6 +21,18 @@ _SECRET_TOKENS = (
     "admin_private_key",
     "otp",
 )
+
+_SECRET_FIELD_TYPES = {
+    "password",
+    "securityquestion",
+    "secretquestion",
+    "pincode",
+    "secret",
+    "keypair",
+    "bankaccount",
+    "paymentcard",
+    "fileref",
+}
 
 REDACTED = "***redacted***"
 _INLINE_REDACTED = "***"
@@ -105,17 +120,50 @@ def _is_secret(key: str) -> bool:
     return any(token in lower for token in _SECRET_TOKENS)
 
 
+def _field_type_key(value: Any) -> str:
+    return str(value or "").replace("_", "").casefold()
+
+
+def _is_secret_typed_field(value: dict[Any, Any]) -> bool:
+    field_type = _field_type_key(value.get("type"))
+    if field_type in _SECRET_FIELD_TYPES:
+        return True
+    for label_key in ("label", "name", "key"):
+        label = value.get(label_key)
+        if isinstance(label, str) and _is_secret(label):
+            return True
+    return False
+
+
+def _redact_field_value(value: Any) -> Any:
+    if value in (None, ""):
+        return value
+    if isinstance(value, list):
+        return [REDACTED if item not in (None, "") else item for item in value]
+    return REDACTED
+
+
 def _redact_string(value: str) -> str:
     for pattern, replacement in _PATTERNS:
         value = pattern.sub(replacement, value)
     return value
 
 
+def _redact_secret_value(value: Any) -> Any:
+    if value in (None, "", "<redacted>", REDACTED):
+        return value
+    return REDACTED
+
+
 def redact(value: Any) -> Any:
     """Deep-copy with any secret-flavored field replaced by the sentinel."""
     if isinstance(value, dict):
+        if _is_secret_typed_field(value) and "value" in value:
+            return {
+                k: (_redact_field_value(v) if k == "value" else redact(v)) for k, v in value.items()
+            }
         return {
-            k: (REDACTED if _is_secret(k) and v not in (None, "") else redact(v))
+            k: (_redact_secret_value(v) if _is_secret(k) else redact(v))
             for k, v in value.items()
         }
     if isinstance(value, list):

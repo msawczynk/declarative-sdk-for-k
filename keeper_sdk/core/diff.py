@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
@@ -435,6 +436,59 @@ def _field_diff_pam_settings_resource(live: dict[str, Any], desired: dict[str, A
     return sorted(changed)
 
 
+_VAULT_FILE_REF_FIELD_TYPES = {"file_ref", "fileref"}
+
+
+def _vault_normalized_field_type(field_type: Any) -> str:
+    return str(field_type or "").replace("_", "").casefold()
+
+
+def _vault_field_label(entry: Mapping[str, Any]) -> str:
+    return str(entry.get("label") or entry.get("name") or entry.get("type") or "")
+
+
+def _vault_canonical_value(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return tuple(sorted((str(k), _vault_canonical_value(v)) for k, v in value.items()))
+    if isinstance(value, list):
+        return tuple(_vault_canonical_value(item) for item in value)
+    return value
+
+
+def _vault_canonical_field_entries(entries: Any) -> list[tuple[str, str, Any]]:
+    out: list[tuple[str, str, Any]] = []
+    if not isinstance(entries, list):
+        return out
+    for entry in entries:
+        if not isinstance(entry, Mapping):
+            continue
+        out.append(
+            (
+                _vault_field_label(entry).casefold(),
+                _vault_normalized_field_type(entry.get("type")),
+                _vault_canonical_value(entry.get("value")),
+            )
+        )
+    return sorted(out, key=lambda item: json.dumps(item, sort_keys=True, default=str))
+
+
+def _vault_field_entries_are_flattenable(entries: Any) -> bool:
+    if not isinstance(entries, list):
+        return True
+    for entry in entries:
+        if not isinstance(entry, Mapping):
+            return False
+        if _vault_normalized_field_type(entry.get("type")) in _VAULT_FILE_REF_FIELD_TYPES:
+            return False
+        values = entry.get("value")
+        if not isinstance(values, list) or len(values) != 1:
+            return False
+        value = values[0]
+        if not isinstance(value, (str, int, float, bool)) and value is not None:
+            return False
+    return True
+
+
 def _vault_flatten_login_field_entries(entries: Any) -> dict[str, Any]:
     """Map typed ``fields[]`` entries to a flat ``label -> scalar`` dict (L1 login)."""
     out: dict[str, Any] = {}
@@ -481,7 +535,10 @@ def _vault_flatten_live_login_scalar_map(
 
 
 def _vault_sorted_custom_json(entries: list[dict[str, Any]]) -> str:
-    norm = sorted(entries, key=lambda e: str(e.get("label") or e.get("name") or ""))
+    norm = sorted(
+        entries,
+        key=lambda e: str(e.get("key") or e.get("label") or e.get("name") or e.get("type") or ""),
+    )
     return json.dumps(norm, sort_keys=True)
 
 
@@ -499,21 +556,27 @@ def _field_diff_vault_login(live: dict[str, Any], desired: dict[str, Any]) -> li
             changed.append(k)
 
     if "fields" in desired and desired.get("fields") is not None:
-        flat_d = _vault_flatten_login_field_entries(desired["fields"])
         live_fields = live.get("fields")
         if isinstance(live_fields, list) and live_fields:
-            flat_l = _vault_flatten_login_field_entries(live_fields)
+            if _vault_canonical_field_entries(live_fields) != _vault_canonical_field_entries(
+                desired["fields"]
+            ):
+                changed.append("fields")
         else:
+            if not _vault_field_entries_are_flattenable(desired["fields"]):
+                changed.append("fields")
+                return sorted(changed)
+            flat_d = _vault_flatten_login_field_entries(desired["fields"])
             flat_l = _vault_flatten_live_login_scalar_map(live, flat_d)
-        if _vault_norm_login_field_map(flat_l) != _vault_norm_login_field_map(flat_d):
-            changed.append("fields")
+            if _vault_norm_login_field_map(flat_l) != _vault_norm_login_field_map(flat_d):
+                changed.append("fields")
 
     if "custom" in desired and desired.get("custom") is not None:
         d_list = [
             e
             for e in desired.get("custom") or []
             if isinstance(e, dict)
-            and str(e.get("label") or e.get("name") or "").casefold()
+            and str(e.get("key") or e.get("label") or e.get("name") or "").casefold()
             != MARKER_FIELD_LABEL.casefold()
         ]
         live_custom = live.get("custom")
@@ -522,7 +585,7 @@ def _field_diff_vault_login(live: dict[str, Any], desired: dict[str, Any]) -> li
             e
             for e in l_raw
             if isinstance(e, dict)
-            and str(e.get("label") or e.get("name") or "").casefold()
+            and str(e.get("key") or e.get("label") or e.get("name") or "").casefold()
             != MARKER_FIELD_LABEL.casefold()
         ]
         if _vault_sorted_custom_json(l_list) != _vault_sorted_custom_json(d_list):

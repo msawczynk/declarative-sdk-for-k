@@ -90,3 +90,76 @@ def run_keeper_batch(
             next_action="inspect Commander stderr; ensure session is logged in",
         )
     return (result.stdout or "").strip()
+
+
+def run_keeper_passthrough(
+    argv: list[str],
+    *,
+    keeper_bin: str | None,
+    config_file: str | None,
+    password: str | None,
+) -> subprocess.CompletedProcess[str]:
+    """Run ``keeper --batch-mode … argv`` and return Commander's raw exit result.
+
+    Used by ``dsk run`` where non-zero Commander exits are intentional passthrough
+    results, not SDK capability failures. Missing local Commander remains a
+    capability error because there is no command to delegate to.
+    """
+    from keeper_sdk.core.errors import CapabilityError
+
+    bin_name = keeper_bin or os.environ.get("KEEPER_BIN", "keeper")
+    if not shutil.which(bin_name):
+        raise CapabilityError(
+            reason=f"keeper CLI not found on PATH (looked up '{bin_name}')",
+            next_action="install Keeper Commander or set KEEPER_BIN",
+        )
+    base = [bin_name, "--batch-mode"]
+    cfg = config_file or os.environ.get("KEEPER_CONFIG")
+    if cfg:
+        base += ["--config", cfg]
+    env = os.environ.copy()
+    pwd = password or os.environ.get("KEEPER_PASSWORD")
+    if pwd:
+        env["KEEPER_PASSWORD"] = pwd
+    result: subprocess.CompletedProcess[str] | None = None
+    for attempt in range(2):
+        result = subprocess.run(
+            base + argv,
+            check=False,
+            capture_output=True,
+            text=True,
+            stdin=subprocess.DEVNULL,
+            env=env,
+        )
+        if result.returncode == 0 or attempt == 1:
+            break
+        if not _is_retryable_keeper_session_text(result.stdout, result.stderr):
+            break
+    assert result is not None
+    return result
+
+
+def raise_team_report_unsupported() -> None:
+    """Stub until Commander exposes team enumeration as a proven JSON report."""
+    from keeper_sdk.core.errors import CapabilityError
+
+    raise CapabilityError(
+        reason=(
+            "dsk report team-report is an upstream gap until Commander exposes "
+            "team enumeration as a supported report surface"
+        ),
+        next_action="keeper enterprise-info --teams",
+    )
+
+
+def raise_role_report_unsupported() -> None:
+    """Stub until Commander exposes role enumeration as a proven JSON report."""
+    from keeper_sdk.core.errors import CapabilityError
+
+    raise CapabilityError(
+        reason=(
+            "dsk report role-report is an upstream gap until Commander exposes "
+            "role enumeration as a supported report surface"
+        ),
+        next_action="keeper enterprise-info --roles",
+    )

@@ -8,7 +8,8 @@ Subcommands:
     diff       - plan + field-by-field render
     apply      - execute a plan via the selected provider
     report     - read-only Commander reports: password-report, compliance-report,
-                 security-audit-report (JSON, redacted)
+                 security-audit-report, team-report, role-report (JSON, redacted)
+    run        - Commander passthrough with redaction and exit-code passthrough
 
 Exit codes:
     0 success, clean
@@ -25,6 +26,7 @@ import contextlib
 import io
 import json
 import os
+import shlex
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -66,8 +68,10 @@ from keeper_sdk.core import (
     redact,
     vault_record_apply_order,
 )
+from keeper_sdk.core.integrations_events_diff import compute_events_diff
 from keeper_sdk.core.interfaces import ApplyOutcome, LiveRecord
 from keeper_sdk.core.manifest import read_manifest_document
+from keeper_sdk.core.models_integrations_events import EVENTS_FAMILY, EventsManifestV1
 from keeper_sdk.core.models_ksm import KSM_FAMILY, KsmManifestV1
 from keeper_sdk.core.planner import Plan
 from keeper_sdk.core.preview import assert_preview_keys_allowed
@@ -212,6 +216,7 @@ class PlanLoadBundle:
     live_msp: list[dict[str, Any]]
     live_record_type_defs: list[dict[str, Any]]
     provider: Any
+    events: EventsManifestV1 | None
 
 
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
@@ -1011,7 +1016,12 @@ def _build_plan(ctx: click.Context, manifest_path: Path, *, allow_delete: bool) 
     bundle = _load_plan_context(ctx, manifest_path)
     ctx.obj["_plan_bundle"] = bundle
     capability_subject: (
-        Manifest | VaultManifestV1 | SharingManifestV1 | MspManifestV1 | IdentityManifestV1
+        Manifest
+        | VaultManifestV1
+        | SharingManifestV1
+        | MspManifestV1
+        | IdentityManifestV1
+        | EventsManifestV1
     )
     try:
         if bundle.pam is not None:
@@ -1055,6 +1065,20 @@ def _build_plan(ctx: click.Context, manifest_path: Path, *, allow_delete: bool) 
             raise CapabilityError(
                 reason=(
                     f"{IDENTITY_FAMILY} plan/apply is not supported "
+                    "(offline schema/model/diff only; no Commander write API confirmed)"
+                ),
+                next_action="use `dsk validate` for schema checks; apply waits on a Commander writer",
+            )
+        elif bundle.events is not None:
+            changes = compute_events_diff(
+                bundle.events,
+                {},
+                manifest_name=bundle.manifest_name,
+                allow_delete=allow_delete,
+            )
+            raise CapabilityError(
+                reason=(
+                    f"{EVENTS_FAMILY} plan/apply is not supported "
                     "(offline schema/model/diff only; no Commander write API confirmed)"
                 ),
                 next_action="use `dsk validate` for schema checks; apply waits on a Commander writer",
@@ -1124,6 +1148,7 @@ def _load_plan_context(ctx: click.Context, manifest_path: Path) -> PlanLoadBundl
     sharing: SharingManifestV1 | None = typed if isinstance(typed, SharingManifestV1) else None
     msp: MspManifestV1 | None = typed if isinstance(typed, MspManifestV1) else None
     identity: IdentityManifestV1 | None = typed if isinstance(typed, IdentityManifestV1) else None
+    events: EventsManifestV1 | None = typed if isinstance(typed, EventsManifestV1) else None
     ksm: KsmManifestV1 | None = typed if isinstance(typed, KsmManifestV1) else None
     if pam is not None:
         manifest_name = pam.name
@@ -1131,6 +1156,8 @@ def _load_plan_context(ctx: click.Context, manifest_path: Path) -> PlanLoadBundl
         manifest_name = msp.name
     elif identity is not None:
         manifest_name = IDENTITY_FAMILY
+    elif events is not None:
+        manifest_name = events.name
     else:
         manifest_name = manifest_path.stem
 
@@ -1149,6 +1176,14 @@ def _load_plan_context(ctx: click.Context, manifest_path: Path) -> PlanLoadBundl
             raise CapabilityError(
                 reason=(
                     f"{IDENTITY_FAMILY} plan/apply is not supported "
+                    "(offline schema/model/diff only; no Commander write API confirmed)"
+                ),
+                next_action="use `dsk validate` for schema checks; apply waits on a Commander writer",
+            )
+        elif events is not None:
+            raise CapabilityError(
+                reason=(
+                    f"{EVENTS_FAMILY} plan/apply is not supported "
                     "(offline schema/model/diff only; no Commander write API confirmed)"
                 ),
                 next_action="use `dsk validate` for schema checks; apply waits on a Commander writer",
@@ -1205,6 +1240,7 @@ def _load_plan_context(ctx: click.Context, manifest_path: Path) -> PlanLoadBundl
         live_msp=live_msp,
         live_record_type_defs=live_record_type_defs,
         provider=provider,
+        events=events,
     )
 
 
@@ -1418,6 +1454,91 @@ def _emit_report_json(payload: dict[str, Any]) -> None:
     sys.exit(EXIT_OK)
 
 
+def _run_argv_from_command(command: tuple[str, ...]) -> list[str]:
+    if not command:
+        raise click.UsageError("missing Commander command")
+    if len(command) == 1:
+        return shlex.split(command[0])
+    return list(command)
+
+
+def _redact_run_output(text: str, *, sanitize_uids: bool) -> str:
+    if not text:
+        return ""
+    from keeper_sdk.cli._live.transcript import _sanitize_value
+    from keeper_sdk.core.redact import redact as redact_secrets
+
+    stripped = text.strip()
+    if stripped.startswith(("{", "[")):
+        try:
+            parsed = json.loads(stripped)
+        except json.JSONDecodeError:
+            redacted = str(redact_secrets(text))
+        else:
+            redacted = json.dumps(redact_secrets(parsed), indent=2)
+            if text.endswith("\n"):
+                redacted += "\n"
+    else:
+        redacted = str(redact_secrets(text))
+    if sanitize_uids:
+        redacted = str(_sanitize_value(redacted))
+    return redacted
+
+
+def _echo_preserving_newline(text: str, *, err: bool = False) -> None:
+    if text:
+        click.echo(text, nl=not text.endswith("\n"), err=err)
+
+
+@main.command("run", context_settings={"ignore_unknown_options": True, "allow_extra_args": True})
+@click.option(
+    "--sanitize-uids",
+    is_flag=True,
+    help="Fingerprint UID-like substrings in Commander output",
+)
+@click.option("--json", "as_json", is_flag=True, help="Append --json to the Commander command")
+@click.argument("command", nargs=-1, type=click.UNPROCESSED)
+@click.pass_context
+def run_commander(
+    ctx: click.Context,
+    sanitize_uids: bool,
+    as_json: bool,
+    command: tuple[str, ...],
+) -> None:
+    """Run an arbitrary Commander command via the configured Commander session."""
+    if ctx.obj.get("provider") != "commander":
+        click.echo(
+            "capability error: dsk run requires --provider commander; "
+            "mock provider has no Commander session; "
+            "next_action: dsk --provider commander run <commander-command>",
+            err=True,
+        )
+        sys.exit(EXIT_CAPABILITY)
+
+    try:
+        argv = _run_argv_from_command(command)
+        if as_json and "--json" not in argv:
+            argv.append("--json")
+        from keeper_sdk.cli._report import runner as keeper_runner
+
+        result = keeper_runner.run_keeper_passthrough(
+            argv,
+            keeper_bin=os.environ.get("KEEPER_BIN"),
+            config_file=os.environ.get("KEEPER_CONFIG"),
+            password=os.environ.get("KEEPER_PASSWORD"),
+        )
+    except CapabilityError as exc:
+        click.echo(f"capability error: {exc}", err=True)
+        sys.exit(EXIT_CAPABILITY)
+
+    _echo_preserving_newline(_redact_run_output(result.stdout or "", sanitize_uids=sanitize_uids))
+    _echo_preserving_newline(
+        _redact_run_output(result.stderr or "", sanitize_uids=sanitize_uids),
+        err=True,
+    )
+    sys.exit(result.returncode)
+
+
 @main.group("report")
 def report_cli() -> None:
     """Run read-only Commander reports; prints redacted JSON to stdout."""
@@ -1600,6 +1721,30 @@ def report_security_audit_report(
         click.echo(f"report error: {exc}", err=True)
         sys.exit(EXIT_CAPABILITY)
     _emit_report_json(payload)
+
+
+@report_cli.command("team-report")
+def report_team_report() -> None:
+    """Enterprise team report stub; upstream Commander enumeration gap."""
+    from keeper_sdk.cli._report.runner import raise_team_report_unsupported
+
+    try:
+        raise_team_report_unsupported()
+    except CapabilityError as exc:
+        click.echo(f"report error: {exc}", err=True)
+        sys.exit(EXIT_CAPABILITY)
+
+
+@report_cli.command("role-report")
+def report_role_report() -> None:
+    """Enterprise role report stub; upstream Commander enumeration gap."""
+    from keeper_sdk.cli._report.runner import raise_role_report_unsupported
+
+    try:
+        raise_role_report_unsupported()
+    except CapabilityError as exc:
+        click.echo(f"report error: {exc}", err=True)
+        sys.exit(EXIT_CAPABILITY)
 
 
 @main.command("live-smoke")

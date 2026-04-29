@@ -29,10 +29,12 @@ Shipped and proven:
   and transcript leak check clean.
 - Provider capability gaps surface as plan conflicts; `validate --online` now
   fails on provider capability gaps.
-- **`keeper-vault.v1` L1 (scalar `login` slice): `supported`** — 2026-04-28 live
-  proof (`vaultOneLogin` smoke PASSED create→verify→destroy; scalar field diff +
-  apply converges). Full vault record-type surface elsewhere remains phased per
-  `VAULT_L1_DESIGN` / parity tables.
+- **`keeper-vault.v1` L1 (`login` slice + typed custom fields): `supported`** —
+  2026-04-28 live proof (`vaultOneLogin` smoke PASSED create→verify→destroy);
+  2026-04-29 offline broadening adds typed `url` / `email` / `phone` /
+  `address` / `secret_question` / `multiline` field validation, type-aware diff,
+  free-form `custom[]` key/value rows, and redacted `file_ref` stubs. Binary
+  file upload remains an upstream-gap until upload policy lands.
 - **MSP discover / `msp-environment.v1`:** 2026-04-28 live proof:
   `dsk validate --online` + `dsk plan` exit 0 against lab tenant using
   `tests/fixtures/examples/msp/01-minimal-msp.yaml`. Read-only discover + plan
@@ -74,12 +76,13 @@ Recently unblocked:
   outside this lift.
 
 Not yet supported:
-- Post-import RBI fields outside the P3.1 supported buckets: URL and proven
-  typed booleans are supported / import-supported per `docs/COMMANDER.md`;
-  list-shaped, audio-only, and upstream-gap rows stay explicitly out of
-  supported claims.
+- Post-import RBI fields outside the P3.1 supported buckets: URL, DAG
+  tri-states, and proven typed booleans are supported / import-supported per
+  `docs/COMMANDER.md` and `docs/RBI_READBACK_DESIGN.md`; list-shaped,
+  audio-only, RBI text recording, and unproven credential/key-event rows stay
+  explicitly out of supported claims.
 - Standalone top-level `pamUser`.
-- JIT writes.
+- JIT writes (`upstream-gap` confirmed by `docs/JIT_DESIGN.md`).
 - Gateway `mode: create` and top-level `projects[]`.
 - Broader non-PAM Keeper surface beyond the current documented boundaries.
 
@@ -224,16 +227,19 @@ Gate-lift rule:
 
 ## Phase 3: Finish Post-Import Tuning / RBI
 
-**2026-04-28 update:** E2E `pamRemoteBrowser` live smoke and `docs/live-proof/*rbi*`
-on `main` **passed**; `docs/COMMANDER.md` has P3.1 buckets (URL from `rbiUrl` =
-import-supported; DAG `allowedSettings` → `pam_settings.options` via
-`TunnelDAG` = edit-supported-clean when a graph exists). “Finish” = align every
-RBI **row** in `COMMANDER.md` with a bucket, keep list-shaped and audio-only
-surfaces out of supported claims, and re-run smoke when the Commander pin
-moves. Issue #5 closeout evidence: smoke rc=0 (`pamRemoteBrowser` create ->
-verify -> clean re-plan -> destroy), committed sanitized artifact
-`docs/live-proof/keeper-pam-environment.v1.89047920.rbi.sanitized.json`, and
-COMMANDER P3.1 table buckets for each current RBI field.
+**2026-04-29 update:** E2E `pamRemoteBrowser` live smoke and
+`docs/live-proof/*rbi*` on `main` **passed**; `docs/COMMANDER.md` has P3.1
+buckets and `docs/RBI_READBACK_DESIGN.md` is now the authoritative per-field
+gate decision. URL from `rbiUrl`, DAG `allowedSettings` -> `pam_settings.options`
+tri-states, and the typed booleans proven by the smoke are supported. The
+remaining 10 risk fields are classified: `autofill_credentials_uid_ref` and
+`recording_include_keys` stay `preview-gated`; list-shaped controls, RBI text
+recording, and audio controls stay `upstream-gap`.
+
+Issue #5 closeout evidence: smoke rc=0 (`pamRemoteBrowser` create -> verify ->
+clean re-plan -> destroy), committed sanitized artifact
+`docs/live-proof/keeper-pam-environment.v1.89047920.rbi.sanitized.json`,
+COMMANDER P3.1 table buckets, and `docs/RBI_READBACK_DESIGN.md`.
 
 Ongoing risk: Commander still **writes** some RBI tri-states to DAG
 `allowedSettings` first; the SDK does **not** re-read the DAG in subprocess-only
@@ -253,7 +259,9 @@ Tasks:
 
 1. Keep `docs/COMMANDER.md` P3.1 classifications aligned with the field map.
 2. Add tests when a dirty/upstream-gap field moves into a supported bucket.
-3. Do not bundle connection fields with RBI fields if their readback behavior
+3. Track the 10 remaining risk fields from `docs/RBI_READBACK_DESIGN.md` as
+   explicit non-support until their writer/readback proof lands.
+4. Do not bundle connection fields with RBI fields if their readback behavior
    differs.
 
 ### P3.2 Readback Design
@@ -275,14 +283,14 @@ Devil's advocate:
 Acceptance:
 
 - `pamRemoteBrowser` live smoke (2026-04-28) **passes** end-to-end; fields
-  claimed as **import-supported** or **edit-supported-clean** must match
-  `docs/COMMANDER.md` P3.1 rows and `test_rbi_readback.py` (and smoke where
-  applicable). Fields that are **edit-supported-dirty** or **upstream-gap** stay
-  explicit conflicts, preview, or out of `supported` table rows in the
-  product matrix.
+  claimed as **supported** must match `docs/COMMANDER.md` P3.1 rows,
+  `docs/RBI_READBACK_DESIGN.md`, and `test_rbi_readback.py` (and smoke where
+  applicable). Fields listed as `preview-gated` or `upstream-gap` in the design
+  doc stay out of `supported` table rows in the product matrix.
 - Maintainer closeout checklist for GitHub #5: cite the sanitized RBI artifact,
   `COMMANDER.md` P3.1 table, `SDK_DA_COMPLETION_PLAN.md` Phase 3 acceptance,
-  and `bash scripts/phase_harness/run_local_gates.sh`; do not paste raw logs or
+  `docs/RBI_READBACK_DESIGN.md`, and
+  `bash scripts/phase_harness/run_local_gates.sh`; do not paste raw logs or
   credentialed transcript paths.
 
 ## Phase 4: Close Deferred v1 Quality Gaps
@@ -320,7 +328,8 @@ Acceptance:
 
 ## Phase 5: JIT Boundary
 
-Current classification: `upstream-gap`.
+Current classification: `upstream-gap` confirmed by `docs/JIT_DESIGN.md` on
+2026-04-29.
 
 Tasks:
 
@@ -332,8 +341,10 @@ Tasks:
    - require live smoke.
 3. If no safe writer exists:
    - keep `jit_settings` preview-gated,
-   - update issue with source refs,
+   - update issue with source refs and `docs/JIT_DESIGN.md`,
    - do not add apply shims.
+4. Close GitHub #6 as `upstream-gap` unless Commander exposes `pam jit` or an
+   equivalent safe writer/readback surface.
 
 Acceptance:
 
@@ -382,8 +393,11 @@ Status (2026-04-29, v1.3.0):
 | KSM inter-agent bus | `preview-gated` (offline mock) | `keeper_sdk/secrets/bus.py` implements JSON custom-field envelopes, `VersionConflict` CAS checks, polling subscribe, delete, and `BusClient` channel send/receive/ack/gc. Offline proof: `tests/test_ksm_bus_impl.py` covers create, CAS conflict, subscribe-on-change, delete, ordering, recipient filtering, channel separation, cursors, and TTL GC. | Live proof still required before a support claim: run sanctioned KSM bus write/readback and concurrent-writer characterization through the committed live harness; KSM SDK conditional-write semantics remain undocumented. |
 | `keeper-enterprise.v1` offline foundation | `supported` offline for schema + typed load + graph + diff/plan rows; `preview-gated` for live/provider claims | P11 adds full offline schema coverage for `nodes`, `users`, `roles`, `teams`, `enforcements`, and `aliases`, plus typed models, dependency graph, field-level diff, plan ordering, and 15+ offline tests in `tests/test_enterprise_schema.py`. Existing PAM manifests still reject unknown team/role resource types. | `dsk validate --online`, discovery, import/apply, ownership markers, and clean live re-plan remain future/upstream-gap until Commander enterprise read/write contracts are proven. |
 | `keeper-integrations-identity.v1` offline foundation | `supported` offline for schema + typed load + diff rows; `upstream-gap` for apply | W14 adds offline schema coverage for domains, SCIM provisioning, SSO providers, and outbound email, plus typed models, field-level diff, and 15+ offline tests in `tests/test_integrations_identity.py`. | `dsk validate` stays schema-only; `dsk plan` / apply exit capability until a safe Commander write/readback API is confirmed. |
+| `keeper-integrations-events.v1` offline foundation | `supported` offline for schema + typed load + diff rows; `upstream-gap` for apply | W15 adds offline schema coverage for automator rules, audit alerts, API keys, and event routes, plus typed models, field-level diff, and 15+ offline tests in `tests/test_integrations_events.py`. | `dsk validate` stays schema-only; `dsk plan` / apply exit capability until a safe Commander write/readback API is confirmed. |
 | Compliance/security-audit reports | `supported` | 2026-04-29 `security-audit-report --sanitize-uids --quiet` live proof exited 0 with a JSON envelope. `compliance-report --sanitize-uids --quiet` hit Commander empty/non-JSON cache output; `--rebuild` emitted the expected envelope, and the SDK wrapper now auto-retries no-rebuild empty/error output with `--rebuild` while emitting the normal envelope. Offline report command coverage includes compliance/security-audit sanitization plus compliance empty-cache retry cases for empty stdout, empty JSON, and Commander errors. | Keep leak checks, UID sanitization, and the empty-cache retry behavior green on future Commander pins. |
 | Password report | `supported` | 2026-04-29 live proof: `dsk report password-report` exit 0, sanitized envelope clean. | Keep leak checks and UID sanitization green on future Commander pins. |
+| `dsk run` Commander passthrough | `preview-gated` | W20 adds the offline CLI surface: requires `--provider commander`, delegates to the existing batch Commander helper, redacts stdout/stderr, optionally fingerprints UID-like output, and passes through Commander's exit code. Offline tests cover mock-provider exit 5, argv parsing, `--json`, sanitization, secret redaction, and rc passthrough. | Needs sanctioned live Commander proof before support claim; no live Commander execution was part of W20. |
+| Team/role report stubs | `upstream-gap` | W20 adds `dsk report team-report` and `dsk report role-report` commands that fail closed with `CapabilityError`; next actions are `keeper enterprise-info --teams` and `keeper enterprise-info --roles`. | Lift only when Commander exposes a proven enumerable/reportable team and role surface with redaction/leak tests and live proof. |
 
 P21-P24 acceptance checkpoints:
 
@@ -403,8 +417,9 @@ Order:
    - Keeper Terraform providers.
 2. Generic vault records:
    - login records first,
-   - custom fields,
-   - file attachments only after redaction/size policy.
+   - custom fields and typed L1 field comparison are supported offline,
+   - file attachment references are redacted stubs; binary upload remains an
+     upstream-gap until redaction/size policy and Commander writer proof land.
 3. Shared folders:
    - create/update,
    - memberships,
@@ -421,7 +436,9 @@ Order:
 6. Compliance/reporting:
    - password-report is live-proven and supported,
    - security-audit-report is live-proven for the sanitized quiet envelope,
-   - compliance-report is supported through the empty-cache auto-rebuild wrapper.
+   - compliance-report is supported through the empty-cache auto-rebuild wrapper,
+   - `dsk run` is preview-gated until live Commander passthrough proof,
+   - team-report and role-report are upstream-gap stubs.
 
 Acceptance:
 
