@@ -151,3 +151,66 @@ The practical AI stack stitches three layers: **KSM MCP** (Go v2.3.0 and Node.js
 ---
 
 Ecosystem reference (April 2026): Commander CLI 17.2.16; Terraform provider v1.0.2; Commander Service REST v2 (async queue, FILEDATA); KSM MCP Go v2.3.0 and Node.js; SCIM push. DSK capability matrix: `docs/SDK_DA_COMPLETION_PLAN.md`.
+
+---
+
+## Cursor SDK Custom Agents (2026-04-29 — new capability)
+
+Cursor launched a Custom Agents SDK (April 2026) that enables programmatic agent invocation from CI/CD pipelines with access to every model and 50% off Composer 2 usage through 2026-05-05.
+
+### Integration #14 — Cursor-native DSK operator agent
+
+| | |
+|---|---|
+| **What it does** | A Cursor custom agent backed by DSK MCP tools runs as a CI job; it reasons about plan output, auto-resolves safe conflicts, posts rich PR annotations, and can apply on merge — far beyond a bare `dsk plan` subprocess |
+| **Why DSK fits** | DSK MCP server (`dsk_validate`, `dsk_plan`, `dsk_apply`, `dsk_diff`, `dsk_report`) provides all tools the agent needs; KSM bus provides credential coordination; no plaintext secrets in CI |
+| **Technical shape** | GH Actions step calls Cursor SDK API → spawns agent with DSK MCP server in env → agent calls `dsk_plan`, reasons about conflicts, posts comment via `gh pr comment`, optionally calls `dsk_apply` on approve label; KSM login via `KsmLoginHelper` injected as env |
+| **Effort** | M |
+| **Strategic value** | **High** — positions DSK as the reasoning layer for self-healing Keeper config, not just a CLI wrapper |
+| **Ship as** | Open-source example in `examples/cursor-agent/` + Keeper SE demo |
+
+### "Keeper AI Operator" vision
+
+Stack:
+```
+Cursor Custom Agent (CI/CD embedded)
+  ├── DSK MCP server (dsk_plan / dsk_apply / dsk_diff)
+  ├── KSM MCP server (secret read — Keeper Go v2.3.0)
+  └── KSM bus (BusClient — inter-agent credential coordination)
+        │
+        ▼
+  Commander Service Mode REST v2 (async queue apply)
+        │
+        ▼
+  Keeper PAM / Vault / MSP / Enterprise
+```
+
+A fully autonomous loop: agent detects drift (cron `dsk_plan`) → reasons about safety → applies safe changes → escalates conflicts to human via GH issue → audits via `dsk_report`. Zero plaintext secrets; every action logged in Keeper audit trail.
+
+**Cost note (2026-05-05 window):** Composer 2 via Cursor SDK is 50% off through May 5, 2026. All agent spec-writing and doc tasks should route through Cursor SDK / cheap-writer during this window.
+
+
+---
+
+## Integration #14 — Cursor SDK Custom Agent operator (2026-04-29)
+
+Cursor launched Custom Agents SDK enabling CI/CD-embedded agents with full model access. Composer 2 via SDK 50% off through 2026-05-05.
+
+| | |
+|---|---|
+| **What it does** | Cursor agent backed by DSK MCP tools reasons about plan output, auto-resolves safe conflicts, posts PR annotations, applies on merge |
+| **Technical shape** | GH Actions → Cursor SDK API → agent with DSK MCP (`dsk_plan`/`dsk_apply`/`dsk_diff`) + KSM MCP (secrets) + KSM bus (coordination) → Commander Service Mode v2 |
+| **Effort** | M |
+| **Strategic value** | **High** — self-healing Keeper config; every action in Keeper audit trail |
+| **Ship as** | `examples/cursor-agent/` + Keeper SE demo |
+
+**"Keeper AI Operator" full stack:**
+```
+Cursor Custom Agent (CI/CD)
+  ├── DSK MCP (plan/apply/diff/report)
+  ├── KSM MCP Go v2.3.0 (secret read)
+  └── KSM bus BusClient (inter-agent coordination)
+         └── Commander Service Mode REST v2 → Keeper PAM/Vault/MSP
+```
+
+**Cost note:** T0 Codex CLI = $0 in Cursor billing — first reflex for all implementation. Cheap-writer (composer-2) only when T0 sandbox cannot reach Cursor MCP. Cursor SDK Composer 2 50% off through 2026-05-05.
