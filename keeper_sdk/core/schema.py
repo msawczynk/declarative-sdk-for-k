@@ -19,13 +19,14 @@ from typing import Any
 from keeper_sdk.core.errors import SchemaError
 
 PAM_FAMILY = "pam-environment.v1"
+ENTERPRISE_FAMILY = "keeper-enterprise.v1"
 SHARING_FAMILY = "keeper-vault-sharing.v1"
 PAM_SCHEMA_FILENAME = "pam-environment.v1.schema.json"
 
 # Canonical registry: manifest ``schema:`` const -> path under keeper_sdk.core.schemas
 SCHEMA_RESOURCE_BY_FAMILY: dict[str, str] = {
     PAM_FAMILY: PAM_SCHEMA_FILENAME,
-    "keeper-enterprise.v1": "keeper-enterprise/keeper-enterprise.v1.schema.json",
+    ENTERPRISE_FAMILY: "enterprise/enterprise.v1.schema.json",
     "keeper-epm.v1": "keeper-epm/keeper-epm.v1.schema.json",
     "keeper-integrations-events.v1": (
         "keeper-integrations-events/keeper-integrations-events.v1.schema.json"
@@ -208,6 +209,13 @@ def validate_manifest(document: dict[str, Any]) -> str:
     validator = jsonschema.Draft202012Validator(schema)
     errors = sorted(validator.iter_errors(document), key=lambda error: list(error.absolute_path))
     if errors:
+        enterprise_stub_error = _enterprise_legacy_stub_error(
+            family=family,
+            document=document,
+            error_count=len(errors),
+        )
+        if enterprise_stub_error is not None:
+            raise enterprise_stub_error
         first = errors[0]
         location = "/".join(str(part) for part in first.absolute_path) or "<root>"
         raise SchemaError(
@@ -229,6 +237,43 @@ def validate_manifest(document: dict[str, Any]) -> str:
 
     apply_semantic_rules(document)
     return family
+
+
+def _enterprise_legacy_stub_error(
+    *,
+    family: str,
+    document: dict[str, Any],
+    error_count: int,
+) -> SchemaError | None:
+    """Keep the old Phase-7 empty-stub failure copy for partial team/role rows."""
+    if family != ENTERPRISE_FAMILY:
+        return None
+    for collection in ("teams", "roles"):
+        rows = document.get(collection)
+        if not isinstance(rows, list) or not rows:
+            continue
+        if not all(_is_legacy_team_role_stub(row) for row in rows):
+            continue
+        return SchemaError(
+            reason=(
+                f"manifest failed schema: {collection} is expected to be empty unless "
+                "rows use the full keeper-enterprise.v1 shape"
+            ),
+            context={
+                "family": family,
+                "location": collection,
+                "error_count": error_count,
+                "additional": [],
+            },
+            next_action="add node_uid_ref and supported membership fields, or leave the block empty",
+        )
+    return None
+
+
+def _is_legacy_team_role_stub(row: Any) -> bool:
+    if not isinstance(row, dict):
+        return False
+    return set(row).issubset({"uid_ref", "name"})
 
 
 def _validate_with_pydantic(document: dict[str, Any]) -> None:

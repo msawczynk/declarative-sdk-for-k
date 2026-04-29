@@ -1031,14 +1031,19 @@ def _build_plan(ctx: click.Context, manifest_path: Path, *, allow_delete: bool) 
                 allow_delete=allow_delete,
             )
             capability_subject = bundle.msp
-        else:
-            assert bundle.sharing is not None
+        elif bundle.sharing is not None:
             changes = _build_sharing_changes(
                 bundle.provider,
                 bundle.sharing,
                 allow_delete=allow_delete,
             )
             capability_subject = bundle.sharing
+        else:
+            raise CapabilityError(
+                "plan is not supported for this manifest family; "
+                "use `dsk validate` to check schema only",
+                next_action="dsk validate <path>",
+            )
     except OwnershipError as exc:
         click.echo(f"ownership error: {exc}", err=True)
         sys.exit(EXIT_CAPABILITY)
@@ -1113,12 +1118,20 @@ def _load_plan_context(ctx: click.Context, manifest_path: Path) -> PlanLoadBundl
             order = vault_record_apply_order(vault)
         elif msp is not None:
             order = msp_apply_order(msp)
-        else:
-            assert sharing is not None
+        elif sharing is not None:
             order = _sharing_apply_order(sharing)
+        else:
+            raise CapabilityError(
+                "plan is not supported for this manifest family; "
+                "use `dsk validate` to check schema only",
+                next_action="dsk validate <path>",
+            )
     except RefError as exc:
         click.echo(f"reference error: {exc}", err=True)
         sys.exit(EXIT_REF)
+    except CapabilityError as exc:
+        click.echo(f"capability error: {exc}", err=True)
+        sys.exit(EXIT_CAPABILITY)
 
     provider = _make_provider(ctx, manifest_path, pam=pam, vault=vault, sharing=sharing, msp=msp)
     live_record_type_defs: list[dict[str, Any]] = []

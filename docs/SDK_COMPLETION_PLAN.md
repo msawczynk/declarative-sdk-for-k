@@ -571,6 +571,23 @@ Tasks:
 - Keep `CHANGELOG.md` high signal.
 - Keep examples runnable offline.
 
+### P7.4 P10 keeper-vault-sharing compatibility surface
+
+Status:
+
+- `preview-gated` pending second-account live proof. The P10 offline worker
+  added the `models_vault_sharing` / `vault_sharing_plan` compatibility API,
+  alias schema copy, and focused schema/plan/mock re-plan tests for
+  shared-folder membership create/update/guarded-delete.
+- This offline slice was explicitly barred from live Keeper/Commander/network
+  commands, so no 2026-04-29 support flip is claimed here.
+
+Remaining bar:
+
+- Capture sanitized live proof for second-account sharing create -> clean
+  re-plan -> guarded delete -> cleanup, then update the DA support table and
+  schema `x-keeper-live-proof` block in the same support-lift change.
+
 ## PR / Release Cadence
 
 Preferred PR size:

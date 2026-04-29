@@ -5,7 +5,7 @@ models. **PAM only:** :func:`load_manifest` / :func:`load_manifest_string` →
 :class:`~keeper_sdk.core.models.Manifest`. **PAM + vault L1 + sharing L1 + MSP slice 1:**
 :func:`load_declarative_manifest` / :func:`load_declarative_manifest_string` →
 ``Manifest``, :class:`~keeper_sdk.core.vault_models.VaultManifestV1` for
-``keeper-vault.v1``, :class:`~keeper_sdk.core.sharing_models.SharingManifestV1`
+``keeper-vault.v1``, :class:`~keeper_sdk.core.models_vault_sharing.VaultSharingManifestV1`
 for ``keeper-vault-sharing.v1``, or :class:`~keeper_sdk.core.msp_models.MspManifestV1``
 for ``msp-environment.v1``.
 Dump: stable canonical YAML/JSON for git diffs and Commander interop.
@@ -19,15 +19,20 @@ from typing import TYPE_CHECKING, Any
 
 from keeper_sdk.core.errors import ManifestError, SchemaError, UnsupportedFamilyError
 from keeper_sdk.core.models import Manifest
+from keeper_sdk.core.models_enterprise import ENTERPRISE_FAMILY
+from keeper_sdk.core.models_vault_sharing import (
+    SHARING_FAMILY,
+    SharingManifestV1,
+    load_vault_sharing_manifest,
+)
 from keeper_sdk.core.msp_models import MSP_FAMILY
 from keeper_sdk.core.normalize import canonicalize
 from keeper_sdk.core.preview import assert_preview_keys_allowed
 from keeper_sdk.core.schema import PAM_FAMILY, validate_manifest
-from keeper_sdk.core.sharing_models import SHARING_FAMILY, load_sharing_manifest
 
 if TYPE_CHECKING:
+    from keeper_sdk.core.models_enterprise import EnterpriseManifestV1
     from keeper_sdk.core.msp_models import MspManifestV1
-    from keeper_sdk.core.sharing_models import SharingManifestV1
     from keeper_sdk.core.vault_models import VaultManifestV1
 
 
@@ -94,13 +99,13 @@ def load_manifest_string(raw: str, *, suffix: str = ".yaml", validate: bool = Tr
 
 def load_declarative_manifest(
     source: str | Path, *, validate: bool = True
-) -> Manifest | VaultManifestV1 | SharingManifestV1 | MspManifestV1:
+) -> Manifest | VaultManifestV1 | SharingManifestV1 | MspManifestV1 | EnterpriseManifestV1:
     """Load a typed manifest for families the engine can plan (PAM + vault/sharing L1 + MSP).
 
     Returns :class:`~keeper_sdk.core.models.Manifest` for ``pam-environment.v1``
     or :class:`~keeper_sdk.core.vault_models.VaultManifestV1` for
     ``keeper-vault.v1``, or
-    :class:`~keeper_sdk.core.sharing_models.SharingManifestV1` for
+    :class:`~keeper_sdk.core.models_vault_sharing.VaultSharingManifestV1` for
     ``keeper-vault-sharing.v1``, or
     :class:`~keeper_sdk.core.msp_models.MspManifestV1` for
     ``msp-environment.v1``. Other schema-valid families raise
@@ -119,8 +124,9 @@ def load_declarative_manifest(
 
 def load_declarative_manifest_string(
     raw: str, *, suffix: str = ".yaml", validate: bool = True
-) -> Manifest | VaultManifestV1 | SharingManifestV1 | MspManifestV1:
+) -> Manifest | VaultManifestV1 | SharingManifestV1 | MspManifestV1 | EnterpriseManifestV1:
     """Like :func:`load_declarative_manifest` but from a string (PAM + vault + sharing + MSP)."""
+    from keeper_sdk.core.models_enterprise import load_enterprise_manifest
     from keeper_sdk.core.msp_models import load_msp_manifest
     from keeper_sdk.core.vault_models import VAULT_FAMILY, load_vault_manifest
 
@@ -143,13 +149,15 @@ def load_declarative_manifest_string(
     if family == VAULT_FAMILY:
         return load_vault_manifest(document)
     if family == SHARING_FAMILY:
-        return load_sharing_manifest(document)
+        return load_vault_sharing_manifest(document)
     if family == MSP_FAMILY:
         return load_msp_manifest(document)
+    if family == ENTERPRISE_FAMILY:
+        return load_enterprise_manifest(document)
     raise UnsupportedFamilyError(
         reason=(
             f"typed plan/load supports {PAM_FAMILY}, {VAULT_FAMILY}, "
-            f"{SHARING_FAMILY}, and {MSP_FAMILY} only "
+            f"{SHARING_FAMILY}, {MSP_FAMILY}, and {ENTERPRISE_FAMILY} only "
             f"(document declares {family!r})"
         ),
         next_action=(
