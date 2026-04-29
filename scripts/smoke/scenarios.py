@@ -35,6 +35,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from keeper_sdk.core.diff import ChangeKind
+from keeper_sdk.core.interfaces import LiveRecord
 from keeper_sdk.core.metadata import MANAGER_NAME
 from keeper_sdk.core.schema import SHARING_FAMILY
 from keeper_sdk.core.sharing_diff import (
@@ -473,6 +474,113 @@ def vault_names() -> list[str]:
 def all_vault_scenarios() -> list[VaultScenarioSpec]:
     """Return every registered vault scenario in name order."""
     return [_VAULT_SCENARIOS[name] for name in vault_names()]
+
+
+@dataclass(frozen=True)
+class AdoptionScenarioSpec:
+    """One offline adoption smoke scenario.
+
+    These scenarios are intentionally separate from the live create/apply/destroy
+    matrix above: they seed unmanaged mock state, run the CLI import workflow,
+    then verify ownership markers.
+    """
+
+    name: str
+    build_manifest: Callable[[str], dict[str, Any]]
+    seed_records: Callable[[str], list[LiveRecord]]
+    verify: Callable[[Sequence[Any], str, str], None]
+    description: str = ""
+
+
+def _pam_adoption_manifest(title_prefix: str) -> dict[str, Any]:
+    return {
+        "version": "1",
+        "name": f"{title_prefix}-adoption",
+        "resources": [
+            {
+                "uid_ref": f"{title_prefix}-adopt-host",
+                "type": "pamMachine",
+                "title": f"{title_prefix}-adopt-host",
+                "host": "10.0.0.240",
+                "port": "22",
+                "ssl_verification": True,
+                "operating_system": "Linux",
+            }
+        ],
+    }
+
+
+def _pam_adoption_seed_records(title_prefix: str) -> list[LiveRecord]:
+    title = f"{title_prefix}-adopt-host"
+    return [
+        LiveRecord(
+            keeper_uid=f"{title_prefix}-adopt-live-uid",
+            title=title,
+            resource_type="pamMachine",
+            payload={
+                "title": title,
+                "host": "10.0.0.240",
+                "port": "22",
+                "operating_system": "Linux",
+            },
+            marker=None,
+        )
+    ]
+
+
+def _verify_pam_adoption(records: Sequence[Any], title_prefix: str, manifest_name: str) -> None:
+    expected_title = f"{title_prefix}-adopt-host"
+    expected_uid_ref = f"{title_prefix}-adopt-host"
+    owned = [
+        record
+        for record in records
+        if getattr(record, "title", None) == expected_title
+        and getattr(record, "resource_type", None) == "pamMachine"
+        and (getattr(record, "marker", None) or {}).get("manager") == MANAGER_NAME
+    ]
+    if len(owned) != 1:
+        raise AssertionError(f"expected one adopted pamMachine, found {len(owned)}")
+    marker = getattr(owned[0], "marker", None) or {}
+    if marker.get("uid_ref") != expected_uid_ref:
+        raise AssertionError(f"adoption marker uid_ref mismatch: {marker.get('uid_ref')!r}")
+    if marker.get("manifest") != manifest_name:
+        raise AssertionError(f"adoption marker manifest mismatch: {marker.get('manifest')!r}")
+    if marker.get("resource_type") != "pamMachine":
+        raise AssertionError(
+            f"adoption marker resource_type mismatch: {marker.get('resource_type')!r}"
+        )
+
+
+PAM_ADOPTION = AdoptionScenarioSpec(
+    name="pamAdoption",
+    build_manifest=_pam_adoption_manifest,
+    seed_records=_pam_adoption_seed_records,
+    verify=_verify_pam_adoption,
+    description="Offline MockProvider import lifecycle for adopting an unmanaged pamMachine.",
+)
+
+_ADOPTION_SCENARIOS: dict[str, AdoptionScenarioSpec] = {
+    "pamAdoption": PAM_ADOPTION,
+}
+
+
+def adoption_get(name: str) -> AdoptionScenarioSpec:
+    """Look up an offline adoption smoke scenario by name."""
+    try:
+        return _ADOPTION_SCENARIOS[name]
+    except KeyError as exc:
+        available = ", ".join(sorted(_ADOPTION_SCENARIOS))
+        raise KeyError(f"unknown adoption smoke scenario {name!r}; available: {available}") from exc
+
+
+def adoption_names() -> list[str]:
+    """Return all registered offline adoption smoke scenario names."""
+    return sorted(_ADOPTION_SCENARIOS)
+
+
+def all_adoption_scenarios() -> list[AdoptionScenarioSpec]:
+    """Return every registered offline adoption scenario in name order."""
+    return [_ADOPTION_SCENARIOS[name] for name in adoption_names()]
 
 
 _SHARING_BLOCKS = (

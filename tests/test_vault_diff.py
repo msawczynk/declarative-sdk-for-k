@@ -22,6 +22,58 @@ def _manifest_one_login() -> dict:
     }
 
 
+def _field_manifest(fields: list[dict[str, object]]) -> dict:
+    return {
+        "schema": "keeper-vault.v1",
+        "records": [
+            {
+                "uid_ref": "vault.login.alpha",
+                "type": "login",
+                "title": "Alpha",
+                "fields": fields,
+            }
+        ],
+    }
+
+
+def _login_field(value: str = "user1") -> dict[str, object]:
+    return {"type": "login", "label": "Login", "value": [value]}
+
+
+def _password_field(value: str) -> dict[str, object]:
+    return {"type": "password", "label": "Password", "value": [value]}
+
+
+def _marked_live_with_fields(fields: list[dict[str, object]]) -> LiveRecord:
+    marker = encode_marker(
+        uid_ref="vault.login.alpha",
+        manifest="demo",
+        resource_type="login",
+    )
+    return LiveRecord(
+        keeper_uid="uid-1",
+        title="Alpha",
+        resource_type="login",
+        payload={"type": "login", "title": "Alpha", "fields": fields},
+        marker=marker,
+    )
+
+
+def _single_update_for_fields(
+    desired_fields: list[dict[str, object]],
+    live_fields: list[dict[str, object]],
+):
+    manifest = load_vault_manifest(_field_manifest(desired_fields))
+    changes = compute_vault_diff(
+        manifest,
+        [_marked_live_with_fields(live_fields)],
+        manifest_name="demo",
+    )
+    updates = [change for change in changes if change.kind is ChangeKind.UPDATE]
+    assert len(updates) == 1
+    return updates[0]
+
+
 def test_vault_diff_noop_when_live_flattens_fields() -> None:
     """Commander-style payload: no ``fields[]``, scalars lifted to top-level keys."""
     manifest = load_vault_manifest(_manifest_one_login())
@@ -132,3 +184,33 @@ def test_vault_diff_custom_ignores_marker_mismatch() -> None:
     changes = compute_vault_diff(manifest, [live], manifest_name="demo")
     kinds = [c.kind for c in changes if c.uid_ref == "vault.login.beta"]
     assert kinds == [ChangeKind.NOOP]
+
+
+def test_vault_diff_update_when_password_field_value_changes() -> None:
+    before_fields = [_login_field(), _password_field("old-secret")]
+    after_fields = [_login_field(), _password_field("new-secret")]
+
+    row = _single_update_for_fields(after_fields, before_fields)
+
+    assert row.before == {"fields": before_fields}
+    assert row.after == {"fields": after_fields}
+
+
+def test_vault_diff_update_when_password_field_is_added() -> None:
+    before_fields = [_login_field()]
+    after_fields = [_login_field(), _password_field("new-secret")]
+
+    row = _single_update_for_fields(after_fields, before_fields)
+
+    assert row.before == {"fields": before_fields}
+    assert row.after == {"fields": after_fields}
+
+
+def test_vault_diff_update_when_password_field_is_removed() -> None:
+    before_fields = [_login_field(), _password_field("old-secret")]
+    after_fields = [_login_field()]
+
+    row = _single_update_for_fields(after_fields, before_fields)
+
+    assert row.before == {"fields": before_fields}
+    assert row.after == {"fields": after_fields}
