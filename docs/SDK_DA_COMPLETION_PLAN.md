@@ -63,18 +63,16 @@ Shipped and proven:
 satisfied 2026-04-29 on lab tenant (see bullets above). `compliance-report`
 still needs exact-command proof for the no-rebuild path.
 
-Not yet supported:
+Recently unblocked:
 
-- Nested `resources[].users[].rotation_settings`: **UPSTREAM-GAP** (2026-04-28)
-  Offline fix (`compute_diff` overlay normalization v2, 964 tests green) proven.
-  Live re-plan blocked: Commander `pam user ls` ParseError on UID positional arg.
-  DSK code is sound; awaiting Commander CLI fix.
-  Classification: `preview-gated` until Commander release.
-- Nested `resources[].users[].rotation_settings` (original — kept for context): apply reaches marker
-  verification; ``compute_diff`` now treats common Commander readback shape drift
-  on ``pamUser.rotation_settings`` (e.g. ``enabled`` bool vs tri-state string,
-  extra ``schedule`` keys with the same CRON) as NOOP. A live re-plan for
-  ``pamUserNestedRotation`` is still required before narrowing preview gates.
+- Nested `resources[].users[].rotation_settings`: **supported** for Commander
+  17.2.16+ readback. GH#35 added `pam rotation list --record-uid --format json`;
+  SDK discover now hydrates nested `pamUser.rotation_settings` from that JSON so
+  post-apply re-plan can compare real Commander state instead of relying on
+  missing-readback suppression. Top-level `users[].rotation_settings` remains
+  outside this lift.
+
+Not yet supported:
 - Post-import RBI tuning: Commander still persists RBI tri-state primarily on
   the TunnelDAG vertex; the provider **merges** `allowedSettings` into
   manifest-shaped `pam_settings.options` when `discover()` has an in-process
@@ -157,18 +155,16 @@ Acceptance:
 
 ## Phase 2: Finish Rotation Honestly
 
-Current blocker: live apply reaches marker verification, but **clean re-plan (exit
-0) is not proven** on Acme-lab after nested rotation (issue **#4**). **Offline
-(2026-04-28):** `compute_diff` now treats parent-resource `pam_settings` as a
-declared-key overlay and normalizes `pamUser.managed` scalars
-(`keeper_sdk/core/diff.py`, `CHANGELOG` [Unreleased], `tests/test_diff.py`) —
-reduces spurious parent/nested UPDATE rows; **re-run** the live command below
-to confirm the remaining gap (if any) is `rotation_settings` / commander
-readback only.
+2026-04-29 update: Commander GH#35 is resolved in 17.2.16 with
+`pam rotation list --record-uid --format json`; the SDK now wires that readback
+into `discover()` for nested `pamUser.rotation_settings`. Parent-run live smoke
+still needs to capture the clean re-plan / destroy transcript for release notes.
 
 ### P2.1 Diagnose Rotation Drift
 
-**Live status:** 2026-04-28 live smoke run: upstream gap CONFIRMED. Re-plan exit 2 after apply (pam_settings null in tenant vs overlay in manifest). Commander CLI limitation — cannot write rotation pam_settings. No SDK code change can fix this until upstream Commander supports the write path.
+**Status:** 2026-04-29 offline SDK readback is wired. The former upstream
+blocker was GH#35 (`pam rotation list` lacked UID filtering + JSON output);
+Commander 17.2.16 unblocks the read path.
 
 Questions:
 
@@ -190,6 +186,8 @@ Tasks:
 3. If fields are SDK-only linkage metadata, add them to the ignored drift set
    with a focused regression test.
 4. If fields are real rotation settings, design readback before any gate lift.
+   Readback is now implemented through `pam rotation list --record-uid --format
+   json`; keep the parent live smoke as the final proof bar.
 5. Fix smoke cleanup if the managed Resources folder UID becomes stale after
    failed re-plan; cleanup must resolve by project name as fallback.
 
@@ -217,7 +215,8 @@ Acceptance:
 
 Gate-lift rule:
 
-- Only nested `resources[].users[].rotation_settings` may be ungated.
+- Only nested `resources[].users[].rotation_settings` is ungated for Commander
+  17.2.16+ readback.
 - Top-level `users[].rotation_settings` stays blocked.
 - `default_rotation_schedule` stays blocked unless a separate setter/readback
   proof exists.

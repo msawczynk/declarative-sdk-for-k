@@ -612,6 +612,7 @@ class CommanderCliProvider(Provider):
                     pass
         if self._keeper_params is not None:
             self._enrich_pam_remote_browser_dag_options(records)
+        self._enrich_pam_user_rotation_settings(records)
         return records
 
     def discover_managed_companies(self) -> list[dict[str, Any]]:
@@ -733,6 +734,30 @@ class CommanderCliProvider(Provider):
             _merge_rbi_dag_options_into_pam_settings(
                 ps, connections=connections, session_recording=session_rec
             )
+
+    def _enrich_pam_user_rotation_settings(self, records: list[LiveRecord]) -> None:
+        """Attach Commander rotation readback to discovered nested ``pamUser`` rows."""
+        source = _manifest_source_dict(self._manifest_source)
+        targets = _nested_rotation_user_targets(source)
+        if not targets.refs and not targets.titles:
+            return
+
+        for live in records:
+            if live.resource_type != "pamUser":
+                continue
+            marker_ref = None
+            if isinstance(live.marker, dict):
+                marker_ref = live.marker.get("uid_ref")
+            if marker_ref not in targets.refs and live.title not in targets.titles:
+                continue
+            rotation_settings = self._get_pam_rotation_state(str(live.keeper_uid))
+            if rotation_settings:
+                live.payload["rotation_settings"] = rotation_settings
+
+    def _get_pam_rotation_state(self, uid: str) -> dict[str, Any]:
+        raw = self._run_cmd(["pam", "rotation", "list", "--record-uid", uid, "--format", "json"])
+        data = _load_json(raw, command="pam rotation list --record-uid <uid> --format json")
+        return _rotation_settings_from_readback(data, uid=uid)
 
     def unsupported_capabilities(self, manifest: Any = None) -> list[str]:
         """Enumerate manifest-declared capabilities this provider cannot drive.
@@ -3451,6 +3476,8 @@ class CommanderCliProvider(Provider):
             return self._run_pam_project_in_process(args)
         if args[:3] == ["pam", "rotation", "edit"]:
             return self._run_pam_rotation_edit_in_process(args)
+        if args[:3] == ["pam", "rotation", "list"]:
+            return self._run_pam_list_in_process(args)
         if args in (
             ["pam", "gateway", "list", "--format", "json"],
             ["pam", "config", "list", "--format", "json"],
@@ -3561,12 +3588,20 @@ class CommanderCliProvider(Provider):
                         )
 
                         result = PAMGatewayListCommand().execute(params, format="json")
-                    else:
+                    elif args[:3] == ["pam", "config", "list"]:
                         from keepercommander.commands.discoveryrotation import (  # type: ignore
                             PAMConfigurationListCommand,
                         )
 
                         result = PAMConfigurationListCommand().execute(params, format="json")
+                    else:
+                        from keepercommander.commands.discoveryrotation import (  # type: ignore
+                            PAMListRecordRotationCommand,
+                        )
+
+                        cmd = PAMListRecordRotationCommand()
+                        parsed = vars(cmd.get_parser().parse_args(args[3:]))
+                        result = cmd.execute(params, **parsed)
             finally:
                 stdout = buf_out.getvalue()
                 stderr = buf_err.getvalue()
@@ -4095,6 +4130,186 @@ def _manifest_resources_by_ref(source: Mapping[str, Any]) -> dict[str, Mapping[s
         if uid_ref:
             resources[uid_ref] = resource
     return resources
+
+
+class _NestedRotationUserTargets:
+    def __init__(self, *, refs: set[str], titles: set[str]) -> None:
+        self.refs = refs
+        self.titles = titles
+
+
+def _nested_rotation_user_targets(source: Mapping[str, Any]) -> _NestedRotationUserTargets:
+    refs: set[str] = set()
+    titles: set[str] = set()
+    for resource in source.get("resources") or []:
+        if not isinstance(resource, Mapping):
+            continue
+        for user in resource.get("users") or []:
+            if (
+                not isinstance(user, Mapping)
+                or user.get("type") != "pamUser"
+                or user.get("rotation_settings") is None
+            ):
+                continue
+            uid_ref = _non_empty_str(user.get("uid_ref"))
+            title = _non_empty_str(user.get("title"))
+            if uid_ref:
+                refs.add(uid_ref)
+            if title:
+                titles.add(title)
+    return _NestedRotationUserTargets(refs=refs, titles=titles)
+
+
+def _rotation_settings_from_readback(data: Any, *, uid: str) -> dict[str, Any]:
+    for row in _rotation_readback_rows(data):
+        row_uid = _first_non_empty(row, ("record_uid", "recordUid", "Record UID", "uid", "record"))
+        if row_uid and row_uid != uid:
+            continue
+        settings = _rotation_settings_from_row(row)
+        if settings:
+            return settings
+    return {}
+
+
+def _rotation_readback_rows(data: Any) -> list[Mapping[str, Any]]:
+    if isinstance(data, list):
+        return [row for row in data if isinstance(row, Mapping)]
+    if not isinstance(data, Mapping):
+        return []
+    for key in ("rotations", "rotation_schedules", "schedules", "records", "items", "data"):
+        value = data.get(key)
+        if isinstance(value, list):
+            return [row for row in value if isinstance(row, Mapping)]
+    return [data]
+
+
+def _rotation_settings_from_row(row: Mapping[str, Any]) -> dict[str, Any]:
+    nested = row.get("rotation_settings") or row.get("rotationSettings")
+    source: dict[str, Any] = dict(row)
+    if isinstance(nested, Mapping):
+        source.update(nested)
+
+    settings: dict[str, Any] = {}
+    rotation = _first_non_empty(
+        source,
+        (
+            "rotation",
+            "rotation_profile",
+            "rotationProfile",
+            "Rotation Profile",
+            "profile",
+            "profile_name",
+        ),
+    )
+    if rotation:
+        settings["rotation"] = rotation
+
+    enabled = _rotation_enabled_value(
+        _first_present(
+            source,
+            (
+                "enabled",
+                "rotation_enabled",
+                "rotationEnabled",
+                "Rotation Enabled",
+                "Enabled",
+                "status",
+            ),
+        )
+    )
+    if enabled:
+        settings["enabled"] = enabled
+
+    schedule = _rotation_schedule_from_row(source)
+    if schedule:
+        settings["schedule"] = schedule
+
+    complexity = _first_non_empty(
+        source,
+        ("password_complexity", "passwordComplexity", "complexity", "Password Complexity"),
+    )
+    if complexity:
+        settings["password_complexity"] = complexity
+    return settings
+
+
+def _first_present(source: Mapping[str, Any], keys: tuple[str, ...]) -> Any:
+    for key in keys:
+        if key in source:
+            return source[key]
+    return None
+
+
+def _first_non_empty(source: Mapping[str, Any], keys: tuple[str, ...]) -> str | None:
+    for key in keys:
+        value = source.get(key)
+        if value is None or value == "":
+            continue
+        return str(value)
+    return None
+
+
+def _rotation_enabled_value(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return "on" if value else "off"
+    text = str(value).strip().lower()
+    if text in {"true", "1", "yes", "on", "enabled", "active"}:
+        return "on"
+    if text in {"false", "0", "no", "off", "disabled", "inactive"}:
+        return "off"
+    return text or None
+
+
+def _rotation_schedule_from_row(row: Mapping[str, Any]) -> dict[str, str] | None:
+    schedule = row.get("schedule") or row.get("Schedule")
+    if isinstance(schedule, Mapping):
+        schedule_type = str(schedule.get("type") or "").strip()
+        if schedule_type.casefold() == "on-demand":
+            return {"type": "on-demand"}
+        cron = schedule.get("cron") or schedule.get("expression")
+        if cron:
+            return {"type": "CRON", "cron": str(cron)}
+    if _truthy(row.get("no_schedule")) or _truthy(row.get("noSchedule")):
+        return {"type": "on-demand"}
+
+    cron = _first_non_empty(
+        row,
+        ("cron", "schedule_cron", "scheduleCron", "schedule_data", "scheduleData"),
+    )
+    if cron:
+        parsed = _rotation_cron_from_string(cron)
+        if parsed:
+            return {"type": "CRON", "cron": parsed}
+    if isinstance(schedule, str):
+        if "manual" in schedule.casefold() or "on-demand" in schedule.casefold():
+            return {"type": "on-demand"}
+        parsed = _rotation_cron_from_string(schedule)
+        if parsed:
+            return {"type": "CRON", "cron": parsed}
+    return None
+
+
+def _truthy(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    return str(value).strip().lower() in _TRUTHY_ENV_VALUES
+
+
+def _rotation_cron_from_string(value: str) -> str | None:
+    text = value.strip()
+    if text.startswith("RotateActionJob|"):
+        text = text.split("|", 1)[1]
+        parts = text.split(".")
+        if len(parts) >= 2 and parts[0].casefold() == "cron":
+            text = parts[1]
+    parts = text.split()
+    if len(parts) in {5, 6, 7}:
+        return text
+    return None
 
 
 _CONNECTION_TUNING_OPTION_KEYS = frozenset(

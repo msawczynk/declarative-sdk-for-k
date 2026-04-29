@@ -12,7 +12,7 @@ This is for human + agent review. Per-folder maps live in `<dir>/SCAFFOLD.md`.
 ## TL;DR
 
 - **Zero remaining v1.0.0 GA blockers.** Tag policy decided: annotated only — distribution is GitHub-only (no PyPI, no `git verify-tag` consumer flow); GPG/SSH signing not required. Upgrade path if supply-chain requirements change → sigstore/cosign `dist/*` in `publish.yml` (OIDC, no maintainer key).
-- **Open upstream blocker** (not GA blocker): nested-`pamUser` rotation (GH **#35**) — DSK offline `diff` work is done, but Commander `pam user ls` ParseError on UID positional arg blocks supported readback / clean re-plan proof. **P3 / #5** `pamRemoteBrowser` closeout evidence is doc-ready (2026-04-28 smoke + COMMANDER P3.1 + DA Phase 3); dirty/list/audio subfields stay bucketed.
+- **GH #35 resolved in Commander 17.2.16:** nested-`pamUser` rotation readback is unblocked by `pam rotation list --record-uid --format json`; the SDK now hydrates nested `pamUser.rotation_settings` during discover. **P3 / #5** `pamRemoteBrowser` closeout evidence is doc-ready (2026-04-28 smoke + COMMANDER P3.1 + DA Phase 3); dirty/list/audio subfields stay bucketed.
 - **v1.3.0.dev0 baseline:** v1.2.0 is shipped; the dev line now tracks Phase 7 shared-folder MockProvider apply, the `declarative_sdk_k` rename shim, KSM bootstrap live proof, and `DSK_NEXT_WORK` blockers / v1.3 roadmap.
 - **Three v1.1 offline quality gaps closed:** adoption smoke against unmanaged records, field-drift->UPDATE smoke, two-writer ownership-marker race smoke.
 - **One v2 deferral:** breaking removal of `keeper_sdk`; `declarative_sdk_k` forward-compatible shim has landed.
@@ -61,7 +61,7 @@ Every modeled capability must classify as `supported` / `preview-gated` / `upstr
 | `pamRemoteBrowser` connection fields | supported | shipped | offline-green | scenario | – |
 | `pamRemoteBrowser` RBI tri-state / audio (DAG-backed) | preview-gated | DAG → manifest merge shipped | green | ✅ | ✅ E2E smoke rc=0 (2026-04-28). DAG-backed subfields (tri-state, audio) remain `preview-gated`. |
 | Nested `pamUser` shape (in `resources[].users[]`) | supported (shape) | shipped | green | scenario | `pamUserNested` |
-| Nested `pamUser.rotation_settings` | upstream-gap (GH #35) | guarded / preview | blocked upstream | blocker confirmed | Commander `pam user ls` ParseError on UID positional arg; DSK offline diff anchor in `tests/test_diff.py`. |
+| Nested `pamUser.rotation_settings` | supported (Commander 17.2.16+) | shipped | unblocked | parent smoke pending | GH #35 added `pam rotation list --record-uid --format json`; SDK discover readback is wired offline. |
 | Top-level `users[].rotation_settings` | preview-gated | guarded | – | – | gate-lift rule: stays blocked even after nested clears |
 | `default_rotation_schedule` | preview-gated | guarded | – | – | needs separate setter/readback proof |
 | `jit_settings` | upstream-gap | guarded | – | – | `docs/ISSUE_6_JIT_SUPPORT_BOUNDARY.md` |
@@ -79,7 +79,7 @@ DA Definition-of-Done compliance:
 - ✅ Full local checks + GitHub CI green on `main`.
 - ✅ All modeled keys classify into one bucket.
 - ✅ No preview-gated key silently applies or silently drops (`_detect_unsupported_capabilities` + plan CONFLICT rows; C3 + D-4 + H6).
-- ⚠️ Live smoke matrix green for **all** supported mutating surfaces — yes for machine/db/dir; RBI + nested-rotation are **preview-gated**, so this DOD row holds.
+- ⚠️ Live smoke matrix green for **all** supported mutating surfaces — yes for machine/db/dir; RBI remains **preview-gated**. Nested rotation now requires Commander 17.2.16+ readback and a parent-run live proof capture.
 - ✅ Unsupported capabilities fail with clear `next_action`.
 - ✅ Docs + scaffold match current behaviour.
 - ✅ GitHub issue state matches behaviour.
@@ -131,7 +131,7 @@ Cross-checking the 2026-04-24 AUDIT scope (W1–W20), DOR contract, and REVIEW d
 | `_parse_ascii_table` (D-3) | INTENTIONAL removal | Migrated to `--format json` after upstream Commander shipped JSON on `pam gateway list` / `pam config list`. Contract pins in `tests/test_coverage_followups.py`. |
 | `Path.home() / "Downloads"` login-helper fallback | INTENTIONAL removal (P0 in REVIEW) | Workstation-specific default unsafe in library. Now requires env var. |
 | `DeleteUnsupportedError` | KEPT as compat shim | Subclass of `CapabilityError`. Test in `tests/test_errors.py`. |
-| Phase 2.1 (nested rotation) full close | NOT dropped — UPSTREAM-GAP | Commander GH #35 ParseError blocks supported clean re-plan proof; DSK offline diff work is done. |
+| Phase 2.1 (nested rotation) full close | NOT dropped — UNBLOCKED | Commander GH #35 is resolved in 17.2.16; SDK readback wiring is offline-tested, with parent live smoke still needed for final proof capture. |
 | Phase 3 (RBI) full close | NOT dropped — DOC-READY | Live smoke + COMMANDER P3.1 + DA Phase 3 evidence is on `main`; maintainer issue close/update remains. |
 | Adoption smoke / field-drift smoke / two-writer smoke | SHIPPED v1.1 (offline) | See `v1.1 Quality-Gap Refresh` above. |
 | Module rename `keeper_sdk` → `declarative_sdk_k` | PARTLY SHIPPED / DEFERRED v2.0 | Compatibility shim landed; breaking removal of `keeper_sdk` remains a v2.0 action. |
