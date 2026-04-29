@@ -11,14 +11,18 @@ from pathlib import Path
 from typing import cast
 
 import pytest
+from click.testing import CliRunner
 from rich.console import Console
 
 from keeper_sdk.cli import renderer as renderer_module
+from keeper_sdk.cli.main import main
 from keeper_sdk.cli.renderer import RichRenderer
 from keeper_sdk.core import build_graph, build_plan, compute_diff, execution_order, load_manifest
+from keeper_sdk.core.diff import Change, ChangeKind
 from keeper_sdk.core.interfaces import ApplyOutcome, LiveRecord
 from keeper_sdk.core.metadata import encode_marker
 from keeper_sdk.core.models import Manifest, PamMachine
+from keeper_sdk.core.planner import Plan
 
 SNAPSHOT_DIR = Path(__file__).resolve().parent / "fixtures" / "renderer_snapshots"
 
@@ -39,6 +43,18 @@ def test_render_plan_snapshot(
     renderer = RichRenderer()
     plan = _build_snapshot_plan(minimal_manifest_path)
     _assert_snapshot("render_plan", renderer.render_plan(plan))
+
+
+def test_render_plan_content_covers_all_action_rows(fixed_width_console: None) -> None:
+    renderer = RichRenderer()
+    rendered = renderer.render_plan(_plan_with_all_rows_for_renderer())
+
+    for header in ("Action", "Type", "uid_ref", "Title", "Keeper UID", "Note"):
+        assert header in rendered
+    for uid_ref in ("uid-create", "uid-update", "uid-delete", "uid-conflict", "uid-noop"):
+        assert uid_ref in rendered
+    for action in ("create", "update", "delete", "conflict", "noop"):
+        assert action in rendered
 
 
 def test_render_diff_snapshot(
@@ -89,6 +105,95 @@ def test_render_outcomes_snapshot(fixed_width_console: None) -> None:
         ),
     ]
     _assert_snapshot("render_outcomes", renderer.render_outcomes(outcomes))
+
+
+def test_render_outcomes_content_covers_success_and_error_rows(
+    fixed_width_console: None,
+) -> None:
+    renderer = RichRenderer()
+    rendered = renderer.render_outcomes(
+        [
+            ApplyOutcome(
+                uid_ref="uid-success",
+                keeper_uid="UID-SUCCESS-001",
+                action="success",
+                details={"verified": True},
+            ),
+            ApplyOutcome(
+                uid_ref="uid-error",
+                keeper_uid="UID-ERROR-001",
+                action="error",
+                details={"reason": "provider refused update"},
+            ),
+        ]
+    )
+
+    for header in ("Action", "uid_ref", "Keeper UID", "Details"):
+        assert header in rendered
+    assert "success" in rendered
+    assert "uid-success" in rendered
+    assert "verified=True" in rendered
+    assert "error" in rendered
+    assert "uid-error" in rendered
+    assert "provider refused update" in rendered
+
+
+def test_validate_output_content_covers_ok_line(minimal_manifest_path: Path) -> None:
+    manifest = load_manifest(minimal_manifest_path)
+    result = CliRunner().invoke(main, ["validate", str(minimal_manifest_path)])
+
+    assert result.exit_code == 0, result.output
+    assert f"ok: {manifest.name} ({len(manifest.iter_uid_refs())} uid_refs)" in result.output
+
+
+class _RendererPlan(Plan):
+    def ordered(self) -> list[Change]:
+        return list(self.changes)
+
+
+def _plan_with_all_rows_for_renderer() -> Plan:
+    changes = [
+        Change(
+            kind=ChangeKind.CREATE,
+            uid_ref="uid-create",
+            resource_type="pamMachine",
+            title="create-title",
+        ),
+        Change(
+            kind=ChangeKind.UPDATE,
+            uid_ref="uid-update",
+            resource_type="pamUser",
+            title="update-title",
+            keeper_uid="UID-UPDATE-001",
+        ),
+        Change(
+            kind=ChangeKind.DELETE,
+            uid_ref="uid-delete",
+            resource_type="pamDatabase",
+            title="delete-title",
+            keeper_uid="UID-DELETE-001",
+        ),
+        Change(
+            kind=ChangeKind.CONFLICT,
+            uid_ref="uid-conflict",
+            resource_type="pamMachine",
+            title="conflict-title",
+            keeper_uid="UID-CONFLICT-001",
+            reason="synthetic conflict",
+        ),
+        Change(
+            kind=ChangeKind.NOOP,
+            uid_ref="uid-noop",
+            resource_type="pam_configuration",
+            title="noop-title",
+            keeper_uid="UID-NOOP-001",
+        ),
+    ]
+    return _RendererPlan(
+        manifest_name="renderer-all-actions",
+        changes=changes,
+        order=[change.uid_ref or "" for change in changes],
+    )
 
 
 def _build_snapshot_plan(minimal_manifest_path: Path):
