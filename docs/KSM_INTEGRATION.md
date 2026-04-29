@@ -103,6 +103,14 @@ credential leakage and centralizes access review in Keeper. It adds the optional
 `keeper-secrets-manager-core` dependency and a KSM application to manage.
 Use `EnvLoginHelper` only for ad-hoc local debugging.
 
+## Known gaps
+
+The KSM inter-agent bus is not implemented. The sealed stub lives in
+[`keeper_sdk/secrets/bus.py`](../keeper_sdk/secrets/bus.py); every public bus
+method raises `NotImplementedError` with a `next_action` until the
+publish/subscribe protocol, cursor/CAS semantics, retention, and operator
+debug workflow are designed. Design doc placeholder: `docs/KSM_BUS.md`.
+
 ## Future work
 
 Manifest `${ksm:UID:field}` placeholder resolution is on the roadmap. Today,
