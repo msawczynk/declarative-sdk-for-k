@@ -7,9 +7,8 @@ from pathlib import Path
 import pytest
 
 from keeper_sdk.core.errors import CapabilityError
-from keeper_sdk.secrets import KsmSecretStore
+from keeper_sdk.secrets import KsmSecretStore, load_keeper_login_from_ksm
 from keeper_sdk.secrets import ksm as ksm_module
-from keeper_sdk.secrets import load_keeper_login_from_ksm
 from keeper_sdk.secrets.ksm import _coerce_totp_secret
 from tests._fakes.ksm import FakeRecord, install_fake_ksm_core
 

@@ -14,5 +14,4 @@ fi
 python3 -m ruff check .
 python3 -m ruff format --check .
 python3 -m mypy keeper_sdk
-isort --check-only .
 python3 -m pytest -q
