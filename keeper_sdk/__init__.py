@@ -15,7 +15,7 @@ Typical use:
     provider.apply_plan(plan)
 """
 
-__version__ = "1.0.0"
+__version__ = "2.0.0"
 
 from keeper_sdk import core, providers
 from keeper_sdk.core import (

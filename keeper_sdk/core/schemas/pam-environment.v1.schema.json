@@ -22,7 +22,7 @@
       "const": "pam-environment.v1",
       "description": "Optional explicit family pin (same as other keeper_* families). Legacy manifests omit this key."
     },
-    "version": { "type": "string", "const": "1" },
+    "version": { "$ref": "#/$defs/manifest_version" },
     "name": { "type": "string", "minLength": 1 },
     "projects": {
       "type": "array",
@@ -41,6 +41,15 @@
     "users": { "type": "array", "items": { "$ref": "#/$defs/user_any" }, "default": [] }
   },
   "$defs": {
+    "manifest_version": {
+      "type": "string",
+      "const": "1",
+      "x-keeper-deprecated": {
+        "since-pin": "6574827cf2993d2a54484516c2f4cc33238f98c9",
+        "remove-after-pin": "v2.0.0",
+        "reason": "Legacy PAM manifests use version/name without an explicit schema pin. New manifests should declare schema: pam-environment.v1; the legacy version field is kept only for the v1.x two-version overlap window."
+      }
+    },
     "on_off": { "type": "string", "enum": ["on", "off"] },
     "uid_ref": { "type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$" },
     "port": { "oneOf": [

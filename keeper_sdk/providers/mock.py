@@ -22,6 +22,14 @@ from keeper_sdk.core.metadata import (
 from keeper_sdk.core.planner import Plan
 
 _MANAGED_COMPANY_RESOURCE = "managed_company"
+_KSM_BLOCKS = ("apps", "tokens", "record_shares", "config_outputs")
+_KSM_BLOCK_BY_RESOURCE = {
+    "ksm_app": "apps",
+    "ksm_token": "tokens",
+    "ksm_record_share": "record_shares",
+    "ksm_config_output": "config_outputs",
+}
+_KSM_RESOURCE_BY_BLOCK = {block: resource for resource, block in _KSM_BLOCK_BY_RESOURCE.items()}
 
 
 class MockProvider(Provider):
@@ -339,6 +347,194 @@ class MockProvider(Provider):
         return keeper_uid
 
 
+class KsmMockProvider:
+    """In-memory keeper-ksm.v1 provider for offline plan/apply tests."""
+
+    def __init__(self, manifest_name: str | None = None) -> None:
+        self._manifest_name = manifest_name or "keeper-ksm"
+        self._ksm_state: dict[str, dict[str, dict[str, Any]]] = {block: {} for block in _KSM_BLOCKS}
+        self._ksm_markers: dict[str, dict[str, Any]] = {}
+
+    def discover_ksm_apps(self) -> list[dict[str, Any]]:
+        """Return the live mock app rows; fresh providers return ``[]``."""
+        return [deepcopy(row) for row in self._ksm_state["apps"].values()]
+
+    def discover_ksm_state(self) -> dict[str, list[dict[str, Any]]]:
+        """Return a Commander-like keeper-ksm.v1 live snapshot."""
+        return {
+            block: [deepcopy(row) for row in self._ksm_state[block].values()]
+            for block in _KSM_BLOCKS
+        }
+
+    def unsupported_capabilities(self, manifest: object = None) -> list[str]:  # noqa: ARG002
+        """Mock KSM provider supports every schema-valid offline KSM row."""
+        return []
+
+    def check_tenant_bindings(self, manifest: object = None) -> list[str]:  # noqa: ARG002
+        """Offline KSM provider has no tenant-side binding checks."""
+        return []
+
+    def apply_ksm_plan(self, plan: Plan, *, dry_run: bool = False) -> list[ApplyOutcome]:
+        """Apply keeper-ksm.v1 plan rows to in-memory state."""
+        outcomes: list[ApplyOutcome] = []
+        for change in _all_plan_changes(plan):
+            if change.kind is ChangeKind.CONFLICT:
+                outcomes.append(
+                    ApplyOutcome(
+                        uid_ref=change.uid_ref or "",
+                        keeper_uid=change.keeper_uid or "",
+                        action="conflict",
+                        details={"reason": change.reason or "blocked"},
+                    )
+                )
+                continue
+
+            block = _KSM_BLOCK_BY_RESOURCE.get(change.resource_type)
+            if block is None:
+                outcomes.append(
+                    ApplyOutcome(
+                        uid_ref=change.uid_ref or "",
+                        keeper_uid=change.keeper_uid or "",
+                        action="noop",
+                        details={"reason": change.reason or "non-ksm-plan-row"},
+                    )
+                )
+                continue
+
+            if change.kind is ChangeKind.CREATE:
+                keeper_uid = _stable_uid(
+                    f"ksm:{plan.manifest_name}:{change.resource_type}:"
+                    f"{change.uid_ref or change.title}"
+                )
+                payload = deepcopy(change.after)
+                payload["keeper_uid"] = keeper_uid
+                marker = encode_marker(
+                    uid_ref=change.uid_ref or change.title,
+                    manifest=plan.manifest_name,
+                    resource_type=change.resource_type,
+                )
+                if not dry_run:
+                    self._ksm_state[block][_ksm_key_for_payload(block, payload)] = payload
+                    self._ksm_markers[keeper_uid] = marker
+                outcomes.append(
+                    ApplyOutcome(
+                        uid_ref=change.uid_ref or "",
+                        keeper_uid=keeper_uid,
+                        action="create",
+                        details={"dry_run": dry_run, "marker_written": not dry_run},
+                    )
+                )
+                continue
+
+            if change.kind is ChangeKind.UPDATE:
+                keeper_uid = change.keeper_uid or ""
+                existing_key = _ksm_key_by_keeper_uid(self._ksm_state[block], keeper_uid)
+                if existing_key is None:
+                    outcomes.append(
+                        ApplyOutcome(
+                            uid_ref=change.uid_ref or "",
+                            keeper_uid=keeper_uid,
+                            action="update",
+                            details={"dry_run": dry_run, "skipped": "record_missing"},
+                        )
+                    )
+                    continue
+
+                existing = self._ksm_state[block][existing_key]
+                payload = {**deepcopy(existing), **deepcopy(change.after)}
+                payload["keeper_uid"] = keeper_uid
+                marker = self._ksm_markers.get(keeper_uid) or encode_marker(
+                    uid_ref=change.uid_ref or change.title,
+                    manifest=plan.manifest_name,
+                    resource_type=change.resource_type,
+                )
+                marker = {
+                    **marker,
+                    "manifest": plan.manifest_name,
+                    "resource_type": change.resource_type,
+                    "last_applied_at": utc_timestamp(),
+                }
+                if not dry_run:
+                    self._ksm_state[block].pop(existing_key, None)
+                    self._ksm_state[block][_ksm_key_for_payload(block, payload)] = payload
+                    self._ksm_markers[keeper_uid] = marker
+                outcomes.append(
+                    ApplyOutcome(
+                        uid_ref=change.uid_ref or "",
+                        keeper_uid=keeper_uid,
+                        action="update",
+                        details={"dry_run": dry_run, "marker_written": not dry_run},
+                    )
+                )
+                continue
+
+            if change.kind is ChangeKind.DELETE:
+                keeper_uid = change.keeper_uid or ""
+                existing_key = _ksm_key_by_keeper_uid(self._ksm_state[block], keeper_uid)
+                if existing_key is None:
+                    outcomes.append(
+                        ApplyOutcome(
+                            uid_ref=change.uid_ref or "",
+                            keeper_uid=keeper_uid,
+                            action="delete",
+                            details={"dry_run": dry_run, "skipped": "record_missing"},
+                        )
+                    )
+                    continue
+                if not dry_run:
+                    self._ksm_state[block].pop(existing_key, None)
+                    self._ksm_markers.pop(keeper_uid, None)
+                outcomes.append(
+                    ApplyOutcome(
+                        uid_ref=change.uid_ref or "",
+                        keeper_uid=keeper_uid,
+                        action="delete",
+                        details={"dry_run": dry_run},
+                    )
+                )
+                continue
+
+            details: dict[str, Any] = {"dry_run": dry_run}
+            if change.reason is not None:
+                details["reason"] = change.reason
+            outcomes.append(
+                ApplyOutcome(
+                    uid_ref=change.uid_ref or "",
+                    keeper_uid=change.keeper_uid or "",
+                    action="noop",
+                    details=details,
+                )
+            )
+        return outcomes
+
+    def seed_ksm_state(self, rows: dict[str, list[dict[str, Any]]]) -> None:
+        """Replace mock KSM state; test helper."""
+        self._ksm_state = {block: {} for block in _KSM_BLOCKS}
+        self._ksm_markers = {}
+        for block in _KSM_BLOCKS:
+            for row in rows.get(block) or []:
+                payload = deepcopy(row)
+                keeper_uid = str(
+                    payload.get("keeper_uid")
+                    or _stable_uid(
+                        f"ksm:{self._manifest_name}:"
+                        f"{_KSM_RESOURCE_BY_BLOCK[block]}:{_ksm_uid_ref_for_payload(block, payload)}"
+                    )
+                )
+                payload["keeper_uid"] = keeper_uid
+                marker = encode_marker(
+                    uid_ref=_ksm_uid_ref_for_payload(block, payload),
+                    manifest=self._manifest_name,
+                    resource_type=_KSM_RESOURCE_BY_BLOCK[block],
+                )
+                self._ksm_state[block][_ksm_key_for_payload(block, payload)] = payload
+                self._ksm_markers[keeper_uid] = marker
+
+    def ksm_markers(self) -> dict[str, dict[str, Any]]:
+        """Return decoded ownership markers for assertions."""
+        return deepcopy(self._ksm_markers)
+
+
 def _stable_uid(seed: str) -> str:
     return uuid.uuid5(uuid.NAMESPACE_URL, f"keeper-declarative://{seed}").hex[:22]
 
@@ -370,9 +566,40 @@ def _msp_change_name(change: Change) -> str:
 
 
 def _msp_plan_changes(plan: Plan) -> list[Change]:
+    return _all_plan_changes(plan)
+
+
+def _all_plan_changes(plan: Plan) -> list[Change]:
     ordered = plan.ordered()
     seen = {id(change) for change in ordered}
     return ordered + [change for change in plan.changes if id(change) not in seen]
 
 
-__all__ = ["MockProvider"]
+def _ksm_key_by_keeper_uid(rows: dict[str, dict[str, Any]], keeper_uid: str) -> str | None:
+    for key, row in rows.items():
+        if row.get("keeper_uid") == keeper_uid:
+            return key
+    return None
+
+
+def _ksm_key_for_payload(block: str, payload: dict[str, Any]) -> str:
+    if block in ("apps", "tokens"):
+        return f"{block}:{payload['uid_ref']}"
+    if block == "record_shares":
+        return f"{block}:{payload['app_uid_ref']}|{payload['record_uid_ref']}"
+    if block == "config_outputs":
+        return f"{block}:{payload['app_uid_ref']}|{payload['output_path']}"
+    raise KeyError(block)
+
+
+def _ksm_uid_ref_for_payload(block: str, payload: dict[str, Any]) -> str:
+    if block in ("apps", "tokens"):
+        return str(payload["uid_ref"])
+    if block == "record_shares":
+        return f"share:{payload['app_uid_ref']}:{payload['record_uid_ref']}"
+    if block == "config_outputs":
+        return f"config:{payload['app_uid_ref']}:{payload['output_path']}"
+    raise KeyError(block)
+
+
+__all__ = ["KsmMockProvider", "MockProvider"]

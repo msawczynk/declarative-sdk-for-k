@@ -178,6 +178,15 @@ no-rebuild `compliance-report` cache shape.
       `NotImplementedError` with `next_action` until protocol and live proof
       land.
 
+### v2.0.0 readiness note (2026-04-29)
+
+All v1.0.0 shipping-gate rows above are checked, and no unchecked checklist
+rows remain. The v2.0.0 prep release can bump the package version because the
+expanded schema families are packaged and the `declarative_sdk_k` import root
+exists while `keeper_sdk` remains backward-compatible for the transition window.
+Support-lift gaps that still need live proof stay classified as
+`preview-gated` / `upstream-gap` in `docs/SDK_DA_COMPLETION_PLAN.md`.
+
 ## Release gating
 
 **Zero remaining v1.0.0 GA blockers.** `EnvLoginHelper` live smoke proved the

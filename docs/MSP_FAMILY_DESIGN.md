@@ -1,7 +1,12 @@
-# MSP family — design memo (`msp-environment.v1`, slice 1)
+# MSP family — design and write-gate memo (`msp-environment.v1`, slice 1)
 
-**Status:** `DRAFT` — design-only; no packaged schema, models, or provider code
-until a follow-on implementation sprint lands.
+**Status:** `design-complete / preview-gated` for managed-company writes. The
+packaged schema, typed models, diff, mock lifecycle, and offline
+Commander-provider wrappers exist, but the public support claim remains
+**read-only** (`validate --online`, `plan`, `diff`) until a sanctioned MSP admin
+live proof and Commander adoption/marker contract land. Commander `dsk import`
+for MSP still exits capability because no safe Managed Company ownership-marker
+writer is proven.
 
 **Links:** [V2_DECISIONS.md — Q5](./V2_DECISIONS.md#q5--msp-and-epm-in-product-scope) ·
 [Vault L1 design (memo shape reference)](./VAULT_L1_DESIGN.md) ·
@@ -10,10 +15,9 @@ until a follow-on implementation sprint lands.
 wires into `dsk validate`) ·
 [CONVENTIONS.md](../keeper_sdk/core/schemas/CONVENTIONS.md)
 
-**Upstream Commander surface (studied):** `keepercommander.commands.msp` in a local
-`Commander` checkout; SDK dependency pin: `keepercommander>=17.2.16,<18` (developer
-`pip show` in this repo: **17.2.15** at time of writing). Class and argv details
-in §6.
+**Upstream Commander surface (studied):** `keepercommander.commands.msp` in the
+installed Commander package; SDK dependency pin: `keepercommander>=17.2.16,<18`
+(local audit: **17.2.16**). Class and argv details in §6.
 
 ---
 
@@ -32,19 +36,20 @@ Per [V2_DECISIONS.md Q5](./V2_DECISIONS.md#q5--msp-and-epm-in-product-scope), th
   `scripts/msp_smoke.py`) was available to capture **sanitized** `msp-info` /
   license-snapshot **envelopes** for design and future contract tests.
 
-This memo is the **Sprint 7h-56** deliverable named in Q5: it specifies the first
-`msp-environment.v1` slice so implementation can start without re-deriving
-upstream Commander behavior from chat.
+This memo began as the **Sprint 7h-56** deliverable named in Q5. W10 updates it
+as the authoritative write-path gate: implementation can proceed without
+re-deriving upstream Commander behavior, and support claims stay bounded until
+live proof exists.
 
 ### In scope (slice 1)
 
 - New schema family key **`msp-environment.v1`** with a minimal **typed**
   manifest: MSP parent metadata + **`managed_companies[]`**.
-- **End-to-end lifecycle** for **one** canonical write path matching Q5: **add
-  managed company** (CLI verb **`msp-add`**, Commander **`MSPAddCommand`**) —
-  expressed in the plan as a **`create_mc`** (or equivalent) op together with
-  **validate / plan / diff / apply** (same exit-code contract as
-  `pam-environment.v1` per [PAM_PARITY_PROGRAM.md](./PAM_PARITY_PROGRAM.md)).
+- **End-to-end design** for the canonical managed-company write paths:
+  **provision** (`msp-add` / `MSPAddCommand`), **update** (`msp-update` /
+  `MSPUpdateCommand`), and **delete** (`msp-remove` / `MSPRemoveCommand`).
+  Offline wrappers may exist before support is claimed; support requires the
+  live gates in §7.
 - **Read path** for diff input aligned with the **smoke harness** probe
   `probes[name=msp-info].rows` (see §3 and §5) — that is, the **same JSON row keys**
   the harness emits after **fingerprinting** sensitive identifiers.
@@ -394,9 +399,77 @@ text may still say `msp-add-mc`; map that phrase to **`msp-add`**.
 Non-goals in slice 1: **`GetMSPDataCommand` (`msp-down`)** as a separate sync
 step unless `query_enterprise` is insufficient in practice (open question).
 
-**Pinned version:** this memo was written against the Commander module layout in
-`keepercommander` **17.2.15** (installed) within the project’s
-**`>=17.2.16,<18`** range. Re-verify signatures before merge if the pin drifts.
+**Pinned version:** W10 re-audited the Commander module layout in
+`keepercommander` **17.2.16** within the project’s **`>=17.2.16,<18`** range.
+Re-verify signatures before merge if the pin drifts.
+
+### 6.1 W10 command audit
+
+| Commander surface | Class / API | Read or write | DSK posture |
+|-------------------|-------------|---------------|-------------|
+| `api.query_enterprise(params)` | enterprise payload refresh | Read | **Supported** for MSP admin `validate --online`, `plan`, and `diff`; maps `managed_companies[]` to SDK rows. |
+| `msp-down` | `GetMSPDataCommand` | Read/cache refresh | Operator-only helper; DSK does not shell out to it. |
+| `msp-info` | `MSPInfoCommand` | Read/report | Harness/report input only; not an apply path. |
+| `msp-billing-report`, `msp-legacy-report` | report commands | Read/report | Out of scope for declarative lifecycle; future `dsk report` candidates only. |
+| `switch-to-mc`, `switch-to-msp` | session context switch | Session context | Out of scope for declarative lifecycle; do not use inside automated apply. |
+| `msp-add` | `MSPAddCommand` -> `enterprise_registration_by_msp` | **Write: provision MC** | Design-complete; offline wrapper exists; support stays `preview-gated` until MSP admin create -> discover -> clean re-plan proof. |
+| `msp-update` | `MSPUpdateCommand` -> `enterprise_update_by_msp` | **Write: update MC** | Design-complete; offline wrapper exists; support stays `preview-gated` until MSP admin update proof covers name/plan/seats/file plan/addons. |
+| `msp-remove` | `MSPRemoveCommand` -> `enterprise_remove_by_msp` | **Write: delete MC** | Design-complete; destructive; must require `--allow-delete`, fresh discover, explicit target id/name, and disposable-MC live proof. |
+| `msp-convert-node`, `msp-copy-role` | conversion / role-copy commands | Write | Explicitly out of slice 1; no DSK manifest support. |
+
+Current DSK support claim is narrower than the code surface: MSP
+discover/validate/plan/diff are supported for MSP admin sessions; Commander
+managed-company writes are **preview-gated**, and Commander `dsk import` remains
+unsupported until a marker/adoption writer is proven. Mock import/apply and
+offline Commander contract tests are useful evidence, not a live support lift.
+
+### 6.2 Write risk and guard requirements
+
+MSP `apply` is destructive by default risk profile. `msp-remove` can remove the
+Managed Company from the MSP account, expire licences/admin access, and make the
+child tenant's data/control plane unavailable or removed from MSP management.
+Treat delete as data-destructive even when Commander labels the action as
+licence removal.
+
+Required guards before any support lift:
+
+- Default plan/apply must not delete; delete rows require explicit
+  `--allow-delete`.
+- Dry-run must render the exact Commander kwargs (`mc`, `force`, `name`, `plan`,
+  `seats`, `file_plan`, addon deltas) without secrets.
+- Provider must rediscover before each mutation and abort on duplicate names,
+  missing targets, or id/name mismatch.
+- Delete must target a disposable MC in live proof first; no bulk delete proof
+  may use a customer or shared lab MC.
+- `msp-remove` must pass `force=True` only after DSK-level confirmation /
+  `--allow-delete`; do not rely on Commander interactive prompts.
+- Support docs must say delete can remove all MSP-managed company data/access
+  from the operator's point of view.
+
+### 6.3 Recommended unlock order
+
+1. **Import/adoption first.** Define the Commander marker contract for Managed
+   Companies, then prove `dsk import --dry-run` and `dsk import --auto-approve`
+   write only the marker/adoption state. This lets operators adopt existing MCs
+   without provisioning or deleting tenants.
+2. **Create/update apply second.** Prove `msp-add` and `msp-update` with an MSP
+   admin session, sanitized transcript, fresh discover, and clean re-plan.
+3. **Delete last.** Prove `msp-remove` only against a disposable MC and only with
+   `--allow-delete`; keep it preview-gated until cleanup semantics are boring.
+
+Import proof sequence:
+
+```text
+MSP admin login
+-> dsk validate MANIFEST --online --provider commander
+-> dsk plan MANIFEST --json --provider commander
+-> dsk import MANIFEST --dry-run --provider commander
+-> inspect adoption rows / no create-update-delete rows
+-> dsk import MANIFEST --auto-approve --provider commander
+-> dsk validate MANIFEST --online --provider commander
+-> dsk plan MANIFEST --json --provider commander
+-> verify no adoption rows remain and no unrelated MC changed
+```
 
 ---
 
@@ -430,14 +503,21 @@ PAM/portal work may host harness runners; the SDK does **not** require them for
    (exit **0** or documented **2** for “no drift” as per [VALIDATION_STAGES.md](./VALIDATION_STAGES.md)).
 2. **Mock round-trip** — `plan` / `apply` (mock) matches PAM’s testing depth for
    one op type.
-3. **Commander** — one **`create_mc`** in lab tenant, then **re-`plan`** shows
-   **no-op**; **destroy** (optional) in line with org policy.
-4. **Attestation** — update **`x-keeper-live-proof`** on
+3. **Commander import** — MSP admin session proves adoption marker write without
+   create/update/delete side effects, then re-discover shows no adoption rows.
+4. **Commander create/update** — one **`create_mc`** and one **`update_mc`** in
+   the lab tenant, then **re-`plan`** shows **no-op**.
+5. **Commander delete** — one disposable **`delete_mc`** only with
+   `--allow-delete`, sanitized dry-run first, and a documented cleanup boundary.
+6. **Attestation** — update **`x-keeper-live-proof`** on
   `msp-environment.v1.schema.json` with **`evidence`** path and pin.
 
 **Gate:** [PAM_PARITY_PROGRAM.md](./PAM_PARITY_PROGRAM.md) “PAM bar” **§7
 live proof** and matrix row — **not** met until a transcript exists; SDK README
 and matrix stay honest per **Q5** and **PAM** documents.
+
+Until those gates pass, the supported DSK statement remains:
+**MSP discover/validate/plan/diff only; MSP import/apply are preview-gated.**
 
 ---
 
@@ -448,6 +528,13 @@ Phases are sized to mirror the **split** described in
 validate online) and the **PAM** smoke matrix in
 [`PAM_PARITY_PROGRAM.md`](./PAM_PARITY_PROGRAM.md). Counts are **planning
 estimates**; a focused team can merge adjacent phases.
+
+W10 current-tree note: P0-P6 have partial or complete offline implementation
+coverage in the repository (schema/model/graph/diff/mock and Commander
+create/update/delete wrappers). This table remains useful as the acceptance
+map, but the remaining support lift is now concentrated in **Commander
+adoption/marker contract**, **MSP admin live proof**, and **delete guard proof**
+rather than initial scaffolding.
 
 | Phase | Description | Files / areas (typical) | Gates | Exit criterion |
 |-------|-------------|------------------------|-------|------------------|
@@ -535,6 +622,7 @@ relevant Q answer for confirmation before that phase's gate.
 |------|--------|------|
 | 2026-04-27 | SDK maintainers (draft) | Initial memo for Sprint 7h-56 — **msp-environment.v1** slice 1, aligned with [V2 Q5](./V2_DECISIONS.md#q5--msp-and-epm-in-product-scope). |
 | 2026-04-27 | SDK maintainers | Sprint 7h-57 P0 unblock — TENTATIVE §10 answers added; option 3 (best-guess + parallel implementation). Maintainer override invalidates only the affected P-phase work. |
+| 2026-04-29 | W10 offline worker | MSP write command audit: `msp-add` / `msp-update` / `msp-remove` are design-complete but preview-gated; import/adoption marker and live MSP admin proof are required before support lift. |
 
 ### Cross-reference index (required docs)
 

@@ -20,12 +20,15 @@ from __future__ import annotations
 import argparse
 import datetime as _dt
 import difflib
+import hashlib
 import importlib
+import importlib.metadata as importlib_metadata
 import json
 import logging
 import re
 import subprocess
 import sys
+import tomllib
 from collections.abc import Iterable, Sequence
 from pathlib import Path
 from typing import Any
@@ -37,6 +40,8 @@ DEFAULT_COMMANDER = REPO_ROOT.parent / "Commander"
 DOCS_DIR = REPO_ROOT / "docs"
 MATRIX_PATH = DOCS_DIR / "CAPABILITY_MATRIX.md"
 SNAPSHOT_PATH = DOCS_DIR / "capability-snapshot.json"
+BASELINE_PATH = REPO_ROOT / ".sync_baseline"
+PYPROJECT_PATH = REPO_ROOT / "pyproject.toml"
 
 # Enforcements we care about in the SDK's validate-stage-4 role check.
 # All names starting with ``ALLOW_PAM`` plus this explicit allowlist.
@@ -65,6 +70,118 @@ _RESOURCE_TYPE_HINTS = (
 _VAULT_FAMILY_COMMAND_LABELS: frozenset[str] = frozenset(
     {"get", "search", "record-add", "record-update", "list-sf", "ls"}
 )
+
+
+# ---------------------------------------------------------------------------
+# Local installed-version baseline audit
+# ---------------------------------------------------------------------------
+
+
+def _keepercommander_dependency(pyproject_path: Path = PYPROJECT_PATH) -> str:
+    """Return the keepercommander dependency spec from ``pyproject.toml``."""
+    data = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
+    deps = data.get("project", {}).get("dependencies", [])
+    for dep in deps:
+        if isinstance(dep, str) and dep.lower().startswith("keepercommander"):
+            return dep
+    raise RuntimeError("keepercommander dependency not found in pyproject.toml")
+
+
+def _pinned_version_from_dependency(dep: str) -> str:
+    """Best-effort lower-bound version from a PEP 508-ish dependency string."""
+    match = re.search(r">=\s*([^,\s;<]+)", dep)
+    if match:
+        return match.group(1)
+    match = re.search(r"==\s*([^,\s;<]+)", dep)
+    if match:
+        return match.group(1)
+    return dep
+
+
+def _installed_keepercommander_version() -> str | None:
+    try:
+        return importlib_metadata.version("keepercommander")
+    except importlib_metadata.PackageNotFoundError:
+        return None
+
+
+def _local_keepercommander_changelog() -> str:
+    """Read local package metadata only; never call PyPI/network."""
+    try:
+        dist = importlib_metadata.distribution("keepercommander")
+    except importlib_metadata.PackageNotFoundError:
+        return ""
+
+    for file in dist.files or ():
+        name = Path(str(file)).name.lower()
+        if name.startswith(("changelog", "changes", "history")):
+            try:
+                return dist.locate_file(file).read_text(encoding="utf-8")
+            except OSError:
+                break
+    return dist.metadata.get_payload() or ""
+
+
+def build_local_baseline(pyproject_path: Path = PYPROJECT_PATH) -> dict[str, Any]:
+    """Build the offline-safe keepercommander version/changelog baseline."""
+    dep = _keepercommander_dependency(pyproject_path)
+    changelog = _local_keepercommander_changelog()
+    return {
+        "keepercommander_spec": dep,
+        "pinned_version": _pinned_version_from_dependency(dep),
+        "installed_version": _installed_keepercommander_version(),
+        "changelog_sha256": hashlib.sha256(changelog.encode("utf-8")).hexdigest(),
+        "commands": [],
+        "apis": [],
+    }
+
+
+def check_local_baseline(
+    current: dict[str, Any], baseline: dict[str, Any]
+) -> tuple[list[str], list[str]]:
+    """Return ``(new_commands, changed_apis)`` against ``.sync_baseline``."""
+    old_commands = {str(v) for v in baseline.get("commands", [])}
+    new_commands = sorted(str(v) for v in current.get("commands", []) if str(v) not in old_commands)
+
+    changed_apis: list[str] = []
+    for key in (
+        "keepercommander_spec",
+        "pinned_version",
+        "installed_version",
+        "changelog_sha256",
+    ):
+        if baseline.get(key) != current.get(key):
+            changed_apis.append(f"{key}: {baseline.get(key)!r} -> {current.get(key)!r}")
+    return new_commands, changed_apis
+
+
+def run_local_baseline_audit(*, baseline_path: Path, update: bool = False) -> int:
+    current = build_local_baseline()
+    if not baseline_path.exists():
+        baseline_path.write_text(
+            json.dumps(current, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        new_commands: list[str] = []
+        changed_apis: list[str] = []
+    else:
+        try:
+            baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            print(f"invalid baseline at {baseline_path}: {exc}", file=sys.stderr)
+            return 1
+        new_commands, changed_apis = check_local_baseline(current, baseline)
+        if update and (new_commands or changed_apis):
+            baseline_path.write_text(
+                json.dumps(current, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            )
+            new_commands = []
+            changed_apis = []
+
+    drift = bool(new_commands or changed_apis)
+    print(f"NEW_COMMANDS: {json.dumps(new_commands)}")
+    print(f"CHANGED_APIS: {json.dumps(changed_apis)}")
+    print(f"DRIFT_DETECTED: {json.dumps(drift)}")
+    return 1 if drift else 0
 
 
 # ---------------------------------------------------------------------------
@@ -786,6 +903,22 @@ def _parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
         default=DOCS_DIR,
         help=argparse.SUPPRESS,
     )
+    parser.add_argument(
+        "--baseline-check",
+        action="store_true",
+        help="Audit local installed keepercommander metadata against .sync_baseline.",
+    )
+    parser.add_argument(
+        "--baseline-file",
+        type=Path,
+        default=BASELINE_PATH,
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--update-baseline",
+        action="store_true",
+        help=argparse.SUPPRESS,
+    )
     return parser.parse_args(argv)
 
 
@@ -793,10 +926,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     args = _parse_args(argv)
 
+    if args.baseline_check:
+        return run_local_baseline_audit(
+            baseline_path=args.baseline_file.resolve(), update=args.update_baseline
+        )
+
     commander_path = args.commander.resolve()
     if not commander_path.is_dir():
-        LOG.error("commander path does not exist: %s", commander_path)
-        return 2
+        if args.check:
+            LOG.error("commander path does not exist: %s", commander_path)
+            return 2
+        return run_local_baseline_audit(
+            baseline_path=args.baseline_file.resolve(), update=args.update_baseline
+        )
 
     snapshot, warnings = build_snapshot(commander_path)
 

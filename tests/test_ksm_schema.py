@@ -9,7 +9,7 @@ import pytest
 from click.testing import CliRunner
 
 from keeper_sdk.cli import main
-from keeper_sdk.cli.main import EXIT_CAPABILITY
+from keeper_sdk.cli.main import EXIT_CHANGES
 from keeper_sdk.core.diff import ChangeKind
 from keeper_sdk.core.errors import RefError, SchemaError
 from keeper_sdk.core.ksm_diff import compute_ksm_diff
@@ -251,7 +251,7 @@ def test_ksm_diff_detects_removed_share_when_delete_allowed() -> None:
     assert share_delete.before["record_uid_ref"] == RECORD_REF
 
 
-def test_ksm_plan_exits_capability_gap(tmp_path) -> None:
+def test_ksm_plan_mock_provider_supported(tmp_path) -> None:
     manifest = tmp_path / "ksm.yaml"
     manifest.write_text(
         """\
@@ -269,6 +269,7 @@ apps:
         catch_exceptions=False,
     )
 
-    assert result.exit_code == EXIT_CAPABILITY, result.output
-    assert "keeper-ksm.v1" in result.output
-    assert "plan/apply are not supported" in result.output
+    assert result.exit_code == EXIT_CHANGES, result.output
+    payload = json.loads(result.output)
+    assert payload["summary"]["create"] == 1
+    assert payload["changes"][0]["resource_type"] == "ksm_app"

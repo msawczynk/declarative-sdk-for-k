@@ -1,0 +1,212 @@
+name: dsk-plan
+description: Run dsk validate + plan as a pull-request check and optionally post the plan.
+
+inputs:
+  manifest_path:
+    description: Path to the declarative manifest to validate and plan.
+    required: true
+  provider:
+    description: "Provider used by dsk plan: mock, service, or commander."
+    required: false
+    default: mock
+  allow_delete:
+    description: Pass --allow-delete to dsk plan.
+    required: false
+    default: "false"
+  post_comment:
+    description: Post or update a pull-request comment with the plan table.
+    required: false
+    default: "true"
+
+outputs:
+  plan_clean:
+    description: "true when dsk plan exits cleanly with no create/update/delete/conflict rows."
+    value: ${{ steps.plan.outputs.plan_clean }}
+  conflict_count:
+    description: Number of plan conflict rows.
+    value: ${{ steps.plan.outputs.conflict_count }}
+  change_count:
+    description: Number of create, update, delete, and conflict rows.
+    value: ${{ steps.plan.outputs.change_count }}
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install dsk
+      shell: bash
+      run: |
+        set -euo pipefail
+        python -m pip install --upgrade pip
+        if [ -f pyproject.toml ] && grep -q 'name = "declarative-sdk-for-k"' pyproject.toml; then
+          python -m pip install -e ".[ksm]"
+        else
+          python -m pip install "declarative-sdk-for-k[ksm] @ git+https://github.com/msawczynk/declarative-sdk-for-k.git@main"
+        fi
+
+    - name: Materialize KSM config secret
+      shell: bash
+      run: |
+        set -euo pipefail
+        for env_name in KEEPER_SDK_KSM_CONFIG KSM_CONFIG; do
+          env_value="${!env_name-}"
+          [ -n "$env_value" ] || continue
+          first_char="$(printf '%s' "$env_value" | sed -n 's/^[[:space:]]*//;s/^\(.\).*$/\1/p' | head -n 1)"
+          if [ "$first_char" = "{" ]; then
+            cfg="$RUNNER_TEMP/dsk-ksm-config.json"
+            umask 077
+            printf '%s' "$env_value" > "$cfg"
+            {
+              echo "KEEPER_SDK_KSM_CONFIG=$cfg"
+              echo "KSM_CONFIG=$cfg"
+            } >> "$GITHUB_ENV"
+            break
+          fi
+        done
+
+    - name: Validate manifest
+      shell: bash
+      env:
+        INPUT_MANIFEST_PATH: ${{ inputs.manifest_path }}
+      run: |
+        set -euo pipefail
+        dsk validate "$INPUT_MANIFEST_PATH"
+
+    - name: Run dsk plan
+      id: plan
+      shell: bash
+      env:
+        INPUT_MANIFEST_PATH: ${{ inputs.manifest_path }}
+        INPUT_PROVIDER: ${{ inputs.provider }}
+        INPUT_ALLOW_DELETE: ${{ inputs.allow_delete }}
+      run: |
+        set -euo pipefail
+        case "$INPUT_PROVIDER" in
+          mock|service|commander) ;;
+          *)
+            echo "::error::provider must be one of: mock, service, commander"
+            exit 1
+            ;;
+        esac
+
+        plan_json="$RUNNER_TEMP/dsk-plan.json"
+        plan_stderr="$RUNNER_TEMP/dsk-plan.stderr"
+        plan_cmd=(dsk plan "$INPUT_MANIFEST_PATH" --json --provider "$INPUT_PROVIDER")
+        if [ "$INPUT_ALLOW_DELETE" = "true" ]; then
+          plan_cmd+=(--allow-delete)
+        fi
+
+        set +e
+        "${plan_cmd[@]}" > "$plan_json" 2> "$plan_stderr"
+        plan_exit=$?
+        set -e
+
+        if ! jq empty "$plan_json" >/dev/null 2>&1; then
+          echo "::error::dsk plan did not emit JSON (exit $plan_exit)"
+          sed -n '1,120p' "$plan_stderr"
+          exit "$plan_exit"
+        fi
+
+        create_count="$(jq -r '.summary.create // 0' "$plan_json")"
+        update_count="$(jq -r '.summary.update // 0' "$plan_json")"
+        delete_count="$(jq -r '.summary.delete // 0' "$plan_json")"
+        conflict_count="$(jq -r '.summary.conflict // 0' "$plan_json")"
+        change_count=$((create_count + update_count + delete_count + conflict_count))
+        if [ "$plan_exit" -eq 0 ] && [ "$change_count" -eq 0 ]; then
+          plan_clean=true
+        else
+          plan_clean=false
+        fi
+
+        plan_md="$RUNNER_TEMP/dsk-plan.md"
+        marker="<!-- dsk-plan:$INPUT_MANIFEST_PATH -->"
+        {
+          echo "$marker"
+          echo "### dsk plan"
+          echo
+          echo "| manifest | provider | clean | create | update | delete | conflicts |"
+          echo "|---|---:|---:|---:|---:|---:|---:|"
+          echo "| \`$INPUT_MANIFEST_PATH\` | \`$INPUT_PROVIDER\` | $plan_clean | $create_count | $update_count | $delete_count | $conflict_count |"
+          echo
+          echo "| kind | uid_ref | resource_type | title | keeper_uid | reason |"
+          echo "|---|---|---|---|---|---|"
+          jq -r '
+            def cell:
+              if . == null or . == "" then "-"
+              else tostring | gsub("\\|"; "\\|") | gsub("\r?\n"; " ")
+              end;
+            (.changes // []) as $changes
+            | if ($changes | length) == 0 then
+                "| noop | - | - | - | - | - |"
+              else
+                $changes[]
+                | "| \(.kind | cell) | \(.uid_ref | cell) | \(.resource_type | cell) | \(.title | cell) | \(.keeper_uid | cell) | \(.reason | cell) |"
+              end
+          ' "$plan_json"
+        } > "$plan_md"
+
+        {
+          echo "plan_clean=$plan_clean"
+          echo "conflict_count=$conflict_count"
+          echo "change_count=$change_count"
+          echo "plan_json=$plan_json"
+          echo "plan_markdown=$plan_md"
+          echo "plan_exit=$plan_exit"
+        } >> "$GITHUB_OUTPUT"
+
+        if [ "$plan_exit" -ne 0 ] && [ "$plan_exit" -ne 2 ]; then
+          if [ "$plan_exit" -ne 4 ]; then
+            echo "::error::dsk plan failed with exit $plan_exit"
+            sed -n '1,120p' "$plan_stderr"
+            exit "$plan_exit"
+          fi
+        fi
+
+    - name: Post PR comment
+      if: ${{ inputs.post_comment == 'true' }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        INPUT_MANIFEST_PATH: ${{ inputs.manifest_path }}
+        PLAN_MARKDOWN: ${{ steps.plan.outputs.plan_markdown }}
+      run: |
+        set -euo pipefail
+        if [ -z "${PR_NUMBER:-}" ]; then
+          echo "Not a pull_request event; skip dsk plan comment."
+          exit 0
+        fi
+
+        marker="<!-- dsk-plan:$INPUT_MANIFEST_PATH -->"
+        comments_json="$RUNNER_TEMP/dsk-plan-comments.json"
+        if ! gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments?per_page=100" > "$comments_json"; then
+          echo "::warning::could not list PR comments; skip dsk plan comment"
+          exit 0
+        fi
+        comment_id="$(jq -r --arg marker "$marker" '.[] | select(.body | contains($marker)) | .id' "$comments_json" | tail -n 1)"
+        payload="$RUNNER_TEMP/dsk-plan-comment-payload.json"
+        jq -n --rawfile body "$PLAN_MARKDOWN" '{body: $body}' > "$payload"
+
+        if [ -n "$comment_id" ] && [ "$comment_id" != "null" ]; then
+          if ! gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$comment_id" --input "$payload" >/dev/null; then
+            echo "::warning::could not update dsk plan PR comment"
+          fi
+        else
+          if ! gh api -X POST "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" --input "$payload" >/dev/null; then
+            echo "::warning::could not create dsk plan PR comment"
+          fi
+        fi
+
+    - name: Fail on conflicts
+      if: ${{ steps.plan.outputs.conflict_count != '0' || steps.plan.outputs.plan_exit == '4' }}
+      shell: bash
+      run: |
+        echo "::error::dsk plan has ${{ steps.plan.outputs.conflict_count }} conflict(s)"
+        exit 4

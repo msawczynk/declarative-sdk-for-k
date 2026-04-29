@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "declarative-sdk-for-k"
-version = "1.3.0"
+version = "2.0.0"
 description = "Declarative lifecycle (validate / export / plan / diff / apply) across the full K surface — vault records, shared folders, teams, roles, enterprise config, KSM, PAM, compliance, rotation — agent- and LLM-friendly by design."
 requires-python = ">=3.11"
 readme = "README.md"
@@ -67,8 +67,9 @@ ksm = [
 [project.scripts]
 # Short, tab-completable, agent-friendly. Primary CLI name.
 dsk = "keeper_sdk.cli:main"
-# Backwards-compat aliases for pre-1.0 callers + CI scripts. Will be
-# removed in v2.0.0 when the package is also renamed to `declarative_sdk_k`.
+dsk-mcp = "keeper_sdk.mcp:main"
+# Backwards-compat aliases for pre-1.0 callers + CI scripts. Keep these during
+# the v2.0.0 rename prep window so existing automation does not break.
 pamform = "keeper_sdk.cli:main"
 keeper-sdk = "keeper_sdk.cli:main"
 
@@ -76,7 +77,7 @@ keeper-sdk = "keeper_sdk.cli:main"
 include-package-data = true
 
 [tool.setuptools.packages.find]
-# v2.0.0: keeper_sdk will be removed; shim until then
+# v2.0.0 prep: ship both import roots; keep keeper_sdk compatible during rename.
 include = ["keeper_sdk*", "declarative_sdk_k*"]
 exclude = ["tests*"]
 

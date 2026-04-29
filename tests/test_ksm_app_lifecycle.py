@@ -50,12 +50,27 @@ ksm_apps:
     assert "ksm_apps" in result.output
 
 
-def test_keeper_ksm_plan_and_cleanup_are_capability_gaps(tmp_path: Path) -> None:
+def test_keeper_ksm_empty_plan_is_clean_for_mock_provider(tmp_path: Path) -> None:
     manifest = tmp_path / "ksm.yaml"
     manifest.write_text("schema: keeper-ksm.v1\n", encoding="utf-8")
 
     plan_result = _run(["--provider", "mock", "plan", str(manifest), "--json"])
 
+    assert plan_result.exit_code == 0, plan_result.output
+    assert json.loads(plan_result.output)["summary"] == {
+        "create": 0,
+        "update": 0,
+        "delete": 0,
+        "conflict": 0,
+        "noop": 0,
+    }
+
+
+def test_keeper_ksm_commander_plan_remains_capability_gap(tmp_path: Path) -> None:
+    manifest = tmp_path / "ksm.yaml"
+    manifest.write_text("schema: keeper-ksm.v1\n", encoding="utf-8")
+
+    plan_result = _run(["--provider", "commander", "plan", str(manifest), "--json"])
+
     assert plan_result.exit_code == EXIT_CAPABILITY, plan_result.output
-    assert "typed plan/load supports" in plan_result.output
-    assert "keeper-ksm.v1" in plan_result.output
+    assert "keeper-ksm.v1 plan/apply is preview-gated for commander provider" in plan_result.output

@@ -38,6 +38,7 @@ import io
 import json
 import logging
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -128,6 +129,13 @@ _MSP_CREATE_ONLY_UNSUPPORTED_REASON = (
 )
 _MSP_MANAGED_COMPANY_RESOURCE_TYPES = {"managed_company", "managedCompany"}
 _MSP_UNLIMITED_SEATS = 1_000_000_000
+_ENTERPRISE_BLOCKS = ("nodes", "users", "roles", "teams", "enforcements", "aliases")
+_ENTERPRISE_STATUS = {
+    "active": "active",
+    "invited": "invited",
+    "disabled": "disabled",
+    "locked": "locked",
+}
 
 
 def _msp_plan_slug_from_product_id(product_id: Any) -> str:
@@ -196,6 +204,212 @@ def _commander_mc_dict_to_sdk_row(mc: Mapping[str, Any]) -> dict[str, Any]:
     if eid is not None:
         out["mc_enterprise_id"] = eid
     return out
+
+
+def _enterprise_manifest_from_commander_rows(
+    *,
+    nodes: list[dict[str, Any]],
+    users: list[dict[str, Any]],
+    roles: list[dict[str, Any]],
+    teams: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Normalise ``enterprise-info`` JSON rows into keeper-enterprise.v1 shape."""
+
+    node_uid_by_name: dict[str, list[str]] = {}
+    node_uid_by_path: dict[str, str] = {}
+    root_node_uid: str | None = None
+    out_nodes: list[dict[str, Any]] = []
+
+    for row in nodes:
+        uid_ref = _enterprise_uid_ref("node", row.get("node_id") or row.get("id") or row.get("uid"))
+        name = _enterprise_clean(row.get("name")) or uid_ref
+        node_uid_by_name.setdefault(name.casefold(), []).append(uid_ref)
+        if root_node_uid is None:
+            root_node_uid = uid_ref
+
+    for row in nodes:
+        uid_ref = _enterprise_uid_ref("node", row.get("node_id") or row.get("id") or row.get("uid"))
+        name = _enterprise_clean(row.get("name")) or uid_ref
+        parent_name = _enterprise_clean(row.get("parent_node"))
+        out: dict[str, Any] = {
+            "uid_ref": uid_ref,
+            "keeper_uid": str(row.get("node_id") or row.get("id") or uid_ref),
+            "name": name,
+        }
+        if parent_name:
+            parent_uid = _enterprise_unique_lookup(node_uid_by_name, parent_name)
+            if parent_uid:
+                out["parent_uid_ref"] = _enterprise_ref("nodes", parent_uid)
+                node_uid_by_path[f"{parent_name}\\{name}".casefold()] = uid_ref
+        else:
+            node_uid_by_path[name.casefold()] = uid_ref
+        out_nodes.append(out)
+
+    def node_ref(value: Any) -> str | None:
+        path = "\\".join(_enterprise_path_parts(value))
+        if path:
+            uid = node_uid_by_path.get(path.casefold())
+            if uid:
+                return _enterprise_ref("nodes", uid)
+            last = _enterprise_path_parts(path)[-1]
+            uid = _enterprise_unique_lookup(node_uid_by_name, last)
+            if uid:
+                return _enterprise_ref("nodes", uid)
+        if root_node_uid:
+            return _enterprise_ref("nodes", root_node_uid)
+        return None
+
+    user_uid_by_email: dict[str, str] = {}
+    out_users: list[dict[str, Any]] = []
+    for row in users:
+        uid_ref = _enterprise_uid_ref("user", row.get("user_id") or row.get("id") or row.get("uid"))
+        email = str(row.get("email") or "").strip()
+        if email:
+            user_uid_by_email[email.casefold()] = uid_ref
+        out = {
+            "uid_ref": uid_ref,
+            "keeper_uid": str(row.get("user_id") or row.get("id") or uid_ref),
+            "email": email or f"{uid_ref}@example.invalid",
+        }
+        name = _enterprise_clean(row.get("name"))
+        if name:
+            out["name"] = name
+        nref = node_ref(row.get("node"))
+        if nref:
+            out["node_uid_ref"] = nref
+        status = _ENTERPRISE_STATUS.get(str(row.get("status") or "").strip().lower())
+        if status:
+            out["status"] = status
+        out_users.append(out)
+
+    role_uid_by_name: dict[str, list[str]] = {}
+    out_roles: list[dict[str, Any]] = []
+    for row in roles:
+        uid_ref = _enterprise_uid_ref("role", row.get("role_id") or row.get("id") or row.get("uid"))
+        role_uid_by_name.setdefault(
+            (_enterprise_clean(row.get("name")) or uid_ref).casefold(), []
+        ).append(uid_ref)
+
+    for row in roles:
+        uid_ref = _enterprise_uid_ref("role", row.get("role_id") or row.get("id") or row.get("uid"))
+        out = {
+            "uid_ref": uid_ref,
+            "keeper_uid": str(row.get("role_id") or row.get("id") or uid_ref),
+            "name": _enterprise_clean(row.get("name")) or uid_ref,
+            "node_uid_ref": node_ref(row.get("node"))
+            or _enterprise_ref("nodes", root_node_uid or "root"),
+        }
+        user_refs = [
+            _enterprise_ref("users", user_uid_by_email[email.casefold()])
+            for email in _enterprise_string_list(row.get("users"))
+            if email.casefold() in user_uid_by_email
+        ]
+        if user_refs:
+            out["user_uid_refs"] = user_refs
+        if "visible_below" in row:
+            out["visible_below"] = _enterprise_bool(row.get("visible_below"))
+        if "default_role" in row:
+            out["new_user_inherit"] = _enterprise_bool(row.get("default_role"))
+        if "admin" in row:
+            out["manage_nodes"] = _enterprise_bool(row.get("admin"))
+        out_roles.append(out)
+
+    out_teams: list[dict[str, Any]] = []
+    for row in teams:
+        uid_ref = _enterprise_uid_ref(
+            "team", row.get("team_uid") or row.get("id") or row.get("uid")
+        )
+        out = {
+            "uid_ref": uid_ref,
+            "keeper_uid": str(row.get("team_uid") or row.get("id") or uid_ref),
+            "name": _enterprise_clean(row.get("name")) or uid_ref,
+            "node_uid_ref": node_ref(row.get("node"))
+            or _enterprise_ref("nodes", root_node_uid or "root"),
+        }
+        user_refs = [
+            _enterprise_ref("users", user_uid_by_email[email.casefold()])
+            for email in _enterprise_string_list(row.get("users"))
+            if email.casefold() in user_uid_by_email
+        ]
+        if user_refs:
+            out["user_uid_refs"] = user_refs
+        role_refs: list[str] = []
+        for role_name in _enterprise_string_list(row.get("roles")):
+            hits = role_uid_by_name.get(role_name.casefold()) or []
+            if len(hits) == 1:
+                role_refs.append(_enterprise_ref("roles", hits[0]))
+        if role_refs:
+            out["role_uid_refs"] = role_refs
+        restrict_tokens = set(str(row.get("restricts") or "").replace(",", " ").split())
+        out["restrict_view"] = "R" in restrict_tokens
+        out["restrict_edit"] = "W" in restrict_tokens
+        out["restrict_share"] = "S" in restrict_tokens
+        out_teams.append(out)
+
+    return {
+        "schema": "keeper-enterprise.v1",
+        "nodes": out_nodes,
+        "users": out_users,
+        "roles": out_roles,
+        "teams": out_teams,
+        "enforcements": [],
+        "aliases": [],
+    }
+
+
+def _enterprise_manifest_from_commander_payload(
+    payload: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    rows = {block: payload.get(block) for block in _ENTERPRISE_BLOCKS}
+    if not any(isinstance(rows.get(block), list) for block in ("nodes", "users", "roles", "teams")):
+        return None
+    return _enterprise_manifest_from_commander_rows(
+        nodes=[dict(row) for row in rows.get("nodes") or [] if isinstance(row, Mapping)],
+        users=[dict(row) for row in rows.get("users") or [] if isinstance(row, Mapping)],
+        roles=[dict(row) for row in rows.get("roles") or [] if isinstance(row, Mapping)],
+        teams=[dict(row) for row in rows.get("teams") or [] if isinstance(row, Mapping)],
+    )
+
+
+def _enterprise_uid_ref(prefix: str, value: Any) -> str:
+    raw = str(value or "").strip()
+    token = re.sub(r"[^A-Za-z0-9_.:-]+", "-", raw).strip(".:-")
+    return f"{prefix}.{token or 'unknown'}"
+
+
+def _enterprise_ref(block: str, uid_ref: str) -> str:
+    return f"keeper-enterprise:{block}:{uid_ref}"
+
+
+def _enterprise_clean(value: Any) -> str:
+    return " ".join(str(value or "").split())
+
+
+def _enterprise_path_parts(value: Any) -> list[str]:
+    return [
+        _enterprise_clean(part) for part in str(value or "").split("\\") if _enterprise_clean(part)
+    ]
+
+
+def _enterprise_unique_lookup(index: Mapping[str, list[str]], name: str) -> str | None:
+    hits = index.get(_enterprise_clean(name).casefold()) or []
+    return hits[0] if len(hits) == 1 else None
+
+
+def _enterprise_string_list(value: Any) -> list[str]:
+    if isinstance(value, list):
+        return [_enterprise_clean(item) for item in value if _enterprise_clean(item)]
+    if isinstance(value, str) and value.strip():
+        return [_enterprise_clean(value)]
+    return []
+
+
+def _enterprise_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in _TRUTHY_ENV_VALUES
+    return bool(value)
 
 
 def _msp_plan_changes(plan: Plan) -> list[Change]:
@@ -659,6 +873,99 @@ class CommanderCliProvider(Provider):
                 reason=f"MSP managed-company discover failed: {type(exc).__name__}: {exc}",
                 next_action="ensure MSP admin session; run `keeper msp-down` then retry",
             ) from exc
+
+    def discover_enterprise(self) -> dict[str, Any]:
+        """Load enterprise nodes/users/roles/teams via Commander ``enterprise-info``."""
+
+        def rows(args: list[str], *, command: str) -> list[dict[str, Any]]:
+            payload = _load_json(
+                self._run_enterprise_info_cmd(args, command=command),
+                command=command,
+            )
+            if not isinstance(payload, list):
+                raise CapabilityError(
+                    reason=f"Commander returned non-array JSON from `{command}`",
+                    next_action="upgrade Commander to a version with enterprise-info JSON list output",
+                )
+            return [dict(row) for row in payload if isinstance(row, Mapping)]
+
+        try:
+            node_rows = rows(
+                ["enterprise-info", "-n", "-v", "--format", "json"],
+                command="enterprise-info -n -v --format json",
+            )
+            user_rows = rows(
+                ["enterprise-info", "-u", "-v", "--format", "json"],
+                command="enterprise-info -u -v --format json",
+            )
+            role_rows = rows(
+                [
+                    "enterprise-info",
+                    "-r",
+                    "-v",
+                    "--format",
+                    "json",
+                    "--columns",
+                    "visible_below,default_role,admin,node,user_count,users,team_count,teams",
+                ],
+                command="enterprise-info -r -v --format json",
+            )
+            team_rows = rows(
+                [
+                    "enterprise-info",
+                    "-t",
+                    "-v",
+                    "--format",
+                    "json",
+                    "--columns",
+                    "restricts,node,user_count,users,role_count,roles",
+                ],
+                command="enterprise-info -t -v --format json",
+            )
+        except CapabilityError:
+            raise
+        except Exception as exc:
+            raise CapabilityError(
+                reason=f"enterprise-info discover failed: {type(exc).__name__}: {exc}",
+                next_action="ensure enterprise admin session; run `keeper enterprise-info` then retry",
+            ) from exc
+
+        return _enterprise_manifest_from_commander_rows(
+            nodes=node_rows,
+            users=user_rows,
+            roles=role_rows,
+            teams=team_rows,
+        )
+
+    def _run_enterprise_info_cmd(self, args: list[str], *, command: str) -> str:
+        base = [self._bin]
+        if self._config:
+            base += ["--config", self._config]
+        env = os.environ.copy()
+        if self._password:
+            env["KEEPER_PASSWORD"] = self._password
+        try:
+            result = subprocess.run(
+                base + args,
+                check=False,
+                capture_output=True,
+                text=True,
+                stdin=subprocess.DEVNULL,
+                env=env,
+                timeout=60,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise CapabilityError(
+                reason=f"keeper {command} timed out",
+                next_action="run `keeper enterprise-info` and confirm the Commander session is unlocked",
+            ) from exc
+        if result.returncode != 0:
+            raise CapabilityError(
+                reason=f"keeper {command} failed (rc={result.returncode})",
+                context={"stdout": result.stdout[-6000:], "stderr": result.stderr[-4000:]},
+                next_action="inspect the Commander output above and retry",
+            )
+        return result.stdout
 
     def _resolve_pam_configuration_keeper_uid(
         self, live: LiveRecord, records: list[LiveRecord]

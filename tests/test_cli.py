@@ -125,6 +125,55 @@ def test_validate_vault_online_json_smoke(monkeypatch: pytest.MonkeyPatch) -> No
     assert data["stage5_summary"]["create"] == 0
 
 
+def test_validate_enterprise_online_json_smoke(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from unittest.mock import MagicMock
+
+    manifest = tmp_path / "enterprise.yaml"
+    manifest.write_text(
+        "schema: keeper-enterprise.v1\n"
+        "nodes:\n"
+        "  - uid_ref: node.root\n"
+        "    name: Root\n"
+        "users:\n"
+        "  - uid_ref: user.alice\n"
+        "    email: alice@example.com\n"
+        "    node_uid_ref: keeper-enterprise:nodes:node.root\n",
+        encoding="utf-8",
+    )
+    live = {
+        "schema": "keeper-enterprise.v1",
+        "nodes": [{"uid_ref": "node.root", "keeper_uid": "1", "name": "Root"}],
+        "users": [
+            {
+                "uid_ref": "user.alice",
+                "keeper_uid": "2",
+                "email": "alice@example.com",
+                "node_uid_ref": "keeper-enterprise:nodes:node.root",
+                "status": "active",
+            }
+        ],
+        "roles": [],
+        "teams": [],
+        "enforcements": [],
+        "aliases": [],
+    }
+    fake = MagicMock()
+    fake.discover_enterprise.return_value = live
+    monkeypatch.setattr(cli_main_module, "CommanderCliProvider", lambda **kw: fake)
+
+    result = _run(["--provider", "commander", "validate", str(manifest), "--online", "--json"])
+
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output.strip())
+    assert data["mode"] == "enterprise_online"
+    assert data["online"] is True
+    assert data["live_enterprise_object_count"] == 2
+    assert data["stage5_summary"]["noop"] == 2
+
+
 def test_plan_vault_mock_creates(tmp_path: Path) -> None:
     p = tmp_path / "vault-one.yaml"
     p.write_text(

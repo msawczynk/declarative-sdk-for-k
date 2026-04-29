@@ -1,4 +1,4 @@
-"""Desired-vs-live diff for ``keeper-ksm.v1`` offline manifests."""
+"""Desired-vs-live diff for ``keeper-epm.v1`` offline manifests."""
 
 from __future__ import annotations
 
@@ -8,16 +8,16 @@ from collections.abc import Mapping
 from typing import Any
 
 from keeper_sdk.core.diff import Change, ChangeKind
-from keeper_sdk.core.models_ksm import KsmManifestV1
+from keeper_sdk.core.models_epm import EpmManifestV1
 
-_BLOCK_ORDER = ("apps", "tokens", "record_shares", "config_outputs")
+_BLOCK_ORDER = ("watchlists", "policies", "approvers", "audit_config")
 _RESOURCE_BY_BLOCK = {
-    "apps": "ksm_app",
-    "tokens": "ksm_token",
-    "record_shares": "ksm_record_share",
-    "config_outputs": "ksm_config_output",
+    "watchlists": "epm_watchlist",
+    "policies": "epm_policy",
+    "approvers": "epm_approver",
+    "audit_config": "epm_audit_config",
 }
-_DELETE_SKIP_REASON = "unmanaged KSM object; pass allow_delete=True to remove"
+_DELETE_SKIP_REASON = "unmanaged EPM object; pass allow_delete=True to remove"
 _KIND_ORDER = {
     ChangeKind.CREATE: 0,
     ChangeKind.UPDATE: 1,
@@ -28,17 +28,17 @@ _KIND_ORDER = {
 }
 
 
-def compute_ksm_diff(
-    manifest: KsmManifestV1,
-    live_ksm: KsmManifestV1 | Mapping[str, Any] | None = None,
+def compute_epm_diff(
+    manifest: EpmManifestV1,
+    live_epm: EpmManifestV1 | Mapping[str, Any] | None = None,
     *,
     manifest_name: str | None = None,
     allow_delete: bool = False,
 ) -> list[Change]:
-    """Classify desired KSM state against an offline live snapshot."""
+    """Classify desired EPM state against an offline live snapshot."""
     desired = _index_objects(_payload_from_manifest(manifest))
-    live, duplicate_live = _index_live(_payload_from_live(live_ksm))
-    manifest_name = manifest_name or "keeper-ksm"
+    live, duplicate_live = _index_live(_payload_from_live(live_epm))
+    manifest_name = manifest_name or "keeper-epm"
 
     changes: list[Change] = []
     for key, desired_obj in desired.items():
@@ -59,7 +59,7 @@ def compute_ksm_diff(
             )
             continue
 
-        before, after = _field_delta(live_obj.payload, desired_obj.payload)
+        before, after = _field_delta(live_obj.payload, desired_obj.payload, desired_obj.key_field)
         if before or after:
             changes.append(
                 Change(
@@ -114,8 +114,8 @@ def compute_ksm_diff(
                 uid_ref=first.uid_ref,
                 resource_type=first.resource_type,
                 title=first.title,
-                before={"uid_ref": first.uid_ref, "count": len(rows)},
-                reason=f"duplicate live KSM key: {first.key}",
+                before={"key": first.key, "count": len(rows)},
+                reason=f"duplicate live EPM object key: {first.key}",
                 manifest_name=manifest_name,
             )
         )
@@ -123,54 +123,65 @@ def compute_ksm_diff(
     return sorted(changes, key=_change_sort_key)
 
 
-class _KsmObject:
+class _EpmObject:
     def __init__(self, *, block: str, payload: dict[str, Any]) -> None:
         self.block = block
-        keeper_uid = payload.get("keeper_uid")
-        self.payload = _normalise_payload(payload)
+        self.payload = _normalise_payload(block, payload)
+        self.resource_type = _RESOURCE_BY_BLOCK[block]
+        self.key_field = "uid_ref"
         self.key = _key_for(block, self.payload)
         self.uid_ref = _uid_ref_for(block, self.payload)
-        self.resource_type = _RESOURCE_BY_BLOCK[block]
         self.title = _title_for(block, self.payload)
+        keeper_uid = self.payload.get("keeper_uid")
         self.keeper_uid = str(keeper_uid) if keeper_uid is not None else None
 
 
-def _payload_from_manifest(manifest: KsmManifestV1) -> dict[str, Any]:
+def _payload_from_manifest(manifest: EpmManifestV1) -> dict[str, Any]:
     return manifest.model_dump(mode="python", exclude_none=True, by_alias=True)
 
 
-def _payload_from_live(live_ksm: KsmManifestV1 | Mapping[str, Any] | None) -> dict[str, Any]:
-    if live_ksm is None:
-        return {block: [] for block in _BLOCK_ORDER}
-    if isinstance(live_ksm, KsmManifestV1):
-        return live_ksm.model_dump(mode="python", exclude_none=True, by_alias=True)
-    return dict(live_ksm)
+def _payload_from_live(live_epm: EpmManifestV1 | Mapping[str, Any] | None) -> dict[str, Any]:
+    if live_epm is None:
+        return {block: [] for block in _BLOCK_ORDER if block != "audit_config"}
+    if isinstance(live_epm, EpmManifestV1):
+        return live_epm.model_dump(mode="python", exclude_none=True, by_alias=True)
+    return dict(live_epm)
 
 
-def _index_objects(payload: Mapping[str, Any]) -> dict[str, _KsmObject]:
-    out: dict[str, _KsmObject] = {}
-    for block in _BLOCK_ORDER:
+def _index_objects(payload: Mapping[str, Any]) -> dict[str, _EpmObject]:
+    out: dict[str, _EpmObject] = {}
+    for block in ("watchlists", "policies", "approvers"):
         for row in payload.get(block) or []:
             if not isinstance(row, Mapping):
                 continue
-            obj = _KsmObject(block=block, payload=dict(row))
+            obj = _EpmObject(block=block, payload=dict(row))
             out[obj.key] = obj
+
+    audit_config = payload.get("audit_config")
+    if isinstance(audit_config, Mapping):
+        obj = _EpmObject(block="audit_config", payload=dict(audit_config))
+        out[obj.key] = obj
     return out
 
 
 def _index_live(
     payload: Mapping[str, Any],
-) -> tuple[dict[str, _KsmObject], dict[str, list[_KsmObject]]]:
-    grouped: dict[str, list[_KsmObject]] = defaultdict(list)
-    for block in _BLOCK_ORDER:
+) -> tuple[dict[str, _EpmObject], dict[str, list[_EpmObject]]]:
+    grouped: dict[str, list[_EpmObject]] = defaultdict(list)
+    for block in ("watchlists", "policies", "approvers"):
         for row in payload.get(block) or []:
             if not isinstance(row, Mapping):
                 continue
-            obj = _KsmObject(block=block, payload=dict(row))
+            obj = _EpmObject(block=block, payload=dict(row))
             grouped[obj.key].append(obj)
 
-    live: dict[str, _KsmObject] = {}
-    duplicate: dict[str, list[_KsmObject]] = {}
+    audit_config = payload.get("audit_config")
+    if isinstance(audit_config, Mapping):
+        obj = _EpmObject(block="audit_config", payload=dict(audit_config))
+        grouped[obj.key].append(obj)
+
+    live: dict[str, _EpmObject] = {}
+    duplicate: dict[str, list[_EpmObject]] = {}
     for key, rows in grouped.items():
         if len(rows) > 1:
             duplicate[key] = rows
@@ -179,9 +190,18 @@ def _index_live(
     return live, duplicate
 
 
-def _normalise_payload(payload: dict[str, Any]) -> dict[str, Any]:
+def _normalise_payload(block: str, payload: dict[str, Any]) -> dict[str, Any]:
     out = {key: _normalise_value(value) for key, value in payload.items() if value is not None}
     out.pop("keeper_uid", None)
+    if block == "watchlists":
+        out.setdefault("description", "")
+        out.setdefault("entries", [])
+    if block == "policies":
+        out.setdefault("target_users", [])
+        out.setdefault("target_groups", [])
+        out.setdefault("application_patterns", [])
+    if block == "approvers":
+        out.setdefault("scope_uid_refs", [])
     return out
 
 
@@ -199,12 +219,13 @@ def _normalise_value(value: Any) -> Any:
 def _field_delta(
     live_payload: dict[str, Any],
     desired_payload: dict[str, Any],
+    key_field: str,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     keys = sorted(set(live_payload) | set(desired_payload))
     before: dict[str, Any] = {}
     after: dict[str, Any] = {}
     for key in keys:
-        if key == "uid_ref":
+        if key == key_field:
             continue
         if live_payload.get(key) == desired_payload.get(key):
             continue
@@ -214,33 +235,21 @@ def _field_delta(
 
 
 def _key_for(block: str, payload: dict[str, Any]) -> str:
-    if block in ("apps", "tokens"):
-        return f"{block}:{payload['uid_ref']}"
-    if block == "record_shares":
-        return f"{block}:{payload['app_uid_ref']}|{payload['record_uid_ref']}"
-    if block == "config_outputs":
-        return f"{block}:{payload['app_uid_ref']}|{payload['output_path']}"
-    raise KeyError(block)
+    if block == "audit_config":
+        return "audit_config"
+    return f"{block}:{payload['uid_ref']}"
 
 
 def _uid_ref_for(block: str, payload: dict[str, Any]) -> str:
-    if block in ("apps", "tokens"):
-        return str(payload["uid_ref"])
-    if block == "record_shares":
-        return f"share:{payload['app_uid_ref']}:{payload['record_uid_ref']}"
-    if block == "config_outputs":
-        return f"config:{payload['app_uid_ref']}:{payload['output_path']}"
-    raise KeyError(block)
+    if block == "audit_config":
+        return "audit_config"
+    return str(payload["uid_ref"])
 
 
 def _title_for(block: str, payload: dict[str, Any]) -> str:
-    if block in ("apps", "tokens"):
-        return str(payload.get("name") or payload["uid_ref"])
-    if block == "record_shares":
-        return f"{payload['app_uid_ref']} -> {payload['record_uid_ref']}"
-    if block == "config_outputs":
-        return str(payload["output_path"])
-    return str(payload.get("uid_ref") or _key_for(block, payload))
+    if block == "audit_config":
+        return "audit_config"
+    return str(payload.get("name") or payload["uid_ref"])
 
 
 def _change_sort_key(change: Change) -> tuple[int, int, str]:
@@ -250,4 +259,4 @@ def _change_sort_key(change: Change) -> tuple[int, int, str]:
     return (_KIND_ORDER[change.kind], block_rank, change.uid_ref or change.title)
 
 
-__all__ = ["compute_ksm_diff"]
+__all__ = ["compute_epm_diff"]

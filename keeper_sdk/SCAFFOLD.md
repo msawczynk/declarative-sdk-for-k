@@ -17,7 +17,7 @@ Pure-Python; no top-level I/O.
 
 | File | Purpose |
 |---|---|
-| `__init__.py` | Re-exports stable surface (`Manifest`, `Plan`, `build_graph`, `compute_diff`, …); pins `__version__ = "1.0.0"`. |
+| `__init__.py` | Re-exports stable surface (`Manifest`, `Plan`, `build_graph`, `compute_diff`, …); pins package `__version__`. |
 
 ## Hard rules
 

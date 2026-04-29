@@ -6,6 +6,52 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-04-29
+
+### Added
+- **Schema-family coverage** — v2.0.0 packages the expanded declarative surface:
+  `keeper-ksm.v1`, `keeper-enterprise.v1`,
+  `keeper-integrations-identity.v1`, `keeper-integrations-events.v1`,
+  `keeper-pam-extended.v1`, `keeper-epm.v1`, and
+  `keeper-vault-sharing.v1`.
+- **KSM offline lifecycle** — `keeper-ksm.v1` now covers apps, tokens, record
+  shares, and config outputs through schema validation, typed loading,
+  dependency ordering, field-level diff, mock `plan` / `apply`, ownership
+  markers, and clean re-plan convergence. Commander KSM writes remain
+  preview-gated until live write/readback proof lands.
+- **Enterprise online validate** — `keeper-enterprise.v1` adds offline
+  graph/diff support and Commander `enterprise-info` discover/diff for
+  `validate --online`; apply stays future-gated until write contracts are
+  proven.
+- **EPM foundation** — `keeper-epm.v1` models watchlists, elevation policies,
+  approvers, and audit configuration with offline schema/model/diff coverage;
+  PEDM tenant write/readback proof remains an upstream gap.
+- **DSK MCP server** — `dsk-mcp` exposes validate, plan, apply, diff, export,
+  report, and KSM bus tools over stdio JSON-RPC for agent clients.
+- **Commander service-mode client** — experimental `--provider service`
+  plumbing covers async submit/poll/result, FILEDATA import, 429 retry, and
+  mocked tests while live Service Mode support remains pending.
+
+### Changed
+- **Version bump** — package metadata and import shims now report `2.0.0`.
+  `V1_GA_CHECKLIST.md` has zero open v1.0 GA blockers, so this release uses the
+  v2.0.0 line rather than a v1.4.0 continuation.
+- **Module rename prep** — `declarative_sdk_k` remains the forward-compatible
+  import root and now exposes submodule aliases, a one-shot deprecation warning,
+  and an explicit `__version__`. Existing `keeper_sdk` imports remain supported
+  for the compatibility window.
+- **MSP write posture** — Commander managed-company write verbs are audited and
+  offline-wrapped, but MSP Commander import/apply remain preview-gated pending
+  marker/adoption contract and MSP admin live proof.
+
+### Fixed
+- **v1.x compatibility carry-forward** — retained the `pamform` /
+  `keeper-sdk` CLI aliases, `from keeper_sdk.core import load_manifest`, and
+  legacy PAM manifest-version schema annotations during the v2.0.0 prep window.
+- **Drift and redaction hardening** — local upstream-baseline checks now report
+  `NEW_COMMANDS`, `CHANGED_APIS`, and `DRIFT_DETECTED`; MCP/report paths keep
+  secret values redacted in JSON outputs.
+
 ## [1.3.0] - 2026-04-29
 
 ### Added

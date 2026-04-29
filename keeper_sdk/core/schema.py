@@ -25,13 +25,14 @@ EVENTS_FAMILY = "keeper-integrations-events.v1"
 KSM_FAMILY = "keeper-ksm.v1"
 SHARING_FAMILY = "keeper-vault-sharing.v1"
 PAM_EXTENDED_FAMILY = "keeper-pam-extended.v1"
+EPM_FAMILY = "keeper-epm.v1"
 PAM_SCHEMA_FILENAME = "pam-environment.v1.schema.json"
 
 # Canonical registry: manifest ``schema:`` const -> path under keeper_sdk.core.schemas
 SCHEMA_RESOURCE_BY_FAMILY: dict[str, str] = {
     PAM_FAMILY: PAM_SCHEMA_FILENAME,
     ENTERPRISE_FAMILY: "enterprise/enterprise.v1.schema.json",
-    "keeper-epm.v1": "keeper-epm/keeper-epm.v1.schema.json",
+    EPM_FAMILY: "epm/epm.v1.schema.json",
     EVENTS_FAMILY: "integrations/events.v1.schema.json",
     IDENTITY_FAMILY: "integrations/identity.v1.schema.json",
     KSM_FAMILY: "ksm/ksm.v1.schema.json",

@@ -38,8 +38,26 @@ Shipped and proven:
 - **MSP discover / `msp-environment.v1`:** 2026-04-28 live proof:
   `dsk validate --online` + `dsk plan` exit 0 against lab tenant using
   `tests/fixtures/examples/msp/01-minimal-msp.yaml`. Read-only discover + plan
-  path confirmed. Commander `import` / `apply` for MSP remain unsupported and
-  fail with `CapabilityError` until a committed write/marker contract exists.
+  path confirmed. W10 classifies MSP managed-company writes as
+  **design-complete / preview-gated**: Commander exposes `msp-add`,
+  `msp-update`, and `msp-remove`, and offline wrappers/tests exist, but public
+  support remains discover/validate/plan/diff only until a Commander
+  adoption-marker contract and MSP admin live proof land. Commander `dsk import`
+  still fails capability because no marker writer is proven.
+- **CommanderServiceProvider:** `supported` offline mock for Commander Service
+  Mode REST API v2 transport. It submits async commands, polls status, fetches
+  results, supports FILEDATA for `pam project import --filename=FILEDATA`, and
+  reuses CommanderCliProvider capability gaps. No live Service Mode proof is
+  claimed yet.
+- **`keeper-epm.v1` offline foundation:** W18 adds schema, typed model load,
+  and field-level diff for Endpoint Privilege Management watchlists, policies,
+  approvers, and audit_config. Offline validation is supported. Plan/apply are
+  `upstream-gap` until a PEDM-licensed tenant writer/readback path is proven;
+  the planned lab path is MSP managed company context with augenblik.eu test
+  users.
+- **`keeper-ksm.v1` mock lifecycle:** W6b supports offline mock
+  `plan`/`apply` for apps, tokens, record shares, and config outputs with
+  ownership markers and clean re-plan. Commander apply remains preview-gated.
 - **CLI export / manifest lift (`dsk export`):** 2026-04-29 live proof:
   Commander-shaped PAM project JSON → `dsk export` → `dsk validate` exit **0**
   (`ok: dsk-export-test (2 uid_refs)`). Commander 17.2.16 has no native
@@ -61,6 +79,9 @@ Shipped and proven:
   The SDK wrapper now retries no-rebuild empty stdout, empty JSON, or Commander
   error output with `--rebuild`, strips rebuild stdout artifacts, and emits the
   normal redacted JSON envelope.
+- **DSK MCP server:** stdio JSON-RPC server exposes declarative lifecycle tools
+  for AI agents. Offline mode uses `MockProvider`; service mode is gated by
+  `KEEPER_SERVICE_URL` + `KEEPER_SERVICE_API_KEY`.
 
 **Acceptance (export / diff / password-report / security-audit-report /
 compliance-report)** — satisfied 2026-04-29 on lab tenant plus offline
@@ -68,11 +89,16 @@ empty-cache wrapper coverage (see bullets above).
 
 Recently unblocked:
 
-- Nested `resources[].users[].rotation_settings`: **supported** for Commander
-  17.2.16+ readback. GH#35 added `pam rotation list --record-uid --format json`;
-  SDK discover now hydrates nested `pamUser.rotation_settings` from that JSON so
-  post-apply re-plan can compare real Commander state instead of relying on
-  missing-readback suppression. Top-level `users[].rotation_settings` remains
+- Nested `resources[].users[].rotation_settings`: **readback-supported,
+  apply live-blocked** for Commander 17.2.16+. GH#35 added `pam rotation list
+  --record-uid --format json`; SDK discover now hydrates nested
+  `pamUser.rotation_settings` from that JSON so post-apply re-plan can compare
+  real Commander state instead of relying on missing-readback suppression.
+  2026-04-29 W1 live smoke reached `pam rotation edit`, then Keeper router
+  returned `Set rotation error "500": Internal server error`; the harness
+  cleaned up with no SDK-owned records left in the sandbox shared folder.
+  Until a create -> clean re-plan -> destroy transcript passes, do not claim
+  nested rotation apply support. Top-level `users[].rotation_settings` remains
   outside this lift.
 
 Not yet supported:
@@ -159,16 +185,19 @@ Acceptance:
 
 2026-04-29 update: Commander GH#35 is resolved in 17.2.16 with
 `pam rotation list --record-uid --format json`; the SDK now wires that readback
-into `discover()` for nested `pamUser.rotation_settings`. The nested
-`resources[].users[]` slice is default-enabled without `DSK_PREVIEW` or
-`DSK_EXPERIMENTAL_ROTATION_APPLY`.
+into `discover()` for nested `pamUser.rotation_settings`. W1 live smoke proved
+auth, sandbox, validate, initial plan, and entry into `pam rotation edit`, but
+the router returned `Set rotation error "500": Internal server error` during
+apply. Treat nested rotation as readback-supported but apply live-blocked until
+the committed smoke passes end to end.
 
 ### P2.1 Diagnose Rotation Drift
 
-**Status:** 2026-04-29 supported for nested
+**Status:** 2026-04-29 readback-supported / apply live-blocked for nested
 `resources[].users[].rotation_settings` on Commander 17.2.16+. The former
-upstream blocker was GH#35 (`pam rotation list` lacked UID filtering + JSON
-output); Commander 17.2.16 unblocks the read path.
+readback blocker was GH#35 (`pam rotation list` lacked UID filtering + JSON
+output); Commander 17.2.16 unblocks the read path. W1 apply proof is blocked by
+Keeper router 500 from `pam rotation edit`.
 
 Questions:
 
@@ -191,8 +220,8 @@ Tasks:
    with a focused regression test.
 4. If fields are real rotation settings, design readback before any gate lift.
    Readback is now implemented through `pam rotation list --record-uid --format
-   json`; keep future live smoke transcripts as regression evidence, not as a
-   gate on the already-supported nested slice.
+   json`; apply support still needs a passing live smoke because W1 hit Keeper
+   router 500 while setting rotation.
 5. Fix smoke cleanup if the managed Resources folder UID becomes stale after
    failed re-plan; cleanup must resolve by project name as fallback.
 
@@ -219,8 +248,10 @@ Acceptance:
 
 Gate-lift rule:
 
-- Only nested `resources[].users[].rotation_settings` is ungated for Commander
-  17.2.16+ readback.
+- Only nested `resources[].users[].rotation_settings` readback is ungated for
+  Commander 17.2.16+.
+- Nested rotation apply support stays blocked until the committed
+  `pamUserNestedRotation` smoke passes create -> clean re-plan -> destroy.
 - Top-level `users[].rotation_settings` stays blocked.
 - `default_rotation_schedule` stays blocked unless a separate setter/readback
   proof exists.
@@ -389,15 +420,20 @@ Status (2026-04-29, v1.3.0):
 | Shared-folder validate / sharing lifecycle | `preview-gated` | Offline validation covers the manifest surface; P35 mock lifecycle proves shared-folder member create/delete/update planning plus mocked Commander share call without a second Keeper account. P34 adds offline Commander membership-removal `--allow-delete` guard proof. | Live membership proof is blocked pending a second Keeper account; keep support preview-gated until that create -> re-plan -> delete path is live-proven. |
 | Shared-folder Commander write primitives | `supported` for create/update/membership command wiring; not full lifecycle support | P30/P34 provider tests cover create/update, membership grant/remove, permission breadth, and destructive-change `--allow-delete` guards. | Full shared-folder lifecycle support still needs second-account live readback proof. |
 | KSM application `reference_existing` | `supported` for gateway read/validate only | Gateway read path is proven for existing app references. | No SDK-owned app mutation is implied by this support claim. |
-| KSM application create | `supported` for `bootstrap-ksm`; `keeper-ksm.v1` schema/offline foundation `supported`; general declarative apply remains `preview-gated` | 2026-04-29 live proof: `tests/live/test_ksm_bootstrap_smoke.py` exit 0 (1 passed); bootstrap create/bind/share, config redemption, login probe, and transcript leak check were clean. Offline bootstrap sequence has 3 cases. W6a adds `keeper-ksm.v1` schema, typed loader, graph, field-level diff, and offline tests for apps, tokens, record shares, and config outputs. `plan`/`apply` still exit capability until provider support lands. | Needs KSM provider discovery/apply, ownership markers, clean re-plan, and cleanup proof before claiming full declarative KSM lifecycle support. |
+| KSM application create | `supported` for `bootstrap-ksm`; `keeper-ksm.v1` mock/offline lifecycle `supported`; Commander apply `preview-gated` | 2026-04-29 live proof: `tests/live/test_ksm_bootstrap_smoke.py` exit 0 (1 passed); bootstrap create/bind/share, config redemption, login probe, and transcript leak check were clean. W6a adds schema, typed loader, graph, field-level diff, and offline tests for apps, tokens, record shares, and config outputs. W6b adds `KsmMockProvider`, mock `plan`/`apply`, ownership markers, dry-run no-write behavior, and clean re-plan tests. | Needs Commander/KSM discovery/apply write/readback, ownership marker persistence, clean re-plan, and cleanup proof before claiming live declarative KSM lifecycle support. |
 | KSM inter-agent bus | `preview-gated` (offline mock) | `keeper_sdk/secrets/bus.py` implements JSON custom-field envelopes, `VersionConflict` CAS checks, polling subscribe, delete, and `BusClient` channel send/receive/ack/gc. Offline proof: `tests/test_ksm_bus_impl.py` covers create, CAS conflict, subscribe-on-change, delete, ordering, recipient filtering, channel separation, cursors, and TTL GC. | Live proof still required before a support claim: run sanctioned KSM bus write/readback and concurrent-writer characterization through the committed live harness; KSM SDK conditional-write semantics remain undocumented. |
 | `keeper-enterprise.v1` offline foundation | `supported` offline for schema + typed load + graph + diff/plan rows; `preview-gated` for live/provider claims | P11 adds full offline schema coverage for `nodes`, `users`, `roles`, `teams`, `enforcements`, and `aliases`, plus typed models, dependency graph, field-level diff, plan ordering, and 15+ offline tests in `tests/test_enterprise_schema.py`. Existing PAM manifests still reject unknown team/role resource types. | `dsk validate --online`, discovery, import/apply, ownership markers, and clean live re-plan remain future/upstream-gap until Commander enterprise read/write contracts are proven. |
 | `keeper-integrations-identity.v1` offline foundation | `supported` offline for schema + typed load + diff rows; `upstream-gap` for apply | W14 adds offline schema coverage for domains, SCIM provisioning, SSO providers, and outbound email, plus typed models, field-level diff, and 15+ offline tests in `tests/test_integrations_identity.py`. | `dsk validate` stays schema-only; `dsk plan` / apply exit capability until a safe Commander write/readback API is confirmed. |
 | `keeper-integrations-events.v1` offline foundation | `supported` offline for schema + typed load + diff rows; `upstream-gap` for apply | W15 adds offline schema coverage for automator rules, audit alerts, API keys, and event routes, plus typed models, field-level diff, and 15+ offline tests in `tests/test_integrations_events.py`. | `dsk validate` stays schema-only; `dsk plan` / apply exit capability until a safe Commander write/readback API is confirmed. |
 | `keeper-pam-extended.v1` offline foundation | `supported` offline for schema + typed load + diff rows; `preview-gated` for apply | W17 adds offline schema coverage for gateway configs, rotation schedules, discovery rules, and service mappings, plus typed models, field-level diff, and 15+ offline tests in `tests/test_pam_extended.py`. | `dsk validate` stays schema-only; `dsk plan` / apply exit capability until a safe Commander write/readback API is live-proven. |
+| `keeper-epm.v1` offline foundation | `supported` offline for schema + typed load + diff rows; `upstream-gap` for apply | W18 adds offline schema coverage for EPM watchlists, elevation policies, approvers, and audit_config, plus typed models, field-level diff, and 15+ offline tests in `tests/test_epm_schema.py`. | `dsk validate` stays schema-only; `dsk plan` / apply exit capability until PEDM tenant writer/readback support is proven through the MSP managed company lab path with augenblik.eu test users. |
 | Compliance/security-audit reports | `supported` | 2026-04-29 `security-audit-report --sanitize-uids --quiet` live proof exited 0 with a JSON envelope. `compliance-report --sanitize-uids --quiet` hit Commander empty/non-JSON cache output; `--rebuild` emitted the expected envelope, and the SDK wrapper now auto-retries no-rebuild empty/error output with `--rebuild` while emitting the normal envelope. Offline report command coverage includes compliance/security-audit sanitization plus compliance empty-cache retry cases for empty stdout, empty JSON, and Commander errors. | Keep leak checks, UID sanitization, and the empty-cache retry behavior green on future Commander pins. |
 | Password report | `supported` | 2026-04-29 live proof: `dsk report password-report` exit 0, sanitized envelope clean. | Keep leak checks and UID sanitization green on future Commander pins. |
+| MSP managed-company writes | `preview-gated` / design-complete | W10 audit in `docs/MSP_FAMILY_DESIGN.md`: Commander 17.2.16 exposes `msp-add` (`MSPAddCommand`), `msp-update` (`MSPUpdateCommand`), and `msp-remove` (`MSPRemoveCommand`) for provision/update/delete. Offline Commander wrapper tests cover kwargs and guards. | Support lift requires MSP admin live proof, Commander import/adoption marker contract, sanitized create/update/clean-replan transcript, and disposable-MC delete proof with `--allow-delete`. Until then, supported DSK posture is discover/validate/plan/diff only. |
+| DSK MCP server | `supported` | W21 adds `dsk-mcp`, stdio JSON-RPC tool registration, lifecycle/report/KSM-bus tool handlers, docs config template, and offline tests covering validate/plan/apply guard/report redaction/server init. | Live Commander service-provider proof is opt-in and separate from offline MCP support; keep secret redaction and `auto_approve` guard green. |
 | `dsk run` Commander passthrough | `preview-gated` | W20 adds the offline CLI surface: requires `--provider commander`, delegates to the existing batch Commander helper, redacts stdout/stderr, optionally fingerprints UID-like output, and passes through Commander's exit code. Offline tests cover mock-provider exit 5, argv parsing, `--json`, sanitization, secret redaction, and rc passthrough. | Needs sanctioned live Commander proof before support claim; no live Commander execution was part of W20. |
+| Commander Service Mode provider | `supported` offline mock / live-pending | `keeper_sdk/providers/service_client.py` implements REST API v2 async submit/poll/result with FILEDATA and 429 retry; `keeper_sdk/providers/commander_service.py` wires discover/apply and reuses CLI provider capability gaps. | No live Service Mode run claimed; live proof must use committed smoke/runbook credentials before lifting beyond offline transport support. |
+| Commander coverage denominator | informational / manual-refresh | [`docs/COMMANDER_COVERAGE.md`](./COMMANDER_COVERAGE.md) is generated by `scripts/coverage/commander_coverage.py` from `docs/COMMANDER.md`, the committed capability snapshot, and `CommanderCliProvider` static command use. | Refresh manually after Commander pin, capability snapshot, or provider command-wiring changes; not a CI gate today. |
 | Team/role report stubs | `upstream-gap` | W20 adds `dsk report team-report` and `dsk report role-report` commands that fail closed with `CapabilityError`; next actions are `keeper enterprise-info --teams` and `keeper enterprise-info --roles`. | Lift only when Commander exposes a proven enumerable/reportable team and role surface with redaction/leak tests and live proof. |
 
 P21-P24 acceptance checkpoints:
@@ -405,7 +441,7 @@ P21-P24 acceptance checkpoints:
 | Phase item | Acceptance | Evidence | Remaining bar |
 |------------|------------|----------|---------------|
 | P21 SharedFolder model / validate + P35 vaultSharingLifecycle | ACCEPTED offline | `VaultSharedFolder` / `diff_shared_folder` model path plus `tests/test_shared_folder_model.py` and `tests/test_vault_shared_folder.py`; P35 adds offline member create, guarded delete, and permission-update lifecycle cases. | Live Commander membership proof is blocked pending a second Keeper account; Commander write support remains preview-gated until live proof passes. |
-| P22 module rename shim | ACCEPTED | `declarative_sdk_k` compatibility shim, `tests/test_compat_shim.py`, `pyproject.toml`, and `V1_GA_CHECKLIST.md` hardening row checked. | Keep `keeper_sdk` import shim for one minor cycle; breaking removal waits for v2.0.0. |
+| P22 module rename / back-compat window | `supported` | `declarative_sdk_k` compatibility shim now aliases submodule imports (`declarative_sdk_k.core`, providers, auth, CLI, secrets), emits a once-per-process `DeprecationWarning`, tags the legacy PAM `version` schema `$defs` entry with `x-keeper-deprecated`, and covers the local `.sync_baseline` Commander drift audit in `tests/test_compat_shim.py`. | Keep `keeper_sdk` import compatibility through the v1.x overlap; breaking removal waits for v2.0.0 and the two-version warning window. |
 | P23 KSM app create proof | ACCEPTED for `bootstrap-ksm` | 2026-04-29 live bootstrap smoke passed: create/bind/share, config redemption, login probe, transcript leak check. `tests/test_ksm_app_lifecycle.py` keeps declarative app lifecycle out of supported claims until the manifest family grows a typed planner/apply path. | Full declarative KSM app lifecycle still needs schema/model/provider implementation, clean re-plan, and cleanup proof. |
 | P24 docs / scaffold final sync | ACCEPTED | `SCAFFOLD.md`, `keeper_sdk/core/SCAFFOLD.md`, `RECONCILIATION.md`, and this plan reflect Phase 7 state. | Keep future sprint memos and operator orchestration out of `docs/`. |
 | P34 SharedFolder destructive guard / permission breadth | ACCEPTED offline | `tests/test_shared_folder_commander.py` covers membership removal requiring `--allow-delete` and member `permission` transitions across `read_only`, `manage_records`, and `manage_users`. | Live readback proof remains required before full shared-folder lifecycle support. |

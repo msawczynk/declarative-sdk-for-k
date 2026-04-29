@@ -1,0 +1,8 @@
+{
+  "apis": [],
+  "changelog_sha256": "7d76ee4bcc9f8bc9d5aecf3785c40cffbca99f39f8d2791286fbcf090955a319",
+  "commands": [],
+  "installed_version": "17.2.16",
+  "keepercommander_spec": "keepercommander>=17.2.16,<18",
+  "pinned_version": "17.2.16"
+}

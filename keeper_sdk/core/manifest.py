@@ -14,7 +14,8 @@ for ``keeper-ksm.v1``, or
 :class:`~keeper_sdk.core.models_integrations_events.EventsManifestV1` for
 ``keeper-integrations-events.v1``, or
 :class:`~keeper_sdk.core.models_pam_extended.PamExtendedManifestV1` for
-``keeper-pam-extended.v1``.
+``keeper-pam-extended.v1``, or
+:class:`~keeper_sdk.core.models_epm.EpmManifestV1` for ``keeper-epm.v1``.
 Dump: stable canonical YAML/JSON for git diffs and Commander interop.
 """
 
@@ -27,6 +28,7 @@ from typing import TYPE_CHECKING, Any
 from keeper_sdk.core.errors import ManifestError, SchemaError, UnsupportedFamilyError
 from keeper_sdk.core.models import Manifest
 from keeper_sdk.core.models_enterprise import ENTERPRISE_FAMILY
+from keeper_sdk.core.models_epm import EPM_FAMILY
 from keeper_sdk.core.models_integrations_events import EVENTS_FAMILY
 from keeper_sdk.core.models_integrations_identity import IDENTITY_FAMILY
 from keeper_sdk.core.models_pam_extended import PAM_EXTENDED_FAMILY
@@ -42,6 +44,7 @@ from keeper_sdk.core.schema import PAM_FAMILY, validate_manifest
 
 if TYPE_CHECKING:
     from keeper_sdk.core.models_enterprise import EnterpriseManifestV1
+    from keeper_sdk.core.models_epm import EpmManifestV1
     from keeper_sdk.core.models_integrations_events import EventsManifestV1
     from keeper_sdk.core.models_integrations_identity import IdentityManifestV1
     from keeper_sdk.core.models_ksm import KsmManifestV1
@@ -123,6 +126,7 @@ def load_declarative_manifest(
     | IdentityManifestV1
     | EventsManifestV1
     | PamExtendedManifestV1
+    | EpmManifestV1
 ):
     """Load a typed manifest for families the engine can plan (PAM + vault/sharing L1 + MSP).
 
@@ -140,7 +144,9 @@ def load_declarative_manifest(
     :class:`~keeper_sdk.core.models_integrations_events.EventsManifestV1` for
     ``keeper-integrations-events.v1``, or
     :class:`~keeper_sdk.core.models_pam_extended.PamExtendedManifestV1` for
-    ``keeper-pam-extended.v1``. Other schema-valid families raise
+    ``keeper-pam-extended.v1``, or
+    :class:`~keeper_sdk.core.models_epm.EpmManifestV1` for ``keeper-epm.v1``.
+    Other schema-valid families raise
     :class:`ManifestError` (use :func:`read_manifest_document` +
     :func:`validate_manifest` for schema-only checks).
 
@@ -166,9 +172,11 @@ def load_declarative_manifest_string(
     | IdentityManifestV1
     | EventsManifestV1
     | PamExtendedManifestV1
+    | EpmManifestV1
 ):
     """Like :func:`load_declarative_manifest` but from a string."""
     from keeper_sdk.core.models_enterprise import load_enterprise_manifest
+    from keeper_sdk.core.models_epm import load_epm_manifest
     from keeper_sdk.core.models_integrations_events import load_events_manifest
     from keeper_sdk.core.models_integrations_identity import load_identity_manifest
     from keeper_sdk.core.models_ksm import KSM_FAMILY, load_ksm_manifest
@@ -208,12 +216,14 @@ def load_declarative_manifest_string(
         return load_events_manifest(document)
     if family == PAM_EXTENDED_FAMILY:
         return load_pam_extended_manifest(document)
+    if family == EPM_FAMILY:
+        return load_epm_manifest(document)
     raise UnsupportedFamilyError(
         reason=(
             f"typed plan/load supports {PAM_FAMILY}, {VAULT_FAMILY}, "
             f"{SHARING_FAMILY}, {MSP_FAMILY}, {ENTERPRISE_FAMILY}, "
             f"{KSM_FAMILY}, {IDENTITY_FAMILY}, {EVENTS_FAMILY}, "
-            f"and {PAM_EXTENDED_FAMILY} only "
+            f"{PAM_EXTENDED_FAMILY}, and {EPM_FAMILY} only "
             f"(document declares {family!r})"
         ),
         next_action=(

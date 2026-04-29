@@ -113,7 +113,7 @@ def test_enterprise_team_role_blocks_reject_non_empty_resources(collection: str)
     assert "expected to be empty" in exc.value.reason
 
 
-def test_current_enterprise_online_validate_is_not_wired_for_live_team_role_reads(
+def test_enterprise_online_validate_requires_commander_provider(
     tmp_path: Path,
 ) -> None:
     path = _write_manifest(
@@ -126,7 +126,7 @@ def test_current_enterprise_online_validate_is_not_wired_for_live_team_role_read
 
     assert result.exit_code == EXIT_CAPABILITY, result.output
     assert "--online" in result.output
-    assert "pam-environment.v1" in result.output
+    assert "--provider commander" in result.output
 
 
 @pytest.mark.xfail(

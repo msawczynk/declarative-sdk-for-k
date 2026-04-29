@@ -68,9 +68,16 @@ from keeper_sdk.core import (
     redact,
     vault_record_apply_order,
 )
+from keeper_sdk.core.enterprise_diff import compute_enterprise_diff
+from keeper_sdk.core.enterprise_graph import build_enterprise_graph, enterprise_apply_order
+from keeper_sdk.core.epm_diff import compute_epm_diff
 from keeper_sdk.core.integrations_events_diff import compute_events_diff
 from keeper_sdk.core.interfaces import ApplyOutcome, LiveRecord
+from keeper_sdk.core.ksm_diff import compute_ksm_diff
+from keeper_sdk.core.ksm_graph import ksm_apply_order
 from keeper_sdk.core.manifest import read_manifest_document
+from keeper_sdk.core.models_enterprise import ENTERPRISE_FAMILY, load_enterprise_manifest
+from keeper_sdk.core.models_epm import EPM_FAMILY, EpmManifestV1
 from keeper_sdk.core.models_integrations_events import EVENTS_FAMILY, EventsManifestV1
 from keeper_sdk.core.models_ksm import KSM_FAMILY, KsmManifestV1
 from keeper_sdk.core.models_pam_extended import PAM_EXTENDED_FAMILY, PamExtendedManifestV1
@@ -80,7 +87,12 @@ from keeper_sdk.core.preview import assert_preview_keys_allowed
 from keeper_sdk.core.schema import PAM_FAMILY, SHARING_FAMILY, validate_manifest
 from keeper_sdk.core.sharing_models import SharingManifestV1, load_sharing_manifest
 from keeper_sdk.core.vault_models import VaultManifestV1
-from keeper_sdk.providers import CommanderCliProvider, MockProvider
+from keeper_sdk.providers import (
+    CommanderCliProvider,
+    CommanderServiceProvider,
+    KsmMockProvider,
+    MockProvider,
+)
 from keeper_sdk.secrets import bootstrap_ksm_application
 
 EXIT_OK = 0
@@ -100,6 +112,11 @@ _MSP_COMMANDER_UNSUPPORTED_REASON = (
     "(no declarative ownership marker writer for managed companies; see docs/MSP_FAMILY_DESIGN.md)"
 )
 _MSP_MANAGED_COMPANY_RESOURCE = "managed_company"
+_ENTERPRISE_COLLECTIONS = ("nodes", "users", "roles", "teams", "enforcements", "aliases")
+
+
+def _enterprise_live_object_count(live: dict[str, Any]) -> int:
+    return sum(len(live.get(collection) or []) for collection in _ENTERPRISE_COLLECTIONS)
 
 
 def _mock_adopt_managed_companies(self: MockProvider, plan: Plan) -> list[ApplyOutcome]:
@@ -212,11 +229,14 @@ class PlanLoadBundle:
     sharing: SharingManifestV1 | None
     msp: MspManifestV1 | None
     identity: IdentityManifestV1 | None
+    ksm: KsmManifestV1 | None
     pam_extended: PamExtendedManifestV1 | None
+    epm: EpmManifestV1 | None
     manifest_name: str
     order: list[str]
     live: list[LiveRecord]
     live_msp: list[dict[str, Any]]
+    live_ksm: dict[str, list[dict[str, Any]]]
     live_record_type_defs: list[dict[str, Any]]
     provider: Any
     events: EventsManifestV1 | None
@@ -225,7 +245,10 @@ class PlanLoadBundle:
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
 @click.version_option()
 @click.option(
-    "--provider", type=click.Choice(["mock", "commander"]), default="mock", show_default=True
+    "--provider",
+    type=click.Choice(["mock", "commander", "service"]),
+    default="mock",
+    show_default=True,
 )
 @click.option(
     "--folder-uid", default=None, help="Keeper shared-folder UID scope (for commander provider)"
@@ -250,7 +273,10 @@ def main(ctx: click.Context, provider: str, folder_uid: str | None) -> None:
 @click.option(
     "--online",
     is_flag=True,
-    help="Tenant checks: PAM discover+diff; keeper-vault.v1 discover+diff; MSP mock discover+diff",
+    help=(
+        "Tenant checks: PAM discover+diff; keeper-vault.v1 discover+diff; "
+        "MSP discover+diff; keeper-enterprise.v1 enterprise-info discover+diff"
+    ),
 )
 @click.pass_context
 def validate(
@@ -281,10 +307,10 @@ def validate(
         sys.exit(EXIT_GENERIC)
 
     if family != PAM_FAMILY:
-        if online and family not in (VAULT_MANIFEST_FAMILY, MSP_FAMILY):
+        if online and family not in (VAULT_MANIFEST_FAMILY, MSP_FAMILY, ENTERPRISE_FAMILY):
             click.echo(
                 "`--online` is supported for pam-environment.v1, keeper-vault.v1, "
-                "and msp-environment.v1 only.",
+                "msp-environment.v1, and keeper-enterprise.v1 only.",
                 err=True,
             )
             sys.exit(EXIT_CAPABILITY)
@@ -420,6 +446,106 @@ def validate(
                 if online_suffix:
                     msg += online_suffix
                 click.echo(msg)
+            return
+
+        if family == ENTERPRISE_FAMILY:
+            try:
+                enterprise_manifest = load_enterprise_manifest(document)
+                build_enterprise_graph(enterprise_manifest)
+                order = enterprise_apply_order(enterprise_manifest)
+            except SchemaError as exc:
+                click.echo(f"validation failed: {exc}", err=True)
+                sys.exit(EXIT_SCHEMA)
+            except RefError as exc:
+                click.echo(f"reference error: {exc}", err=True)
+                sys.exit(EXIT_REF)
+
+            live_enterprise: dict[str, Any] | None = None
+            online_suffix = ""
+            create_count = update_count = delete_count = conflict_count = 0
+            noop_count = skip_count = 0
+
+            if online:
+                if ctx.obj.get("provider") != "commander":
+                    click.echo(
+                        "`keeper-enterprise.v1` --online requires --provider commander "
+                        "(Commander CLI enterprise-info discover + diff smoke).",
+                        err=True,
+                    )
+                    sys.exit(EXIT_CAPABILITY)
+                provider = CommanderCliProvider()
+                try:
+                    live_enterprise = provider.discover_enterprise()
+                except CapabilityError as exc:
+                    click.echo(f"discovery failed: {exc}", err=True)
+                    sys.exit(EXIT_CAPABILITY)
+
+                changes = compute_enterprise_diff(
+                    enterprise_manifest,
+                    live_enterprise,
+                    manifest_name=manifest_path.stem,
+                )
+                create_count = sum(1 for c in changes if c.kind.value == "create")
+                update_count = sum(1 for c in changes if c.kind.value == "update")
+                delete_count = sum(1 for c in changes if c.kind.value == "delete")
+                conflict_count = sum(1 for c in changes if c.kind.value == "conflict")
+                noop_count = sum(1 for c in changes if c.kind.value == "noop")
+                skip_count = sum(1 for c in changes if c.kind.value == "skip")
+                if not as_json:
+                    click.echo(
+                        "stage 5: "
+                        f"{create_count} create, "
+                        f"{update_count} update, "
+                        f"{delete_count} delete-candidates, "
+                        f"{conflict_count} conflicts, "
+                        f"{noop_count} noop, "
+                        f"{skip_count} skip"
+                    )
+                online_suffix = (
+                    f"; online: {_enterprise_live_object_count(live_enterprise)} enterprise objects"
+                )
+
+            if emit_canonical and not as_json:
+                import yaml
+
+                click.echo(yaml.safe_dump(document, sort_keys=False, allow_unicode=True))
+            if as_json:
+                epayload: dict[str, Any] = {
+                    "ok": True,
+                    "family": family,
+                    "mode": "enterprise_online" if online else "enterprise_offline",
+                    "manifest_path": str(manifest_path.resolve()),
+                    "stages_completed": [
+                        "json_schema",
+                        "semantic_rules",
+                        "typed_model",
+                        "uid_ref_graph",
+                    ],
+                    "uid_ref_count": len(enterprise_manifest.iter_uid_refs()),
+                    "online": online,
+                }
+                if online and live_enterprise is not None:
+                    epayload["stages_completed"].append("diff_smoke")
+                    epayload["live_enterprise_object_count"] = _enterprise_live_object_count(
+                        live_enterprise
+                    )
+                    epayload["stage5_summary"] = {
+                        "create": create_count,
+                        "update": update_count,
+                        "delete": delete_count,
+                        "conflict": conflict_count,
+                        "noop": noop_count,
+                        "skip": skip_count,
+                    }
+                if emit_canonical:
+                    import yaml
+
+                    epayload["canonical_yaml"] = yaml.safe_dump(
+                        document, sort_keys=False, allow_unicode=True
+                    )
+                click.echo(json.dumps(epayload, indent=2))
+            else:
+                click.echo(f"ok: {ENTERPRISE_FAMILY} ({len(order)} uid_refs){online_suffix}")
             return
 
         if family == MSP_FAMILY:
@@ -815,7 +941,7 @@ def bootstrap_ksm_cmd(
 @click.option(
     "--provider",
     "provider_override",
-    type=click.Choice(["mock", "commander"]),
+    type=click.Choice(["mock", "commander", "service"]),
     default=None,
     help="Override the configured provider",
 )
@@ -964,7 +1090,7 @@ def import_(
 @click.option(
     "--provider",
     "provider_override",
-    type=click.Choice(["mock", "commander"]),
+    type=click.Choice(["mock", "commander", "service"]),
     default=None,
     help="Override the configured provider",
 )
@@ -999,6 +1125,8 @@ def apply(
     try:
         if bundle.msp is not None:
             outcomes = provider.apply_msp_plan(plan_obj, dry_run=dry_run)
+        elif bundle.ksm is not None:
+            outcomes = provider.apply_ksm_plan(plan_obj, dry_run=dry_run)
         else:
             outcomes = provider.apply_plan(plan_obj, dry_run=dry_run)
     except CapabilityError as exc:
@@ -1024,8 +1152,10 @@ def _build_plan(ctx: click.Context, manifest_path: Path, *, allow_delete: bool) 
         | SharingManifestV1
         | MspManifestV1
         | IdentityManifestV1
+        | KsmManifestV1
         | EventsManifestV1
         | PamExtendedManifestV1
+        | EpmManifestV1
     )
     try:
         if bundle.pam is not None:
@@ -1073,6 +1203,14 @@ def _build_plan(ctx: click.Context, manifest_path: Path, *, allow_delete: bool) 
                 ),
                 next_action="use `dsk validate` for schema checks; apply waits on a Commander writer",
             )
+        elif bundle.ksm is not None:
+            changes = compute_ksm_diff(
+                bundle.ksm,
+                bundle.live_ksm,
+                manifest_name=bundle.manifest_name,
+                allow_delete=allow_delete,
+            )
+            capability_subject = bundle.ksm
         elif bundle.events is not None:
             changes = compute_events_diff(
                 bundle.events,
@@ -1102,6 +1240,23 @@ def _build_plan(ctx: click.Context, manifest_path: Path, *, allow_delete: bool) 
                 next_action=(
                     "use `dsk validate` for schema checks; apply waits on Commander "
                     "write/readback proof"
+                ),
+            )
+        elif bundle.epm is not None:
+            changes = compute_epm_diff(
+                bundle.epm,
+                {},
+                manifest_name=bundle.manifest_name,
+                allow_delete=allow_delete,
+            )
+            raise CapabilityError(
+                reason=(
+                    f"{EPM_FAMILY} plan/apply is upstream-gap "
+                    "(offline schema/model/diff only; no PEDM tenant write/readback proof)"
+                ),
+                next_action=(
+                    "use `dsk validate` for schema checks; apply waits on a PEDM tenant "
+                    "writer proven through MSP managed-company lab context"
                 ),
             )
         else:
@@ -1169,11 +1324,12 @@ def _load_plan_context(ctx: click.Context, manifest_path: Path) -> PlanLoadBundl
     sharing: SharingManifestV1 | None = typed if isinstance(typed, SharingManifestV1) else None
     msp: MspManifestV1 | None = typed if isinstance(typed, MspManifestV1) else None
     identity: IdentityManifestV1 | None = typed if isinstance(typed, IdentityManifestV1) else None
+    ksm: KsmManifestV1 | None = typed if isinstance(typed, KsmManifestV1) else None
     pam_extended: PamExtendedManifestV1 | None = (
         typed if isinstance(typed, PamExtendedManifestV1) else None
     )
+    epm: EpmManifestV1 | None = typed if isinstance(typed, EpmManifestV1) else None
     events: EventsManifestV1 | None = typed if isinstance(typed, EventsManifestV1) else None
-    ksm: KsmManifestV1 | None = typed if isinstance(typed, KsmManifestV1) else None
     if pam is not None:
         manifest_name = pam.name
     elif msp is not None:
@@ -1184,6 +1340,8 @@ def _load_plan_context(ctx: click.Context, manifest_path: Path) -> PlanLoadBundl
         manifest_name = events.name
     elif pam_extended is not None:
         manifest_name = PAM_EXTENDED_FAMILY
+    elif epm is not None:
+        manifest_name = EPM_FAMILY
     else:
         manifest_name = manifest_path.stem
 
@@ -1206,6 +1364,16 @@ def _load_plan_context(ctx: click.Context, manifest_path: Path) -> PlanLoadBundl
                 ),
                 next_action="use `dsk validate` for schema checks; apply waits on a Commander writer",
             )
+        elif ksm is not None:
+            provider_name = ctx.obj.get("provider", "mock")
+            if provider_name != "mock":
+                raise CapabilityError(
+                    reason=(
+                        f"{KSM_FAMILY} plan/apply is preview-gated for {provider_name} provider"
+                    ),
+                    next_action="use `--provider mock` for offline KSM plan/apply simulation",
+                )
+            order = ksm_apply_order(ksm)
         elif events is not None:
             raise CapabilityError(
                 reason=(
@@ -1225,13 +1393,16 @@ def _load_plan_context(ctx: click.Context, manifest_path: Path) -> PlanLoadBundl
                     "write/readback proof"
                 ),
             )
-        elif ksm is not None:
+        elif epm is not None:
             raise CapabilityError(
                 reason=(
-                    f"typed plan/load supports {KSM_FAMILY} for offline validation only; "
-                    "plan/apply are not supported for this manifest family yet"
+                    f"{EPM_FAMILY} plan/apply is upstream-gap "
+                    "(offline schema/model/diff only; no PEDM tenant write/readback proof)"
                 ),
-                next_action="use `dsk validate` for keeper-ksm.v1 schema checks",
+                next_action=(
+                    "use `dsk validate` for schema checks; apply waits on a PEDM tenant "
+                    "writer proven through MSP managed-company lab context"
+                ),
             )
         else:
             raise CapabilityError(
@@ -1246,11 +1417,26 @@ def _load_plan_context(ctx: click.Context, manifest_path: Path) -> PlanLoadBundl
         click.echo(f"capability error: {exc}", err=True)
         sys.exit(EXIT_CAPABILITY)
 
-    provider = _make_provider(ctx, manifest_path, pam=pam, vault=vault, sharing=sharing, msp=msp)
+    provider = _make_provider(
+        ctx,
+        manifest_path,
+        pam=pam,
+        vault=vault,
+        sharing=sharing,
+        msp=msp,
+        ksm=ksm,
+    )
     live_record_type_defs: list[dict[str, Any]] = []
     live: list[LiveRecord] = []
     live_msp: list[dict[str, Any]] = []
-    if msp is not None:
+    live_ksm: dict[str, list[dict[str, Any]]] = {}
+    if ksm is not None:
+        try:
+            live_ksm = provider.discover_ksm_state()
+        except CapabilityError as exc:
+            click.echo(f"discovery failed: {exc}", err=True)
+            sys.exit(EXIT_CAPABILITY)
+    elif msp is not None:
         try:
             live_msp = provider.discover_managed_companies()
         except CapabilityError as exc:
@@ -1271,11 +1457,14 @@ def _load_plan_context(ctx: click.Context, manifest_path: Path) -> PlanLoadBundl
         sharing=sharing,
         msp=msp,
         identity=identity,
+        ksm=ksm,
         pam_extended=pam_extended,
+        epm=epm,
         manifest_name=manifest_name,
         order=order,
         live=live,
         live_msp=live_msp,
+        live_ksm=live_ksm,
         live_record_type_defs=live_record_type_defs,
         provider=provider,
         events=events,
@@ -1359,6 +1548,7 @@ def _make_provider(
     vault: VaultManifestV1 | None = None,
     sharing: SharingManifestV1 | None = None,
     msp: MspManifestV1 | None = None,
+    ksm: KsmManifestV1 | None = None,
 ):
     provider_name = ctx.obj.get("provider", "mock")
     folder_uid = ctx.obj.get("folder_uid")
@@ -1368,6 +1558,8 @@ def _make_provider(
         manifest_name = msp.name
     else:
         manifest_name = manifest_path.stem
+    if provider_name == "mock" and ksm is not None:
+        return ctx.obj.setdefault("_ksm_provider_instance", KsmMockProvider(manifest_name))
     if provider_name == "mock":
         return ctx.obj.setdefault("_provider_instance", MockProvider(manifest_name))
     if provider_name == "commander":
@@ -1380,8 +1572,28 @@ def _make_provider(
             manifest_source = sharing.model_dump(mode="python", exclude_none=True, by_alias=True)
         elif msp is not None:
             manifest_source = msp.model_dump(mode="python", exclude_none=True, by_alias=True)
+        elif ksm is not None:
+            manifest_source = ksm.model_dump(mode="python", exclude_none=True, by_alias=True)
         return CommanderCliProvider(
             folder_uid=folder_uid or os.environ.get("KEEPER_DECLARATIVE_FOLDER"),
+            manifest_source=manifest_source,
+        )
+    if provider_name == "service":
+        manifest_source = {}
+        if pam is not None:
+            manifest_source = pam.model_dump(mode="python", exclude_none=True)
+        elif vault is not None:
+            manifest_source = vault.model_dump(mode="python", exclude_none=True, by_alias=True)
+        elif sharing is not None:
+            manifest_source = sharing.model_dump(mode="python", exclude_none=True, by_alias=True)
+        elif msp is not None:
+            manifest_source = msp.model_dump(mode="python", exclude_none=True, by_alias=True)
+        elif ksm is not None:
+            manifest_source = ksm.model_dump(mode="python", exclude_none=True, by_alias=True)
+        return CommanderServiceProvider(
+            base_url=os.environ.get("KEEPER_SERVICE_URL", "http://localhost:4020"),
+            api_key=os.environ.get("KEEPER_SERVICE_API_KEY"),
+            timeout=int(os.environ.get("KEEPER_SERVICE_TIMEOUT", "300")),
             manifest_source=manifest_source,
         )
     raise click.ClickException(f"unknown provider '{provider_name}'")
