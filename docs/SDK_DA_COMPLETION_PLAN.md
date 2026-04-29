@@ -35,6 +35,20 @@ Shipped and proven:
   `tests/fixtures/examples/msp/01-minimal-msp.yaml`. Read-only discover + plan
   path confirmed. Apply blocked by CapabilityError (P5/P6 create_mc wired
   2026-04-28, but live apply not tested yet).
+- **CLI export / manifest lift (`dsk export`):** 2026-04-29 live proof: `pam
+  project export` → `dsk export` → `dsk validate` exit **0** (`ok:
+  dsk-export-test (2 uid_refs)`). Read path + manifest round-trip accepted for
+  support claims tied to AGENTS/export docs.
+- **Vault/plan drift view (`dsk diff`):** 2026-04-29 live proof vs lab tenant:
+  exit **2** when changes present (informational exit contract); renderer/path
+  accepted live.
+- **Operator reports (`dsk report password-report`):** 2026-04-29 live proof:
+  exit **0**, 11-row output envelope, **`--sanitize-uids`** run clean (no UID
+  leak signal). Redaction/leak-contract surface accepted for guarded reporting
+  use.
+
+**Acceptance (export / diff / password-report)** — satisfied 2026-04-29 on lab
+tenant (see bullets above); no pending “needs live proof” for these CLI paths.
 
 Not yet supported:
 

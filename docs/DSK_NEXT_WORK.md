@@ -26,6 +26,7 @@ implementation is at the wheel.
 | **KSM** — bootstrap + `KsmLoginHelper` live | **2026-04-28 COMPLETE:** `pytest tests/live/test_ksm_bootstrap_smoke.py` green + full `pamMachine` smoke PASSED (`create→verify→destroy`). Admin KSM auth via profile (`~/.config/dsk/profiles/default.json` + `~/.keeper/ksm-config.json`). Testuser2 reuse path via admin vault record — no re-enrollment needed. See `docs/LIVE_TEST_RUNBOOK.md` § KSM Profile Setup. | **DONE** |
 | **`keeper-vault.v1` L1** | **2026-04-28 LIVE PROOF COMPLETE:** `vaultOneLogin` smoke PASSED (create→verify→destroy). Scalar field diff + apply converges. Gate lift: L1 login CRUD is **supported** (not preview-gated). Bonus find: `vaultSharingLifecycle` registration bug fixed (was in scenarios.py but not in `_SHARING_SCENARIOS` / `sharing_get`). | `SDK_DA`; not PAM-bar unless stated elsewhere |
 | **MSP — `msp-environment.v1`** | **2026-04-28 MSP online validate + plan:** exit 0 against lab tenant. `msp-environment.v1` validate/plan path proven live. | `tests/fixtures/examples/msp/01-minimal-msp.yaml`; `dsk validate --online`; `dsk plan` |
+| **`dsk export` / `dsk diff` / `dsk report`** | **2026-04-29 LIVE:** `pam project export` → `dsk export` → `validate` exit **0**, `ok: dsk-export-test (2 uid_refs)`; **`dsk diff`** vs lab tenant exit **2** (changes present, renderer working); **`dsk report password-report`** exit **0**, 11 rows, `--sanitize-uids` clean (no UID leak). | `AGENTS.md` command table; `docs/LIVE_TEST_RUNBOOK.md` |
 
 ## Every local session (before push)
 
