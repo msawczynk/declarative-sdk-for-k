@@ -66,6 +66,17 @@ Manual fallback: if you cannot use interactive Commander, create the KSM
 application in Keeper Web UI, share the admin record into the app, download the
 device config to disk, and set `KEEPER_SDK_KSM_CONFIG` to that path.
 
+## Declarative app lifecycle
+
+`keeper-ksm.v1` is currently a schema-only marker for KSM integration evidence.
+It does not yet model `ksm_apps`, `ksm_clients`, or share bindings, and `dsk
+plan` / `dsk apply` intentionally reject the family as a capability gap. Use
+`dsk bootstrap-ksm` for the supported create/bind/share/config-redemption path.
+
+A future declarative KSM lifecycle must add a typed manifest body, graph and
+diff support, provider create/share/client/delete primitives, clean re-plan
+readback, and cleanup proof before the SDK claims app lifecycle support.
+
 ## Env-var matrix
 
 | Env var | Default | Meaning |
@@ -130,6 +141,7 @@ live-proven. Design doc placeholder: `docs/KSM_BUS.md`.
 
 ## Future work
 
-Manifest `${ksm:UID:field}` placeholder resolution is on the roadmap. Today,
-programmatic use of `KsmSecretStore` is the supported path for non-login
-secrets.
+Manifest `${ksm:UID:field}` placeholder resolution and declarative KSM app
+lifecycle resources are on the roadmap. Today, programmatic use of
+`KsmSecretStore` is the supported path for non-login secrets, and
+`dsk bootstrap-ksm` is the supported KSM app provisioning path.
