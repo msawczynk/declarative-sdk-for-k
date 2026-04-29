@@ -1,8 +1,9 @@
 # `examples/` — canonical minimal manifests
 
-Root `*.yaml` files are validate-clean examples for the packaged declarative
-families that have CLI validation paths today: `pam-environment.v1`,
-`keeper-vault.v1`, and `keeper-vault-sharing.v1`.
+Root `*.yaml` files and focused subdirectory manifests are validate-clean
+examples for the packaged declarative families that have CLI validation paths
+today: `pam-environment.v1`, `keeper-vault.v1`,
+`keeper-vault-sharing.v1`, and `msp-environment.v1`.
 
 `examples/scaffold_only/*.yaml` remain tiny packaged-family starter documents.
 They are kept for backwards-compatible references and schema smoke coverage.
@@ -26,6 +27,9 @@ root + scaffold-only manifests and runs mock plans for root examples.
 | `vault-records.yaml` | `keeper-vault.v1` | Five L1-compatible login records exercising login, payment-card, database, server, and custom field payloads. |
 | `vault-record-types.yaml` | `keeper-vault.v1` | Custom `record_types[]` declarations. |
 | `vault-attachments.yaml` | `keeper-vault.v1` | `attachments[]` declarations attached to a login record. |
+| `vault/login-record.yaml` | `keeper-vault.v1` | Minimal login record with login, password, and URL fields. |
+| `vault/shared-folder.yaml` | `keeper-vault.v1` | Phase 7 planned shared-folder placeholder; validates as an empty vault manifest until shared folders land in this schema family. |
+| `msp/02-with-modules.yaml` | `msp-environment.v1` | Managed-company example mapping module flags to the current `plan` + structured `addons[]` schema. |
 
 ### `scaffold_only/` (packaged families; CI validate)
 

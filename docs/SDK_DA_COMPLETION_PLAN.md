@@ -358,6 +358,17 @@ Acceptance:
 
 Do not hand-code broad support from memory. Mirror upstream first.
 
+Status (2026-04-29, v1.2.0 active):
+
+| Surface | Classification | Evidence | Remaining bar |
+|---------|----------------|----------|---------------|
+| Shared-folder validate | `preview-gated` | Offline validation tests cover the manifest surface. | Commander write modeling for create/update/membership/permission diffs is not done. |
+| KSM application `reference_existing` | `supported` for gateway read/validate only | Gateway read path is proven for existing app references. | No SDK-owned app mutation is implied by this support claim. |
+| KSM application create | `preview-gated` | Bootstrap sequence has 3 offline cases. | Needs lab live proof for create -> bind/share -> clean re-plan -> cleanup before support. |
+| Teams/roles read-only validate | `preview-gated` | Offline read-only validation rejects unknown team/role types. | Writes stay out of support until upstream-safe surfaces and approval gates are modeled. |
+| Compliance/security-audit reports | `preview-gated` | Offline report command coverage has 5 compliance/security-audit cases. | Live compliance-report and security-audit-report proof is still pending (P19 running). |
+| Password report | `supported` | 2026-04-29 live proof: `dsk report password-report` exit 0, sanitized envelope clean. | Keep leak checks and UID sanitization green on future Commander pins. |
+
 Order:
 
 1. Extend capability mirror:
@@ -382,7 +393,9 @@ Order:
    - read/validate first,
    - write only with upstream-safe surfaces and strong approval gates.
 6. Compliance/reporting:
-   - start as read-only assertions in `validate --online`.
+   - password-report is live-proven and supported,
+   - compliance-report and security-audit-report are offline-covered but remain
+     preview-gated until live proof completes.
 
 Acceptance:
 

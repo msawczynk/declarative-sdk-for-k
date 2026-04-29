@@ -101,6 +101,9 @@ line-length = 100
 select = ["E", "F", "W", "I", "UP"]
 ignore = ["E501"]
 
+[tool.isort]
+profile = "black"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = [
