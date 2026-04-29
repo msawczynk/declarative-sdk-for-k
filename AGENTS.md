@@ -209,7 +209,31 @@ dsk plan env.yaml --json | jq '.changes[] | select(.kind=="update")'
 
 - **PAM (`pam-environment.v1`):** `from keeper_sdk.core import load_manifest, build_graph, compute_diff, build_plan, …` — see [`README.md`](./README.md) § Programmatic use.
 - **`keeper-vault.v1`:** use **`load_declarative_manifest`** (returns `VaultManifestV1`), **`build_vault_graph`**, **`compute_vault_diff`**, **`vault_record_apply_order`**, then **`build_plan`** + provider — same exit-code / marker patterns as CLI. **`load_manifest` is PAM-only** and refuses vault documents.
-- **Reference:** [`keeper_sdk/core/manifest.py`](./keeper_sdk/core/manifest.py) module docstring; offline round-trip tests in [`tests/test_vault_mock_provider.py`](./tests/test_vault_mock_provider.py).
+- **Reference:** [`keeper_sdk/core/manifest.py`](keeper_sdk/core/manifest.py) module docstring; offline round-trip tests in [`tests/test_vault_mock_provider.py`](tests/test_vault_mock_provider.py).
+
+## Orchestration hierarchy
+
+| Tier | Who | Owns |
+|------|-----|------|
+| **Grandparent** | Human user | Strategic only: GA tag, public GH issue close, irresolvable design fork |
+| **Parent** | Cursor chat primary | Queue dispatch, phase_runner, pre-claim, git push, live smoke routing, amber triage |
+| **Child** | T0 Codex workers (`codex_offline_bg.sh` / `codex_live.sh`) | Code/test/doc/gate/live smoke execution |
+
+Parent escalates to grandparent ONLY at those three triggers. See `.cursorrules` § "Router-mode" for the full T0→T1→T2→T3 routing order.
+
+## Advisor contract
+
+Trigger advisor (Task `subagent_type: advisor`) when any of:
+- 3-patch trip on same failure mode
+- Worker `BLOCKER` / cross-rule reconciliation
+- Pre-claim ≥2 axes flagged
+- Novel error with no LESSONS tag match
+- Iterative debug >3 round-trips on same bug
+- User intent: why/should-I/architect/gate-lift/support claim/recommend/trade-off
+
+Advisor returns `ADVICE: <continue>` or `ESCALATE: <needs grandparent>`.
+
+**Note:** Task `model:` only accepts `composer-2-fast` as an injectable slug. Advisor subagent inherits parent tier. True Opus review requires user switching chat primary model in Cursor UI.
 
 ## JSON contracts agents can parse
 
