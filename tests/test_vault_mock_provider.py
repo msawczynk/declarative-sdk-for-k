@@ -26,6 +26,24 @@ def _minimal_vault_doc() -> dict:
     }
 
 
+def _login_record(uid_ref: str, *, depends_on: str | None = None) -> dict:
+    record = {
+        "uid_ref": uid_ref,
+        "type": "login",
+        "title": uid_ref.rsplit(".", 1)[-1].title(),
+        "fields": [{"type": "login", "label": "Login", "value": [f"{uid_ref}@example.com"]}],
+    }
+    if depends_on is not None:
+        record["custom"] = [
+            {
+                "type": "text",
+                "label": "Depends On",
+                "value": [f"keeper-vault:records:{depends_on}"],
+            }
+        ]
+    return record
+
+
 def test_vault_apply_then_replan_is_clean() -> None:
     manifest = load_vault_manifest(_minimal_vault_doc())
     name = "fixture-stem"
@@ -71,3 +89,26 @@ def test_vault_allow_delete_orphan() -> None:
     plan2 = build_plan(name, changes, order)
     outcomes = provider.apply_plan(plan2)
     assert any(o.action == "delete" for o in outcomes)
+
+
+def test_vault_multi_record_apply_order() -> None:
+    doc = {
+        "schema": "keeper-vault.v1",
+        "records": [
+            _login_record("vault.login.a"),
+            _login_record("vault.login.b", depends_on="vault.login.a"),
+            _login_record("vault.login.c", depends_on="vault.login.b"),
+        ],
+    }
+    manifest = load_vault_manifest(doc)
+    name = "ordering-fixture"
+    provider = MockProvider(name)
+
+    order = vault_record_apply_order(manifest)
+    assert order == ["vault.login.a", "vault.login.b", "vault.login.c"]
+
+    changes = compute_vault_diff(manifest, provider.discover(), manifest_name=name)
+    outcomes = provider.apply_plan(build_plan(name, changes, order))
+
+    assert [outcome.uid_ref for outcome in outcomes] == order
+    assert [record.marker["uid_ref"] for record in provider.discover()] == order

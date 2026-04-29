@@ -21,6 +21,18 @@ contract.
 | `ISSUE_6_JIT_SUPPORT_BOUNDARY.md` | maintainer | JIT apply boundary against pinned Commander; no safe writer → `upstream-gap`. |
 | `ISSUE_7_GATEWAY_CREATE_PROJECTS_DESIGN.md` | maintainer | Gateway `mode: create` + top-level `projects[]` design boundary. |
 
+## Key test files
+
+| File | Owns |
+|---|---|
+| `tests/test_vault_shared_folder.py` | Phase 7 shared-folder validate semantics; offline only until Commander write modeling exists. |
+| `tests/test_ksm_app_reference.py` | KSM application `reference_existing` and gateway read-path validation. |
+| `tests/test_vault_custom_fields.py` | Coming Phase 7 vault custom-field diff/validate coverage. |
+| `tests/test_vault_update_smoke.py` | Offline scalar `login` field-drift -> UPDATE -> clean re-plan smoke. |
+| `tests/test_adoption_smoke.py` | Offline unmanaged-record adoption lifecycle and marker convergence. |
+| `tests/test_two_writer.py` | Offline ownership-marker race/conflict coverage. |
+| `tests/test_msp_apply.py` | MSP apply/plan convergence coverage. |
+
 ## Where to land new work
 
 | Change | File | Sibling to copy |
@@ -39,6 +51,8 @@ contract.
 
 - Tables stable column-order — agents parse them.
 - Capability claims MUST include classification (`supported`/`preview-gated`/`upstream-gap`).
+- Local gate floor reference is **995 tests / 87% coverage** as of v1.2.0
+  (2026-04-29); any lower floor needs an explicit reconciliation note.
 - No tutorials. No screenshots. No marketing copy.
 - DOR (`keeper-pam-declarative/`) is the upstream design source — link, don't copy.
 - `CHANGELOG.md` lives at root (Keep-a-Changelog format), not here.

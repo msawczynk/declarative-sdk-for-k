@@ -1,6 +1,6 @@
 # RECONCILIATION — design vs tree
 
-Written: 2026-04-26 (agent scaffold pass; refreshed 2026-04-29 for KSM live + rotation/RBI + P2.1 `diff` queue + v1.1 offline quality smokes).
+Written: 2026-04-26 (agent scaffold pass; refreshed 2026-04-29 for KSM live + rotation/RBI + P2.1 `diff` queue + v1.1 offline quality smokes + v1.2/Phase 7 entry).
 Source of truth: `main` at time of last doc edit (exact SHA: `git rev-parse HEAD`).
 Cross-checks against `V1_GA_CHECKLIST.md`, `docs/SDK_DA_COMPLETION_PLAN.md`,
 `AUDIT.md`, `REVIEW.md`, and DOR pointers in `keeper-pam-declarative/`.
@@ -12,7 +12,8 @@ This is for human + agent review. Per-folder maps live in `<dir>/SCAFFOLD.md`.
 ## TL;DR
 
 - **Zero remaining v1.0.0 GA blockers.** Tag policy decided: annotated only — distribution is GitHub-only (no PyPI, no `git verify-tag` consumer flow); GPG/SSH signing not required. Upgrade path if supply-chain requirements change → sigstore/cosign `dist/*` in `publish.yml` (OIDC, no maintainer key).
-- **Open clean-re-plan work** (not GA blockers): nested-`pamUser` rotation (P2.1 / issue #4) — apply + rotation edit OK; **offline** `diff` now handles parent `pam_settings` overlay + `managed` bool skew (`CHANGELOG` [Unreleased]) — **live re-plan exit 0** must be re-proven on Acme-lab. **P3 / #5** `pamRemoteBrowser` closeout evidence is doc-ready (2026-04-28 smoke + COMMANDER P3.1 + DA Phase 3); dirty/list/audio subfields stay bucketed.
+- **Open upstream blocker** (not GA blocker): nested-`pamUser` rotation (GH **#35**) — DSK offline `diff` work is done, but Commander `pam user ls` ParseError on UID positional arg blocks supported readback / clean re-plan proof. **P3 / #5** `pamRemoteBrowser` closeout evidence is doc-ready (2026-04-28 smoke + COMMANDER P3.1 + DA Phase 3); dirty/list/audio subfields stay bucketed.
+- **v1.2.0 shipped baseline:** `CHANGELOG.md` bumped; local gate baseline is **995 tests / 87% coverage**; Phase 7 entry work started.
 - **Three v1.1 offline quality gaps closed:** adoption smoke against unmanaged records, field-drift->UPDATE smoke, two-writer ownership-marker race smoke.
 - **One v2 deferral:** module rename `keeper_sdk` → `declarative_sdk_k` (will ship compat shim).
 - **Nothing has been silently dropped.** Every preview-gated key fails loud at apply via `_detect_unsupported_capabilities` + plan-surface CONFLICT rows (C3 fix; H6 regression test).
@@ -60,7 +61,7 @@ Every modeled capability must classify as `supported` / `preview-gated` / `upstr
 | `pamRemoteBrowser` connection fields | supported | shipped | offline-green | scenario | – |
 | `pamRemoteBrowser` RBI tri-state / audio (DAG-backed) | preview-gated | DAG → manifest merge shipped | green | ✅ | ✅ E2E smoke rc=0 (2026-04-28). DAG-backed subfields (tri-state, audio) remain `preview-gated`. |
 | Nested `pamUser` shape (in `resources[].users[]`) | supported (shape) | shipped | green | scenario | `pamUserNested` |
-| Nested `pamUser.rotation_settings` | preview-gated | apply lands | reviewed gate (P2.1) | open | offline diff anchor in `tests/test_diff.py` |
+| Nested `pamUser.rotation_settings` | upstream-gap (GH #35) | guarded / preview | blocked upstream | blocker confirmed | Commander `pam user ls` ParseError on UID positional arg; DSK offline diff anchor in `tests/test_diff.py`. |
 | Top-level `users[].rotation_settings` | preview-gated | guarded | – | – | gate-lift rule: stays blocked even after nested clears |
 | `default_rotation_schedule` | preview-gated | guarded | – | – | needs separate setter/readback proof |
 | `jit_settings` | upstream-gap | guarded | – | – | `docs/ISSUE_6_JIT_SUPPORT_BOUNDARY.md` |
@@ -69,9 +70,9 @@ Every modeled capability must classify as `supported` / `preview-gated` / `upstr
 | Top-level `projects[]` | preview-gated / design-only | guarded | – | – | same |
 | KSM application provisioning (`dsk bootstrap-ksm`) | supported | shipped | live-green (bootstrap+login) | low | 2026-04-28: `tests/live/test_ksm_bootstrap_smoke.py` with `KEEPER_LIVE_TENANT=1` + KSM config — see `LIVE_TEST_RUNBOOK`. Also `docs/KSM_BOOTSTRAP.md` + 89 unit tests. Full PAM apply+KSM remains via committed smoke, not this pytest alone. |
 | `KsmLoginHelper` (Commander credentials read from KSM) | supported | shipped | live: exercised on bootstrap+login path per same pytest | low | `keeper_sdk/auth/helper.py` + 175+ unit tests; `docs/KSM_INTEGRATION.md`. |
-| `keeper-vault.v1` L1 (login CRUD) | `preview-gated` | – | – | ❌ | Live proof pending — UPDATE path exists in code; `VAULT_L1_DESIGN` §7 acceptance needed before gate lift |
+| `keeper-vault.v1` L1 (login CRUD) | supported | shipped | green | green | 2026-04-28 `vaultOneLogin` smoke passed create -> verify -> destroy; scalar field diff + apply converges. |
 | KSM inter-agent bus (`secrets/bus.py`) | `preview-gated` / skeleton | sealed (raises `CapabilityError`) | – | ❌ | Wire format frozen; client implementation deferred to v1.1 |
-| MSP discover (`msp-environment.v1`) | `preview-gated` | – | – | ❌ | Requires MSP admin session; `dsk validate --online` Commander path only; apply/import unsupported |
+| MSP discover/apply (`msp-environment.v1`) | supported | shipped | green | green | 2026-04-29 lab proof: `validate --online` exit 0 and post-apply plan converged; import remains unsupported. |
 
 DA Definition-of-Done compliance:
 - ✅ GitHub install path works (git URL + release wheel/sdist).
@@ -95,6 +96,17 @@ Rows added for the v1.1 items that landed after the last reconciliation pass:
 | Field-drift UPDATE vault smoke | SHIPPED v1.1 (offline) | `tests/test_vault_update_smoke.py` | Covers scalar `login` field change -> plan UPDATE -> apply -> clean re-plan. |
 | Two-writer ownership-marker coverage | SHIPPED v1.1 (offline) | `tests/test_two_writer.py` | Covers same resource with different manager -> CONFLICT, same manager -> noop, and post-release adopt path. |
 
+## v1.2 / Phase 7 Entry Refresh
+
+Rows added for the v1.2 state and first Phase 7 landing slice:
+
+| Item | Status | Evidence in tree | Notes |
+|---|---|---|---|
+| Shared-folder validate | PHASE 7 STARTED (offline) | `tests/test_vault_shared_folder.py` | Validate/reference coverage only; no Commander write modeling or supported create/update claim yet. |
+| KSM app `reference_existing` | PHASE 7 STARTED (offline) | `tests/test_ksm_app_reference.py` | Gateway read path proven for existing app references; create model remains next work. |
+| Renderer snapshot coverage | SHIPPED v1.2 (offline) | `tests/test_renderer_snapshots.py`, `tests/fixtures/renderer_snapshots/` | Six layout snapshots lock CLI table shape for current renderers. |
+| Perf memory assertion | SHIPPED v1.2 (offline) | `tests/test_perf.py` | Local gate asserts peak RSS stays under **192 MiB** for the covered workload. |
+
 ---
 
 ## Has anything been DROPPED?
@@ -108,8 +120,8 @@ Cross-checking the 2026-04-24 AUDIT scope (W1–W20), DOR contract, and REVIEW d
 | `_parse_ascii_table` (D-3) | INTENTIONAL removal | Migrated to `--format json` after upstream Commander shipped JSON on `pam gateway list` / `pam config list`. Contract pins in `tests/test_coverage_followups.py`. |
 | `Path.home() / "Downloads"` login-helper fallback | INTENTIONAL removal (P0 in REVIEW) | Workstation-specific default unsafe in library. Now requires env var. |
 | `DeleteUnsupportedError` | KEPT as compat shim | Subclass of `CapabilityError`. Test in `tests/test_errors.py`. |
-| Phase 2.1 (nested rotation) full close | NOT dropped — IN FLIGHT | Apply ✅ marker verify ✅ clean re-plan ⏳ (parent-verified gate). |
-| Phase 3 (RBI) full close | NOT dropped — IN FLIGHT | DAG merge shipped; clean re-plan ⏳. |
+| Phase 2.1 (nested rotation) full close | NOT dropped — UPSTREAM-GAP | Commander GH #35 ParseError blocks supported clean re-plan proof; DSK offline diff work is done. |
+| Phase 3 (RBI) full close | NOT dropped — DOC-READY | Live smoke + COMMANDER P3.1 + DA Phase 3 evidence is on `main`; maintainer issue close/update remains. |
 | Adoption smoke / field-drift smoke / two-writer smoke | SHIPPED v1.1 (offline) | See `v1.1 Quality-Gap Refresh` above. |
 | Module rename `keeper_sdk` → `declarative_sdk_k` | DEFERRED v2.0 (explicit) | Hardening row. Ship via compat shim. |
 | Multi-project manifests | OUT OF SCOPE per AUDIT | `Project` 0..1 per manifest per `SCHEMA_CONTRACT.md` L98. |
