@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 from click.testing import CliRunner
@@ -13,9 +14,11 @@ from keeper_sdk.cli import main
 from keeper_sdk.cli.main import EXIT_CHANGES
 from keeper_sdk.core.diff import ChangeKind
 from keeper_sdk.core.metadata import encode_marker
+from keeper_sdk.core.planner import build_plan
 from keeper_sdk.core.sharing_diff import compute_sharing_diff
 from keeper_sdk.core.sharing_models import SHARING_FAMILY, SharingManifestV1
 from keeper_sdk.providers import MockProvider
+from keeper_sdk.providers.commander_cli import CommanderCliProvider
 
 cli_main_module = importlib.import_module("keeper_sdk.cli.main")
 
@@ -67,6 +70,30 @@ def _share_manifest(share: dict[str, object]) -> SharingManifestV1:
     )
 
 
+def _sharing_manifest(*shares: dict[str, object]) -> SharingManifestV1:
+    return SharingManifestV1.model_validate(
+        {
+            "schema": SHARING_FAMILY,
+            "shared_folders": [{"uid_ref": "sf.ops", "path": "/Shared/Ops"}],
+            "share_folders": list(shares),
+        }
+    )
+
+
+def _live_shared_folder() -> dict[str, object]:
+    return {
+        "keeper_uid": "live-sf.ops",
+        "resource_type": "sharing_shared_folder",
+        "title": "/Shared/Ops",
+        "payload": {"uid_ref": "sf.ops", "name": "/Shared/Ops"},
+        "marker": encode_marker(
+            uid_ref="sf.ops",
+            manifest="vault-sharing",
+            resource_type="sharing_shared_folder",
+        ),
+    }
+
+
 def _live_share_folder(share: dict[str, object]) -> dict[str, object]:
     uid_ref = str(share["uid_ref"])
     return {
@@ -116,6 +143,106 @@ def test_plan_shared_folder_create_then_noop(
     clean_plan = json.loads(clean_result.output)
     assert clean_plan["summary"]["create"] == 0
     assert clean_plan["changes"] == []
+
+
+def test_shared_folder_member_create_plan_and_mock_commander_share_call(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    share = _grantee_share(manage_records=False)
+    manifest = _sharing_manifest(share)
+    changes = compute_sharing_diff(
+        manifest,
+        live_shared_folders=[_live_shared_folder()],
+        live_share_folders=[],
+    )
+    plan = build_plan("vault-sharing", changes, ["sf.ops", "sf.ops.alice"])
+
+    assert len(plan.creates) == 1
+    create = plan.creates[0]
+    assert create.resource_type == "sharing_share_folder"
+    assert create.uid_ref == "sf.ops.alice"
+    assert create.after["user_email"] == "alice@example.com"
+
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli.shutil.which",
+        lambda _bin: "/usr/bin/keeper",
+    )
+    monkeypatch.setattr(
+        "keeper_sdk.providers.commander_cli._ensure_keepercommander_version_for_apply",
+        lambda: None,
+    )
+    provider = CommanderCliProvider(
+        folder_uid="marker-folder",
+        manifest_source={"schema": SHARING_FAMILY},
+    )
+    share_calls: list[dict[str, Any]] = []
+    monkeypatch.setattr(
+        provider,
+        "_sharing_resolve_ref",
+        lambda _ref, *, expected_resource_type: "SF_UID",
+    )
+    monkeypatch.setattr(provider, "_sharing_upsert_sidecar", lambda **_kwargs: None)
+    monkeypatch.setattr(
+        provider,
+        "_share_folder_to_grantee",
+        lambda **kwargs: share_calls.append(dict(kwargs)),
+    )
+
+    outcomes = provider.apply_plan(plan)
+
+    assert [outcome.action for outcome in outcomes] == ["create"]
+    assert share_calls == [
+        {
+            "shared_folder_uid": "SF_UID",
+            "grantee_kind": "user",
+            "identifier": "alice@example.com",
+            "manage_records": False,
+            "manage_users": False,
+        }
+    ]
+
+
+def test_shared_folder_member_remove_requires_allow_delete_then_plans_delete() -> None:
+    live_member = _live_share_folder(_grantee_share(manage_records=False))
+
+    guarded_changes = compute_sharing_diff(
+        _sharing_manifest(),
+        live_shared_folders=[_live_shared_folder()],
+        live_share_folders=[live_member],
+    )
+    assert len(guarded_changes) == 1
+    assert guarded_changes[0].kind is ChangeKind.SKIP
+    assert guarded_changes[0].reason == "managed share_folder missing from manifest"
+
+    delete_changes = compute_sharing_diff(
+        _sharing_manifest(),
+        live_shared_folders=[_live_shared_folder()],
+        live_share_folders=[live_member],
+        allow_delete=True,
+    )
+    plan = build_plan("vault-sharing", delete_changes, ["sf.ops", "sf.ops.alice"])
+
+    assert len(plan.deletes) == 1
+    assert plan.deletes[0].resource_type == "sharing_share_folder"
+    assert plan.deletes[0].uid_ref == "sf.ops.alice"
+
+
+def test_shared_folder_member_permission_update_read_only_to_manage_records() -> None:
+    desired = _grantee_share(manage_records=True)
+    live = _grantee_share(manage_records=False)
+
+    changes = compute_sharing_diff(
+        _sharing_manifest(desired),
+        live_shared_folders=[_live_shared_folder()],
+        live_share_folders=[_live_share_folder(live)],
+    )
+    plan = build_plan("vault-sharing", changes, ["sf.ops", "sf.ops.alice"])
+
+    assert len(plan.updates) == 1
+    update = plan.updates[0]
+    assert update.resource_type == "sharing_share_folder"
+    assert update.before == {"manage_records": False}
+    assert update.after == {"manage_records": True}
 
 
 def test_shared_folder_membership_permission_diff_updates() -> None:
