@@ -10,6 +10,9 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 - **Phase 7 — shared-folder model** — shared-folder manifests now have a
   typed offline model and validation coverage, including `reference_existing`
   paths and schema-stage guardrails.
+- **Phase 7 — shared-folder apply path** — MockProvider apply coverage now
+  exercises shared-folder create/update/noop/delete guardrails and
+  `keeper-vault-sharing.v1` CLI apply -> clean mock-plan convergence.
 - **Phase 7 — KSM bootstrap live path** — `bootstrap-ksm` coverage now tracks
   the live bootstrap flow through application provisioning, one-time token
   redemption, local KSM config materialization, and login-helper verification.
@@ -21,8 +24,11 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
   UID sanitization / quiet-mode coverage.
 - **Phase 7 — example manifests** — scaffold-only manifests now exercise the
   Phase 7 families so CI can validate and mock-plan the new declarative shapes.
-- **Import-path preview** — packaged `declarative_sdk_k` as the 1.x compatibility
-  shim ahead of the planned 2.0 module rename from `keeper_sdk`.
+- **Phase 7 — module rename shim** — packaged `declarative_sdk_k` as the 1.x
+  compatibility shim ahead of the planned 2.0 module rename from `keeper_sdk`.
+- **Phase 7 — v1.3 roadmap** — `docs/DSK_NEXT_WORK.md` now carries the blocker
+  table and v1.3 roadmap for shared-folder write support, KSM app create proof,
+  module rename timing, and teams/roles live validate.
 - **Phase 7 tests** — shared-folder `validate` coverage and KSM app
   `reference_existing` tests.
 - **RichRenderer snapshots** — six layout snapshot cases in

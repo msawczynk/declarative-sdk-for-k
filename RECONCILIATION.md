@@ -1,6 +1,6 @@
 # RECONCILIATION — design vs tree
 
-Written: 2026-04-26 (agent scaffold pass; refreshed 2026-04-29 for KSM live + rotation/RBI + P2.1 `diff` queue + v1.1 offline quality smokes + v1.2/Phase 7 entry/final pass).
+Written: 2026-04-26 (agent scaffold pass; refreshed 2026-04-29 for KSM live + rotation/RBI + P2.1 `diff` queue + v1.1 offline quality smokes + v1.2/Phase 7 entry/final pass + v1.3.dev0 final pass).
 Source of truth: `main` at time of last doc edit (exact SHA: `git rev-parse HEAD`).
 Cross-checks against `V1_GA_CHECKLIST.md`, `docs/SDK_DA_COMPLETION_PLAN.md`,
 `AUDIT.md`, `REVIEW.md`, and DOR pointers in `keeper-pam-declarative/`.
@@ -13,7 +13,7 @@ This is for human + agent review. Per-folder maps live in `<dir>/SCAFFOLD.md`.
 
 - **Zero remaining v1.0.0 GA blockers.** Tag policy decided: annotated only — distribution is GitHub-only (no PyPI, no `git verify-tag` consumer flow); GPG/SSH signing not required. Upgrade path if supply-chain requirements change → sigstore/cosign `dist/*` in `publish.yml` (OIDC, no maintainer key).
 - **Open upstream blocker** (not GA blocker): nested-`pamUser` rotation (GH **#35**) — DSK offline `diff` work is done, but Commander `pam user ls` ParseError on UID positional arg blocks supported readback / clean re-plan proof. **P3 / #5** `pamRemoteBrowser` closeout evidence is doc-ready (2026-04-28 smoke + COMMANDER P3.1 + DA Phase 3); dirty/list/audio subfields stay bucketed.
-- **v1.2.0 shipped baseline:** `CHANGELOG.md` bumped; local gate baseline is **1024 tests / 87% coverage**; Phase 7 work is active.
+- **v1.3.0.dev0 baseline:** v1.2.0 is shipped; the dev line now tracks Phase 7 shared-folder MockProvider apply, the `declarative_sdk_k` rename shim, KSM bootstrap live proof, and `DSK_NEXT_WORK` blockers / v1.3 roadmap.
 - **Three v1.1 offline quality gaps closed:** adoption smoke against unmanaged records, field-drift->UPDATE smoke, two-writer ownership-marker race smoke.
 - **One v2 deferral:** breaking removal of `keeper_sdk`; `declarative_sdk_k` forward-compatible shim has landed.
 - **Nothing has been silently dropped.** Every preview-gated key fails loud at apply via `_detect_unsupported_capabilities` + plan-surface CONFLICT rows (C3 fix; H6 regression test).
@@ -112,6 +112,9 @@ Rows added for the v1.2 state and first Phase 7 landing slice:
 | `declarative_sdk_k` compatibility shim | SHIPPED v1.2/P22 | `declarative_sdk_k/__init__.py`, `tests/test_compat_shim.py`, `pyproject.toml` | New package name forwards to `keeper_sdk`; breaking removal of `keeper_sdk` remains v2.0. |
 | Renderer snapshot coverage | SHIPPED v1.2 (offline) | `tests/test_renderer_snapshots.py`, `tests/fixtures/renderer_snapshots/` | Six layout snapshots lock CLI table shape for current renderers. |
 | Perf memory assertion | SHIPPED v1.2 (offline) | `tests/test_perf.py` | Local gate asserts peak RSS stays under **192 MiB** for the covered workload. |
+| P25 shared-folder MockProvider apply | SHIPPED v1.3.dev0 (offline) | `tests/test_shared_folder_apply.py`, `tests/test_cli_sharing_dispatch.py`, `tests/test_sharing_mock_provider.py`, `tests/test_sharing_mock_provider_siblings.py` | Mock apply covers create/update/noop/delete guardrails and `keeper-vault-sharing.v1` apply -> clean mock-plan convergence; Commander live support remains preview-gated until write/readback proof. |
+| P26 v1.3.0.dev0 baseline | SHIPPED dev baseline | `pyproject.toml`, `CHANGELOG.md` | Package metadata is on `1.3.0.dev0`; the `declarative_sdk_k` shim remains the v1.x bridge and breaking `keeper_sdk` removal waits for v2.0.0. |
+| P27 blockers table + v1.3 roadmap | SHIPPED docs/index | `docs/DSK_NEXT_WORK.md` | The queue now records blockers and v1.3 roadmap items for shared-folder write support, KSM app create proof, module rename timing, and teams/roles live validate. |
 
 ---
 
