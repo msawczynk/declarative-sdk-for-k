@@ -10,7 +10,7 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 - feat(mcp): `dsk mcp serve` CLI command starts a stdio JSON-RPC MCP server that exposes manifest tooling to AI agents (gated by optional `mcp` extra).
-- feat(pam): `rotation_scripts` field on `pamUser` for declarative `pam rotation script add` attachments, with plan-time warning when readback would require unavailable `pam rotation info --format=json`.
+- feat(pam): `rotation_scripts` field on `pamUser` for declarative `pam rotation script add` attachments, with plan-time warning when readback would require `pam rotation info --format=json` (Commander PR #2003 merged to `release` — warning lifts once next Commander tag ships).
 - feat(ksm): `update_app` now wired in `CommanderCliProvider` — KSM app metadata drift triggers an in-place rename instead of delete+recreate.
 - feat(diff): `pam_configuration.options` permission-flag drift (connections, tunneling, rotation, remote_browser_isolation, graphical_session_recording, text_session_recording, ai_threat_detection, ai_terminate_session_on_detection) now surfaces as UPDATE rows; previously silently dropped post-import.
 - test(live): KSM app lifecycle (token / share / config-output) live-proof accepted against the lab tenant — 3/3 lifecycle ops verified.
@@ -26,6 +26,17 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 - fix(diff): `pamConfiguration` permission flags no longer silently ignored — overlay diff against the manifest `options` block (Commander-injected defaults remain unmanaged).
+
+### Upstream contributions
+
+Four Commander pull requests were authored during the v2.3.0 cycle and **merged
+into `Keeper-Security/Commander` `release` branch on 2026-04-30** (ship in next
+Commander tag, post-`17.2.16`):
+
+- [Commander #2003](https://github.com/Keeper-Security/Commander/pull/2003) — `pam rotation info --format=json`
+- [Commander #2004](https://github.com/Keeper-Security/Commander/pull/2004) — `secrets-manager token add <app-uid>`
+- [Commander #2005](https://github.com/Keeper-Security/Commander/pull/2005) — `pam project import` duplicate-uid guard
+- [Commander #2006](https://github.com/Keeper-Security/Commander/pull/2006) — `pam project export`
 
 ## [2.1.0] - 2026-04-30
 

@@ -135,8 +135,11 @@ config list commands; non-gateway delete uses `rm --force`.
 | `resources[].users[].rotation_settings` | experimental — `DSK_EXPERIMENTAL_ROTATION_APPLY=1` | `pam rotation edit` |
 
 **Rotation scheduling** is gated behind `DSK_EXPERIMENTAL_ROTATION_APPLY=1`.
-`pam rotation info --format=json` does not exist in Commander `17.x`; readback
-uses the human-readable form and is partial.
+`pam rotation info --format=json` does not exist in Commander `17.2.16` — but
+**[PR #2003](https://github.com/Keeper-Security/Commander/pull/2003)** is merged
+into the Commander `release` branch and ships in the next Commander tag. DSK
+will silently lift the rotation-script readback warning once that release lands.
+Until then, readback uses the human-readable form and is partial.
 
 ---
 
@@ -181,9 +184,9 @@ login path.
 | Operation | Status | Commander surface | Notes |
 |---|---|---|---|
 | App create | ✅ Supported | In-process `KSMCommand.add_new_v5_app(params, name)` | Requires `17.2.16+` |
-| App rename / metadata update (`update_app`) | ❌ `missing_apply` | In-process `KSMCommand.update_app` (stable Commander **17.2.16**+) | Not yet wired into `CommanderCliProvider` — pending implementation; classification `missing_apply` (model exists, Commander API exists, wiring not done); raises `CapabilityError` |
+| App rename / metadata update (`update_app`) | ✅ Supported (DSK 2.3.0) | In-process `KSMCommand.update_app` (stable Commander **17.2.16**+) | Wired in `CommanderCliProvider.apply_ksm_plan` for `ChangeKind.UPDATE` |
 | App delete | ✅ Supported | In-process `KSMCommand.remove_v5_app(params, app_name_or_uid, purge, force)` | Requires delete row from owned live state |
-| Token add | ❌ Upstream-gap | None | Not a stable programmatic surface |
+| Token add | ⏳ Coming in next Commander release | `secrets-manager token add <app-uid>` ([PR #2004](https://github.com/Keeper-Security/Commander/pull/2004) merged to `release`) | Not yet wired into DSK; lifts to scriptable on next Commander tag |
 | Existing share editable update | ✅ Supported | In-process `KSMCommand.update_app_share(params, secret_uids, app_uid, editable)` | Existing shares only |
 | New record share | ❌ Upstream-gap | No committed DSK create/readback contract in this family | Use Secrets Manager console or sharing family where applicable |
 | Config output | ❌ Upstream-gap | None | Use Secrets Manager console |
@@ -250,16 +253,31 @@ per-report flags.
 
 ## 6. Explicit capability gaps
 
+### 6.1 Coming in next Commander release (merged to `release` branch)
+
+Four upstream Commander pull requests were merged on **2026-04-30** into
+`Keeper-Security/Commander` `release` branch and ship in the next Commander
+tag (post-`17.2.16`). DSK already detects and uses them when available:
+
+| Capability | Commander PR | DSK behaviour |
+|---|---|---|
+| `pam rotation info --format=json` | [#2003](https://github.com/Keeper-Security/Commander/pull/2003) | DSK now warns at plan-time when rotation-script readback would require this; lifts to silent on next Commander release |
+| `secrets-manager token add <app-uid>` | [#2004](https://github.com/Keeper-Security/Commander/pull/2004) | KSM token-add becomes scriptable; DSK roadmap will wire `keeper-ksm.v1` token lifecycle |
+| `pam project import` duplicate-uid guard | [#2005](https://github.com/Keeper-Security/Commander/pull/2005) | DSK manifests with duplicate `uid_ref` collisions now fail fast in Commander, not silently overwrite |
+| `pam project export` (deterministic JSON) | [#2006](https://github.com/Keeper-Security/Commander/pull/2006) | DSK keeps its synthesised `dsk export` (works on `17.2.16+`); also accepts native `pam project export` JSON on next Commander release |
+
+### 6.2 Gaps still present on Commander `17.2.16`
+
 | Gap | Root cause | Workaround | Tracking |
 |---|---|---|---|
-| `pam rotation info --format=json` | Not available in any `17.x` release | `keeper pam rotation info` (human-readable); rotation scheduling via admin console | Upstream backlog |
+| `pam rotation info --format=json` (on `17.2.16`) | Not available in any released `17.x` tag yet — merged for next release (PR #2003) | `keeper pam rotation info` (human-readable); rotation scheduling via admin console | Next Commander release |
 | Rotation scheduling apply | `DSK_EXPERIMENTAL_ROTATION_APPLY` must be set; readback partial | Do not use in production without live proof | Experimental gate |
-| KSM token / new share / config-output management | Not a stable programmatic Commander surface in the `keeper-ksm.v1` family | Keeper Secrets Manager console; `keeper sm token add` interactively | v2+ roadmap |
-| KSM app rename / metadata update (`update_app`) | Classification `missing_apply`: `KSMCommand.update_app` is stable on Commander **17.2.16**; model + Commander API exist; DSK wiring in `CommanderCliProvider` not done yet | — | Pending DSK implementation |
+| KSM token / new share / config-output management | Not a stable programmatic Commander surface in the `keeper-ksm.v1` family on `17.2.16` (PR #2004 lands token add in next release) | Keeper Secrets Manager console; `keeper sm token add` interactively | Next Commander release |
+| KSM app rename / metadata update (`update_app`) | Classification `missing_apply`: `KSMCommand.update_app` is stable on Commander **17.2.16**; model + Commander API exist | — | Implemented in DSK 2.3.0 |
 | MSP apply without tenant permit | `msp_permits.allowed_mc_products` required on tenant | Request MSP permit from Keeper; validate-only with `dsk plan` | Upstream tenant-capability |
-| MSP import marker write | No stable marker anchor for managed-company records | Use mock provider for full lifecycle testing | Design pending (`docs/MSP_FAMILY_DESIGN.md`) |
+| MSP import marker write | No stable marker anchor for managed-company records | Use mock provider for full lifecycle testing | Design pending |
 | Enterprise write operations | Commander enterprise API is read-only via DSK | Use Keeper admin console for node/user/role/team mutations | By design (read-only family) |
-| `pam project export` | Does not exist in Commander `17.2.16+` | `dsk export <project.json>` synthesises export from `ls` + `get` | N/A — DSK workaround ships |
+| `pam project export` (on `17.2.16`) | Does not exist in `17.2.16` (PR #2006 lands in next release) | `dsk export <project.json>` synthesises export from `ls` + `get` | DSK workaround ships; native command in next Commander release |
 | `record-update` (subprocess) | Version-fragile typed-field syntax | In-process `record_management.update_record` API used instead | N/A — DSK workaround ships |
 | Standalone JIT edit | No dedicated `pam jit edit` Commander surface separate from import/extend | Use manifest import/extend lifecycle for supported PAM resources | Future Commander surface |
 | RBI audio controls | Commander exposes flags; no typed manifest field | — | Schema extension candidate |
@@ -295,13 +313,13 @@ See [COMMANDER.md](COMMANDER.md) for the exact pin SHA and delta table between
 
 | Command | Reason |
 |---|---|
-| `pam project export` | Does not exist in `17.2.16+`; DSK synthesises via `ls` + `get` |
+| `pam project export` | Does not exist in `17.2.16` (lands in next release via PR #2006); DSK synthesises via `ls` + `get` and continues to do so for back-compat |
 | `pam project remove` / `destroy` | Does not exist; destroy is per-record `rm --force` |
 | `record-update` (subprocess) | Version-fragile; in-process API used instead |
 | Interactive `keeper login` / `keeper sync-down` | Subprocess prompts interactively; `deploy_watcher.keeper_login()` handles both |
 | `msp-down` (subprocess) | In-process `api.query_enterprise` used; operators may run `keeper msp-down` manually to refresh cache |
-| `pam rotation info --format=json` | Not available in `17.x`; human-readable fallback only |
-| `secrets-manager token add` | Not a stable programmatic surface in `17.x` |
+| `pam rotation info --format=json` | Not available in `17.2.16` (lands in next release via PR #2003); human-readable fallback only |
+| `secrets-manager token add` | Not a stable programmatic surface in `17.2.16` (lands in next release via PR #2004) |
 
 ---
 
