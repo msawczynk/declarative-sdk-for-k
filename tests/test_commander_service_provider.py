@@ -277,12 +277,19 @@ def test_apply_plan_delete_builds_delete_command() -> None:
 def test_unsupported_capabilities_match_cli_detector() -> None:
     provider = CommanderServiceProvider(
         api_key="token",
-        manifest_source={"gateways": [{"uid_ref": "gw.new", "name": "new", "mode": "create"}]},
+        manifest_source={
+            "pam_configurations": [
+                {
+                    "uid_ref": "cfg",
+                    "default_rotation_schedule": {"type": "on-demand"},
+                }
+            ]
+        },
     )
 
     gaps = provider.unsupported_capabilities()
 
-    assert "mode: create is not implemented" in gaps[0]
+    assert "default_rotation_schedule" in gaps[0]
 
 
 def test_service_client_post_async_serializes_filedata(monkeypatch: pytest.MonkeyPatch) -> None:

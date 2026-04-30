@@ -49,8 +49,12 @@ from keeper_sdk.core import (
 )
 from keeper_sdk.core.interfaces import ApplyOutcome, LiveRecord
 from keeper_sdk.core.manifest import load_manifest_string
+from keeper_sdk.core.models_ai_agent import AI_AGENT_FAMILY, AiAgentManifest
 from keeper_sdk.core.models_integrations_events import EVENTS_FAMILY, EventsManifestV1
 from keeper_sdk.core.models_ksm import KSM_FAMILY, KsmManifestV1
+from keeper_sdk.core.models_nhi import NHI_FAMILY, NhiAgentManifest
+from keeper_sdk.core.models_pam_extended import PAM_EXTENDED_FAMILY, PamExtendedManifestV1
+from keeper_sdk.core.pam_extended_diff import compute_pam_extended_diff
 from keeper_sdk.core.planner import Plan
 from keeper_sdk.core.sharing_models import SharingManifestV1
 from keeper_sdk.core.vault_models import VaultManifestV1
@@ -84,7 +88,10 @@ class PlanBundle:
     sharing: SharingManifestV1 | None = None
     msp: MspManifestV1 | None = None
     identity: IdentityManifestV1 | None = None
+    pam_extended: PamExtendedManifestV1 | None = None
     events: EventsManifestV1 | None = None
+    nhi: NhiAgentManifest | None = None
+    ai_agent: AiAgentManifest | None = None
     live: list[LiveRecord] | None = None
     live_msp: list[dict[str, Any]] | None = None
     live_record_type_defs: list[dict[str, Any]] | None = None
@@ -168,7 +175,10 @@ server = JsonRpcMcpServer(_SERVER_NAME)
 
 @server.tool("dsk_validate")
 async def validate(manifest_yaml: str) -> str:
-    """Validate a DSK manifest YAML string against packaged schemas."""
+    """Validate a DSK manifest YAML string against packaged schemas.
+
+    Includes nhi-agent.v1 and ai-agent.v1.
+    """
     path = yaml_to_tempfile(manifest_yaml)
     try:
         output = capture_dsk_output(
@@ -370,6 +380,18 @@ def _build_mcp_plan(path: Path, *, allow_delete: bool) -> tuple[Plan, PlanBundle
             raise _unsupported_plan_apply(IDENTITY_FAMILY, "upstream-gap")
         elif bundle.events is not None:
             raise _unsupported_plan_apply(EVENTS_FAMILY, "upstream-gap")
+        elif bundle.nhi is not None:
+            raise _unsupported_plan_apply(NHI_FAMILY, "upstream-gap; pending NHI PAM API GA")
+        elif bundle.ai_agent is not None:
+            raise _unsupported_plan_apply(AI_AGENT_FAMILY, "upstream-gap; pending NHI PAM API GA")
+        elif bundle.pam_extended is not None:
+            compute_pam_extended_diff(
+                bundle.pam_extended,
+                {},
+                manifest_name=bundle.manifest_name,
+                allow_delete=allow_delete,
+            )
+            raise _unsupported_plan_apply(PAM_EXTENDED_FAMILY, "preview-gated")
         else:
             raise CapabilityError(
                 reason="plan is not supported for this manifest family",
@@ -403,8 +425,12 @@ def _load_mcp_bundle(path: Path) -> PlanBundle:
     sharing = typed if isinstance(typed, SharingManifestV1) else None
     msp = typed if isinstance(typed, MspManifestV1) else None
     identity = typed if isinstance(typed, IdentityManifestV1) else None
+    pam_extended = typed if isinstance(typed, PamExtendedManifestV1) else None
     events = typed if isinstance(typed, EventsManifestV1) else None
+    nhi = typed if isinstance(typed, NhiAgentManifest) else None
+    ai_agent = typed if isinstance(typed, AiAgentManifest) else None
     ksm = typed if isinstance(typed, KsmManifestV1) else None
+    manifest_name = _manifest_name(path, pam, msp, identity, pam_extended, events, nhi, ai_agent)
 
     if pam is not None:
         order = execution_order(build_graph(pam))
@@ -419,6 +445,12 @@ def _load_mcp_bundle(path: Path) -> PlanBundle:
         raise _unsupported_plan_apply(IDENTITY_FAMILY, "upstream-gap")
     elif events is not None:
         raise _unsupported_plan_apply(EVENTS_FAMILY, "upstream-gap")
+    elif nhi is not None:
+        raise _unsupported_plan_apply(NHI_FAMILY, "upstream-gap; pending NHI PAM API GA")
+    elif ai_agent is not None:
+        raise _unsupported_plan_apply(AI_AGENT_FAMILY, "upstream-gap; pending NHI PAM API GA")
+    elif pam_extended is not None:
+        raise _unsupported_plan_apply(PAM_EXTENDED_FAMILY, "preview-gated")
     elif ksm is not None:
         raise CapabilityError(
             reason=f"typed plan/load supports {KSM_FAMILY} for offline validation only",
@@ -430,7 +462,6 @@ def _load_mcp_bundle(path: Path) -> PlanBundle:
             next_action="use dsk_validate for schema checks",
         )
 
-    manifest_name = _manifest_name(path, pam, msp, identity, events)
     provider = _make_mcp_provider(manifest_name, typed)
     live: list[LiveRecord] = []
     live_msp: list[dict[str, Any]] = []
@@ -451,7 +482,10 @@ def _load_mcp_bundle(path: Path) -> PlanBundle:
         sharing=sharing,
         msp=msp,
         identity=identity,
+        pam_extended=pam_extended,
         events=events,
+        nhi=nhi,
+        ai_agent=ai_agent,
         live=live,
         live_msp=live_msp,
         live_record_type_defs=live_record_type_defs,
@@ -493,7 +527,10 @@ def _manifest_name(
     pam: Manifest | None,
     msp: MspManifestV1 | None,
     identity: IdentityManifestV1 | None,
+    pam_extended: PamExtendedManifestV1 | None,
     events: EventsManifestV1 | None,
+    nhi: NhiAgentManifest | None,
+    ai_agent: AiAgentManifest | None,
 ) -> str:
     if pam is not None:
         return pam.name
@@ -503,6 +540,12 @@ def _manifest_name(
         return IDENTITY_FAMILY
     if events is not None:
         return events.name
+    if nhi is not None:
+        return NHI_FAMILY
+    if ai_agent is not None:
+        return AI_AGENT_FAMILY
+    if pam_extended is not None:
+        return PAM_EXTENDED_FAMILY
     return path.stem
 
 

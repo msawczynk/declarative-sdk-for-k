@@ -330,6 +330,9 @@ See `docs/LOGIN.md` for the 30-line helper skeleton.
 
 ## Operator tooling
 
+
+**Publish gate rule (enforced 2026-04-30):** public mirror only receives Commander-shipped features. Run `bash scripts/check_public_content.sh` before any `publish.sh` invocation. Features classified `upstream-gap` or `preview-gated` in `docs/SDK_DA_COMPLETION_PLAN.md` MUST NOT appear in public. Use `bash scripts/generate_public_docs.sh` to produce the stripped `docs/CAPABILITY_STATUS.md` for public consumption.
+
 Operator-side orchestration tooling is not part of this SDK and is not
 documented here.
 

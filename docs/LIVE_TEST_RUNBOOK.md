@@ -34,8 +34,8 @@ this runbook or [`scripts/smoke/README.md`](../scripts/smoke/README.md).
 ## Pre-flight (run before every live session)
 
 1. Confirm tenant (`admin@example.com` for the lab).
-2. Verify a usable KSM/Commander session is available before spending tenant API quota
-   (e.g. run your site KSM preflight script or confirm `pip show keepercommander` reports the correct version).
+2. `bash ~/.cursor-daybook-sync/scripts/ksm_login_preflight.sh` —
+   verifies a usable KSM session before spending tenant API quota.
 3. `git status` clean on the repo. Live tests write artefacts under
    `.live-smoke/` (gitignored).
 4. Confirm `.commander-pin` matches `keepercommander` installed

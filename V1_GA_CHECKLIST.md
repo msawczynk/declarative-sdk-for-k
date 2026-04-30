@@ -126,6 +126,8 @@ and `tests/test_smoke_scenarios.py`.
 
 Phase 7 hardening complete. v2.0.0 prep release ready: `declarative_sdk_k`
 shim delivered, `keeper_sdk` compat shim active. New scaffolds added 2026-04-30:
+`nhi-agent.v1` + `ai-agent.v1` offline (apply pending NHI API GA),
+`keeper-pam-extended.v1` offline foundation, KSM bus CAS offline,
 compliance-report empty-cache path, ksm-usage Commander-unavailable fallback.
 Remaining non-GA blockers: gateway `mode: create` / `projects[]` / JIT deferred
 to v2 design; vault-sharing live proof + ksm-usage live proof pending

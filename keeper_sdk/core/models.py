@@ -78,6 +78,39 @@ class JitSettings(_Model):
     pam_directory_uid_ref: str | None = None
 
 
+class WorkflowSettings(_Model):
+    """Inline PAM workflow settings for a resource (router-stored, keyed by record UID).
+
+    Maps to ``pam workflow create/update <uid> ...`` on the Commander router.
+    All fields are optional; omitting means no workflow enforcement.
+    """
+
+    approvals_needed: int | None = None
+    checkout_needed: bool | None = None
+    start_access_on_approval: bool | None = None
+    require_reason: bool | None = None
+    require_ticket: bool | None = None
+    require_mfa: bool | None = None
+    access_length: int | None = None  # minutes
+    allowed_days: list[Literal["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]] | None = None
+    allowed_from_time: str | None = None  # HH:MM
+    allowed_to_time: str | None = None  # HH:MM
+    allowed_timezone: str | None = None
+    approver_uid_refs: list[str] = Field(default_factory=list)
+
+
+class SaasPluginConfig(_Model):
+    """One SaaS rotation plugin attached to a pamUser.
+
+    ``plugin_name`` identifies the Commander gateway plugin.
+    ``config`` is opaque key/value — validated at runtime by the gateway.
+    Maps to ``pam saas config/set/update`` Commander verbs.
+    """
+
+    plugin_name: str
+    config: dict[str, Any] = Field(default_factory=dict)
+
+
 class AiSettings(_Model):
     risk_levels: dict[str, Any] | None = None
 
@@ -290,6 +323,7 @@ class PamUser(_Model):
     attachments: list[str] | None = None
     scripts: list[dict[str, Any]] | None = None
     rotation_settings: RotationSettings | None = None
+    saas_plugins: list[SaasPluginConfig] = Field(default_factory=list)
 
 
 class LoginRecord(_Model):
@@ -319,6 +353,7 @@ class _ResourceBase(_Model):
     attachments: list[str] | None = None
     scripts: list[dict[str, Any]] | None = None
     pam_settings: PamSettings | None = None
+    workflow_settings: WorkflowSettings | None = None
     users: list[PamUser] = Field(default_factory=list)
 
 

@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/msawczynk/declarative-sdk-for-k/schemas/privileged-access/v1.json",
+  "title": "keeper-privileged-access.v1",
+  "description": "Preview-gated schema for PAM privileged cloud access users, groups, and memberships. Commander 17.2.16 ships pam access verbs; DSK currently validates typed intent only.",
+  "x-keeper-live-proof": {
+    "status": "preview-gated",
+    "evidence": "Commander 17.2.16 pam access registry",
+    "since_pin": "6574827cf2993d2a54484516c2f4cc33238f98c9",
+    "notes": "Schema and typed model scaffold only. Plan/apply wait on provider mapping, live write/readback proof, and ownership-marker design."
+  },
+  "type": "object",
+  "required": ["schema"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "keeper-privileged-access.v1"
+    },
+    "users": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/privileged_user"
+      }
+    },
+    "groups": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/privileged_group"
+      }
+    },
+    "group_memberships": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/privileged_group_membership"
+      }
+    }
+  },
+  "$defs": {
+    "uid_ref": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "user_ref": {
+      "type": "string",
+      "pattern": "^keeper-privileged-access:users:[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "group_ref": {
+      "type": "string",
+      "pattern": "^keeper-privileged-access:groups:[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "non_empty_string": {
+      "type": "string",
+      "minLength": 1
+    },
+    "provider": {
+      "type": "string",
+      "enum": ["aws", "azure", "gcp", "generic"],
+      "default": "generic"
+    },
+    "privileged_user": {
+      "type": "object",
+      "required": ["uid_ref", "principal"],
+      "additionalProperties": false,
+      "properties": {
+        "uid_ref": {
+          "$ref": "#/$defs/uid_ref"
+        },
+        "principal": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "provider": {
+          "$ref": "#/$defs/provider"
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "privileged_group": {
+      "type": "object",
+      "required": ["uid_ref", "name"],
+      "additionalProperties": false,
+      "properties": {
+        "uid_ref": {
+          "$ref": "#/$defs/uid_ref"
+        },
+        "name": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "provider": {
+          "$ref": "#/$defs/provider"
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "privileged_group_membership": {
+      "type": "object",
+      "required": ["uid_ref", "user_uid_ref", "group_uid_ref"],
+      "additionalProperties": false,
+      "properties": {
+        "uid_ref": {
+          "$ref": "#/$defs/uid_ref"
+        },
+        "user_uid_ref": {
+          "$ref": "#/$defs/user_ref"
+        },
+        "group_uid_ref": {
+          "$ref": "#/$defs/group_ref"
+        }
+      }
+    }
+  }
+}

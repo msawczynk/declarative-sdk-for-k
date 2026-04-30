@@ -31,10 +31,14 @@ records:
 """
 
 
+NHI_MANIFEST = """\
+schema: nhi-agent.v1
 resources: []
 """
 
 
+AI_AGENT_MANIFEST = """\
+schema: ai-agent.v1
 resources: []
 """
 
@@ -95,6 +99,9 @@ def test_server_initializes_without_network(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.delenv("KEEPER_SERVICE_API_KEY", raising=False)
     tools = mcp_server.server.list_tools()
     assert {tool["name"] for tool in tools} >= {"dsk_validate", "dsk_plan", "dsk_apply"}
+    validate_tool = next(tool for tool in tools if tool["name"] == "dsk_validate")
+    assert "nhi-agent.v1" in validate_tool["description"]
+    assert "ai-agent.v1" in validate_tool["description"]
 
 
 def test_json_rpc_tools_list() -> None:
@@ -115,6 +122,31 @@ def test_json_rpc_tools_call() -> None:
     )
     assert response["result"]["content"][0]["text"] == "ok"
     assert response["result"]["isError"] is False
+
+
+@pytest.mark.parametrize(
+    ("family", "manifest_yaml"),
+    [("nhi-agent.v1", NHI_MANIFEST), ("ai-agent.v1", AI_AGENT_MANIFEST)],
+)
+def test_mcp_plan_registers_nhi_ai_agent_families_as_upstream_gap(
+    family: str,
+    manifest_yaml: str,
+) -> None:
+    response = _run(
+        mcp_server.server.handle(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {"name": "dsk_plan", "arguments": {"manifest_yaml": manifest_yaml}},
+            }
+        )
+    )
+    text = response["result"]["content"][0]["text"]
+    assert response["result"]["isError"] is True
+    assert family in text
+    assert "upstream-gap" in text
+    assert "NHI PAM API GA" in text
 
 
 def test_bus_publish_and_get(monkeypatch: pytest.MonkeyPatch) -> None:

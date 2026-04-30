@@ -2,13 +2,13 @@
 
 ## Decision
 
-Keep gateway `mode: create` and top-level `projects[]` preview-gated for this
-release. This is a design slice, not support. The SDK must not claim gateway
-creation or multi-project apply until a non-interactive Commander writer path
-is proven with live tenant evidence and a clean re-plan.
+Gateway `mode: create` is resolved for the Commander 17.2.16
+`pam gateway new` path. Top-level `projects[]` remains preview-gated for this
+release. The SDK must not claim multi-project apply until a non-interactive
+Commander writer path is proven with live tenant evidence and a clean re-plan.
 
-Classification: design-only. `reference_existing` remains the supported
-gateway mode.
+Classification: gateway lifecycle supported; `projects[]` design-only.
+`reference_existing` remains the lowest-risk gateway mode for existing tenants.
 
 ## Target Manifest Shape
 
@@ -144,12 +144,13 @@ When compatibility `projects[]` support lands:
 
 ## Gate Policy
 
-Current gates stay closed:
+Current gates:
 
-- `keeper_sdk/core/preview.py` rejects `mode: create` and top-level
-  `projects[]` unless `DSK_PREVIEW=1`.
-- `CommanderCliProvider.unsupported_capabilities()` reports `mode: create` as a
-  plan-time conflict and `apply_plan()` refuses it as a last-line defense.
+- `keeper_sdk/core/preview.py` rejects top-level `projects[]` unless
+  `DSK_PREVIEW=1`.
+- `CommanderCliProvider` routes gateway create/edit/remove through
+  `PAMCreateGatewayCommand`, `PAMEditGatewayCommand`, and
+  `PAMGatewayRemoveCommand`.
 - `projects[]` remains preview-only; before any provider can claim support, a
   provider conflict must be added for unsupported multi-project semantics when
   `DSK_PREVIEW=1` is used.

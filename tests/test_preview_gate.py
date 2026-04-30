@@ -3,8 +3,8 @@
 Pins three invariants:
 
 1. With ``DSK_PREVIEW`` unset, a manifest carrying a preview key
-   (unsupported rotation locations, ``jit_settings``, gateway ``mode:
-   create``, ``default_rotation_schedule``, top-level ``projects[]``) is
+   (unsupported rotation locations, ``default_rotation_schedule``,
+   top-level ``projects[]``) is
    rejected at load time with :class:`SchemaError` and a remediation that
    names the env var.
 2. With ``DSK_PREVIEW=1``, the same manifest loads cleanly.
@@ -107,7 +107,6 @@ def preview_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
 @pytest.mark.parametrize(
     ("raw", "needle"),
     [
-        (_MANIFEST_WITH_GATEWAY_CREATE, "mode: create"),
         (_MANIFEST_WITH_PROJECTS, "top-level projects[]"),
     ],
 )
@@ -138,6 +137,13 @@ def test_gate_accepts_preview_key_with_opt_in(
     assert expected_ref in refs
 
 
+def test_gateway_create_is_supported_without_preview(preview_disabled: None) -> None:
+    manifest = load_manifest_string(_MANIFEST_WITH_GATEWAY_CREATE, suffix=".yaml")
+
+    assert manifest.gateways[0].mode == "create"
+    assert manifest.gateways[0].ksm_application_name == "sdk-test-ksm"
+
+
 def test_nested_rotation_is_supported_without_preview(preview_disabled: None) -> None:
     manifest = load_manifest_string(_MANIFEST_WITH_ROTATION, suffix=".yaml")
 
@@ -160,7 +166,7 @@ def test_detector_is_pure_and_ignores_env(preview_enabled: None) -> None:
         }
     )
     joined = " ".join(hits)
-    assert "mode: create" in joined
+    assert "mode: create" not in joined
     assert "top-level projects[]" in joined
     assert "rotation_settings" in joined
 

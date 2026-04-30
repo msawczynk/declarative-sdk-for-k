@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/msawczynk/declarative-sdk-for-k/schemas/workflow/v1.json",
+  "title": "keeper-workflow.v1",
+  "description": "Preview-gated schema for Keeper PAM Workflow definitions, approvers, requests, and state metadata. Commander 17.2.16 ships pam workflow verbs; DSK currently validates typed intent only.",
+  "x-keeper-live-proof": {
+    "status": "preview-gated",
+    "evidence": "Commander 17.2.16 pam workflow registry",
+    "since_pin": "6574827cf2993d2a54484516c2f4cc33238f98c9",
+    "notes": "Schema and typed model scaffold only. Plan/apply wait on provider mapping, live write/readback proof, and ownership-marker design."
+  },
+  "type": "object",
+  "required": ["schema"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "keeper-workflow.v1"
+    },
+    "workflows": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/workflow_config"
+      }
+    },
+    "approvers": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/workflow_approver"
+      }
+    },
+    "requests": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/workflow_request"
+      }
+    },
+    "states": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/workflow_state"
+      }
+    }
+  },
+  "$defs": {
+    "uid_ref": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "workflow_ref": {
+      "type": "string",
+      "pattern": "^keeper-workflow:workflows:[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "approver_ref": {
+      "type": "string",
+      "pattern": "^keeper-workflow:approvers:[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "non_empty_string": {
+      "type": "string",
+      "minLength": 1
+    },
+    "approver_ref_list": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/approver_ref"
+      }
+    },
+    "workflow_config": {
+      "type": "object",
+      "required": ["uid_ref", "name"],
+      "additionalProperties": false,
+      "properties": {
+        "uid_ref": {
+          "$ref": "#/$defs/uid_ref"
+        },
+        "name": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "resource_uid_ref": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "approver_uid_refs": {
+          "$ref": "#/$defs/approver_ref_list"
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "workflow_approver": {
+      "type": "object",
+      "required": ["uid_ref", "name"],
+      "additionalProperties": false,
+      "properties": {
+        "uid_ref": {
+          "$ref": "#/$defs/uid_ref"
+        },
+        "name": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "email": {
+          "$ref": "#/$defs/non_empty_string"
+        }
+      }
+    },
+    "workflow_request": {
+      "type": "object",
+      "required": ["uid_ref", "workflow_uid_ref", "requester"],
+      "additionalProperties": false,
+      "properties": {
+        "uid_ref": {
+          "$ref": "#/$defs/uid_ref"
+        },
+        "workflow_uid_ref": {
+          "$ref": "#/$defs/workflow_ref"
+        },
+        "requester": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "reason": {
+          "type": "string"
+        }
+      }
+    },
+    "workflow_state": {
+      "type": "object",
+      "required": ["uid_ref", "workflow_uid_ref"],
+      "additionalProperties": false,
+      "properties": {
+        "uid_ref": {
+          "$ref": "#/$defs/uid_ref"
+        },
+        "workflow_uid_ref": {
+          "$ref": "#/$defs/workflow_ref"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "approved", "denied", "started", "ended"],
+          "default": "pending"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,13 @@
+schema: keeper-privileged-access.v1
+users:
+  - uid_ref: user.alice
+    principal: alice@example.com
+    provider: aws
+groups:
+  - uid_ref: group.break-glass
+    name: BreakGlassAdmins
+    provider: aws
+group_memberships:
+  - uid_ref: membership.alice-break-glass
+    user_uid_ref: keeper-privileged-access:users:user.alice
+    group_uid_ref: keeper-privileged-access:groups:group.break-glass

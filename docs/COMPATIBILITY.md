@@ -65,9 +65,9 @@ full capability breakdown and `P3.1` readback bucket definitions.
 | Gap | Status | Workaround |
 |-----|--------|-----------|
 | `pam rotation info --format=json` | Not available in any 17.x release | Use `keeper pam rotation info` (human-readable); schedule rotation via admin console |
-| Gateway `mode: create` | No `pam gateway create` in Commander | Import existing gateways via `dsk import`; create via admin console |
+| Standalone JIT edit | No dedicated `pam jit edit` in Commander | Use manifest import/extend lifecycle for supported PAM resources |
 | MSP apply (MC create/update/delete) | Requires tenant `msp_permits.allowed_mc_products` | Run `dsk plan --json`; apply via Keeper admin console |
-| KSM token/share/update/delete | No stable programmatic Commander surface | Use Secrets Manager console |
+| KSM token/new-share/config-output/app-metadata update | No stable programmatic Commander surface | Use Secrets Manager console |
 
 See `docs/COMMANDER.md` for the complete gap table and Commander pin-churn policy.
 
@@ -130,7 +130,6 @@ Short list; see `docs/COMMANDER.md` § "Known Commander gaps affecting DSK" for 
 authoritative table with workarounds.
 
 - `pam rotation info --format=json` — not available in any Commander 17.x
-- Gateway `mode: create` — use `dsk import` instead
 - MSP apply — requires tenant MSP product permit
-- KSM token/share/update/delete — exit 5 upstream-gap; use console
+- KSM token/new-share/config-output/app-metadata update — exit 5 upstream-gap; use console
 - `pam project export` — does not exist; DSK synthesises via `get` + `ls`

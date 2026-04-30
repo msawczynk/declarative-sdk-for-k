@@ -1,0 +1,21 @@
+version: "1"
+name: jit-project-import
+resources:
+  - uid_ref: dir.linux
+    type: pamDirectory
+    title: Linux Directory
+    directory_type: ldap
+    host: ldap.example.com
+  - uid_ref: res.shell
+    type: pamMachine
+    title: shell
+    host: shell.example.com
+    pam_settings:
+      options:
+        jit_settings:
+          create_ephemeral: true
+          elevate: true
+          elevation_method: group
+          elevation_string: wheel
+          ephemeral_account_type: linux
+          pam_directory_uid_ref: dir.linux

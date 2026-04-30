@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/msawczynk/declarative-sdk-for-k/schemas/tunnel/v1.json",
+  "title": "keeper-tunnel.v1",
+  "description": "Preview-gated schema for Keeper PAM tunnels, gateway bindings, and host mappings. Commander 17.2.16 ships pam tunnel verbs; DSK currently validates typed intent only.",
+  "x-keeper-live-proof": {
+    "status": "preview-gated",
+    "evidence": "Commander 17.2.16 pam tunnel registry",
+    "since_pin": "6574827cf2993d2a54484516c2f4cc33238f98c9",
+    "notes": "Schema and typed model scaffold only. Plan/apply wait on provider mapping, live write/readback proof, and ownership-marker design."
+  },
+  "type": "object",
+  "required": ["schema"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "keeper-tunnel.v1"
+    },
+    "tunnels": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/tunnel_config"
+      }
+    },
+    "gateway_bindings": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/tunnel_gateway_binding"
+      }
+    },
+    "host_mappings": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/tunnel_host_mapping"
+      }
+    }
+  },
+  "$defs": {
+    "uid_ref": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "tunnel_ref": {
+      "type": "string",
+      "pattern": "^keeper-tunnel:tunnels:[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "non_empty_string": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tunnel_config": {
+      "type": "object",
+      "required": ["uid_ref", "name"],
+      "additionalProperties": false,
+      "properties": {
+        "uid_ref": {
+          "$ref": "#/$defs/uid_ref"
+        },
+        "name": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "protocol": {
+          "type": "string",
+          "enum": ["ssh", "rdp", "http", "tcp"],
+          "default": "tcp"
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "tunnel_gateway_binding": {
+      "type": "object",
+      "required": ["uid_ref", "tunnel_uid_ref", "gateway_uid_ref"],
+      "additionalProperties": false,
+      "properties": {
+        "uid_ref": {
+          "$ref": "#/$defs/uid_ref"
+        },
+        "tunnel_uid_ref": {
+          "$ref": "#/$defs/tunnel_ref"
+        },
+        "gateway_uid_ref": {
+          "$ref": "#/$defs/non_empty_string"
+        }
+      }
+    },
+    "tunnel_host_mapping": {
+      "type": "object",
+      "required": ["uid_ref", "tunnel_uid_ref", "host", "port"],
+      "additionalProperties": false,
+      "properties": {
+        "uid_ref": {
+          "$ref": "#/$defs/uid_ref"
+        },
+        "tunnel_uid_ref": {
+          "$ref": "#/$defs/tunnel_ref"
+        },
+        "host": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        }
+      }
+    }
+  }
+}

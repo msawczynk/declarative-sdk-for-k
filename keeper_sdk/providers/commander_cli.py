@@ -146,9 +146,10 @@ _MSP_UNLIMITED_SEATS = 1_000_000_000
 _KSM_APP_RESOURCE_TYPE = "ksm_app"
 _KSM_BLOCKS = ("apps", "tokens", "record_shares", "config_outputs")
 _KSM_CREATE_ONLY_UNSUPPORTED_REASON = (
-    "CommanderCliProvider KSM apply only supports application create via "
-    "`KSMCommand.add_new_v5_app`; tokens, record shares, config outputs, updates, "
-    "and deletes remain unsupported"
+    "CommanderCliProvider KSM apply supports application create/delete via "
+    "`KSMCommand.add_new_v5_app` / `KSMCommand.remove_v5_app` and existing "
+    "share editable updates via `KSMCommand.update_app_share`; tokens, new "
+    "record shares, config outputs, and app metadata updates remain unsupported"
 )
 _ENTERPRISE_BLOCKS = ("nodes", "users", "roles", "teams", "enforcements", "aliases")
 _ENTERPRISE_STATUS = {
@@ -451,6 +452,35 @@ def _ksm_change_name(change: Change) -> str:
         if value is not None:
             return str(value)
     return str(change.uid_ref or change.title)
+
+
+def _ksm_change_bool(change: Change, key: str, *, default: bool = False) -> bool:
+    for payload in (change.after, change.before):
+        value = payload.get(key)
+        if value is not None:
+            return _enterprise_bool(value)
+    return default
+
+
+def _ref_leaf(ref: Any, prefix: str) -> str:
+    value = str(ref or "")
+    if value.startswith(prefix):
+        return value[len(prefix) :]
+    return value
+
+
+def _ksm_share_keeper_uids(change: Change) -> tuple[str, str]:
+    keeper_uid = str(change.keeper_uid or "")
+    if "|" in keeper_uid:
+        app_uid, secret_uid = keeper_uid.split("|", 1)
+        if app_uid and secret_uid:
+            return app_uid, secret_uid
+    app_ref = change.after.get("app_uid_ref") or change.before.get("app_uid_ref")
+    record_ref = change.after.get("record_uid_ref") or change.before.get("record_uid_ref")
+    return (
+        _ref_leaf(app_ref, "keeper-ksm:apps:"),
+        _ref_leaf(record_ref, "keeper-vault:records:"),
+    )
 
 
 def _ksm_create_result_uid(result: Any) -> str | None:
@@ -966,6 +996,7 @@ class CommanderCliProvider(Provider):
                     "allowed_ips": [],
                 }
             )
+            state["record_shares"].extend(self._ksm_app_share_rows(app_uid, app_uid_ref=uid_ref))
         return state
 
     def discover_enterprise(self) -> dict[str, Any]:
@@ -1317,6 +1348,157 @@ class CommanderCliProvider(Provider):
 
         return issues
 
+    def _apply_gateway_lifecycle_changes(
+        self,
+        plan: Plan,
+        changes: list[Change],
+        *,
+        dry_run: bool,
+    ) -> list[ApplyOutcome]:
+        outcomes: list[ApplyOutcome] = []
+        for change in changes:
+            payload = change.after if change.kind is not ChangeKind.DELETE else change.before
+            name = str(payload.get("name") or change.title or change.uid_ref or "")
+            if change.kind is ChangeKind.CREATE:
+                ksm_app_name = str(payload.get("ksm_application_name") or "")
+                if not ksm_app_name:
+                    raise CapabilityError(
+                        reason="gateway mode:create requires ksm_application_name",
+                        uid_ref=change.uid_ref,
+                        resource_type=change.resource_type,
+                        next_action="set gateways[].ksm_application_name before apply",
+                    )
+                if dry_run:
+                    outcomes.append(
+                        ApplyOutcome(
+                            uid_ref=change.uid_ref or name,
+                            keeper_uid="",
+                            action="create",
+                            details={
+                                "dry_run": True,
+                                "commander_argv": [
+                                    "pam",
+                                    "gateway",
+                                    "new",
+                                    "--name",
+                                    name,
+                                    "--application",
+                                    ksm_app_name,
+                                    "--return_value",
+                                ],
+                                "marker_written": False,
+                            },
+                        )
+                    )
+                    continue
+                self._pam_gateway_new(
+                    name,
+                    ksm_app_name,
+                    node_id=payload.get("node_id"),
+                )
+                outcomes.append(
+                    ApplyOutcome(
+                        uid_ref=change.uid_ref or name,
+                        keeper_uid=change.keeper_uid or "",
+                        action="create",
+                        details={
+                            "dry_run": False,
+                            "manager_marker": "not-applicable",
+                            "one_time_token_returned": True,
+                            "manifest": plan.manifest_name,
+                        },
+                    )
+                )
+                continue
+
+            if change.kind is ChangeKind.UPDATE:
+                gateway = change.keeper_uid or name
+                new_name = change.after.get("name")
+                node_id = change.after.get("node_id")
+                if dry_run:
+                    details: dict[str, Any] = {"dry_run": True}
+                    argv = ["pam", "gateway", "edit", "--gateway", gateway]
+                    if new_name:
+                        argv += ["--name", str(new_name)]
+                    if node_id:
+                        argv += ["--node-id", str(node_id)]
+                    details["commander_argv"] = argv
+                    outcomes.append(
+                        ApplyOutcome(
+                            uid_ref=change.uid_ref or name,
+                            keeper_uid=change.keeper_uid or "",
+                            action="update",
+                            details=details,
+                        )
+                    )
+                    continue
+                if not new_name and not node_id:
+                    outcomes.append(
+                        ApplyOutcome(
+                            uid_ref=change.uid_ref or name,
+                            keeper_uid=change.keeper_uid or "",
+                            action="noop",
+                            details={"reason": "no gateway edit fields changed"},
+                        )
+                    )
+                    continue
+                self._pam_gateway_edit(
+                    gateway=gateway,
+                    name=str(new_name) if new_name else None,
+                    node_id=str(node_id) if node_id else None,
+                )
+                outcomes.append(
+                    ApplyOutcome(
+                        uid_ref=change.uid_ref or name,
+                        keeper_uid=change.keeper_uid or "",
+                        action="update",
+                        details={"dry_run": False},
+                    )
+                )
+                continue
+
+            if change.kind is ChangeKind.DELETE:
+                gateway = change.keeper_uid or name
+                if dry_run:
+                    outcomes.append(
+                        ApplyOutcome(
+                            uid_ref=change.uid_ref or name,
+                            keeper_uid=change.keeper_uid or "",
+                            action="delete",
+                            details={
+                                "dry_run": True,
+                                "commander_argv": [
+                                    "pam",
+                                    "gateway",
+                                    "remove",
+                                    "--gateway",
+                                    gateway,
+                                ],
+                            },
+                        )
+                    )
+                    continue
+                self._pam_gateway_remove(gateway)
+                outcomes.append(
+                    ApplyOutcome(
+                        uid_ref=change.uid_ref or name,
+                        keeper_uid=change.keeper_uid or "",
+                        action="delete",
+                        details={"dry_run": False, "removed": True},
+                    )
+                )
+                continue
+
+            outcomes.append(
+                ApplyOutcome(
+                    uid_ref=change.uid_ref or name,
+                    keeper_uid=change.keeper_uid or "",
+                    action="noop",
+                    details={"reason": change.reason or "non-actionable gateway row"},
+                )
+            )
+        return outcomes
+
     def apply_plan(self, plan: Plan, *, dry_run: bool = False) -> list[ApplyOutcome]:
         if _manifest_source_is_vault(self._manifest_source):
             return self._apply_vault_plan(plan, dry_run=dry_run)
@@ -1345,9 +1527,25 @@ class CommanderCliProvider(Provider):
         creates_updates = [
             c for c in plan.ordered() if c.kind in (ChangeKind.CREATE, ChangeKind.UPDATE)
         ]
-        deletes = plan.deletes
+        gateway_creates_updates = [
+            change for change in creates_updates if change.resource_type == "gateway"
+        ]
+        pam_creates_updates = [
+            change for change in creates_updates if change.resource_type != "gateway"
+        ]
+        gateway_deletes = [change for change in plan.deletes if change.resource_type == "gateway"]
+        deletes = [change for change in plan.deletes if change.resource_type != "gateway"]
 
-        if creates_updates:
+        if gateway_creates_updates:
+            outcomes.extend(
+                self._apply_gateway_lifecycle_changes(
+                    plan,
+                    gateway_creates_updates,
+                    dry_run=dry_run,
+                )
+            )
+
+        if pam_creates_updates:
             rotation_preview_argvs = (
                 _preview_rotation_argvs_by_ref(self._manifest_source)
                 if dry_run and _rotation_apply_is_enabled()
@@ -1355,7 +1553,11 @@ class CommanderCliProvider(Provider):
             )
             payload = to_pam_import_json(self._manifest_source)
             with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as handle:
-                cmd = ["pam", "project", "extend" if _has_existing(creates_updates) else "import"]
+                cmd = [
+                    "pam",
+                    "project",
+                    "extend" if _has_existing(pam_creates_updates) else "import",
+                ]
                 synthetic_config = None
                 if _uses_reference_existing(self._manifest_source):
                     synthetic_config = self._resolve_reference_configuration(payload)
@@ -1404,7 +1606,7 @@ class CommanderCliProvider(Provider):
                 self._run_cmd(cmd)
                 if not dry_run and not synthetic_config:
                     self._resolve_project_resources_folder(plan.manifest_name)
-                for change in creates_updates:
+                for change in pam_creates_updates:
                     keeper_uid = ""
                     if synthetic_config and change.resource_type == "pam_configuration":
                         keeper_uid = synthetic_config["config_uid"]
@@ -1447,7 +1649,8 @@ class CommanderCliProvider(Provider):
                 # order above, so lengths must match — strict=True turns any
                 # future drift into a loud failure rather than a silent
                 # mis-association of markers to changes.
-                for change, outcome in zip(creates_updates, outcomes, strict=True):
+                pam_outcomes = outcomes[-len(pam_creates_updates) :]
+                for change, outcome in zip(pam_creates_updates, pam_outcomes, strict=True):
                     try:
                         if synthetic_config and change.resource_type == "pam_configuration":
                             outcome.details.update(
@@ -1547,6 +1750,11 @@ class CommanderCliProvider(Provider):
                         context={**exc.context, "partial_outcomes": list(outcomes)},
                     ) from exc
 
+        if gateway_deletes:
+            outcomes.extend(
+                self._apply_gateway_lifecycle_changes(plan, gateway_deletes, dry_run=dry_run)
+            )
+
         for change in deletes:
             if not change.keeper_uid:
                 outcomes.append(
@@ -1637,14 +1845,93 @@ class CommanderCliProvider(Provider):
                 details: dict[str, Any] = {"dry_run": dry_run}
                 if change.reason is not None:
                     details["reason"] = change.reason
+                if change.kind is ChangeKind.UPDATE and change.resource_type == "ksm_record_share":
+                    app_uid, secret_uid = _ksm_share_keeper_uids(change)
+                    editable = _ksm_change_bool(change, "editable")
+                    if dry_run:
+                        outcomes.append(
+                            ApplyOutcome(
+                                uid_ref=change.uid_ref or name,
+                                keeper_uid=change.keeper_uid or "",
+                                action="update",
+                                details={
+                                    "dry_run": True,
+                                    "app_uid": app_uid,
+                                    "secret_uid": secret_uid,
+                                    "editable": editable,
+                                },
+                            )
+                        )
+                        continue
+                    if not app_uid or not secret_uid:
+                        raise CapabilityError(
+                            reason="KSM share update requires resolvable app and secret UIDs",
+                            uid_ref=change.uid_ref or name,
+                            resource_type=change.resource_type,
+                            next_action=(
+                                "refresh live KSM state so change.keeper_uid is "
+                                "`<app_uid>|<secret_uid>` or use UID-shaped refs"
+                            ),
+                        )
+                    self.ksm_app_share_update(app_uid, [secret_uid], editable)
+                    outcomes.append(
+                        ApplyOutcome(
+                            uid_ref=change.uid_ref or name,
+                            keeper_uid=change.keeper_uid or f"{app_uid}|{secret_uid}",
+                            action="update",
+                            details={
+                                "dry_run": False,
+                                "app_uid": app_uid,
+                                "secret_uid": secret_uid,
+                                "editable": editable,
+                            },
+                        )
+                    )
+                    continue
+                if (
+                    change.kind is ChangeKind.DELETE
+                    and change.resource_type == _KSM_APP_RESOURCE_TYPE
+                ):
+                    app_uid_or_name = change.keeper_uid or name
+                    if dry_run:
+                        outcomes.append(
+                            ApplyOutcome(
+                                uid_ref=change.uid_ref or name,
+                                keeper_uid=change.keeper_uid or "",
+                                action="delete",
+                                details={
+                                    "dry_run": True,
+                                    "purge": False,
+                                    "force": True,
+                                },
+                            )
+                        )
+                        continue
+                    self.ksm_app_remove(app_uid_or_name, purge=False, force=True)
+                    self._ksm_app_rows_cache = None
+                    outcomes.append(
+                        ApplyOutcome(
+                            uid_ref=change.uid_ref or name,
+                            keeper_uid=change.keeper_uid or "",
+                            action="delete",
+                            details={
+                                "dry_run": False,
+                                "purge": False,
+                                "force": True,
+                                "removed": True,
+                            },
+                        )
+                    )
+                    continue
                 if change.kind in (ChangeKind.UPDATE, ChangeKind.DELETE):
                     raise CapabilityError(
                         reason=_KSM_CREATE_ONLY_UNSUPPORTED_REASON,
                         uid_ref=change.uid_ref or name,
                         resource_type=change.resource_type,
                         next_action=(
-                            "apply only ksm_app create rows with Commander; use mock provider "
-                            "for full offline KSM lifecycle simulation"
+                            "apply ksm_app create/delete rows or existing ksm_record_share "
+                            "editable updates with Commander; use mock provider for full "
+                            "offline KSM lifecycle simulation"
                         ),
                     )
                 outcomes.append(
@@ -1664,7 +1951,8 @@ class CommanderCliProvider(Provider):
                     resource_type=change.resource_type,
                     next_action=(
                         "apply only ksm_app create rows with Commander; use mock provider "
-                        "for tokens, record shares, and config outputs"
+                        "or an existing-share update row for tokens, new record shares, and "
+                        "config outputs"
                     ),
                 )
 
@@ -3905,6 +4193,92 @@ class CommanderCliProvider(Provider):
         self._ksm_app_rows_cache = rows
         return rows
 
+    def ksm_app_remove(
+        self,
+        app_name_or_uid: str,
+        *,
+        purge: bool = False,
+        force: bool = False,
+    ) -> None:
+        """Remove a KSM application through Commander's in-process API."""
+        try:
+            from keepercommander import api as commander_api  # type: ignore
+            from keepercommander.commands.ksm import KSMCommand  # type: ignore
+        except (ImportError, AttributeError) as exc:
+            raise CapabilityError(
+                reason=f"Commander KSMCommand is unavailable: {exc}",
+                next_action=(
+                    "upgrade keepercommander to a version that provides "
+                    "KSMCommand.remove_v5_app(params, app_name_or_uid, purge, force)"
+                ),
+            ) from exc
+
+        def run_once() -> None:
+            params = self._get_keeper_params()
+            if not hasattr(KSMCommand, "remove_v5_app"):
+                raise CapabilityError(
+                    reason="Commander KSMCommand has no remove_v5_app API",
+                    next_action="need KSMCommand.remove_v5_app(params, app_name_or_uid, purge, force)",
+                )
+            KSMCommand.remove_v5_app(params, app_name_or_uid, purge, force)
+            if hasattr(commander_api, "sync_down"):
+                commander_api.sync_down(params)
+
+        try:
+            self._with_keeper_session_refresh(run_once)
+        except CapabilityError:
+            raise
+        except Exception as exc:
+            raise CapabilityError(
+                reason=f"KSM application delete failed: {type(exc).__name__}: {exc}",
+                next_action="verify Keeper Secrets Manager application delete permissions",
+            ) from exc
+
+    def ksm_app_share_update(
+        self,
+        app_uid: str,
+        secret_uids: list[str],
+        editable: bool,
+    ) -> None:
+        """Update editable permission on secrets already shared to a KSM app."""
+        try:
+            from keepercommander import api as commander_api  # type: ignore
+            from keepercommander.commands.ksm import KSMCommand  # type: ignore
+        except (ImportError, AttributeError) as exc:
+            raise CapabilityError(
+                reason=f"Commander KSMCommand is unavailable: {exc}",
+                next_action=(
+                    "upgrade keepercommander to a version that provides "
+                    "KSMCommand.update_app_share(params, secret_uids, app_uid, editable)"
+                ),
+            ) from exc
+
+        def run_once() -> None:
+            params = self._get_keeper_params()
+            if not hasattr(KSMCommand, "update_app_share"):
+                raise CapabilityError(
+                    reason="Commander KSMCommand has no update_app_share API",
+                    next_action=(
+                        "need KSMCommand.update_app_share(params, secret_uids, "
+                        "app_name_or_uid, is_editable)"
+                    ),
+                )
+            if hasattr(commander_api, "sync_down"):
+                commander_api.sync_down(params)
+            KSMCommand.update_app_share(params, secret_uids, app_uid, editable)
+            if hasattr(commander_api, "sync_down"):
+                commander_api.sync_down(params)
+
+        try:
+            self._with_keeper_session_refresh(run_once)
+        except CapabilityError:
+            raise
+        except Exception as exc:
+            raise CapabilityError(
+                reason=f"KSM app share update failed: {type(exc).__name__}: {exc}",
+                next_action="verify the secret is already shared with this KSM app",
+            ) from exc
+
     def _ksm_app_marker(self, app_uid: str) -> dict[str, Any] | None:
         """Best-effort read of the SDK ownership marker from a KSM app record."""
         try:
@@ -3916,6 +4290,61 @@ class CommanderCliProvider(Provider):
             return None
         marker = decode_marker(_extract_marker_field(item))
         return marker if isinstance(marker, dict) else None
+
+    def _ksm_app_share_rows(self, app_uid: str, *, app_uid_ref: str) -> list[dict[str, Any]]:
+        """Best-effort KSM app-share readback for editable-permission updates."""
+        try:
+            from keepercommander import utils  # type: ignore
+            from keepercommander.commands.ksm import KSMCommand  # type: ignore
+        except (ImportError, AttributeError):
+            return []
+        if not hasattr(KSMCommand, "get_app_info"):
+            return []
+
+        def run_once() -> list[dict[str, Any]]:
+            params = self._get_keeper_params()
+            app_infos = KSMCommand.get_app_info(params, app_uid) or []
+            rows: list[dict[str, Any]] = []
+            for app_info in app_infos:
+                for share in getattr(app_info, "shares", None) or []:
+                    share_type = getattr(share, "shareType", None)
+                    if str(share_type) not in {"0", "SHARE_TYPE_RECORD"}:
+                        continue
+                    secret_uid_raw = getattr(share, "secretUid", None)
+                    if isinstance(secret_uid_raw, bytes):
+                        secret_uid = utils.base64_url_encode(secret_uid_raw)
+                    else:
+                        secret_uid = str(secret_uid_raw or "")
+                    if not secret_uid:
+                        continue
+                    rows.append(
+                        {
+                            "record_uid_ref": self._vault_record_ref_for_uid(secret_uid),
+                            "app_uid_ref": f"keeper-ksm:apps:{app_uid_ref}",
+                            "editable": bool(getattr(share, "editable", False)),
+                            "keeper_uid": f"{app_uid}|{secret_uid}",
+                        }
+                    )
+            return rows
+
+        try:
+            return self._with_keeper_session_refresh(run_once)
+        except Exception:
+            return []
+
+    def _vault_record_ref_for_uid(self, record_uid: str) -> str:
+        try:
+            raw = self._run_cmd(["get", record_uid, "--format", "json"])
+            item = _load_json(raw, command="get <record_uid> --format json")
+        except CapabilityError:
+            return f"keeper-vault:records:{record_uid}"
+        if not isinstance(item, dict):
+            return f"keeper-vault:records:{record_uid}"
+        marker = decode_marker(_extract_marker_field(item))
+        uid_ref = marker.get("uid_ref") if isinstance(marker, dict) else None
+        if isinstance(uid_ref, str) and uid_ref:
+            return f"keeper-vault:records:{uid_ref}"
+        return f"keeper-vault:records:{record_uid}"
 
     def _gateway_bound_app_name(self, row: dict[str, str]) -> tuple[str | None, str | None]:
         """Resolve the KSM app title for a gateway row, or explain why not."""
@@ -4101,6 +4530,13 @@ class CommanderCliProvider(Provider):
             and args[2] in {"import", "extend"}
         ):
             return self._run_pam_project_in_process(args)
+        if (
+            len(args) >= 3
+            and args[0] == "pam"
+            and args[1] == "gateway"
+            and args[2] in {"new", "edit", "remove"}
+        ):
+            return self._run_pam_gateway_in_process(args)
         if args[:3] == ["pam", "rotation", "edit"]:
             return self._run_pam_rotation_edit_in_process(args)
         if args[:3] == ["pam", "rotation", "list"]:
@@ -4344,6 +4780,114 @@ class CommanderCliProvider(Provider):
         except Exception as exc:
             raise CapabilityError(
                 reason=f"in-process keeper {' '.join(args)} failed: {type(exc).__name__}: {exc}",
+                context={"stdout": stdout[-6000:], "stderr": stderr[-4000:]},
+                next_action="inspect the Commander output above and retry",
+            ) from exc
+
+    def _pam_gateway_new(
+        self,
+        name: str,
+        ksm_app_name: str,
+        node_id: str | None = None,
+    ) -> str:
+        args = [
+            "pam",
+            "gateway",
+            "new",
+            "--name",
+            name,
+            "--application",
+            ksm_app_name,
+            "--return_value",
+        ]
+        result = self._run_pam_gateway_in_process(args)
+        if node_id:
+            self._pam_gateway_edit(gateway=name, node_id=node_id)
+        return result
+
+    def _pam_gateway_edit(
+        self,
+        *,
+        gateway: str,
+        name: str | None = None,
+        node_id: str | None = None,
+    ) -> str:
+        args = ["pam", "gateway", "edit", "--gateway", gateway]
+        if name:
+            args += ["--name", name]
+        if node_id:
+            args += ["--node-id", node_id]
+        return self._run_pam_gateway_in_process(args)
+
+    def _pam_gateway_remove(self, gateway: str) -> str:
+        return self._run_pam_gateway_in_process(["pam", "gateway", "remove", "--gateway", gateway])
+
+    def _run_pam_gateway_in_process(self, args: list[str]) -> str:
+        """Run ``pam gateway new/edit/remove`` via Commander's command classes."""
+        subcmd = args[2]
+        stdout = ""
+        stderr = ""
+
+        def command_for_subcmd() -> Any:
+            if subcmd == "new":
+                from keepercommander.commands.discoveryrotation import (  # type: ignore
+                    PAMCreateGatewayCommand,
+                )
+
+                return PAMCreateGatewayCommand()
+            if subcmd == "edit":
+                from keepercommander.commands.discoveryrotation import (  # type: ignore
+                    PAMEditGatewayCommand,
+                )
+
+                return PAMEditGatewayCommand()
+            if subcmd == "remove":
+                from keepercommander.commands.discoveryrotation import (  # type: ignore
+                    PAMGatewayRemoveCommand,
+                )
+
+                return PAMGatewayRemoveCommand()
+            raise CapabilityError(
+                reason=f"unsupported PAM gateway subcommand {subcmd!r}",
+                next_action="use pam gateway new, edit, or remove",
+            )
+
+        def run_once() -> str:
+            nonlocal stdout, stderr
+            from keepercommander import api  # type: ignore[import-not-found]
+
+            params = self._get_keeper_params()
+            command = command_for_subcmd()
+            parsed = vars(command.get_parser().parse_args(args[3:]))
+            buf_out = io.StringIO()
+            buf_err = io.StringIO()
+            err_log_handler = logging.StreamHandler(buf_err)
+            err_log_handler.setLevel(logging.WARNING)
+            root_logger = logging.getLogger()
+            root_logger.addHandler(err_log_handler)
+            try:
+                api.sync_down(params)
+                with contextlib.redirect_stdout(buf_out), contextlib.redirect_stderr(buf_err):
+                    result = command.execute(params, **parsed)
+                    if isinstance(result, bytes):
+                        print(result.decode("utf-8", errors="replace"), end="")
+                    elif isinstance(result, str):
+                        print(result, end="")
+                    elif isinstance(result, (dict, list)):
+                        print(json.dumps(result), end="")
+            finally:
+                stdout = buf_out.getvalue()
+                stderr = buf_err.getvalue()
+                root_logger.removeHandler(err_log_handler)
+            return stdout
+
+        try:
+            return self._with_keeper_session_refresh(run_once)
+        except CapabilityError:
+            raise
+        except Exception as exc:
+            raise CapabilityError(
+                reason=f"in-process keeper pam gateway {subcmd} failed: {type(exc).__name__}: {exc}",
                 context={"stdout": stdout[-6000:], "stderr": stderr[-4000:]},
                 next_action="inspect the Commander output above and retry",
             ) from exc
@@ -5438,11 +5982,6 @@ _UNSUPPORTED_CAPABILITY_HINTS: tuple[tuple[str, str, str], ...] = (
         "pam_configurations[].default_rotation_schedule",
         "no confirmed Commander CLI setter; pam rotation edit --schedule-config only reads config default",
     ),
-    (
-        "jit_settings",
-        "jit_settings (per-resource or per-config)",
-        "pam_launch/jit.py + DAG jit_settings writer",
-    ),
     ("rotation_schedule", "rotation_schedule (embedded)", "pam rotation edit --schedulecron"),
 )
 
@@ -5680,17 +6219,6 @@ def _detect_unsupported_capabilities(
 
     hits: list[str] = []
 
-    gateways = source.get("gateways")
-    if isinstance(gateways, list):
-        for gateway in gateways:
-            if isinstance(gateway, dict) and gateway.get("mode") == "create":
-                hits.append(
-                    f"gateway '{gateway.get('uid_ref') or gateway.get('name')}': "
-                    "mode: create is not implemented (use Commander `pam gateway new "
-                    "--application <ksm_app> --config-init json` and switch to "
-                    "mode: reference_existing)"
-                )
-
     if _has_top_level_user_rotation(source):
         hits.append(
             "top-level users[].rotation_settings is not implemented for pamUser "
@@ -5712,14 +6240,7 @@ def _detect_unsupported_capabilities(
 
     for needle, human, hook in _UNSUPPORTED_CAPABILITY_HINTS:
         if _contains_key(source, needle):
-            if needle == "jit_settings":
-                hits.append(
-                    f"upstream-gap: {human} is not implemented "
-                    "(no supported `pam jit` writer/readback contract; "
-                    f"Commander hook audit: `{hook}`)"
-                )
-            else:
-                hits.append(f"{human} is not implemented (Commander hook: `{hook}`)")
+            hits.append(f"{human} is not implemented (Commander hook: `{hook}`)")
 
     return hits
 

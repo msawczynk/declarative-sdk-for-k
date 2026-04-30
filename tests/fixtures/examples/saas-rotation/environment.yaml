@@ -1,0 +1,11 @@
+schema: keeper-saas-rotation.v1
+rotations:
+  - uid_ref: rotation.salesforce-admin
+    name: Salesforce Admin Rotation
+    provider: salesforce
+    schedule: "0 6 * * 1"
+bindings:
+  - uid_ref: binding.salesforce-admin
+    rotation_uid_ref: keeper-saas-rotation:rotations:rotation.salesforce-admin
+    record_uid_ref: keeper-vault:records:rec.salesforce-admin
+    account: admin@example.com

@@ -6,23 +6,30 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- feat: Commander 17.2.16 gateway lifecycle wiring for `pam gateway new/edit/remove`.
+- feat: KSM app delete and existing app-share editable update wiring via `KSMCommand`.
+- feat: public-eligible schema/model scaffolds for workflow, privileged access, tunnel, and SaaS rotation families.
+- feat: private-only KeeperDrive schema/model scaffold gated out of `publish.sh`.
+
+### Changed
+- docs: reclassify JIT import/extend, gateway lifecycle, KSM app delete, and KSM app-share update as Commander 17.2.16 supported surfaces.
+
 ## [2.1.0] - 2026-04-30
 
-### Features
-- KSM inter-agent bus — CAS-style acquire/release/publish/consume protocol with `MockBusStore` for offline testing
-- `dsk report ksm-usage` — `--quiet` flag added; Commander-unavailable fallback envelope
-- compliance-report — Graceful empty-cache path (`--no-fail-on-empty`), no longer requires `--rebuild` for the happy path
-- KSM app create — CLI gate removed; `CommanderCliProvider` now wires `KSMCommand.add_new_v5_app` with ownership marker write-back
-- vault-sharing — Idempotent re-plan offline coverage; live proof accepted (shared_folder_create_count=1 confirmed)
-- keeper-enterprise.v1 — Additional teams/roles scaffold tests and fixture
+### Added
+- feat: nhi-agent.v1 and ai-agent.v1 resource type scaffolds (offline validate; apply pending NHI PAM API GA)
+- feat: keeper-pam-extended.v1 offline foundation
+- feat: KSM inter-agent bus CAS protocol (acquire/release/publish/consume + MockBusStore)
+- feat: compliance-report graceful empty-cache path (--no-fail-on-empty)
+- feat: vault-sharing idempotent re-plan offline coverage
+- feat: ksm-usage report Commander-unavailable fallback envelope
+- feat: KSM app create SDK wiring (remove CLI gate, wire add_new_v5_app)
+- feat: keeper-enterprise.v1 teams/roles additional scaffold tests
 
-### Quality
-- 1375 tests passing (5 skipped, 1 xfailed by design)
-- Commander floor: `keepercommander>=17.2.16,<18`
-- `workflow_dispatch` trigger added to CI for manual runs
+### Changed
+- chore: repo sanitization (no lab credentials or internal UIDs in public files)
 
-### Repo hygiene
-- Public-facing README rewrite, capability status pages
 ## [2.0.0] - 2026-04-29
 
 ### Added

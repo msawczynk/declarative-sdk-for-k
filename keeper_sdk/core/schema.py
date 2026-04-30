@@ -11,7 +11,7 @@ Phase 0 (PAM parity program): every packaged ``*.v1`` family resolves via
 from __future__ import annotations
 
 import json
-from functools import lru_cache
+from functools import cache
 from importlib import resources
 from pathlib import Path
 from typing import Any
@@ -24,10 +24,17 @@ IDENTITY_FAMILY = "keeper-integrations-identity.v1"
 EVENTS_FAMILY = "keeper-integrations-events.v1"
 KSM_FAMILY = "keeper-ksm.v1"
 SHARING_FAMILY = "keeper-vault-sharing.v1"
+PAM_EXTENDED_FAMILY = "keeper-pam-extended.v1"
 EPM_FAMILY = "keeper-epm.v1"
 TERRAFORM_FAMILY = "keeper-terraform.v1"
 K8S_ESO_FAMILY = "keeper-k8s-eso.v1"
 SIEM_FAMILY = "keeper-siem.v1"
+NHI_FAMILY = "nhi-agent.v1"
+AI_AGENT_FAMILY = "ai-agent.v1"
+WORKFLOW_FAMILY = "keeper-workflow.v1"
+PRIVILEGED_ACCESS_FAMILY = "keeper-privileged-access.v1"
+TUNNEL_FAMILY = "keeper-tunnel.v1"
+SAAS_ROTATION_FAMILY = "keeper-saas-rotation.v1"
 PAM_SCHEMA_FILENAME = "pam-environment.v1.schema.json"
 
 # Canonical registry: manifest ``schema:`` const -> path under keeper_sdk.core.schemas
@@ -38,6 +45,7 @@ SCHEMA_RESOURCE_BY_FAMILY: dict[str, str] = {
     EVENTS_FAMILY: "integrations/events.v1.schema.json",
     IDENTITY_FAMILY: "integrations/identity.v1.schema.json",
     KSM_FAMILY: "ksm/ksm.v1.schema.json",
+    PAM_EXTENDED_FAMILY: "pam-extended/keeper-pam-extended.v1.schema.json",
     "keeper-security-posture.v1": (
         "keeper-security-posture/keeper-security-posture.v1.schema.json"
     ),
@@ -47,7 +55,20 @@ SCHEMA_RESOURCE_BY_FAMILY: dict[str, str] = {
     SIEM_FAMILY: "keeper-siem/keeper-siem.v1.schema.json",
     TERRAFORM_FAMILY: "keeper-terraform/keeper-terraform.v1.schema.json",
     "msp-environment.v1": "msp-environment/msp-environment.v1.schema.json",
+    NHI_FAMILY: "nhi-agent/nhi-agent.v1.schema.json",
+    AI_AGENT_FAMILY: "ai-agent/ai-agent.v1.schema.json",
+    WORKFLOW_FAMILY: "workflow/workflow.v1.schema.json",
+    PRIVILEGED_ACCESS_FAMILY: "privileged-access/privileged-access.v1.schema.json",
+    TUNNEL_FAMILY: "tunnel/tunnel.v1.schema.json",
+    SAAS_ROTATION_FAMILY: "saas-rotation/saas-rotation.v1.schema.json",
 }
+
+try:
+    from keeper_sdk.core._private_families import register_private
+except ImportError:
+    pass
+else:
+    register_private(SCHEMA_RESOURCE_BY_FAMILY)
 
 # Backward-compat alias used by older imports / docs.
 SCHEMA_ID = PAM_SCHEMA_FILENAME
@@ -123,7 +144,7 @@ def _read_pam_schema_from_sibling_or_env() -> dict[str, Any] | None:
     return None
 
 
-@lru_cache(maxsize=len(SCHEMA_RESOURCE_BY_FAMILY))
+@cache
 def load_schema_for_family(family: str) -> dict[str, Any]:
     """Load the packaged JSON Schema dict for *family* (const matches ``schema:``)."""
     if family not in SCHEMA_RESOURCE_BY_FAMILY:

@@ -1,0 +1,14 @@
+schema: keeper-tunnel.v1
+tunnels:
+  - uid_ref: tunnel.ssh-admin
+    name: SSH Admin Tunnel
+    protocol: ssh
+gateway_bindings:
+  - uid_ref: binding.ssh-admin-gateway
+    tunnel_uid_ref: keeper-tunnel:tunnels:tunnel.ssh-admin
+    gateway_uid_ref: gw.lab
+host_mappings:
+  - uid_ref: host.ssh-admin
+    tunnel_uid_ref: keeper-tunnel:tunnels:tunnel.ssh-admin
+    host: admin.internal.example.com
+    port: 22

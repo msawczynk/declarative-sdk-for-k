@@ -1,10 +1,13 @@
 # Gateway `mode: create` — design decision memo
 
-**status: DECIDED 2026-04-29 — Option B current, Option A deferred to v2.0**
+**status: UPDATED 2026-04-30 — control-plane create wired; agent bootstrap still operator-owned**
 
 ## Context
 
-`gateway.mode: create` implies the SDK would stand up a new PAM gateway instead of only adopting one. Provisioning touches Commander (e.g. `pam gateway new`), token exchange, and an agent on the target host—so we need an explicit fork before implementation.
+`gateway.mode: create` now calls Commander `pam gateway new` through the
+in-process `PAMCreateGatewayCommand`. This creates the Keeper control-plane
+gateway and one-time initialization material. Installing/running the gateway
+agent on the target host remains operator-owned.
 
 ## Options
 
@@ -34,4 +37,7 @@ SDK issues a one-time token and a bootstrap script; operator runs it on the targ
 
 ## Recommendation
 
-**Decided:** Ship **B** as the supported path now: `reference_existing` is safe and proven. Defer **A** (SDK-owned provisioning) to **v2.0** — requires non-interactive, auditable agent install and token flow. Option **C** (hybrid bootstrap script) is a v1.3 stretch if operator demand justifies it.
+**Updated:** DSK supports the Commander control-plane create path, while
+`reference_existing` remains the safest path for already-provisioned gateways.
+Full SDK-owned host bootstrap is still deferred until a non-interactive,
+auditable agent install contract exists.

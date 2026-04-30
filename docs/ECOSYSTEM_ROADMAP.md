@@ -21,6 +21,7 @@ Authoritative classifications (`supported` / `preview-gated` / `upstream-gap`): 
 - `keeper-ksm.v1` — KSM apps, tokens, record shares, config outputs as modeled; offline supported.
 - `keeper-integrations-identity.v1` — Domains, SCIM, SSO, outbound email as modeled; offline supported.
 - `keeper-integrations-events.v1` — Automator rules, audit-alert wiring, API keys, event routes as modeled; offline supported.
+- `keeper-pam-extended.v1` — Extended gateway configs, rotation schedules, discovery rules as modeled; offline supported.
 - `keeper-epm.v1` — EPM watchlists, policies, approvers as modeled; offline supported.
 - `msp-environment.v1` — Managed companies; validate and discover supported; Commander `apply` preview-gated per DA plan—not restated here.
 - `keeper-secrets/bus.py` — KSM inter-agent compare-and-swap message bus; offline proven integration point; live proof pending parity with MCP secret flows.

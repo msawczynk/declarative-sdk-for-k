@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/msawczynk/declarative-sdk-for-k/schemas/saas-rotation/v1.json",
+  "title": "keeper-saas-rotation.v1",
+  "description": "Preview-gated schema for SaaS rotation configs and record bindings. Commander 17.2.16 ships pam action saas verbs; DSK currently validates typed intent only.",
+  "x-keeper-live-proof": {
+    "status": "preview-gated",
+    "evidence": "Commander 17.2.16 pam action saas registry",
+    "since_pin": "6574827cf2993d2a54484516c2f4cc33238f98c9",
+    "notes": "Schema and typed model scaffold only. Plan/apply wait on provider mapping, live write/readback proof, and ownership-marker design."
+  },
+  "type": "object",
+  "required": ["schema"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "keeper-saas-rotation.v1"
+    },
+    "rotations": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/saas_rotation_config"
+      }
+    },
+    "bindings": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/saas_rotation_binding"
+      }
+    }
+  },
+  "$defs": {
+    "uid_ref": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "rotation_ref": {
+      "type": "string",
+      "pattern": "^keeper-saas-rotation:rotations:[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "vault_record_ref": {
+      "type": "string",
+      "pattern": "^keeper-vault:records:[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "non_empty_string": {
+      "type": "string",
+      "minLength": 1
+    },
+    "saas_rotation_config": {
+      "type": "object",
+      "required": ["uid_ref", "name", "provider"],
+      "additionalProperties": false,
+      "properties": {
+        "uid_ref": {
+          "$ref": "#/$defs/uid_ref"
+        },
+        "name": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "provider": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "schedule": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "saas_rotation_binding": {
+      "type": "object",
+      "required": ["uid_ref", "rotation_uid_ref", "record_uid_ref"],
+      "additionalProperties": false,
+      "properties": {
+        "uid_ref": {
+          "$ref": "#/$defs/uid_ref"
+        },
+        "rotation_uid_ref": {
+          "$ref": "#/$defs/rotation_ref"
+        },
+        "record_uid_ref": {
+          "$ref": "#/$defs/vault_record_ref"
+        },
+        "account": {
+          "$ref": "#/$defs/non_empty_string"
+        }
+      }
+    }
+  }
+}

@@ -93,6 +93,7 @@ transcript helpers (`keeper_sdk.cli._live.transcript`). When in doubt, keep
 | `keeper-vault-sharing.v1` | `scaffold-only` / partial proof | [`keeper-vault-sharing.v1.535e03f.folderlifecycle.sanitized.json`](./keeper-vault-sharing.v1.535e03f.folderlifecycle.sanitized.json) — folder lifecycle only; not a full status flip |
 | `keeper-enterprise.v1` | `scaffold-only` / partial read-only proof | [`keeper-enterprise.v1.6574827c.team-roles.sanitized.json`](./keeper-enterprise.v1.6574827c.team-roles.sanitized.json) — team/role reports 2026-04-29; not enterprise mutation support |
 | `keeper-pam-environment.v1` (RBI slice) | `supported` (E2E smoke) | [`keeper-pam-environment.v1.89047920.rbi.sanitized.json`](./keeper-pam-environment.v1.89047920.rbi.sanitized.json) — `pamRemoteBrowser` 2026-04-28; see also machine transcript |
+| `keeper-pam-extended.v1` | `preview-gated` | [`keeper-pam-extended.v1.6574827c.wave8-live-b.sanitized.json`](./keeper-pam-extended.v1.6574827c.wave8-live-b.sanitized.json) — schema-only validate passed; Commander plan/apply still exit capability |
 
 When a real file exists and covers the family bar, point `evidence` at that file
 path instead of this README. Partial transcripts may live here without changing

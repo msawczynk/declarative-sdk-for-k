@@ -26,7 +26,7 @@ This is the contract layer — every behaviour change here ripples into provider
 | `metadata.py` | 99 | Marker encode/decode; `MANAGER_NAME = "keeper-pam-declarative"`; field label `keeper_declarative_manager`. `utc_timestamp()` single source of truth. | `encode_marker`, `decode_marker`, `MARKER_FIELD_LABEL` |
 | `normalize.py` | 305 | Manifest ↔ Commander `pam_import` JSON shape. `to_pam_import_json` / `from_pam_import_json`. Commander field-name leakage confined here. | `to_pam_import_json`, `from_pam_import_json` |
 | `redact.py` | 133 | Redaction patterns (passwords, tokens, JWTs, KSM URLs, `keeper://` URLs added 2026-04-29, bearer); applied at renderer + error layers. | `redact` |
-| `preview.py` | 129 | `DSK_PREVIEW=1` guard for unsupported schema surface (`jit_settings`, `gateway.mode: create`, top-level `projects[]`, `default_rotation_schedule`, and unsupported rotation locations). Nested `resources[].users[].rotation_settings` is not preview-gated. | (preview helper APIs) |
+| `preview.py` | 129 | `DSK_PREVIEW=1` guard for unsupported schema surface (top-level `projects[]`, `default_rotation_schedule`, and unsupported rotation locations). Nested `resources[].users[].rotation_settings` is not preview-gated. | (preview helper APIs) |
 | `rules.py` | 82 | Semantic validation beyond JSON schema: requires `pam_configuration_uid_ref` when configs exist; `pamRemoteBrowser` cannot carry `jit_settings`; `rotation` only on `pamMachine|pamDatabase|pamDirectory`. | (rule registry) |
 | `schemas/pam-environment.v1.schema.json` | – | Packaged JSON schema (v1). | – |
 

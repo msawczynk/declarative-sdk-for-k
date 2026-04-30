@@ -39,8 +39,8 @@ Floor: `keepercommander>=17.2.16,<18`. Enforced at `apply_plan` start via
 ## Capability gates
 
 `_detect_unsupported_capabilities` reports unsupported capability hits for:
-`rotation_settings`, `default_rotation_schedule`, `jit_settings`,
-`rotation_schedule`, `gateway.mode: create`. `apply_plan` raises
+`rotation_settings`, `default_rotation_schedule`, and `rotation_schedule`.
+`apply_plan` raises
 `CapabilityError` (with the exact Commander hook in `next_action`) from the
 same hits. The gaps also surface as `ChangeKind.CONFLICT` rows in `plan` /
 `apply --dry-run` via `Provider.unsupported_capabilities(manifest)`.
@@ -82,5 +82,6 @@ UPDATE path merges ``change.after`` into existing **record version 3** ``data_un
 | Nested-pamUser rotation apply | shipped (preview) | `pam rotation edit` path |
 | Nested-pamUser rotation clean re-plan | open (P2.1) | offline diff anchor present; live re-plan parent-verified |
 | Top-level `pamUser` | unsupported (v1.1) | `_detect_unsupported_capabilities` |
-| Gateway `mode: create` / `projects[]` | preview-gated / design-only | `docs/ISSUE_7_GATEWAY_CREATE_PROJECTS_DESIGN.md` |
-| JIT writes | upstream-gap | `docs/ISSUE_6_JIT_SUPPORT_BOUNDARY.md` |
+| Gateway `mode: create` | shipped | `PAMCreateGatewayCommand` in-process path |
+| Top-level `projects[]` | preview-gated / design-only | `docs/ISSUE_7_GATEWAY_CREATE_PROJECTS_DESIGN.md` |
+| JIT writes via import/extend | shipped | `docs/ISSUE_6_JIT_SUPPORT_BOUNDARY.md` |

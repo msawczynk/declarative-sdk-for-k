@@ -27,6 +27,7 @@ DskFamily: TypeAlias = Literal[
     "keeper-vault-sharing.v1",
     "keeper-enterprise.v1",
     "keeper-ksm.v1",
+    "keeper-pam-extended.v1",
     "keeper-epm.v1",
     "keeper-integrations-identity.v1",
     "keeper-integrations-events.v1",

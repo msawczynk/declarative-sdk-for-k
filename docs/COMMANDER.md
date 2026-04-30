@@ -51,6 +51,10 @@ Three concrete deltas that the SDK has to work around:
 
 17.2.14+: JSON import methods now accept stringified JSON as filename (not just local file path), enabling cleaner SDK-level integration. Relevant to `dsk export` pipeline when piping Commander JSON output directly.
 
+17.2.16 (2026-04-28): PAM/Workflow/Rotation fixes. The release includes
+gateway lifecycle verbs, KSM app delete/share-update helpers, PAM workflow,
+privileged access, tunnel, SaaS rotation surfaces, and project import/extend
+JIT writers used by DSK.
 
 ## Capabilities the SDK uses
 
@@ -64,6 +68,7 @@ Three concrete deltas that the SDK has to work around:
 | `mkdir -sf --manage-users --manage-records --can-edit --can-share <path>` | per-project Resources/Users shared folders | shared-folder flag |
 | `secrets-manager share add --app <app> --secret <sf_uid> --editable` | bind scaffolded shared folders to the gateway's KSM app | |
 | `pam gateway list --format json` | resolve `mode: reference_existing` gateway UID / KSM app UID | ships in `17.2.16+` |
+| `pam gateway new/edit/remove` | gateway lifecycle for `mode: create`, rename/node edits, and delete rows | in-process Commander command classes |
 | `pam config list --format json` | resolve reference-existing PAM configuration UID | ships in `17.2.16+` |
 | `enterprise-info -n/-u/-r/-t -v --format json` | `keeper-enterprise.v1` read-only discover plus team/role reports | list output includes nodes, users, roles, and teams; relationship columns are selected with `--columns` |
 | `rm --force <uid>` | delete orphaned managed records in `apply --allow-delete` | `--force` skips the interactive confirm |
@@ -74,6 +79,12 @@ Three concrete deltas that the SDK has to work around:
 |------------------|----------|
 | `keepercommander.commands.pam_import.edit.PAMProjectImportCommand.execute` | create project scaffold + PAM data in one call |
 | `keepercommander.commands.pam_import.extend.PAMProjectExtendCommand.execute` | add resources to an existing configuration |
+| `keepercommander.commands.discoveryrotation.PAMCreateGatewayCommand.execute` | create a PAM gateway bound to an existing KSM app |
+| `keepercommander.commands.discoveryrotation.PAMEditGatewayCommand.execute` | edit supported gateway metadata |
+| `keepercommander.commands.discoveryrotation.PAMGatewayRemoveCommand.execute` | remove a gateway |
+| `keepercommander.commands.ksm.KSMCommand.add_new_v5_app` | create a KSM application |
+| `keepercommander.commands.ksm.KSMCommand.remove_v5_app` | delete a KSM application |
+| `keepercommander.commands.ksm.KSMCommand.update_app_share` | update editable permission for secrets already shared with a KSM app |
 | `keepercommander.api.login` (via `deploy_watcher.py` helper) | bootstrap a `KeeperParams` for the provider |
 | `keepercommander.record_management.update_record` | write the `keeper_declarative_manager` custom field |
 | `keepercommander.vault.KeeperRecord.load` | hydrate typed record for the marker write |
@@ -238,8 +249,8 @@ string on stderr.
 |-----|------------------|--------|------------|
 | `pam rotation info --format=json` | Not available in any `17.x` release | DSK can model `rotation_settings` in manifests; live rotation scheduling emits exit 5 | Use `keeper pam rotation info` (human-readable); rotation scheduling via admin console |
 | MSP apply (MC create/update/delete) | `msp-add`, `msp-update`, `msp-remove` present in `17.2.16` but require tenant `msp_permits.allowed_mc_products` | `apply_msp_plan` → `CapabilityError` when tenant lacks MSP permit | Run `dsk plan --json` to validate intent; apply via Keeper admin console |
-| Gateway create | No `pam gateway create` equivalent in Commander | `mode: create` in manifests exits 5 | Import existing gateways via `dsk import`; create gateways via admin console |
-| KSM token provisioning | `secrets-manager token add` is not a stable programmatic Commander surface | Token create/share/update/delete → exit 5 with `next_action` | Use Secrets Manager console or `keeper sm token add` interactively |
+| Standalone JIT edit | No dedicated `pam jit edit` in Commander 17.2.16 | DSK supports JIT through `pam project import` / `pam project extend`; standalone JIT-only edits wait on a Commander writer | Use the manifest import/extend lifecycle for supported PAM resources |
+| KSM token / new-share / config-output / app-metadata update | These do not have a committed DSK write/readback contract in Commander 17.2.16 | Unsupported rows exit 5 with `next_action` | Use Secrets Manager console or `keeper sm token add` interactively |
 | `pam project export` | Does **not exist** in `17.2.16+` | DSK synthesises export by iterating `get` + `ls` | `dsk export <project.json>` covers the use case |
 
 ## Automated capability mirror

@@ -49,6 +49,7 @@ complete the JSON file looks.
 | `keeper-integrations-identity.v1` | yes | **no** | scaffold-only |
 | `keeper-integrations-events.v1` | yes | **no** | scaffold-only |
 | `keeper-ksm.v1` | yes | **no** (KSM bootstrap + helpers are separate CLI/SDK paths) | scaffold / partial |
+| `keeper-pam-extended.v1` | yes | **no** | scaffold-only / stubs |
 | `keeper-epm.v1` | yes | **no** | watchlist (V2 Q5) |
 | `keeper-security-posture.v1` | yes (intentional trap) | **no** — use `dsk report` verbs | `dropped-design` |
 
@@ -106,9 +107,11 @@ agents.
 - Split integrations families: identity vs events; respect `uid_ref` grammar
   from `keeper_sdk/core/schemas/CONVENTIONS.md`.
 
+### Phase 3 — KSM + pam-extended
 
 - `keeper-ksm.v1`: connect schema to existing bootstrap / share flows where
   declarative; avoid duplicating `dsk bootstrap-ksm` semantics in two ways.
+- `keeper-pam-extended.v1`: lift `maxItems: 0` stubs when Commander paths exist;
   mark `upstream-gap` until Commander exposes stable idempotent writers.
 
 ### Phase 4 — EPM and posture

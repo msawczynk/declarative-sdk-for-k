@@ -278,11 +278,11 @@ def test_pam_config_rows_parses_release_json_shape(monkeypatch: pytest.MonkeyPat
     ]
 
 
-def test_apply_plan_refuses_unimplemented_gateway_mode_create(
+def test_apply_plan_supports_gateway_mode_create_dry_run(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """D-4 guard: gateway mode:create must fail loud, not silently drop."""
-    from keeper_sdk.core.errors import CapabilityError
+    """Gateway mode:create now routes to pam gateway new."""
+    from keeper_sdk.core.diff import Change, ChangeKind
     from keeper_sdk.core.planner import Plan
 
     monkeypatch.setattr(
@@ -292,13 +292,34 @@ def test_apply_plan_refuses_unimplemented_gateway_mode_create(
         manifest_source={
             "version": "1",
             "name": "proj",
-            "gateways": [{"uid_ref": "gw.new", "name": "New GW", "mode": "create"}],
+            "gateways": [
+                {
+                    "uid_ref": "gw.new",
+                    "name": "New GW",
+                    "mode": "create",
+                    "ksm_application_name": "Gateway App",
+                }
+            ],
         },
     )
-    plan = Plan(manifest_name="proj", changes=[], order=[])
-    with pytest.raises(CapabilityError) as exc:
-        provider.apply_plan(plan)
-    assert "mode: create" in exc.value.reason
+    change = Change(
+        kind=ChangeKind.CREATE,
+        uid_ref="gw.new",
+        resource_type="gateway",
+        title="New GW",
+        after={
+            "uid_ref": "gw.new",
+            "name": "New GW",
+            "mode": "create",
+            "ksm_application_name": "Gateway App",
+        },
+    )
+    plan = Plan(manifest_name="proj", changes=[change], order=["gw.new"])
+
+    outcomes = provider.apply_plan(plan, dry_run=True)
+
+    assert outcomes[0].action == "create"
+    assert outcomes[0].details["commander_argv"][:3] == ["pam", "gateway", "new"]
 
 
 def test_apply_plan_refuses_rotation_settings(monkeypatch: pytest.MonkeyPatch) -> None:

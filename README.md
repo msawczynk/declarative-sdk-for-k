@@ -12,12 +12,19 @@ Declarative lifecycle management for Keeper Security tenants.
 
 | Manifest family | Scope | Status | Notes |
 |---|---|---|---|
-| `pam-environment.v1` | PAM gateways, configurations, machines, databases, directories, users, and remote browsers | supported | Full lifecycle for supported PAM resources |
+| `pam-environment.v1` | PAM gateways, configurations, machines, databases, directories, users, remote browsers, and JIT import/extend settings | supported | Full lifecycle for supported PAM resources; gateway lifecycle uses Commander `pam gateway new/edit/remove` |
 | `keeper-vault.v1` | Vault records, including the `login` type | supported | Login L1 lifecycle |
 | `keeper-vault-sharing.v1` | Shared folders and record shares | supported | Shared-folder and record-share lifecycle |
-| `keeper-ksm.v1` | KSM applications | supported | App create wired (Commander + ownership marker); tokens/shares/app-updates are upstream-gap (exit 5 with next_action) |
+| `keeper-ksm.v1` | KSM applications and existing app-share editable updates | supported | App create/delete wired; existing share editable updates wired; tokens/new shares/config outputs remain capability-gated |
 | `keeper-enterprise.v1` | Teams, roles, nodes, enterprise-info | supported | Online validate/plan/diff supported; apply is read-only for enterprise roles/teams |
+| `keeper-workflow.v1` | PAM workflow configs, approvers, requests, and state | preview-gated | Public-eligible schema/model scaffold; Commander 17.2.16 ships `pam workflow` |
+| `keeper-privileged-access.v1` | PAM privileged access users, groups, and memberships | preview-gated | Public-eligible schema/model scaffold; Commander 17.2.16 ships `pam access` |
+| `keeper-tunnel.v1` | PAM tunnels, gateway bindings, and host mappings | preview-gated | Public-eligible schema/model scaffold; Commander 17.2.16 ships `pam tunnel` |
+| `keeper-saas-rotation.v1` | SaaS rotation configs and record bindings | preview-gated | Public-eligible schema/model scaffold; Commander 17.2.16 ships `pam action saas` |
+| `keeper-drive.v1` | KeeperDrive folders, files, and shares | private-preview | Private-only scaffold; excluded from public mirror until Commander ships KeeperDrive |
 | `msp-environment.v1` | MSP managed companies | preview-gated | Discover/validate/plan supported; apply blocked — tenant MSP product permit required |
+| `nhi-agent.v1` | Non-Human Identity resources | upstream-gap | Pending Keeper NHI API GA |
+| `ai-agent.v1` | AI agent identity resources | upstream-gap | Pending Keeper NHI API GA |
 
 ## Install
 
@@ -52,9 +59,8 @@ The following capabilities are **not yet available** in this release:
 |---|---|---|
 | MSP managed-company apply | `CommanderCliProvider.apply_msp_plan` exits 5 — tenant requires MSP product permit (`msp_permits.allowed_mc_products`). Not a DSK or Commander bug. | Use `dsk plan` to verify intent; apply via Keeper admin console. |
 | `pam rotation info --format=json` | Not implemented in Commander (upstream backlog). DSK can model `rotation_settings` in manifests; live rotation scheduling is blocked upstream. | Use `keeper pam rotation info` (human-readable output only). |
-| Gateway create (`mode: create`) | Not implemented. DSK has no Commander surface to create a gateway. | Import existing gateways with `dsk import`; create new gateways via Keeper admin console. |
-| KSM mutations beyond app create | `keeper-ksm.v1` supports app creation only. Token provisioning, record shares, app updates, and app deletion exit 5 with `next_action` on stderr. | Perform KSM token/share operations via Keeper Commander or Secrets Manager console. |
-| JIT access, project creation | Upstream-gap — no Commander API available. Roadmap item for v2.x. | Use Keeper admin console. |
+| KSM mutations beyond wired lifecycle | Token provisioning, new record shares, config outputs, and app metadata updates remain capability-gated. | Perform those operations via Keeper Commander or Secrets Manager console. |
+| Standalone JIT edit | JIT is supported through `pam project import` / `extend`; there is no dedicated `pam jit edit` in Commander 17.2.16. | Use the manifest import/extend lifecycle for supported PAM resources. |
 | Enterprise apply (roles/teams write) | `keeper-enterprise.v1` online validate/plan/diff are supported; apply for role and team mutations is read-only (Commander ACL limitation). | Apply enterprise changes via Keeper admin console. |
 
 ## CLI Commands
@@ -165,7 +171,7 @@ For the `commander` provider, set `KEEPER_EMAIL`, `KEEPER_PASSWORD`, and
 Public issues and pull requests are welcome on
 `github.com/msawczynk/declarative-sdk-for-k`. Maintainers may mirror accepted
 changes through the private development repository before publication. The
-current full test gate is 1375 passed.
+current local private gate is 1491 passed, 4 skipped, 1 xfailed.
 
 ## License
 

@@ -114,6 +114,9 @@ def _rewrite_refs(node: Any, lookup: dict[str, tuple[str, str]]) -> Any:
         for key, value in node.items():
             if key in _DECLARATIVE_ONLY_KEYS:
                 continue
+            if key == "jit_settings" and isinstance(value, dict):
+                rewritten[key] = _rewrite_jit_settings_refs(value, lookup)
+                continue
             if key in _REF_FIELD_MAP and isinstance(value, str):
                 new_key = _REF_FIELD_MAP[key][0]
                 title = lookup.get(value, (value,))[0] or value
@@ -129,6 +132,21 @@ def _rewrite_refs(node: Any, lookup: dict[str, tuple[str, str]]) -> Any:
     if isinstance(node, list):
         return [_rewrite_refs(item, lookup) for item in node]
     return node
+
+
+def _rewrite_jit_settings_refs(
+    settings: dict[str, Any],
+    lookup: dict[str, tuple[str, str]],
+) -> dict[str, Any]:
+    rewritten: dict[str, Any] = {}
+    for key, value in settings.items():
+        if key in _DECLARATIVE_ONLY_KEYS:
+            continue
+        if key == "pam_directory_uid_ref" and isinstance(value, str):
+            rewritten["pam_directory_record"] = lookup.get(value, (value,))[0] or value
+            continue
+        rewritten[key] = _rewrite_refs(value, lookup)
+    return rewritten
 
 
 def to_pam_import_json(manifest: dict[str, Any]) -> dict[str, Any]:

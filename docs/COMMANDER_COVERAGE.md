@@ -12,12 +12,17 @@
 
 | DSK Family | Commander commands used | Invocation mode | DSK operations |
 |---|---|---|---|
-| `pam-environment.v1` | `pam project import`, `pam project extend`, `pam gateway list --format json`, `pam config list --format json`, `pam rotation list --record-uid <uid> --format json`, `pam connection edit`, `pam rbi edit`, `pam rotation edit`, `ls <folder> --format json`, `get <uid> --format json`, `rm --force <uid>` | In-process (import/extend/rotation/edit) + subprocess (ls/get/rm/gateway-list/config-list) | validate, plan, diff, apply, import, export |
+| `pam-environment.v1` | `pam project import`, `pam project extend`, `pam gateway list/new/edit/remove`, `pam config list --format json`, `pam rotation list --record-uid <uid> --format json`, `pam connection edit`, `pam rbi edit`, `pam rotation edit`, `ls <folder> --format json`, `get <uid> --format json`, `rm --force <uid>` | In-process (import/extend/gateway lifecycle/rotation/edit) + subprocess (ls/get/rm/list fallbacks) | validate, plan, diff, apply, import, export |
 | `keeper-vault.v1` | `ls <folder_uid> --format json`, `get <uid> --format json`, `rm --force <uid>` + in-process `RecordAddCommand`, `record_management.update_record` | In-process (add/marker) + subprocess (ls/get/rm) | validate, plan, diff, apply |
 | `keeper-vault-sharing.v1` | `mkdir -uf <path>`, `mkdir -sf --manage-users --manage-records --can-edit --can-share <path>`, `mv --user-folder/--shared-folder <src> <dst>`, `rmdir -f <path_or_uid>`, `share-record -a grant/revoke -e <email>`, `share-folder`, `secrets-manager share add --app <app> --secret <sf_uid> --editable`, `ls --format json`, `get <sf_uid> --format json` | In-process + subprocess | validate, plan, diff, apply |
-| `keeper-ksm.v1` | In-process `KSMCommand.add_new_v5_app(params, name)` | In-process only | validate, plan, apply (create only) |
+| `keeper-ksm.v1` | In-process `KSMCommand.add_new_v5_app(params, name)`, `KSMCommand.remove_v5_app(params, app_name_or_uid, purge, force)`, `KSMCommand.update_app_share(params, secret_uids, app_uid, editable)` | In-process only | validate, plan, apply (app create/delete, existing share editable update) |
 | `keeper-enterprise.v1` | `enterprise-info -n -v --format json` (nodes), `enterprise-info -u -v --format json` (users), `enterprise-info -r -v --format json` (roles), `enterprise-info -t -v --format json` (teams) | Subprocess | validate, plan, diff, validate --online |
 | `msp-environment.v1` | In-process `api.query_enterprise(params)` for discover; in-process `MSPAddCommand`, `MSPUpdateCommand`, `MSPRemoveCommand` for apply | In-process only | validate, plan, diff, apply (MC create/update/delete with tenant permit) |
+| `keeper-workflow.v1` | Commander release surface verified (`pam workflow`) | Not wired yet | validate (schema/model scaffold) |
+| `keeper-privileged-access.v1` | Commander release surface verified (`pam access`) | Not wired yet | validate (schema/model scaffold) |
+| `keeper-tunnel.v1` | Commander release surface verified (`pam tunnel`) | Not wired yet | validate (schema/model scaffold) |
+| `keeper-saas-rotation.v1` | Commander release surface verified (`pam action saas`) | Not wired yet | validate (schema/model scaffold) |
+| `keeper-drive.v1` | Not in Commander 17.2.16 | Private-only | validate (private schema/model scaffold) |
 
 > **Note:** `dsk export` does **not** use `pam project export` — that command does
 > not exist in Commander `17.2.16+`. Export is synthesised by iterating `ls` +
@@ -33,9 +38,9 @@
 | `dsk validate --online` | `list` / `get` (read-only) | No | Discovers live tenant for reference checks |
 | `dsk plan` | `list` / `get` (read-only) | No | Computes delta; no writes |
 | `dsk diff` | `list` / `get` (read-only) | No | Field-level diff; no writes |
-| `dsk apply` (create) | `pam project import`, `RecordAddCommand`, `mkdir`, `MSPAddCommand`, `KSMCommand.add_new_v5_app` | **Yes** | Creates new resources |
-| `dsk apply` (update) | `pam project extend`, `pam connection edit`, `pam rbi edit`, `pam rotation edit`, `record_management.update_record`, `MSPUpdateCommand` | **Yes** | Modifies existing resources |
-| `dsk apply` (delete) | `rm --force <uid>`, `rmdir -f`, `MSPRemoveCommand` | **Yes** | Requires `--allow-delete` for PAM/vault |
+| `dsk apply` (create) | `pam project import`, `pam gateway new`, `RecordAddCommand`, `mkdir`, `MSPAddCommand`, `KSMCommand.add_new_v5_app` | **Yes** | Creates new resources |
+| `dsk apply` (update) | `pam project extend`, `pam gateway edit`, `pam connection edit`, `pam rbi edit`, `pam rotation edit`, `record_management.update_record`, `MSPUpdateCommand`, `KSMCommand.update_app_share` | **Yes** | Modifies existing resources |
+| `dsk apply` (delete) | `rm --force <uid>`, `pam gateway remove`, `rmdir -f`, `MSPRemoveCommand`, `KSMCommand.remove_v5_app` | **Yes** | Requires `--allow-delete` for PAM/vault/KSM deletes |
 | `dsk import` | `list` / `get` + marker write via `record_management.update_record` | **Yes** (marker write only) | Adopts existing records; no structural change |
 | `dsk export` | `ls --format json`, `get --format json` (iterates project folder) | No | Synthesised; no `pam project export` |
 | `dsk report password-report` | `security-audit-report` Commander command | No | Read-only; output redacted |
@@ -66,7 +71,8 @@ DSK supports two invocation modes for the `commander` provider:
   `RecordAddCommand` (vault record add), `record_management.update_record`
   (marker writes), `api.query_enterprise` (MSP / enterprise discover),
   `MSPAddCommand` / `MSPUpdateCommand` / `MSPRemoveCommand`,
-  `KSMCommand.add_new_v5_app`.
+  `KSMCommand.add_new_v5_app`, `KSMCommand.remove_v5_app`,
+  `KSMCommand.update_app_share`, and `pam gateway new/edit/remove`.
 - Requires `keepercommander>=17.2.16,<18` installed as a Python module.
   `apply_plan()` gates on this before any mutation.
 
@@ -95,13 +101,14 @@ about which Commander Python surface is stable enough to call via subprocess.
 
 ### 4.1 pam-environment.v1
 
-All PAM resource CRUD routes through `pam project import` (create) or
-`pam project extend` (update), **not** through individual per-type Commander
-subcommands. Discover reads via `ls` + `get`; delete via `rm --force`.
+Most PAM resource CRUD routes through `pam project import` (create) or
+`pam project extend` (update). Gateway lifecycle is the exception and uses
+`pam gateway new/edit/remove`. Discover reads via `ls` + `get` plus gateway /
+config list commands; non-gateway delete uses `rm --force`.
 
 | Resource type | Create | Read (discover) | Update | Delete | Import (adopt) |
 |---|---|---|---|---|---|
-| `pamGateway` | ❌ upstream-gap | ✅ `pam gateway list` (for uid resolution) | ❌ | ❌ | ✅ `mode: reference_existing` |
+| `pamGateway` | ✅ `pam gateway new` | ✅ `pam gateway list` (for uid resolution) | ✅ `pam gateway edit` | ✅ `pam gateway remove` | ✅ `mode: reference_existing` |
 | `pamConfiguration` | ✅ `pam project import` | ✅ `pam config list` + `get` | ✅ `pam project extend` | ✅ `rm --force` | ✅ |
 | `pamMachine` | ✅ `pam project import` | ✅ `ls` + `get` | ✅ `pam project extend` + `pam connection edit` | ✅ `rm --force` | ✅ |
 | `pamDatabase` | ✅ `pam project import` | ✅ `ls` + `get` | ✅ `pam project extend` + `pam connection edit` | ✅ `rm --force` | ✅ |
@@ -175,10 +182,11 @@ login path.
 | Operation | Status | Commander surface | Notes |
 |---|---|---|---|
 | App create | ✅ Supported | In-process `KSMCommand.add_new_v5_app(params, name)` | Requires `17.2.16+` |
-| App update | ❌ Upstream-gap | None | Raises `CapabilityError` |
-| App delete | ❌ Upstream-gap | None | Raises `CapabilityError` |
+| App metadata update | ❌ Not supported | No `update_v5_app`; no DSK app-metadata contract | Raises `CapabilityError` |
+| App delete | ✅ Supported | In-process `KSMCommand.remove_v5_app(params, app_name_or_uid, purge, force)` | Requires delete row from owned live state |
 | Token add | ❌ Upstream-gap | None | Not a stable programmatic surface |
-| Record share | ❌ Upstream-gap | None | Use Secrets Manager console |
+| Existing share editable update | ✅ Supported | In-process `KSMCommand.update_app_share(params, secret_uids, app_uid, editable)` | Existing shares only |
+| New record share | ❌ Upstream-gap | No committed DSK create/readback contract in this family | Use Secrets Manager console or sharing family where applicable |
 | Config output | ❌ Upstream-gap | None | Use Secrets Manager console |
 
 ---
@@ -211,6 +219,19 @@ subprocess). Apply requires MSP admin session and tenant `msp_permits.allowed_mc
 | Import marker write | `managed_company` | ❌ Not implemented | No stable marker path |
 | Non-MC resource types | any | ❌ | Raises `CapabilityError` |
 
+### 4.7 PAM workflow, SaaS rotation, tunnel, access, KeeperDrive
+
+Reference-only status for Commander groups adjacent to `pam-environment.v1`; these
+are not necessarily wired through the standard import/extend table above.
+
+| Commander surface | Commander availability | DSK status |
+|---|---|---|
+| `pam workflow` | **17.2.14+** (full stack from **17.2.16**) | `workflow_settings:` colocated extension on PAM resources in progress (**Wave E**). |
+| `pam saas` | **17.2.16** | `saas_plugins:` opaque passthrough on `pamUser` in progress (**Wave E**). |
+| `pam tunnel` | **17.2.16** | Operation-only; not declarative — explicitly out of scope for DSK plan/apply. |
+| `pam access` | **17.2.16** | Operation-only (IdP provisioning flows); out of scope for declarative management. |
+| KeeperDrive | Not yet on Commander **master** (**PR #1975** pending) | Private scaffold only in DSK; public release when upstream lands in an official Commander release. |
+
 ---
 
 ## 5. Report coverage
@@ -232,17 +253,15 @@ per-report flags.
 
 | Gap | Root cause | Workaround | Tracking |
 |---|---|---|---|
-| `pamGateway` create / update / delete | No `pam gateway create/edit/remove` verb in Commander `17.x` | Use Keeper admin console; adopt existing via `dsk import` with `mode: reference_existing` | v2+ roadmap |
 | `pam rotation info --format=json` | Not available in any `17.x` release | `keeper pam rotation info` (human-readable); rotation scheduling via admin console | Upstream backlog |
 | Rotation scheduling apply | `DSK_EXPERIMENTAL_ROTATION_APPLY` must be set; readback partial | Do not use in production without live proof | Experimental gate |
-| KSM token / share / config-output management | Not a stable programmatic Commander surface | Keeper Secrets Manager console; `keeper sm token add` interactively | v2+ roadmap |
-| KSM app update / delete | No `KSMCommand` API for update or delete | Manage via Secrets Manager console | Upstream gap |
+| KSM token / new share / config-output / app-metadata update management | Not a stable programmatic Commander surface in this family | Keeper Secrets Manager console; `keeper sm token add` interactively | v2+ roadmap |
 | MSP apply without tenant permit | `msp_permits.allowed_mc_products` required on tenant | Request MSP permit from Keeper; validate-only with `dsk plan` | Upstream tenant-capability |
 | MSP import marker write | No stable marker anchor for managed-company records | Use mock provider for full lifecycle testing | Design pending (`docs/MSP_FAMILY_DESIGN.md`) |
 | Enterprise write operations | Commander enterprise API is read-only via DSK | Use Keeper admin console for node/user/role/team mutations | By design (read-only family) |
 | `pam project export` | Does not exist in Commander `17.2.16+` | `dsk export <project.json>` synthesises export from `ls` + `get` | N/A — DSK workaround ships |
 | `record-update` (subprocess) | Version-fragile typed-field syntax | In-process `record_management.update_record` API used instead | N/A — DSK workaround ships |
-| JIT access policies | No Commander API surface | — | v2+ roadmap |
+| Standalone JIT edit | No dedicated `pam jit edit` Commander surface separate from import/extend | Use manifest import/extend lifecycle for supported PAM resources | Future Commander surface |
 | RBI audio controls | Commander exposes flags; no typed manifest field | — | Schema extension candidate |
 | `pam rbi edit` autofill-targets (list-native) | Scalar model vs Commander repeated flags | Single-target autofill works; list readback dirty | Schema extension candidate |
 
@@ -281,7 +300,6 @@ See [COMMANDER.md](COMMANDER.md) for the exact pin SHA and delta table between
 | `record-update` (subprocess) | Version-fragile; in-process API used instead |
 | Interactive `keeper login` / `keeper sync-down` | Subprocess prompts interactively; `deploy_watcher.keeper_login()` handles both |
 | `msp-down` (subprocess) | In-process `api.query_enterprise` used; operators may run `keeper msp-down` manually to refresh cache |
-| `pam gateway new` / create | Does not exist in Commander `17.x` |
 | `pam rotation info --format=json` | Not available in `17.x`; human-readable fallback only |
 | `secrets-manager token add` | Not a stable programmatic surface in `17.x` |
 

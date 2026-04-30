@@ -1,8 +1,7 @@
 """Preview-key gate: reject manifest keys whose implementation is deferred.
 
 The JSON Schema accepts a wider surface than any provider currently
-drives — ``jit_settings``, gateway ``mode: create``,
-``default_rotation_schedule``, top-level ``projects[]``, and rotation
+drives — ``default_rotation_schedule``, top-level ``projects[]``, and rotation
 settings outside the supported nested ``resources[].users[]`` slice.
 Without this gate, ``validate`` returns clean, ``plan`` produces
 CONFLICT rows, and the operator has to read plan output to discover
@@ -49,7 +48,6 @@ PREVIEW_KEYS: tuple[tuple[str, str, str], ...] = (
         "pam_configurations[].default_rotation_schedule",
         "planned for 1.1",
     ),
-    ("jit_settings", "jit_settings (per-resource or per-config)", "planned for 1.2"),
     ("rotation_schedule", "rotation_schedule (embedded)", "planned for 1.1"),
 )
 
@@ -105,15 +103,6 @@ def detect_preview_keys(manifest: dict[str, Any]) -> list[str]:
     whether to raise based on :func:`preview_is_enabled`.
     """
     hits: list[str] = []
-
-    gateways = manifest.get("gateways")
-    if isinstance(gateways, list):
-        for gateway in gateways:
-            if isinstance(gateway, dict) and gateway.get("mode") == "create":
-                hits.append(
-                    f"gateway '{gateway.get('uid_ref') or gateway.get('name')}': "
-                    "mode: create (planned for 1.2)"
-                )
 
     if manifest.get("projects"):
         hits.append("top-level projects[] (planned for 1.2)")

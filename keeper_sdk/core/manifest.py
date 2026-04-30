@@ -13,12 +13,17 @@ for ``keeper-ksm.v1``, or
 ``keeper-integrations-identity.v1``, or
 :class:`~keeper_sdk.core.models_integrations_events.EventsManifestV1` for
 ``keeper-integrations-events.v1``, or
+:class:`~keeper_sdk.core.models_pam_extended.PamExtendedManifestV1` for
+``keeper-pam-extended.v1``, or
 :class:`~keeper_sdk.core.models_epm.EpmManifestV1` for ``keeper-epm.v1``, or
 :class:`~keeper_sdk.core.models_terraform.TerraformIntegrationManifestV1` for
 ``keeper-terraform.v1``, or
 :class:`~keeper_sdk.core.models_k8s_eso.K8sEsoManifestV1` for
 ``keeper-k8s-eso.v1``, or
 :class:`~keeper_sdk.core.models_siem.SiemManifestV1` for ``keeper-siem.v1``, or
+:class:`~keeper_sdk.core.models_nhi.NhiAgentManifest` for ``nhi-agent.v1``, or
+:class:`~keeper_sdk.core.models_ai_agent.AiAgentManifest` for ``ai-agent.v1``,
+or other packaged typed families registered by the private-family hook.
 Dump: stable canonical YAML/JSON for git diffs and Commander interop.
 """
 
@@ -30,32 +35,46 @@ from typing import TYPE_CHECKING, Any
 
 from keeper_sdk.core.errors import ManifestError, SchemaError, UnsupportedFamilyError
 from keeper_sdk.core.models import Manifest
+from keeper_sdk.core.models_ai_agent import AI_AGENT_FAMILY
 from keeper_sdk.core.models_enterprise import ENTERPRISE_FAMILY
 from keeper_sdk.core.models_epm import EPM_FAMILY
 from keeper_sdk.core.models_integrations_events import EVENTS_FAMILY
 from keeper_sdk.core.models_integrations_identity import IDENTITY_FAMILY
 from keeper_sdk.core.models_k8s_eso import K8S_ESO_FAMILY
+from keeper_sdk.core.models_nhi import NHI_FAMILY
+from keeper_sdk.core.models_pam_extended import PAM_EXTENDED_FAMILY
+from keeper_sdk.core.models_privileged_access import PRIVILEGED_ACCESS_FAMILY
+from keeper_sdk.core.models_saas_rotation import SAAS_ROTATION_FAMILY
 from keeper_sdk.core.models_siem import SIEM_FAMILY
 from keeper_sdk.core.models_terraform import TERRAFORM_FAMILY
+from keeper_sdk.core.models_tunnel import TUNNEL_FAMILY
 from keeper_sdk.core.models_vault_sharing import (
     SHARING_FAMILY,
     SharingManifestV1,
     load_vault_sharing_manifest,
 )
+from keeper_sdk.core.models_workflow import WORKFLOW_FAMILY
 from keeper_sdk.core.msp_models import MSP_FAMILY
 from keeper_sdk.core.normalize import canonicalize
 from keeper_sdk.core.preview import assert_preview_keys_allowed
 from keeper_sdk.core.schema import PAM_FAMILY, validate_manifest
 
 if TYPE_CHECKING:
+    from keeper_sdk.core.models_ai_agent import AiAgentManifest
     from keeper_sdk.core.models_enterprise import EnterpriseManifestV1
     from keeper_sdk.core.models_epm import EpmManifestV1
     from keeper_sdk.core.models_integrations_events import EventsManifestV1
     from keeper_sdk.core.models_integrations_identity import IdentityManifestV1
     from keeper_sdk.core.models_k8s_eso import K8sEsoManifestV1
     from keeper_sdk.core.models_ksm import KsmManifestV1
+    from keeper_sdk.core.models_nhi import NhiAgentManifest
+    from keeper_sdk.core.models_pam_extended import PamExtendedManifestV1
+    from keeper_sdk.core.models_privileged_access import PrivilegedAccessManifestV1
+    from keeper_sdk.core.models_saas_rotation import SaaSRotationManifestV1
     from keeper_sdk.core.models_siem import SiemManifestV1
     from keeper_sdk.core.models_terraform import TerraformIntegrationManifestV1
+    from keeper_sdk.core.models_tunnel import TunnelManifestV1
+    from keeper_sdk.core.models_workflow import WorkflowManifestV1
     from keeper_sdk.core.msp_models import MspManifestV1
     from keeper_sdk.core.vault_models import VaultManifestV1
 
@@ -132,10 +151,18 @@ def load_declarative_manifest(
     | KsmManifestV1
     | IdentityManifestV1
     | EventsManifestV1
+    | PamExtendedManifestV1
     | EpmManifestV1
     | TerraformIntegrationManifestV1
     | K8sEsoManifestV1
     | SiemManifestV1
+    | NhiAgentManifest
+    | AiAgentManifest
+    | WorkflowManifestV1
+    | PrivilegedAccessManifestV1
+    | TunnelManifestV1
+    | SaaSRotationManifestV1
+    | Any
 ):
     """Load a typed manifest for families the engine can plan (PAM + vault/sharing L1 + MSP).
 
@@ -152,6 +179,8 @@ def load_declarative_manifest(
     ``keeper-integrations-identity.v1``, or
     :class:`~keeper_sdk.core.models_integrations_events.EventsManifestV1` for
     ``keeper-integrations-events.v1``, or
+    :class:`~keeper_sdk.core.models_pam_extended.PamExtendedManifestV1` for
+    ``keeper-pam-extended.v1``, or
     :class:`~keeper_sdk.core.models_epm.EpmManifestV1` for ``keeper-epm.v1``, or
     :class:`~keeper_sdk.core.models_terraform.TerraformIntegrationManifestV1` for
     ``keeper-terraform.v1``, or
@@ -183,20 +212,35 @@ def load_declarative_manifest_string(
     | KsmManifestV1
     | IdentityManifestV1
     | EventsManifestV1
+    | PamExtendedManifestV1
     | EpmManifestV1
     | TerraformIntegrationManifestV1
     | K8sEsoManifestV1
     | SiemManifestV1
+    | NhiAgentManifest
+    | AiAgentManifest
+    | WorkflowManifestV1
+    | PrivilegedAccessManifestV1
+    | TunnelManifestV1
+    | SaaSRotationManifestV1
+    | Any
 ):
     """Like :func:`load_declarative_manifest` but from a string."""
+    from keeper_sdk.core.models_ai_agent import load_ai_agent_manifest
     from keeper_sdk.core.models_enterprise import load_enterprise_manifest
     from keeper_sdk.core.models_epm import load_epm_manifest
     from keeper_sdk.core.models_integrations_events import load_events_manifest
     from keeper_sdk.core.models_integrations_identity import load_identity_manifest
     from keeper_sdk.core.models_k8s_eso import load_k8s_eso_manifest
     from keeper_sdk.core.models_ksm import KSM_FAMILY, load_ksm_manifest
+    from keeper_sdk.core.models_nhi import load_nhi_manifest
+    from keeper_sdk.core.models_pam_extended import load_pam_extended_manifest
+    from keeper_sdk.core.models_privileged_access import load_privileged_access_manifest
+    from keeper_sdk.core.models_saas_rotation import load_saas_rotation_manifest
     from keeper_sdk.core.models_siem import load_siem_manifest
     from keeper_sdk.core.models_terraform import load_terraform_manifest
+    from keeper_sdk.core.models_tunnel import load_tunnel_manifest
+    from keeper_sdk.core.models_workflow import load_workflow_manifest
     from keeper_sdk.core.msp_models import load_msp_manifest
     from keeper_sdk.core.vault_models import VAULT_FAMILY, load_vault_manifest
 
@@ -230,6 +274,8 @@ def load_declarative_manifest_string(
         return load_identity_manifest(document)
     if family == EVENTS_FAMILY:
         return load_events_manifest(document)
+    if family == PAM_EXTENDED_FAMILY:
+        return load_pam_extended_manifest(document)
     if family == EPM_FAMILY:
         return load_epm_manifest(document)
     if family == TERRAFORM_FAMILY:
@@ -238,13 +284,29 @@ def load_declarative_manifest_string(
         return load_k8s_eso_manifest(document)
     if family == SIEM_FAMILY:
         return load_siem_manifest(document)
+    if family == NHI_FAMILY:
+        return load_nhi_manifest(document)
+    if family == AI_AGENT_FAMILY:
+        return load_ai_agent_manifest(document)
+    if family == WORKFLOW_FAMILY:
+        return load_workflow_manifest(document)
+    if family == PRIVILEGED_ACCESS_FAMILY:
+        return load_privileged_access_manifest(document)
+    if family == TUNNEL_FAMILY:
+        return load_tunnel_manifest(document)
+    if family == SAAS_ROTATION_FAMILY:
+        return load_saas_rotation_manifest(document)
+    private_manifest = _load_private_manifest(family, document)
+    if private_manifest is not None:
+        return private_manifest
     raise UnsupportedFamilyError(
         reason=(
             f"typed plan/load supports {PAM_FAMILY}, {VAULT_FAMILY}, "
             f"{SHARING_FAMILY}, {MSP_FAMILY}, {ENTERPRISE_FAMILY}, "
             f"{KSM_FAMILY}, {IDENTITY_FAMILY}, {EVENTS_FAMILY}, "
-            f"{EPM_FAMILY}, {TERRAFORM_FAMILY}, {K8S_ESO_FAMILY}, "
-            f"and {SIEM_FAMILY} only "
+            f"{PAM_EXTENDED_FAMILY}, {EPM_FAMILY}, {TERRAFORM_FAMILY}, "
+            f"{K8S_ESO_FAMILY}, {SIEM_FAMILY}, {NHI_FAMILY}, and "
+            f"{AI_AGENT_FAMILY} plus packaged Commander 17.2.16 families only "
             f"(document declares {family!r})"
         ),
         next_action=(
@@ -252,6 +314,14 @@ def load_declarative_manifest_string(
             "see docs/PAM_PARITY_PROGRAM.md"
         ),
     )
+
+
+def _load_private_manifest(family: str, document: dict[str, Any]) -> Any | None:
+    try:
+        from keeper_sdk.core._private_families import load_private_manifest
+    except ImportError:
+        return None
+    return load_private_manifest(family, document)
 
 
 def dump_manifest(manifest: Manifest, *, fmt: str = "yaml") -> str:

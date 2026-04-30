@@ -89,8 +89,10 @@ from keeper_sdk.core.models_enterprise import (
 from keeper_sdk.core.models_epm import EPM_FAMILY, EpmManifestV1
 from keeper_sdk.core.models_integrations_events import EVENTS_FAMILY, EventsManifestV1
 from keeper_sdk.core.models_ksm import KSM_FAMILY, KsmManifestV1
+from keeper_sdk.core.models_pam_extended import PAM_EXTENDED_FAMILY, PamExtendedManifestV1
 from keeper_sdk.core.models_siem import SiemManifestV1
 from keeper_sdk.core.models_terraform import TERRAFORM_FAMILY, TerraformIntegrationManifestV1
+from keeper_sdk.core.pam_extended_diff import compute_pam_extended_diff
 from keeper_sdk.core.planner import Plan
 from keeper_sdk.core.preview import assert_preview_keys_allowed
 from keeper_sdk.core.schema import PAM_FAMILY, SHARING_FAMILY, validate_manifest
@@ -256,6 +258,7 @@ class PlanLoadBundle:
     msp: MspManifestV1 | None
     identity: IdentityManifestV1 | None
     ksm: KsmManifestV1 | None
+    pam_extended: PamExtendedManifestV1 | None
     epm: EpmManifestV1 | None
     terraform: TerraformIntegrationManifestV1 | None
     k8s_eso: K8sEsoManifestV1 | None
@@ -1232,6 +1235,15 @@ def apply(
         click.echo(f"{len(plan_obj.conflicts)} conflict(s) must be resolved first.", err=True)
         sys.exit(EXIT_CONFLICT)
     bundle = ctx.obj["_plan_bundle"]
+    if bundle.pam_extended is not None:
+        click.echo(
+            (
+                f"provider error: {PAM_EXTENDED_FAMILY} apply is upstream-gap "
+                "(offline schema/model/diff and plan only; no Commander write/readback proof)"
+            ),
+            err=True,
+        )
+        sys.exit(EXIT_CAPABILITY)
     if not auto_approve and not dry_run:
         click.confirm("Proceed?", abort=True)
     provider = bundle.provider
@@ -1244,7 +1256,10 @@ def apply(
                     reason=(
                         f"provider {ctx.obj.get('provider', 'mock')!r} has no KSM apply support"
                     ),
-                    next_action="use `--provider commander` for KSM app create or `--provider mock` for offline simulation",
+                    next_action=(
+                        "use `--provider commander` for supported KSM app lifecycle rows "
+                        "or `--provider mock` for full offline simulation"
+                    ),
                 )
             outcomes = provider.apply_ksm_plan(plan_obj, dry_run=dry_run)
         else:
@@ -1274,6 +1289,7 @@ def _build_plan(ctx: click.Context, manifest_path: Path, *, allow_delete: bool) 
         | IdentityManifestV1
         | KsmManifestV1
         | EventsManifestV1
+        | PamExtendedManifestV1
         | EpmManifestV1
         | TerraformIntegrationManifestV1
         | K8sEsoManifestV1
@@ -1352,6 +1368,14 @@ def _build_plan(ctx: click.Context, manifest_path: Path, *, allow_delete: bool) 
                     "use `dsk validate` for schema checks; apply waits on a Commander events writer"
                 ),
             )
+        elif bundle.pam_extended is not None:
+            changes = compute_pam_extended_diff(
+                bundle.pam_extended,
+                {},
+                manifest_name=bundle.manifest_name,
+                allow_delete=allow_delete,
+            )
+            capability_subject = bundle.pam_extended
         elif bundle.epm is not None:
             changes = compute_epm_diff(
                 bundle.epm,
@@ -1477,6 +1501,9 @@ def _load_plan_context(ctx: click.Context, manifest_path: Path) -> PlanLoadBundl
     msp: MspManifestV1 | None = typed if isinstance(typed, MspManifestV1) else None
     identity: IdentityManifestV1 | None = typed if isinstance(typed, IdentityManifestV1) else None
     ksm: KsmManifestV1 | None = typed if isinstance(typed, KsmManifestV1) else None
+    pam_extended: PamExtendedManifestV1 | None = (
+        typed if isinstance(typed, PamExtendedManifestV1) else None
+    )
     epm: EpmManifestV1 | None = typed if isinstance(typed, EpmManifestV1) else None
     terraform: TerraformIntegrationManifestV1 | None = (
         typed if isinstance(typed, TerraformIntegrationManifestV1) else None
@@ -1492,6 +1519,8 @@ def _load_plan_context(ctx: click.Context, manifest_path: Path) -> PlanLoadBundl
         manifest_name = IDENTITY_FAMILY
     elif events is not None:
         manifest_name = events.name
+    elif pam_extended is not None:
+        manifest_name = PAM_EXTENDED_FAMILY
     elif epm is not None:
         manifest_name = EPM_FAMILY
     elif terraform is not None:
@@ -1532,7 +1561,10 @@ def _load_plan_context(ctx: click.Context, manifest_path: Path) -> PlanLoadBundl
                     reason=(
                         f"{KSM_FAMILY} plan/apply is not implemented for {provider_name} provider"
                     ),
-                    next_action="use `--provider commander` for KSM app create or `--provider mock` for offline simulation",
+                    next_action=(
+                        "use `--provider commander` for supported KSM app lifecycle rows "
+                        "or `--provider mock` for full offline simulation"
+                    ),
                 )
             order = ksm_apply_order(ksm)
         elif events is not None:
@@ -1545,6 +1577,8 @@ def _load_plan_context(ctx: click.Context, manifest_path: Path) -> PlanLoadBundl
                     "use `dsk validate` for schema checks; apply waits on a Commander events writer"
                 ),
             )
+        elif pam_extended is not None:
+            order = [uid_ref for uid_ref, _kind in pam_extended.iter_object_refs()]
         elif epm is not None:
             raise CapabilityError(
                 reason=(
@@ -1636,7 +1670,7 @@ def _load_plan_context(ctx: click.Context, manifest_path: Path) -> PlanLoadBundl
         except CapabilityError as exc:
             click.echo(f"discovery failed: {exc}", err=True)
             sys.exit(EXIT_CAPABILITY)
-    elif sharing is None:
+    elif sharing is None and pam_extended is None:
         try:
             live = provider.discover()
         except CapabilityError as exc:
@@ -1644,6 +1678,7 @@ def _load_plan_context(ctx: click.Context, manifest_path: Path) -> PlanLoadBundl
             sys.exit(EXIT_CAPABILITY)
         if vault is not None:
             live, live_record_type_defs = _vault_live_inputs(live)
+
     return PlanLoadBundle(
         pam=pam,
         vault=vault,
@@ -1651,6 +1686,7 @@ def _load_plan_context(ctx: click.Context, manifest_path: Path) -> PlanLoadBundl
         msp=msp,
         identity=identity,
         ksm=ksm,
+        pam_extended=pam_extended,
         epm=epm,
         terraform=terraform,
         k8s_eso=k8s_eso,

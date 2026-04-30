@@ -18,12 +18,17 @@ Stable public surface:
     - compute_msp_diff (core.msp_diff) — MSP slice 1
     - IdentityManifestV1, load_identity_manifest, compute_identity_diff
       (core.models_integrations_identity / core.integrations_identity_diff) — W14 offline
+    - PamExtendedManifestV1, load_pam_extended_manifest, compute_pam_extended_diff
+      (core.models_pam_extended / core.pam_extended_diff) — W17 offline
     - TerraformIntegrationManifestV1, load_terraform_manifest
       (core.models_terraform) — Terraform integration boundary metadata
     - K8sEsoManifestV1, load_k8s_eso_manifest
       (core.models_k8s_eso) — Kubernetes ESO integration boundary metadata
     - SiemManifestV1, load_siem_manifest, compute_siem_diff
       (core.models_siem / core.siem_diff) — SIEM event streaming metadata
+    - Workflow / privileged-access / tunnel / SaaS rotation typed scaffolds
+      (core.models_workflow, core.models_privileged_access, core.models_tunnel,
+      core.models_saas_rotation) — Commander 17.2.16 public-eligible families
     - build_graph, execution_order (core.graph)
     - compute_diff, Change (core.diff)
     - build_plan, Plan (core.planner)
@@ -86,6 +91,32 @@ from keeper_sdk.core.models_k8s_eso import (
     K8sEsoManifestV1,
     load_k8s_eso_manifest,
 )
+from keeper_sdk.core.models_pam_extended import (
+    PAM_EXTENDED_FAMILY,
+    PamExtendedDiscoveryRule,
+    PamExtendedGatewayConfig,
+    PamExtendedManifest,
+    PamExtendedManifestV1,
+    PamExtendedResource,
+    PamExtendedRotationSchedule,
+    PamExtendedServiceMapping,
+    load_pam_extended_manifest,
+)
+from keeper_sdk.core.models_privileged_access import (
+    PRIVILEGED_ACCESS_FAMILY,
+    PrivilegedAccessManifestV1,
+    PrivilegedGroup,
+    PrivilegedGroupMembership,
+    PrivilegedUser,
+    load_privileged_access_manifest,
+)
+from keeper_sdk.core.models_saas_rotation import (
+    SAAS_ROTATION_FAMILY,
+    SaaSRotationBinding,
+    SaaSRotationConfig,
+    SaaSRotationManifestV1,
+    load_saas_rotation_manifest,
+)
 from keeper_sdk.core.models_siem import (
     SIEM_FAMILY,
     SiemFilter,
@@ -100,6 +131,23 @@ from keeper_sdk.core.models_terraform import (
     TerraformResourceMapping,
     load_terraform_manifest,
 )
+from keeper_sdk.core.models_tunnel import (
+    TUNNEL_FAMILY,
+    TunnelConfig,
+    TunnelGatewayBinding,
+    TunnelHostMapping,
+    TunnelManifestV1,
+    load_tunnel_manifest,
+)
+from keeper_sdk.core.models_workflow import (
+    WORKFLOW_FAMILY,
+    WorkflowApprover,
+    WorkflowConfig,
+    WorkflowManifestV1,
+    WorkflowRequest,
+    WorkflowState,
+    load_workflow_manifest,
+)
 from keeper_sdk.core.msp_diff import compute_msp_diff
 from keeper_sdk.core.msp_graph import build_msp_graph, msp_apply_order
 from keeper_sdk.core.msp_models import (
@@ -110,6 +158,7 @@ from keeper_sdk.core.msp_models import (
     load_msp_manifest,
 )
 from keeper_sdk.core.normalize import from_pam_import_json, to_pam_import_json
+from keeper_sdk.core.pam_extended_diff import compute_pam_extended_diff
 from keeper_sdk.core.planner import Plan, build_plan
 from keeper_sdk.core.redact import redact
 from keeper_sdk.core.schema import (
@@ -168,9 +217,14 @@ __all__ = [
     "SharedFoldersBlock",
     "MSP_FAMILY",
     "IDENTITY_FAMILY",
+    "PAM_EXTENDED_FAMILY",
     "TERRAFORM_FAMILY",
     "K8S_ESO_FAMILY",
     "SIEM_FAMILY",
+    "WORKFLOW_FAMILY",
+    "PRIVILEGED_ACCESS_FAMILY",
+    "TUNNEL_FAMILY",
+    "SAAS_ROTATION_FAMILY",
     "MspManifestV1",
     "IdentityDomain",
     "IdentityManifestV1",
@@ -180,6 +234,7 @@ __all__ = [
     "PamExtendedDiscoveryRule",
     "PamExtendedGatewayConfig",
     "PamExtendedManifest",
+    "PamExtendedManifestV1",
     "PamExtendedResource",
     "TerraformIntegrationManifestV1",
     "TerraformResourceMapping",
@@ -188,6 +243,22 @@ __all__ = [
     "SiemManifestV1",
     "SiemRoute",
     "SiemSink",
+    "WorkflowApprover",
+    "WorkflowConfig",
+    "WorkflowManifestV1",
+    "WorkflowRequest",
+    "WorkflowState",
+    "PrivilegedAccessManifestV1",
+    "PrivilegedGroup",
+    "PrivilegedGroupMembership",
+    "PrivilegedUser",
+    "TunnelConfig",
+    "TunnelGatewayBinding",
+    "TunnelHostMapping",
+    "TunnelManifestV1",
+    "SaaSRotationBinding",
+    "SaaSRotationConfig",
+    "SaaSRotationManifestV1",
     "EsoStore",
     "ExternalSecret",
     "ExternalSecretData",
@@ -196,9 +267,14 @@ __all__ = [
     "ManagedCompany",
     "Addon",
     "load_identity_manifest",
+    "load_pam_extended_manifest",
     "load_terraform_manifest",
     "load_k8s_eso_manifest",
     "load_siem_manifest",
+    "load_workflow_manifest",
+    "load_privileged_access_manifest",
+    "load_tunnel_manifest",
+    "load_saas_rotation_manifest",
     "load_msp_manifest",
     "load_manifest",
     "load_declarative_manifest",
@@ -218,6 +294,7 @@ __all__ = [
     "compute_diff",
     "compute_msp_diff",
     "compute_identity_diff",
+    "compute_pam_extended_diff",
     "compute_vault_diff",
     "build_sharing_graph",
     "sharing_apply_order",

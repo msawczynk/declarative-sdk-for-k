@@ -1,0 +1,20 @@
+schema: keeper-workflow.v1
+approvers:
+  - uid_ref: approver.security
+    name: Security Team
+    email: security@example.com
+workflows:
+  - uid_ref: workflow.break-glass
+    name: Break Glass Approval
+    resource_uid_ref: keeper-vault:records:admin-linux
+    approver_uid_refs:
+      - keeper-workflow:approvers:approver.security
+requests:
+  - uid_ref: request.demo
+    workflow_uid_ref: keeper-workflow:workflows:workflow.break-glass
+    requester: operator@example.com
+    reason: Emergency maintenance
+states:
+  - uid_ref: state.demo
+    workflow_uid_ref: keeper-workflow:workflows:workflow.break-glass
+    status: pending

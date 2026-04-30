@@ -24,7 +24,7 @@ runs `bash scripts/daybook/harness.sh` (no `~/.cursor-daybook-sync` required for
 | `test_renderer_snapshots.py` | 228 | RichRenderer plan/diff/outcomes byte-snapshots in `tests/fixtures/renderer_snapshots/`. |
 | `test_interfaces.py` | 9 | Protocol shape conformance. |
 | `test_providers.py` | 66 | Provider protocol + common-provider behaviour. |
-| `test_preview_gate.py` | 202 | Preview gates unsupported rotation locations, `jit_settings`, `gateway.mode: create`, `default_rotation_schedule`, and `projects[]`; nested `resources[].users[].rotation_settings` validates without preview. |
+| `test_preview_gate.py` | 202 | Preview gates unsupported rotation locations, `default_rotation_schedule`, and `projects[]`; nested `resources[].users[].rotation_settings` and gateway `mode: create` validate without preview. |
 | `test_uid_ref_gate.py` | 22 | `pam_configuration_uid_ref` cross-manifest gate (stage 3 fail). |
 | `test_perf.py` | 73 | 500 `pamMachine` validate→graph→diff→plan inside 5 s budget; `resource.getrusage` mem assert. `@pytest.mark.slow`. |
 | `test_cli.py` | 297 | Click commands; exit codes; `apply --dry-run == plan` byte equivalence (W3/W10). |
