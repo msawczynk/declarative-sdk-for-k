@@ -1,6 +1,8 @@
 # Commander dependency pin
 
 > Full compatibility matrix (Python / OS / tenant): [docs/COMPATIBILITY.md](COMPATIBILITY.md)
+> For the full Commander feature coverage matrix (CRUD per resource, gap table, verb inventory), see [COMMANDER_COVERAGE.md](COMMANDER_COVERAGE.md).
+
 
 The SDK shells out to the **Keeper Commander** CLI (`keeper`) and imports its
 Python module in-process for a handful of commands. This page documents the
