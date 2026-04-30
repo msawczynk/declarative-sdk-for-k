@@ -237,15 +237,28 @@ def load_declarative_manifest_string(
     | Any
 ):
     """Like :func:`load_declarative_manifest` but from a string."""
-    from keeper_sdk.core.models_ai_agent import load_ai_agent_manifest
+    try:
+        from keeper_sdk.core.models_ai_agent import (
+            load_ai_agent_manifest,  # stripped in public build
+        )
+    except ImportError:
+        load_ai_agent_manifest = None  # type: ignore[assignment]
     from keeper_sdk.core.models_enterprise import load_enterprise_manifest
     from keeper_sdk.core.models_epm import load_epm_manifest
     from keeper_sdk.core.models_integrations_events import load_events_manifest
     from keeper_sdk.core.models_integrations_identity import load_identity_manifest
     from keeper_sdk.core.models_k8s_eso import load_k8s_eso_manifest
     from keeper_sdk.core.models_ksm import KSM_FAMILY, load_ksm_manifest
-    from keeper_sdk.core.models_nhi import load_nhi_manifest
-    from keeper_sdk.core.models_pam_extended import load_pam_extended_manifest
+    try:
+        from keeper_sdk.core.models_nhi import load_nhi_manifest  # stripped in public build
+    except ImportError:
+        load_nhi_manifest = None  # type: ignore[assignment]
+    try:
+        from keeper_sdk.core.models_pam_extended import (
+            load_pam_extended_manifest,  # stripped in public build
+        )
+    except ImportError:
+        load_pam_extended_manifest = None  # type: ignore[assignment]
     from keeper_sdk.core.models_privileged_access import load_privileged_access_manifest
     from keeper_sdk.core.models_saas_rotation import load_saas_rotation_manifest
     from keeper_sdk.core.models_siem import load_siem_manifest
@@ -285,7 +298,7 @@ def load_declarative_manifest_string(
         return load_identity_manifest(document)
     if family == EVENTS_FAMILY:
         return load_events_manifest(document)
-    if family == PAM_EXTENDED_FAMILY:
+    if family == PAM_EXTENDED_FAMILY and load_pam_extended_manifest is not None:
         return load_pam_extended_manifest(document)
     if family == EPM_FAMILY:
         return load_epm_manifest(document)
@@ -295,9 +308,9 @@ def load_declarative_manifest_string(
         return load_k8s_eso_manifest(document)
     if family == SIEM_FAMILY:
         return load_siem_manifest(document)
-    if family == NHI_FAMILY:
+    if family == NHI_FAMILY and load_nhi_manifest is not None:
         return load_nhi_manifest(document)
-    if family == AI_AGENT_FAMILY:
+    if family == AI_AGENT_FAMILY and load_ai_agent_manifest is not None:
         return load_ai_agent_manifest(document)
     if family == WORKFLOW_FAMILY:
         return load_workflow_manifest(document)
