@@ -73,6 +73,26 @@ if [[ -f pyproject.toml && -f CHANGELOG.md ]]; then
   fi
 fi
 
+
+# --- Gate 5: published docs must NOT contain private family name strings ---
+echo "==> check_public_content: Gate5 — scanning published docs for private family refs"
+PRIVATE_PATTERN="nhi-agent|nhi_agent|ai-agent|ai_agent|pam-extended|pam_extended|keeper-drive|keeperdrive"
+PUBLIC_SCANNED_DOCS=(
+  "README.md"
+  "CHANGELOG.md"
+  "docs/COMMANDER_COVERAGE.md"
+  "docs/CAPABILITY_STATUS.md"
+)
+for f in "${PUBLIC_SCANNED_DOCS[@]}"; do
+  if [[ -f "$f" ]]; then
+    if grep -qiE "$PRIVATE_PATTERN" "$f"; then
+      echo "ERROR [Gate5]: Private family reference found in published doc: $f" >&2
+      grep -inE "$PRIVATE_PATTERN" "$f" | head -10 >&2
+      FAIL=1
+    fi
+  fi
+done
+
 if [[ $FAIL -eq 1 ]]; then
   echo ""
   echo "==> check_public_content: FAILED — run publish.sh to strip before checking," >&2

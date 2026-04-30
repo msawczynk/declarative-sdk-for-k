@@ -21,10 +21,7 @@ Declarative lifecycle management for Keeper Security tenants.
 | `keeper-privileged-access.v1` | PAM privileged access users, groups, and memberships | preview-gated | Public-eligible schema/model scaffold; Commander 17.2.16 ships `pam access` |
 | `keeper-tunnel.v1` | PAM tunnels, gateway bindings, and host mappings | preview-gated | Public-eligible schema/model scaffold; Commander 17.2.16 ships `pam tunnel` |
 | `keeper-saas-rotation.v1` | SaaS rotation configs and record bindings | preview-gated | Public-eligible schema/model scaffold; Commander 17.2.16 ships `pam action saas` |
-| `keeper-drive.v1` | KeeperDrive folders, files, and shares | private-preview | Private-only scaffold; excluded from public mirror until Commander ships KeeperDrive |
 | `msp-environment.v1` | MSP managed companies | preview-gated | Discover/validate/plan supported; apply blocked — tenant MSP product permit required |
-| `nhi-agent.v1` | Non-Human Identity resources | upstream-gap | Pending Keeper NHI API GA |
-| `ai-agent.v1` | AI agent identity resources | upstream-gap | Pending Keeper NHI API GA |
 
 ## Install
 

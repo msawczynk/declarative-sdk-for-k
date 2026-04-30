@@ -10,7 +10,6 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 - feat: Commander 17.2.16 gateway lifecycle wiring for `pam gateway new/edit/remove`.
 - feat: KSM app delete and existing app-share editable update wiring via `KSMCommand`.
 - feat: public-eligible schema/model scaffolds for workflow, privileged access, tunnel, and SaaS rotation families.
-- feat: private-only KeeperDrive schema/model scaffold gated out of `publish.sh`.
 
 ### Changed
 - docs: reclassify JIT import/extend, gateway lifecycle, KSM app delete, and KSM app-share update as Commander 17.2.16 supported surfaces.
@@ -18,8 +17,6 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 ## [2.1.0] - 2026-04-30
 
 ### Added
-- feat: nhi-agent.v1 and ai-agent.v1 resource type scaffolds (offline validate; apply pending NHI PAM API GA)
-- feat: keeper-pam-extended.v1 offline foundation
 - feat: KSM inter-agent bus CAS protocol (acquire/release/publish/consume + MockBusStore)
 - feat: compliance-report graceful empty-cache path (--no-fail-on-empty)
 - feat: vault-sharing idempotent re-plan offline coverage

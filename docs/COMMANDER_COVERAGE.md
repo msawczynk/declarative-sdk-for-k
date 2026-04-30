@@ -22,7 +22,6 @@
 | `keeper-privileged-access.v1` | Commander release surface verified (`pam access`) | Not wired yet | validate (schema/model scaffold) |
 | `keeper-tunnel.v1` | Commander release surface verified (`pam tunnel`) | Not wired yet | validate (schema/model scaffold) |
 | `keeper-saas-rotation.v1` | Commander release surface verified (`pam action saas`) | Not wired yet | validate (schema/model scaffold) |
-| `keeper-drive.v1` | Not in Commander 17.2.16 | Private-only | validate (private schema/model scaffold) |
 
 > **Note:** `dsk export` does **not** use `pam project export` — that command does
 > not exist in Commander `17.2.16+`. Export is synthesised by iterating `ls` +
@@ -219,7 +218,8 @@ subprocess). Apply requires MSP admin session and tenant `msp_permits.allowed_mc
 | Import marker write | `managed_company` | ❌ Not implemented | No stable marker path |
 | Non-MC resource types | any | ❌ | Raises `CapabilityError` |
 
-### 4.7 PAM workflow, SaaS rotation, tunnel, access, KeeperDrive
+
+### 4.7 PAM workflow, SaaS rotation, tunnel, and access
 
 Reference-only status for Commander groups adjacent to `pam-environment.v1`; these
 are not necessarily wired through the standard import/extend table above.
@@ -230,7 +230,6 @@ are not necessarily wired through the standard import/extend table above.
 | `pam saas` | **17.2.16** | `saas_plugins:` opaque passthrough on `pamUser` in progress (**Wave E**). |
 | `pam tunnel` | **17.2.16** | Operation-only; not declarative — explicitly out of scope for DSK plan/apply. |
 | `pam access` | **17.2.16** | Operation-only (IdP provisioning flows); out of scope for declarative management. |
-| KeeperDrive | Not yet on Commander **master** (**PR #1975** pending) | Private scaffold only in DSK; public release when upstream lands in an official Commander release. |
 
 ---
 
