@@ -91,6 +91,7 @@ from keeper_sdk.core.models_k8s_eso import (
     K8sEsoManifestV1,
     load_k8s_eso_manifest,
 )
+
 try:
     from keeper_sdk.core.models_pam_extended import (  # stripped in public build
         PAM_EXTENDED_FAMILY,
@@ -161,7 +162,13 @@ from keeper_sdk.core.msp_models import (
     load_msp_manifest,
 )
 from keeper_sdk.core.normalize import from_pam_import_json, to_pam_import_json
-from keeper_sdk.core.pam_extended_diff import compute_pam_extended_diff
+
+try:
+    from keeper_sdk.core.pam_extended_diff import (
+        compute_pam_extended_diff,  # stripped in public build
+    )
+except ImportError:
+    compute_pam_extended_diff = None  # type: ignore[assignment]
 from keeper_sdk.core.planner import Plan, build_plan
 from keeper_sdk.core.redact import redact
 from keeper_sdk.core.schema import (

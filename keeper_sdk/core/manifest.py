@@ -35,6 +35,7 @@ from typing import TYPE_CHECKING, Any
 
 from keeper_sdk.core.errors import ManifestError, SchemaError, UnsupportedFamilyError
 from keeper_sdk.core.models import Manifest
+
 try:
     from keeper_sdk.core.models_ai_agent import AI_AGENT_FAMILY
 except ImportError:  # stripped in public build
@@ -44,6 +45,7 @@ from keeper_sdk.core.models_epm import EPM_FAMILY
 from keeper_sdk.core.models_integrations_events import EVENTS_FAMILY
 from keeper_sdk.core.models_integrations_identity import IDENTITY_FAMILY
 from keeper_sdk.core.models_k8s_eso import K8S_ESO_FAMILY
+
 try:
     from keeper_sdk.core.models_nhi import NHI_FAMILY
 except ImportError:  # stripped in public build
