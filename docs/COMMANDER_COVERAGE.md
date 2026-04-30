@@ -23,9 +23,9 @@
 | `keeper-tunnel.v1` | Commander release surface verified (`pam tunnel`) | Not wired yet | validate (schema/model scaffold) |
 | `keeper-saas-rotation.v1` | Commander release surface verified (`pam action saas`) | Not wired yet | validate (schema/model scaffold) |
 
-> **Note:** `dsk export` does **not** use `pam project export` — that command does
-> not exist in Commander `17.2.16+`. Export is synthesised by iterating `ls` +
-> `get` over the project folder.
+> **Note:** on Commander `17.2.16`, `dsk export` synthesises export by iterating
+> `ls` + `get` over the project folder. Commander v18 adds native
+> `pam project export`; DSK feature-gates that path at runtime.
 
 ---
 
@@ -41,7 +41,7 @@
 | `dsk apply` (update) | `pam project extend`, `pam gateway edit`, `pam connection edit`, `pam rbi edit`, `pam rotation edit`, `record_management.update_record`, `MSPUpdateCommand`, `KSMCommand.update_app_share` | **Yes** | Modifies existing resources |
 | `dsk apply` (delete) | `rm --force <uid>`, `pam gateway remove`, `rmdir -f`, `MSPRemoveCommand`, `KSMCommand.remove_v5_app` | **Yes** | Requires `--allow-delete` for PAM/vault/KSM deletes |
 | `dsk import` | `list` / `get` + marker write via `record_management.update_record` | **Yes** (marker write only) | Adopts existing records; no structural change |
-| `dsk export` | `ls --format json`, `get --format json` (iterates project folder) | No | Synthesised; no `pam project export` |
+| `dsk export` | `pam project export --project-uid <uid> --format json` (Commander v18), else `ls --format json` + `get --format json` | No | Native when v18-gated; synthesised on 17.x |
 | `dsk report password-report` | `security-audit-report` Commander command | No | Read-only; output redacted |
 | `dsk report compliance-report` | `compliance-report` Commander command | No | Read-only; output redacted |
 | `dsk report security-audit-report` | `security-audit-report` Commander command | No | Read-only; output redacted |
@@ -259,25 +259,29 @@ Four upstream Commander pull requests were merged on **2026-04-30** into
 `Keeper-Security/Commander` `release` branch and ship in the next Commander
 tag (post-`17.2.16`). DSK already detects and uses them when available:
 
+DSK detects the installed Commander version at runtime via
+`keeper_sdk.providers.commander_version`. Set `DSK_COMMANDER_V18=1` to force v18
+code paths for preview testing before the tag ships.
+
 | Capability | Commander PR | DSK behaviour |
 |---|---|---|
-| `pam rotation info --format=json` | [#2003](https://github.com/Keeper-Security/Commander/pull/2003) | DSK now warns at plan-time when rotation-script readback would require this; lifts to silent on next Commander release |
-| `secrets-manager token add <app-uid>` | [#2004](https://github.com/Keeper-Security/Commander/pull/2004) | KSM token-add becomes scriptable; DSK roadmap will wire `keeper-ksm.v1` token lifecycle |
-| `pam project import` duplicate-uid guard | [#2005](https://github.com/Keeper-Security/Commander/pull/2005) | DSK manifests with duplicate `uid_ref` collisions now fail fast in Commander, not silently overwrite |
-| `pam project export` (deterministic JSON) | [#2006](https://github.com/Keeper-Security/Commander/pull/2006) | DSK keeps its synthesised `dsk export` (works on `17.2.16+`); also accepts native `pam project export` JSON on next Commander release |
+| `pam rotation info --format=json` | [#2003](https://github.com/Keeper-Security/Commander/pull/2003) | DSK warns at plan-time on 17.x; the warning is suppressed when the v18 gate is open |
+| `secrets-manager token add <app-uid>` | [#2004](https://github.com/Keeper-Security/Commander/pull/2004) | KSM token-add is feature-gated behind Commander v18 / `DSK_COMMANDER_V18=1` |
+| `pam project import` duplicate-uid guard | [#2005](https://github.com/Keeper-Security/Commander/pull/2005) | DSK exposes a predicate for server-side duplicate-uid guard availability |
+| `pam project export` (deterministic JSON) | [#2006](https://github.com/Keeper-Security/Commander/pull/2006) | DSK prefers native `pam project export` when the v18 gate is open; 17.x keeps the synthesised path |
 
 ### 6.2 Gaps still present on Commander `17.2.16`
 
 | Gap | Root cause | Workaround | Tracking |
 |---|---|---|---|
-| `pam rotation info --format=json` (on `17.2.16`) | Not available in any released `17.x` tag yet — merged for next release (PR #2003) | `keeper pam rotation info` (human-readable); rotation scheduling via admin console | Next Commander release |
+| `pam rotation info --format=json` (on `17.2.16`) | Not available in any released `17.x` tag yet — merged for next release (PR #2003) | `keeper pam rotation info` (human-readable); rotation scheduling via admin console. Set `DSK_COMMANDER_V18=1` to enable (requires Commander release branch wheel). | Next Commander release |
 | Rotation scheduling apply | `DSK_EXPERIMENTAL_ROTATION_APPLY` must be set; readback partial | Do not use in production without live proof | Experimental gate |
-| KSM token / new share / config-output management | Not a stable programmatic Commander surface in the `keeper-ksm.v1` family on `17.2.16` (PR #2004 lands token add in next release) | Keeper Secrets Manager console; `keeper sm token add` interactively | Next Commander release |
+| KSM token / new share / config-output management | Not a stable programmatic Commander surface in the `keeper-ksm.v1` family on `17.2.16` (PR #2004 lands token add in next release) | Keeper Secrets Manager console; `keeper sm token add` interactively. Set `DSK_COMMANDER_V18=1` to enable token add (requires Commander release branch wheel). | Next Commander release |
 | KSM app rename / metadata update (`update_app`) | Classification `missing_apply`: `KSMCommand.update_app` is stable on Commander **17.2.16**; model + Commander API exist | — | Implemented in DSK 2.3.0 |
 | MSP apply without tenant permit | `msp_permits.allowed_mc_products` required on tenant | Request MSP permit from Keeper; validate-only with `dsk plan` | Upstream tenant-capability |
 | MSP import marker write | No stable marker anchor for managed-company records | Use mock provider for full lifecycle testing | Design pending |
 | Enterprise write operations | Commander enterprise API is read-only via DSK | Use Keeper admin console for node/user/role/team mutations | By design (read-only family) |
-| `pam project export` (on `17.2.16`) | Does not exist in `17.2.16` (PR #2006 lands in next release) | `dsk export <project.json>` synthesises export from `ls` + `get` | DSK workaround ships; native command in next Commander release |
+| `pam project export` (on `17.2.16`) | Does not exist in `17.2.16` (PR #2006 lands in next release) | `dsk export <project.json>` synthesises export from `ls` + `get`. Set `DSK_COMMANDER_V18=1` to enable (requires Commander release branch wheel). | DSK workaround ships; native command in next Commander release |
 | `record-update` (subprocess) | Version-fragile typed-field syntax | In-process `record_management.update_record` API used instead | N/A — DSK workaround ships |
 | Standalone JIT edit | No dedicated `pam jit edit` Commander surface separate from import/extend | Use manifest import/extend lifecycle for supported PAM resources | Future Commander surface |
 | RBI audio controls | Commander exposes flags; no typed manifest field | — | Schema extension candidate |
@@ -294,7 +298,7 @@ tag (post-`17.2.16`). DSK already detects and uses them when available:
 | `17.2.16` (floor — fully tested) | All supported operations green; reference pin for CI |
 | `17.2.x` (>16) | Expected compatible — re-run smoke on each patch bump |
 | `17.3.x` | Untested — run `scripts/smoke/smoke.py` and report |
-| `>=18` | Blocked — hard ceiling in `pyproject.toml` (`keepercommander<18`) |
+| `>=18` | Feature-gated preview paths; stable packaging still pins `keepercommander<18` until the Commander v18 tag ships |
 
 Two version concepts apply:
 
@@ -313,7 +317,7 @@ See [COMMANDER.md](COMMANDER.md) for the exact pin SHA and delta table between
 
 | Command | Reason |
 |---|---|
-| `pam project export` | Does not exist in `17.2.16` (lands in next release via PR #2006); DSK synthesises via `ls` + `get` and continues to do so for back-compat |
+| `pam project export` | Feature-gated to Commander v18; on `17.2.16`, DSK synthesises via `ls` + `get` |
 | `pam project remove` / `destroy` | Does not exist; destroy is per-record `rm --force` |
 | `record-update` (subprocess) | Version-fragile; in-process API used instead |
 | Interactive `keeper login` / `keeper sync-down` | Subprocess prompts interactively; `deploy_watcher.keeper_login()` handles both |
@@ -360,7 +364,7 @@ the remaining operational surface; see sections 1–4 above for the full picture
 | `share-record` | ✅ (in-process) | apply | Not in generator `COMMAND_ROOTS` |
 | `share-folder` | ✅ (in-process) | apply | Not in generator `COMMAND_ROOTS` |
 | `record-update` | ❌ (by design) | — | In-process `RecordEditCommand` used instead |
-| `pam project export` | ❌ (does not exist) | — | DSK synthesises via `ls` + `get` |
+| `pam project export` | v18-gated | `dsk export` | DSK synthesises via `ls` + `get` on 17.x |
 | `automator *`, `scim *`, `trash *` | ❌ | — | Mirrored surface; no DSK lifecycle coverage |
 
 To refresh the raw report:

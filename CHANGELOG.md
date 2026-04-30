@@ -6,114 +6,538 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-## [2.3.0] - 2026-04-30
+## [2.4.0] - 2026-04-30
 
 ### Added
-- feat(mcp): `dsk mcp serve` CLI command starts a stdio JSON-RPC MCP server that exposes manifest tooling to AI agents (gated by optional `mcp` extra).
-- feat(pam): `rotation_scripts` field on `pamUser` for declarative `pam rotation script add` attachments, with plan-time warning when readback would require `pam rotation info --format=json` (Commander PR #2003 merged to `release` — warning lifts once next Commander tag ships).
-- feat(ksm): `update_app` now wired in `CommanderCliProvider` — KSM app metadata drift triggers an in-place rename instead of delete+recreate.
-- feat(diff): `pam_configuration.options` permission-flag drift (connections, tunneling, rotation, remote_browser_isolation, graphical_session_recording, text_session_recording, ai_threat_detection, ai_terminate_session_on_detection) now surfaces as UPDATE rows; previously silently dropped post-import.
-- test(live): KSM app lifecycle (token / share / config-output) live-proof accepted against the lab tenant — 3/3 lifecycle ops verified.
-- test(live): enterprise teams/roles online-validate live-proof accepted — 18 enterprise objects.
-- test(live): `ksm-usage` report live-proof accepted; CLI table + JSON envelope verified end-to-end.
-- test(live): KSM bootstrap (`acquire/release/publish/consume`) inter-agent bus live-proof accepted — concurrent-writer CAS verified.
+- feat(v18): `keeper_sdk/providers/commander_version.py` — runtime Commander version detection; `get_commander_version()` returns `(major, minor, patch)` via `importlib.metadata`; `v18_or_later()` predicate gates all four Commander v18 PR capabilities; `DSK_COMMANDER_V18=1` env override for preview testing.
+- feat(v18): `v18_rotation_info_json`, `v18_sm_token_add`, `v18_project_import_server_dedup`, `v18_project_export_native` predicates covering PRs #2003–#2006 (all merged to Commander `release` branch 2026-04-30).
+- test: 12 new unit tests for version detection and v18 capability gates (1520 pass total).
 
 ### Changed
-- docs(DA plan): KSM bootstrap, KSM bus, ksm-usage, enterprise validate, and KSM lifecycle reclassified to **Live proof ACCEPTED**.
-- docs(commander coverage): `update_app` correctly documented as Commander 17.2.16 stable; previous "no update_v5_app" wording corrected.
-- docs(scope): `pam_access` (privileged-access) and `pam_tunnel` are operation-only and out of scope for declarative management.
-- chore(publish): hardened publish gate scrubs internal-only references from public-facing docs and refuses to push if any reappear.
+- feat(v18): rotation-scripts plan-time warning suppressed when Commander >=18 (`v18_rotation_info_json()`).
+- feat(v18): `dsk export` prefers native `pam project export` subprocess when `v18_project_export_native()`; falls back to synthesised `ls`+`get` on any failure.
+
+### Added
+- **Phase 7 — shared-folder model** — shared-folder manifests now have a
+  typed offline model and validation coverage, including `reference_existing`
+  paths and schema-stage guardrails.
+- **Phase 7 — shared-folder apply path** — MockProvider apply coverage now
+  exercises shared-folder create/update/noop/delete guardrails and
+  `keeper-vault-sharing.v1` CLI apply -> clean mock-plan convergence.
+- **Phase 7 — shared-folder Commander write path** — Commander provider now
+  wires shared-folder create/update and membership grant paths with delete
+  guardrails while broader permission diff/readback proof remains gated.
+- **Phase 7 — KSM inter-agent bus stub** — `keeper_sdk.secrets.bus` documents
+  the future publish/subscribe surface and raises `NotImplementedError` with
+  `next_action` until the protocol and live proof land.
+- **Phase 7 — KSM bootstrap live path** — `bootstrap-ksm` coverage now tracks
+  the live bootstrap flow through application provisioning, one-time token
+  redemption, local KSM config materialization, and login-helper verification.
+- **Phase 7 — teams / roles** — teams and roles schema/model coverage landed
+  with offline validation for accepted shapes, unknown-type rejection, and
+  forward-looking xfail cases.
+- **Phase 7 — report commands** — `password-report`, `compliance-report`, and
+  `security-audit-report` now share the redacted JSON-envelope contract with
+  UID sanitization / quiet-mode coverage.
+- **Phase 7 — example manifests** — scaffold-only manifests now exercise the
+  Phase 7 families so CI can validate and mock-plan the new declarative shapes.
+- **Phase 7 — module rename shim** — packaged `declarative_sdk_k` as the 1.x
+  compatibility shim ahead of the planned 2.0 module rename from `keeper_sdk`.
+- **Phase 7 — v1.3 roadmap** — `docs/DSK_NEXT_WORK.md` now carries the blocker
+  table and v1.3 roadmap for shared-folder write support, KSM app create proof,
+  module rename timing, and teams/roles live validate.
+- **Phase 7 tests** — shared-folder `validate` coverage and KSM app
+  `reference_existing` tests.
+- **RichRenderer snapshots** — six layout snapshot cases in
+  `tests/test_renderer_snapshots.py`.
+- **Performance guard** — `tests/test_perf.py` now asserts peak RSS stays below
+  192 MiB.
+- **Vault custom-field diffs** — five add / change / remove diff cases.
+- **Vault apply ordering** — multi-record topological ordering coverage in
+  `tests/test_vault_mock_provider.py`.
+- **Teams / roles validate** — six offline validation tests, including
+  unknown-type rejection and future xfail coverage.
+- **Report commands** — five offline tests for compliance / security-audit UID
+  sanitization.
+- **KSM app create** — three bootstrap sequence tests.
+- **Redaction patterns** — bearer-token, JWT, and KSM URL test coverage.
+
+### Changed
+- **Module rename prep** — packaging now includes both `keeper_sdk*` and
+  `declarative_sdk_k*`, keeping the 1.x import path stable while exposing the
+  future package name for early adopters.
 
 ### Fixed
-- fix(diff): `pamConfiguration` permission flags no longer silently ignored — overlay diff against the manifest `options` block (Commander-injected defaults remain unmanaged).
-
-### Upstream contributions
-
-Four Commander pull requests were authored during the v2.3.0 cycle and **merged
-into `Keeper-Security/Commander` `release` branch on 2026-04-30** (ship in next
-Commander tag, post-`17.2.16`):
-
-- [Commander #2003](https://github.com/Keeper-Security/Commander/pull/2003) — `pam rotation info --format=json`
-- [Commander #2004](https://github.com/Keeper-Security/Commander/pull/2004) — `secrets-manager token add <app-uid>`
-- [Commander #2005](https://github.com/Keeper-Security/Commander/pull/2005) — `pam project import` duplicate-uid guard
-- [Commander #2006](https://github.com/Keeper-Security/Commander/pull/2006) — `pam project export`
-
-## [2.1.0] - 2026-04-30
-
-### Added
-- feat: KSM inter-agent bus CAS protocol (acquire/release/publish/consume + MockBusStore)
-- feat: compliance-report graceful empty-cache path (--no-fail-on-empty)
-- feat: vault-sharing idempotent re-plan offline coverage
-- feat: ksm-usage report Commander-unavailable fallback envelope
-- feat: KSM app create SDK wiring (remove CLI gate, wire add_new_v5_app)
-- feat: keeper-enterprise.v1 teams/roles additional scaffold tests
-
-### Changed
-- chore: repo sanitization (no lab credentials or internal UIDs in public files)
-
-## [2.0.0] - 2026-04-29
-
-### Added
-- DSK MCP server over stdio JSON-RPC for lifecycle, report, and KSM bus tools.
-- Commander Service Mode provider with async submit, poll, result, FILEDATA, and
-  retry handling.
-- Expanded schema-family packaging for KSM, enterprise, vault sharing,
-  integrations, EPM, and PAM extension foundations.
-- Back-compat `declarative_sdk_k` import shim while `keeper_sdk` remains
-  supported during the compatibility window.
-
-### Changed
-- Package metadata and compatibility shims report `2.0.0`.
-- GitHub Actions examples cover plan comments and drift checks.
-- Redaction and report paths keep secret values out of JSON output.
-
-## [1.3.0] - 2026-04-29
-
-### Added
-- Shared-folder model, mock lifecycle, Commander write primitives, and
-  destructive-change guards.
-- KSM bootstrap and login-helper integration for credentialed Commander use.
-- `msp-environment.v1` schema and read-only Commander validation surface.
-- Report wrappers for password, compliance, and security-audit reports.
-- Module rename preparation through the `declarative_sdk_k` compatibility shim.
-
-### Changed
-- Runtime floor moved to `keepercommander>=17.2.16,<18`.
-- Nested PAM user rotation readback is supported on the Commander floor where
-  JSON rotation listing is available; unsupported rotation paths remain guarded.
-- Vault login L1 compare behavior aligns manifest `fields[]` with
-  Commander-flattened scalar values.
+- **Redaction patterns** — `keeper://` references are covered by the
+  sanitization pass so report output and transcripts do not leak Keeper locator
+  values.
 
 ## [1.2.0] - 2026-04-29
 
+### Fixed
+- **PAM plan/diff (P2.1 / issue #4)** — `pamMachine.pam_settings` now ignores Commander-injected
+  `options` defaults when the manifest only declares `pam_settings.connection`.
+- **Tests —** `test_unsupported_nested_rotation_settings_gate_stays_closed` clears
+  `DSK_EXPERIMENTAL_ROTATION_APPLY` so a shell-exported opt-in cannot silently empty the nested
+  rotation unsupported hit; bundle smoke skips when `main` is not ahead of `origin` even if the
+  bundle script exits **0** with “Nothing to bundle”.
+- **PAM plan/diff (P2.1 / issue #4)** — `pamMachine` / `pamDatabase` / `pamDirectory` now treat
+  `pam_settings` as a **partial overlay** (manifest keys must match; Commander/DAG may add extra
+  `options` / `connection` / `port_forward` keys). `pamUser.managed` compares normalized booleans
+  so string/bool readback skew does not force endless UPDATE rows. See `tests/test_diff.py`.
+- **Vault Commander UPDATE** — after `RecordEditCommand`, require `return_result["update_record_v3"]`
+  when the merged v3 JSON still differs from cache data (Commander otherwise logs and returns
+  without raising); skip the call when patch yields no net change.
+
+### Changed
+- **Docs — RBI / GitHub #5 closeout** — [`docs/COMMANDER.md`](docs/COMMANDER.md)
+  now gives each current `pamRemoteBrowser` post-import field an explicit P3.1
+  bucket; [`docs/SDK_DA_COMPLETION_PLAN.md`](docs/SDK_DA_COMPLETION_PLAN.md)
+  records the sanitized smoke artifact and maintainer closeout checklist.
+- **Docs — live access (any credentialed agent)** — [`docs/LIVE_TEST_RUNBOOK.md`](docs/LIVE_TEST_RUNBOOK.md),
+  [`AGENTS.md`](AGENTS.md) **Autonomous execution**, [`docs/DSK_NEXT_WORK.md`](docs/DSK_NEXT_WORK.md),
+  [`scripts/daybook/README.md`](scripts/daybook/README.md) — not “primary only”;
+  bar is KSM/Commander in effect, not agent kind; credless CI/sandbox must not ad hoc.
+- **Docs — vault L1 contracts** — [`docs/VAULT_L1_DESIGN.md`](docs/VAULT_L1_DESIGN.md) §4;
+  [`docs/VALIDATION_STAGES.md`](docs/VALIDATION_STAGES.md) (operator caveats + remediation);
+  [`AGENTS.md`](AGENTS.md) (vault paragraph after `validate` pointer);
+  [`docs/live-proof/README.md`](docs/live-proof/README.md) (caveat links);
+  [`README.md`](README.md) (readiness + honest limits + layout tree).
+- **Docs — product indexes** — [`docs/SCAFFOLD.md`](docs/SCAFFOLD.md);
+  [`keeper_sdk/providers/SCAFFOLD.md`](keeper_sdk/providers/SCAFFOLD.md);
+  [`docs/PAM_PARITY_PROGRAM.md`](docs/PAM_PARITY_PROGRAM.md)
+  (inventory, `validate`, JSON modes, and readiness gates).
+- **Docs — v1.0.0 GA checklist** — [`V1_GA_CHECKLIST.md`](V1_GA_CHECKLIST.md): `keeper-vault.v1` `validate --online` note under §5 (not a v1.0.0 blocker; PAM-bar / Tier A docs apply).
+- **Docs — examples index** — [`examples/SCAFFOLD.md`](examples/SCAFFOLD.md): CI validate vs mock-plan split; `vaultOneLogin.yaml`; reconciliation note.
+- **Docs — CI ladder** — [`README.md`](README.md): layout tree includes `examples/SCAFFOLD.md`. [`docs/SCAFFOLD.md`](docs/SCAFFOLD.md): “Where to land” row points to `examples/SCAFFOLD.md`.
+- **Docs — parity Phase 1 + CLI scaffold** — [`docs/PAM_PARITY_PROGRAM.md`](docs/PAM_PARITY_PROGRAM.md): vault L1 shipped vs sharing open; “still open” excludes vault L1 partial row. [`keeper_sdk/cli/SCAFFOLD.md`](keeper_sdk/cli/SCAFFOLD.md): `validate` modes + `--online`; reconciliation vault note; `main.py` LOC band.
+- **Core** — [`keeper_sdk/core/manifest.py`](keeper_sdk/core/manifest.py) module docstring: `load_manifest` (PAM-only) vs `load_declarative_manifest` (PAM + `keeper-vault.v1`).
+- **Docs** — [`README.md`](README.md) programmatic use: vault import path + `load_manifest` PAM-only note. [`keeper_sdk/core/SCAFFOLD.md`](keeper_sdk/core/SCAFFOLD.md): `manifest.py` LOC + loader note.
+- **Core** — [`keeper_sdk/core/vault_models.py`](keeper_sdk/core/vault_models.py) module docstring: loader + CLI pointer (stale “PR-V3+” removed).
+- **Docs** — [`AGENTS.md`](AGENTS.md): playbook **§E** — programmatic `load_manifest` vs `load_declarative_manifest` for vault L1. [`docs/SCAFFOLD.md`](docs/SCAFFOLD.md): “Where to land” row cites §E.
+
 ### Added
-- Bundle handoff helper for environments that cannot push directly.
-- Vault L1 design, live-proof artifact structure, and declarative loader docs.
-- Field-drift, adoption, two-writer, renderer, and performance test coverage.
+- **Tests —** [`tests/test_phase_harness_scripts.py`](tests/test_phase_harness_scripts.py) — `bash -n` on
+  `run_local_gates.sh` / `bundle_unpushed_commits.sh` + smoke `git bundle` when `main` is ahead of
+  `origin`.
+- **Scripts —** [`scripts/phase_harness/bundle_unpushed_commits.sh`](scripts/phase_harness/bundle_unpushed_commits.sh) —
+  `git bundle` of `main` not yet on `origin` (handoff when push is not possible on host).
+- **Docs — `DSK_NEXT_WORK.md`** — in-repo **product** orchestration queue (P3 / P2.1 / KSM
+  priorities, `run_local_gates.sh`, `phase_runner` + `scripts/phase_harness/` pointer;
+  live runbook; explicitly not daybook). Indexed from [`AGENTS.md`](AGENTS.md) and
+  [`RECONCILIATION.md`](RECONCILIATION.md).
+- **Scripts — daybook harness** — [`scripts/daybook/README.md`](scripts/daybook/README.md):
+  `harness.sh` forwards to `~/.cursor-daybook-sync` (boot, `doctor`, sync, append, …);
+  canonical JOURNAL/LESSONS are **not** stored in this repo. Tests:
+  [`tests/test_daybook_harness.py`](tests/test_daybook_harness.py).
+- **MSP P7b (discover)** — `CommanderCliProvider.discover_managed_companies()` maps
+  `params.enterprise['managed_companies']` after `api.query_enterprise`; `dsk validate --online`
+  with `--provider commander` runs MSP stage-5 discover (apply/import/adopt on commander remain
+  unsupported).
+- **MSP P7a** — mock-only `dsk import` adoption for `msp-environment.v1`
+  managed companies, plus case-insensitive duplicate-name rejection for MSP
+  manifests.
+- **MSP P0** — `msp-environment.v1` schema family (registry + scaffold-only schema; no plan/apply path yet — see `docs/MSP_FAMILY_DESIGN.md`).
+- **V8 prep** — [`docs/live-proof/keeper-vault.v1.sanitized.template.json`](docs/live-proof/keeper-vault.v1.sanitized.template.json)
+  (`template: true`, shape-only) plus README section. CI `schema-validate` also runs `python -m json.tool` on
+  `docs/live-proof/*.json`. `docs/SCAFFOLD.md` indexes `live-proof/`; regression
+  tests in `tests/test_live_proof_artifacts.py`. Sample L1 manifest
+  [`examples/scaffold_only/vaultOneLogin.yaml`](examples/scaffold_only/vaultOneLogin.yaml)
+  linked from `docs/live-proof/README.md`.
+- **Vault L1** — `docs/VAULT_L1_DESIGN.md` (slice 1 design; sign-off §7 still
+  pending) plus **`keeper_sdk/core/vault_models.py`**: `VaultManifestV1`,
+  `VaultRecord`, `load_vault_manifest()` with L1 **`login`-only** record rule;
+  tests in `tests/test_vault_models.py`.
+- **Vault PR-V2** — **`keeper_sdk/core/vault_graph.py`**: `build_vault_graph`,
+  `vault_record_apply_order` (duplicate `uid_ref`, `folder_ref` prerequisite
+  nodes, invalid `folder_ref` pattern → `RefError`); tests in
+  `tests/test_vault_graph.py`.
+- **Vault PR-V5/V6 (Commander)** — :class:`~keeper_sdk.providers.commander_cli.CommanderCliProvider`
+  ``discover()`` filters to ``login`` when ``manifest_source`` is ``keeper-vault.v1``;
+  ``apply_plan()`` uses :meth:`~keeper_sdk.providers.commander_cli.CommanderCliProvider._apply_vault_plan`
+  (``RecordAddCommand`` create; ``RecordEditCommand`` + marker for **UPDATE**;
+  ``rm`` delete). ``_detect_unsupported_capabilities`` returns ``[]`` for vault manifests.
+  Tests in ``tests/test_commander_cli.py``.
+- **Vault PR-V4** — **`load_declarative_manifest`** / **`load_declarative_manifest_string`**
+  in `keeper_sdk/core/manifest.py` (PAM :class:`~keeper_sdk.core.models.Manifest` or
+  :class:`~keeper_sdk.core.vault_models.VaultManifestV1`). CLI **plan** / **diff** /
+  **apply** dispatch on family; **validate --json** uses ``vault_offline`` /
+  ``vault_online`` for ``keeper-vault.v1`` (``--online`` = Commander discover +
+  ``compute_vault_diff`` smoke). **import** stays PAM-only. Tests: `tests/test_cli.py`.
+- **Vault PR-V3** — **`keeper_sdk/core/vault_diff.py`**: `compute_vault_diff`
+  (reuses PAM diff classification for vault ``records[]``); integration tests with
+  existing :class:`~keeper_sdk.providers.mock.MockProvider` in
+  `tests/test_vault_mock_provider.py`. CLI family dispatch = PR-V4+.
+- **`dsk report` — `--sanitize-uids`** on `password-report`,
+  `compliance-report`, and `security-audit-report`: fingerprints
+  Base64-style UIDs that appear inside string values. Raw
+  `record_uid` (and related) key values stay as returned by Commander
+  unless **`--quiet`** is also set (which fingerprints those UID
+  fields). See `AGENTS.md` command table.
+- **P18b** — `sync_upstream` adds **integrations** groups (`ScimCommand`,
+  `AutomatorCommand`) + **trash** `GroupCommand`; vault-related **Command** rows
+  (`get`, `search`, `record-add`, `record-update`, `list-sf`, `ls`). Matrix
+  sections for P18b + split PAM group table header.
+- **P18a** — `scripts/sync_upstream.py` registers six enterprise CLI command
+  classes (`enterprise-down` / `-info` / `-node` / `-user` / `-role` / `-team`);
+  capability matrix gains **Enterprise commands (extracted, P18a)** section;
+  `capability-snapshot.json` expanded accordingly.
+- **P18 R1** — `docs/P18_SYNC_UPSTREAM_EXTRACTOR_DECISION.md` (extractor
+  expansion: registry model, nesting, phasing P18a–c, risks). `keeper-enterprise`
+  `x-keeper-live-proof.evidence` aligned to `docs/live-proof/README.md` (same as
+  vault families).
+- **Orchestration** — `NEXT_SPRINT` §0 adds explicit **session boundary** note:
+  nudges between chats are normal; §0 shortens what each nudge must carry.
+  **§0.1** compares queued “continue” heartbeats vs CI / PR / background-agent
+  cadence.
+- **Live-proof runbook** — `docs/live-proof/README.md` (L1 checklist,
+  committed-artifact naming, sanitization expectations). `keeper-vault.v1`
+  and `keeper-vault-sharing.v1` now cite it from
+  `x-keeper-live-proof.evidence` while status remains `scaffold-only`
+  until a transcript JSON is added.
+- **KSM as first-class SDK feature** — three new modules in
+  `keeper_sdk/secrets/` close the credential loop end-to-end:
+  - `bootstrap.py` provisions a Keeper Secrets Manager application,
+    shares the Commander admin record into it, generates a one-time
+    client token, redeems that token into a local
+    `~/.keeper/<app-name>-ksm-config.json`, and verifies the resulting
+    KSM client can see the admin-record shape `KsmLoginHelper` expects.
+    Exposed as `dsk bootstrap-ksm --app-name … [--admin-record-uid …]
+    [--create-admin-record] [--first-access-minutes …] [--unlock-ip]
+    [--with-bus] [--login-helper commander|ksm|<path>]`.
+  - `ksm.py` ships `KsmSecretStore` (thin façade over
+    `keeper_secrets_manager_core.SecretsManager` with field-value
+    caching), `KsmLoginCreds` dataclass, and
+    `load_keeper_login_from_ksm()` — used by
+    `keeper_sdk.auth.KsmLoginHelper` so SDK callers can authenticate
+    Commander *from* KSM with no plaintext env vars on the host.
+    Resolves the config from `$KEEPER_SDK_KSM_CONFIG`, `$KSM_CONFIG`,
+    `~/.keeper/caravan-ksm-config.json`, or
+    `~/.keeper/ksm-config.json` (first usable wins). Field-name
+    overrides via `KEEPER_SDK_KSM_LOGIN_FIELD` /
+    `KEEPER_SDK_KSM_PASSWORD_FIELD` / `KEEPER_SDK_KSM_TOTP_FIELD` /
+    `KEEPER_SDK_KSM_CREDS_RECORD_UID`. TOTP normalisation accepts
+    both `otpauth://` URIs and bare base32 secrets.
+  - `bus.py` is a sealed Phase B skeleton — every public entry point
+    raises `CapabilityError` with a precise next-action so
+    accidental imports fail loudly. The `bootstrap_ksm_application
+    (create_bus_directory=True, …)` flow already provisions the
+    on-tenant directory record this module will read/write; that
+    contract is frozen and unit-tested. Wire format, CAS semantics,
+    and implementation checklist are documented in the module
+    docstring.
+  - `keeper_sdk.auth.KsmLoginHelper` joins `EnvLoginHelper` as a
+    reference `LoginHelper` impl; `keeper_sdk.providers.commander_cli`
+    accepts `--login-helper ksm` or `--login-helper /path/to/helper.py`.
+  - New docs: `docs/KSM_BOOTSTRAP.md` (operator runbook for
+    `dsk bootstrap-ksm`) and `docs/KSM_INTEGRATION.md` (end-to-end
+    bootstrap → `ksm-config.json` → `KsmLoginHelper` → SDK story).
+  - 264 unit tests across `tests/test_auth_ksm.py`,
+    `tests/test_secrets_ksm.py`, `tests/test_bootstrap_ksm.py`, and
+    `tests/_fakes/{ksm,commander}.py` (offline-green; live
+    bootstrap → login → apply loop is the next gate).
+- **Scope-fence CI workflow** (`.github/workflows/scope-fence.yml`) —
+  structural denylist that fails on newly-ADDED paths matching the
+  orchestration and per-session globs.
+  `git diff --diff-filter=A` so only ADDS trip the fence;
+  modifications to pre-existing tracked files don't fire. Activated
+  alongside the regular `lint / typecheck / test / examples /
+  drift-check` jobs.
+- **Per-module 100% coverage** for three core modules with no API
+  changes — `keeper_sdk/core/redact.py`, `keeper_sdk/core/schema.py`,
+  `keeper_sdk/core/normalize.py` — via expanded edge-case tests in
+  `tests/test_redact.py`, `tests/test_schema.py`,
+  `tests/test_normalize.py`. Total suite now 315 tests / 86.32% line
+  coverage (was 277 / 85.4%).
+- **Cov ratchet floor raised to 84%** in
+  `.github/workflows/ci.yml::test` — `pytest --cov-fail-under=84`
+  (was 83). Comment block updated for the new baseline (86% across
+  3604 LOC / 315 tests). Floor stays at `baseline - 2` so small
+  refactors don't gate CI while still catching ~70 LOC regressions.
+
+### Changed
+- **Vault Commander `apply_plan` UPDATE** — `_apply_vault_plan` now merges
+  planner ``change.after`` into existing v3 record JSON (in-process
+  ``RecordEditCommand``) before refreshing the ownership marker; ``custom[]``
+  merges preserve the SDK marker when the manifest patch omits it.
+- **Report row preprocessing** always applies **secret-key-only**
+  redaction to row-shaped data before the existing `redact` pass, so
+  Commander fields whose names match known secret keys (for example
+  `token`) are replaced with `<redacted>` even when UID fields remain
+  visible. Implemented via `sanitize_secret_keys_only` in
+  `keeper_sdk/cli/_live/transcript.py` and `prepare_report_rows` in
+  `keeper_sdk/cli/_report/common.py`.
 
 ### Fixed
-- PAM plan/diff normalization for partial `pam_settings` overlays.
-- Vault Commander update handling for record version 3 JSON edits.
-- Session refresh handling around Commander-backed apply and re-plan paths.
+- **Vault diff false positives** — ``compute_vault_diff`` compares manifest
+  ``login`` ``fields[]`` to Commander-flattened scalar keys (and strips the SDK
+  marker from ``custom[]`` compare) so matching tenants do not churn ``UPDATE``;
+  tests in ``tests/test_vault_diff.py`` (includes case-insensitive typed-field
+  labels vs flattened live keys). ``AGENTS`` / ``VALIDATION_STAGES`` / README
+  readiness row + ``examples/scaffold_only/vaultMinimal.yaml`` comment updated.
+- **Vault Commander UPDATE** — body sync now requires **record cache
+  version 3** only; v6 was incorrectly admitted but Commander's
+  ``RecordEditCommand`` ``--data`` path accepts ``rv == 3`` only.
+- **Rotation drift resume** — `keeper_sdk/providers/commander_cli.py`
+  no longer loops on `session_token_expired` during rotation re-plan
+  after a session refresh. The bounded in-process refresh helper now
+  walks `__cause__` correctly when the original exception is wrapped
+  by Commander's session-management layer; pinned by
+  `tests/test_session_refresh_*` regression tests.
+
+### Changed
+- `README.md` reconciled against the new `main`: dated 2026-04-26,
+  test count 216 → 315, coverage 86.32% (CI floor 84), KSM-as-feature
+  surfaced with offline-green / live-gate-pending caveat. Capability
+  scope KSM row rewritten to include `dsk bootstrap-ksm` and
+  `KsmLoginHelper`. Layout block adds `keeper_sdk/secrets/`, the
+  `KsmLoginHelper` mention under `auth/`, `bootstrap-ksm` in the CLI
+  list, and `docs/KSM_BOOTSTRAP.md` + `docs/KSM_INTEGRATION.md` in
+  the docs index. New "Quick start (KSM bootstrap)" subsection.
+
+### Removed
+- In-tree non-product automation files under `scripts/agent/`, `.github/`,
+  and documentation. Operator-side tooling is not part of this SDK and is not
+  documented here.
+
+### Changed
+- `AGENTS.md`, `README.md`, `SCAFFOLD.md`, `.cursorrules`,
+  `V1_GA_CHECKLIST.md`, `RECONCILIATION.md`, `AUDIT.md`,
+  `docs/SCAFFOLD.md`, `scripts/SCAFFOLD.md`, `scripts/smoke/SCAFFOLD.md`,
+  `scripts/smoke/README.md`, `.github/SCAFFOLD.md`,
+  `docs/SDK_DA_COMPLETION_PLAN.md`, and
+  `docs/SDK_COMPLETION_PLAN.md` reconciled against the
+  removal — every link to a deleted path replaced with a thin pointer
+  to the equivalent direct command
+  (`pytest`, `ruff`, `mypy`, `python3 scripts/smoke/smoke.py …`).
+- `.gitignore` drops `.codex-runs/` (no longer applicable); `.smoke-runs/`
+  retained for ad-hoc local logs.
 
 ## [1.1.0] - 2026-04-26
 
+Tag policy decision: annotated-only, GitHub-only repo (no PyPI, no `git
+verify-tag` consumer flow). Sigstore/cosign of `dist/*` in `publish.yml`
+is the cheap upgrade path if supply-chain requirements change.
+
 ### Added
-- Agent-oriented operating manual, local module scaffolds, and validation stage
-  documentation.
-- Built-in `EnvLoginHelper` and custom login-helper contract.
-- Commander capability mirror, drift snapshot, and validation-stage exit-code
-  documentation.
-- Example PAM manifests and smoke scenario coverage.
+- 12 per-folder `SCAFFOLD.md` files under `keeper_sdk/{,core,cli,providers,auth}`,
+  `tests/`, `docs/`, `examples/`, `scripts/{,agent,smoke}`, and `.github/`. Each
+  provides local module map, hard rules, "where to land new work" table, and
+  reconciliation rows so agents landing in any directory get scoped context
+  without re-reading the root scaffold.
+- `RECONCILIATION.md` — root cross-check vs `V1_GA_CHECKLIST.md`,
+  `docs/SDK_DA_COMPLETION_PLAN.md`, `AUDIT.md`, `REVIEW.md`. Records every
+  shipped / preview-gated / upstream-gap / deferred row, proves no silent
+  drops, lists open questions. Single page agents read before proposing
+  new features.
+- `CommanderCliProvider.apply_plan()` — runtime `keepercommander` floor check
+  (`17.2.13` via `importlib.metadata`) plus `CapabilityError.context["partial_outcomes"]`
+  when post-import `discover()`, marker tuning, marker write, or rotation apply
+  fails after earlier creates succeeded (offline tests in `test_commander_cli.py`).
+- `scripts/agent/run_smoke_matrix.sh` — sequential live run of every smoke
+  scenario with `python3 -u` and per-scenario logs under `.smoke-runs/`
+  (gitignored); optional `SMOKE_LOGIN_HELPER` / `--login-helper`.
+
+### Fixed
+- `scripts/smoke/smoke.py` — post-destroy folder sweep + manifest-empty
+  re-discover for verify. Empty-manifest plans omit gateways /
+  `pam_configurations`; combined with `reference_existing` scaffolds,
+  Commander could leave SDK-marked `pam_configuration` rows under the
+  project Resources/Users folders that never appeared as DELETE rows.
+  Smoke now sweeps both folders via `sandbox.teardown_records(manager=…)`
+  (tolerant of "No such folder" since destroy may have removed the tree)
+  and re-discovers with an empty `manifest_source` so `discover()` skips
+  the synthetic reference-config `LiveRecord` that always carries the
+  marker. Pairs with the manifest-aware RBI discover from `e71fb46`.
 
 ### Changed
-- Project renamed to `declarative-sdk-for-k`; primary CLI is `dsk`.
-- Legacy `pamform` and `keeper-sdk` CLI aliases remain for backward
-  compatibility.
-- Runtime metadata requires Python 3.11+.
-
-## [0.y.z] - Pre-release
+- `V1_GA_CHECKLIST.md` — drop signed-`v1.0.0`-tag blocker; record
+  annotated-only tag policy with rationale (GitHub-only repo, no PyPI,
+  no documented `git verify-tag` consumer flow). Sigstore/cosign of
+  `dist/*` in `publish.yml` is the upgrade path if supply-chain
+  requirements change.
+- `SCAFFOLD.md` — refreshed to link the 12 per-folder SCAFFOLDs and
+  add new tree entries (`scripts/agent/_codex_resolve.sh`,
+  `run_parallel_codex.sh`, `prompts/`, `tests/test_errors.py`,
+  `tests/test_rbi_readback.py`); reconciliation row for the `v1.0.0`
+  tag flipped `EXTERNAL-GAP` → `SHIPPED-by-policy`.
+- `compute_diff` — ``pamUser`` field drift uses semantic equality for
+  ``rotation_settings`` (CRON normalization, ``enabled`` bool vs ``on``/``off``,
+  extra schedule keys) so live re-plan is not blocked by readback-only shape
+  noise; true schedule changes still surface as UPDATE.
+- `AGENTS.md` — maintainer grant for autonomous gates + live smoke when lab
+  configs exist (no per-step approval); still no secret echo.
+- Commander: after reference-existing scaffold, invalidate cached in-process
+  `KeeperParams` before `pam project extend` to avoid `session_token_expired`
+  on graph APIs; walk `__cause__` when detecting retryable session errors.
+- Smoke: fail KSM `share add` when stdout reports folder is not a record/shared
+  folder even if rc=0; include stderr/stdout tail on non-zero share failures.
+- `docs/COMMANDER.md` — SDK_DA §P3.1 readback bucket vocabulary; runtime
+  `keepercommander` floor on `apply_plan()`; Issue #5 RBI dirty-readback status.
+- Autonomous orchestration pass: parallel `run_parallel_codex.sh` (slices 01–03)
+  aligned GitHub issue template + `CODEX_GITHUB`, smoke README scenario matrix,
+  root docs with `ORCHESTRATION_PHASE0_PARALLEL`; parent ran `phase0_gates.sh full`
+  + `ruff format` on touched Python.
+- RBI discover DAG merge (`allowedSettings` → `pam_settings.options`) now
+  delegates to `_merge_rbi_dag_options_into_pam_settings` in
+  `_commander_cli_helpers.py`, with unit tests for tri-state / default
+  handling. Discover passes `folder_uid` on each `ls` listing row for
+  consistent `get` readback metadata. Post-apply smoke passes `manifest_source`
+  and `discover()` may bootstrap in-process login when RBI + resources list are
+  present so verify can see DAG-backed toggles.
 
 ### Added
-- Initial public release scaffolding, MIT license, security policy, CI, and the
-  first PAM declarative lifecycle implementation.
+- Offline P2.1 diff anchor: `test_diff_nested_pam_user_rotation_drift_surfaces_rotation_settings_key` — proves nested `pamUser` rotation readback drift keys `rotation_settings` in plan tails.
+- In-tree automation helpers for local development runs. These were later
+  removed from the SDK public surface.
+- `pamUserNested` smoke scenario — proves nested `resources[].users[]`
+  through schema, typed model, planner, and Commander normalization
+  without claiming standalone top-level `pamUser` live support.
+- Offline `pam rotation edit` argv mapping helper and stricter preview
+  detection for rotation keys. Rotation remains preview/unsupported
+  until live apply is proven.
+- Offline post-import tuning apply wiring for a safe subset of
+  `pam connection edit` and `pam rbi edit` fields. `apply_plan()` now
+  resolves changed records after rediscovery, executes the mapped edit
+  argv via `_run_cmd()`, and exposes dry-run preview argv without running
+  tuning commands. Live tenant proof is still pending.
+- Bounded in-process Commander session refresh for `session_token_expired`
+  during `pam project import` / `extend` and ownership-marker writes.
+  This is unit-tested with synthetic exceptions and live-proven through
+  `scripts/smoke/smoke.py --login-helper env --scenario pamMachine`.
+- In-process PAM gateway/config JSON listing for the Commander provider,
+  with `sync_down` and bounded session refresh. This avoids stale
+  subprocess Commander sessions during reference-existing apply.
+- `docs/SDK_COMPLETION_PLAN.md` — devil's-advocate completion plan for
+  parent orchestration plus Codex worker slices.
+- Smoke-runner diagnostics now identify the active SDK auth path and
+  preserve command, exit code, stdout tail, and stderr tail on SDK
+  subprocess failures.
+- Pure `build_pam_rotation_edit_argvs()` resolver for nested `pamUser`
+  rotation settings. It resolves user/resource/config/admin refs and is
+  used only by the experimental apply path while rotation remains gated.
+- Experimental Commander apply wiring for nested
+  `resources[].users[].rotation_settings`, guarded by
+  `DSK_EXPERIMENTAL_ROTATION_APPLY=1`. The public provider conflict
+  remains closed by default pending parent live proof.
+- `docs/ISSUE_6_JIT_SUPPORT_BOUNDARY.md` — source-backed JIT decision:
+  keep `jit_settings` preview-gated because pinned Commander has import
+  and launch helpers, but no safe standalone edit surface.
+- `docs/ISSUE_7_GATEWAY_CREATE_PROJECTS_DESIGN.md` — docs-only design
+  for gateway `mode: create` and top-level `projects[]`; preview gates
+  remain closed until Commander hooks and live proof are available.
+- `docs/COMMANDER.md` post-import tuning field map for connection/RBI
+  fields, marking import-supported, helper-only, and unsupported/unknown
+  cases.
+- `examples/`: minimal `pamMachine` / `pamDatabase` / `pamDirectory` /
+  `pamRemoteBrowser` manifests; CI validates + mock-plans every file.
+- `SCAFFOLD.md`: LLM-readable repo map + design-vs-shipped reconcile.
+- `ci(examples)`: new examples job + added to build needs.
+- `scripts/smoke/scenarios.py` — registered live-smoke matrix
+  (`pamMachine`, `pamDatabase`, `pamDirectory`, `pamRemoteBrowser`).
+  `smoke.py` now accepts `--scenario NAME`; the identity / sandbox /
+  destroy flow is invariant across scenarios. Unit tests in
+  `tests/test_smoke_scenarios.py` validate each scenario against the
+  offline schema + typed-model + planner stack so drift is caught
+  without a tenant round-trip.
+- `Provider.check_tenant_bindings(manifest) -> list[str]` protocol
+  method. `validate --online` stage 5 now calls it and exits
+  `EXIT_CAPABILITY` (`5`) on any returned issue. Commander
+  implementation verifies pam_configuration titles resolve, each
+  config has a `shared_folder_uid`, `gateway_uid_ref` pairings match
+  the tenant, and declared `ksm_application_name` matches what the
+  tenant actually bound. MockProvider returns `[]`. See
+  `docs/VALIDATION_STAGES.md` for the per-stage exit-code contract.
+- `docs/VALIDATION_STAGES.md` — complete stage-by-stage exit code
+  contract, remediation pointers, passing / failing examples.
+  Linked from `AGENTS.md`.
+- `scripts/sync_upstream.py` — extracts the Keeper Commander capability
+  surface (registered PAM group commands, argparse flags for
+  `pam project import` / `extend` / `pam rbi edit` /
+  `pam connection edit`, `ALLOW_PAM_*` enforcements, record-type field
+  sets from `pam_import/README.md`) into
+  `docs/CAPABILITY_MATRIX.md` + `docs/capability-snapshot.json`. Runs
+  in `--check` mode for CI drift detection.
+- `docs/CAPABILITY_MATRIX.md` + `docs/capability-snapshot.json` —
+  pinned upstream surface for Commander `231f557c`.
+- `.commander-pin` — single-line Commander SHA that CI clones and
+  diffs against (`drift-check` job in `.github/workflows/ci.yml`).
+- Schema hardening (`pam-environment.v1.schema.json`): typed fields
+  for RDP options (`security`, `disable_authentication`,
+  `load_balance_info`, `preconnection_id`, `preconnection_blob`,
+  `disable_audio`, `disable_dynamic_resizing`, `enable_full_window_drag`,
+  `enable_wallpaper`), audio (`audio_channels`, `audio_bps`,
+  `audio_sample_rate`), and `text_session_recording` on
+  `pam_remote_browser.options`. Non-breaking.
+- `docs/COMMANDER.md`: new "Automated capability mirror" section
+  linking to the pinned matrix and the DOR drift policy.
+- `scripts/smoke/smoke.py --login-helper env` — live-smoke mode that
+  exercises the public `EnvLoginHelper` fallback instead of the lab's
+  `deploy_watcher.py` helper. `tests/test_smoke_args.py` pins the CLI
+  switch.
+- `tests/test_auth_helper.py` — unit coverage for env-var credential
+  loading, Commander config warm-up, step-based `LoginUi` construction,
+  and invalid config errors.
+- `tests/test_renderer_snapshots.py` + `tests/fixtures/renderer_snapshots/`
+  — snapshot coverage for Rich plan/diff/outcome layouts.
+- `tests/test_dor_scenarios.py` — offline mapping for DOR `TEST_PLAN`
+  cases, with v1.1-only gaps marked `xfail`.
+
+### Changed
+- Sibling `keeper-pam-declarative` repo reframed as a capability
+  mirror (not a forward-looking Design of Record). Retired 10 design
+  docs, rewrote README + SCHEMA_CONTRACT + PLATFORM_REFERENCE, added
+  DRIFT_POLICY. The authoritative capability matrix now lives in this
+  repo under `docs/` and is auto-generated.
+
+- Initial public release scaffolding: `LICENSE` (MIT), `SECURITY.md`, `CHANGELOG.md`.
+- GitHub Actions CI: ruff + mypy + pytest on Python 3.11 / 3.12 / 3.13.
+- `AGENTS.md` — agent- and LLM-oriented operating manual (exit-code map,
+  machine-readable command table, JSON contracts).
+- `keeper_sdk.auth` reference login helper (`EnvLoginHelper`) so
+  `KEEPER_SDK_LOGIN_HELPER` is now optional for the common case.
+- `EnvLoginHelper` now implements Commander's full step-based
+  `LoginUi`, loads `KEEPER_CONFIG` through Commander's config loader
+  before env credentials are applied, and reuses persistent-login state
+  without letting stale config credentials override env credentials.
+- `docs/LOGIN.md` — helper contract + 30-line skeleton for custom flows.
+- `V1_GA_CHECKLIST.md` — roadmap toward v1.0.0; now tracks full-K
+  scope (vault records, shared folders, teams, roles, enterprise
+  config, KSM apps, PAM, compliance, rotation, migration) rather
+  than PAM-only.
+- `tests/test_perf.py` now asserts peak RSS under the 500-resource
+  lifecycle smoke to catch memory regressions.
+- Packaging metadata now uses the SPDX `license = "MIT"` form and drops
+  the deprecated license classifier.
+- Retained `DeleteUnsupportedError` as a public compat shim subclassing
+  `CapabilityError`; provider failures now use `CapabilityError` directly.
+- Added `pyotp` as an unpinned runtime dependency because the built-in
+  `EnvLoginHelper` imports it lazily during Commander login.
+
+### Changed
+- **Project renamed** across two hops:
+  - `keeper-declarative-sdk` → `pamform` (PAM-scoped rebrand).
+  - `pamform` → `declarative-sdk-for-k` (scope broadened to the
+    full K surface; primary CLI is now `dsk`). `pamform` and
+    `keeper-sdk` remain as CLI aliases through 1.x.
+- Import path stays `keeper_sdk` in 1.x (keeps the 106-test suite
+  green). Will rename to `declarative_sdk_k` in 2.0 with a shim.
+- `pyproject.toml`: pin `keepercommander>=17.2.13,<18`; require
+  Python `>=3.11`; expanded `keywords` + `classifiers`; homepage
+  points at `msawczynk/declarative-sdk-for-k`.
+- Env-var convention rename: `PAMFORM_CI` → `DSK_CI`,
+  `PAMFORM_PREVIEW` → `DSK_PREVIEW`.
+
+## [0.y.z] — pre-release history
+
+Recorded in `AUDIT.md` and `git log` on the `main` branch. Notable landmarks:
+
+- **2026-04-24 (late)** — C1/C2/C3 + H1..H6 closure; capability gaps
+  surface as plan-time CONFLICT rows so `plan == apply --dry-run == apply`.
+  106/106 tests green.
+- **2026-04-24 (early)** — "finish-it-all" pass D-1..D-7 against
+  Commander release branch 17.2.13+40. JSON migration for `pam gateway
+  list` / `pam config list`. Live-smoke GREEN end-to-end.
+- **2026-04-24 (review)** — devil's-advocate sweep, 82 → 95 tests.
+- **pre-2026-04-24** — W1..W20 sdk-completion milestones (see
+  `AUDIT.md`).

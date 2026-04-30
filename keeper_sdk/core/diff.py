@@ -112,6 +112,14 @@ def _desired_objects(manifest: Manifest) -> list[tuple[str, str, str, dict[str, 
     return out
 
 
+def _rotation_scripts_readback_available() -> bool:
+    try:
+        from keeper_sdk.providers.commander_version import v18_rotation_info_json
+    except Exception:
+        return False
+    return v18_rotation_info_json()
+
+
 def compute_diff(
     manifest: Manifest,
     live_records: list[LiveRecord],
@@ -170,6 +178,8 @@ def compute_diff(
             scripts = user.get("rotation_scripts") or []
             if not scripts:
                 continue
+            if _rotation_scripts_readback_available():
+                continue
             changes.append(
                 Change(
                     kind=ChangeKind.NOOP,
@@ -177,7 +187,7 @@ def compute_diff(
                     resource_type="pamUser",
                     title=str(user.get("title") or ""),
                     reason=(
-                        "rotation_scripts present: attachment will run on apply but "
+                        "rotation_scripts readback warning: attachment will run on apply but "
                         "cannot be verified (no pam rotation info --format=json in "
                         "Commander 17.x)"
                     ),

@@ -97,6 +97,7 @@ def _is_keeper_fill_change(change: Change) -> bool:
 _SILENT_FAIL_COMMANDS = {
     ("pam", "project", "import"),
     ("pam", "project", "extend"),
+    ("pam", "project", "export"),
     ("pam", "connection", "edit"),
     ("pam", "rbi", "edit"),
     ("compliance", "report"),
@@ -105,6 +106,7 @@ _SILENT_FAIL_COMMANDS = {
     ("record-update",),
     ("rm",),
 }
+LOGGER = logging.getLogger(__name__)
 _COMPLIANCE_EMPTY_CACHE_MARKERS = (
     "Cache last update: NONE",
     "compliance-report --rebuild",
@@ -749,6 +751,38 @@ def _keepercommander_installed_tuple() -> tuple[int, ...]:
             break
         parts.append(int(digits))
     return tuple(parts)
+
+
+def _v18_rotation_info_json() -> bool:
+    try:
+        from .commander_version import v18_rotation_info_json
+    except Exception:
+        return False
+    return v18_rotation_info_json()
+
+
+def _v18_sm_token_add() -> bool:
+    try:
+        from .commander_version import v18_sm_token_add
+    except Exception:
+        return False
+    return v18_sm_token_add()
+
+
+def _v18_project_import_server_dedup() -> bool:
+    try:
+        from .commander_version import v18_project_import_server_dedup
+    except Exception:
+        return False
+    return v18_project_import_server_dedup()
+
+
+def _v18_project_export_native() -> bool:
+    try:
+        from .commander_version import v18_project_export_native
+    except Exception:
+        return False
+    return v18_project_export_native()
 
 
 def _commander_on_off(value: bool) -> str:
@@ -2028,6 +2062,23 @@ class CommanderCliProvider(Provider):
                 )
                 continue
 
+            if change.kind is ChangeKind.CREATE and change.resource_type == "ksm_token":
+                if not _v18_sm_token_add():
+                    raise CapabilityError(
+                        reason=(
+                            "KSM token create requires Commander v18 "
+                            "`secrets-manager token add <app_uid>` (PR #2004)"
+                        ),
+                        uid_ref=change.uid_ref or name,
+                        resource_type=change.resource_type,
+                        next_action=(
+                            "install a Commander v18/release-branch wheel and set "
+                            "DSK_COMMANDER_V18=1 for preview testing, or use mock provider"
+                        ),
+                    )
+                outcomes.append(self._apply_ksm_token_add(change, plan, dry_run=dry_run))
+                continue
+
             if change.resource_type != _KSM_APP_RESOURCE_TYPE:
                 raise CapabilityError(
                     reason=_KSM_CREATE_ONLY_UNSUPPORTED_REASON,
@@ -2433,6 +2484,43 @@ class CommanderCliProvider(Provider):
                     )
                 )
         return outcomes
+
+    def _apply_ksm_token_add(
+        self,
+        change: Change,
+        plan: Plan,
+        *,
+        dry_run: bool,
+    ) -> ApplyOutcome:
+        name = _ksm_change_name(change)
+        app_uid_ref = str(change.after.get("app_uid_ref") or "")
+        app_uid = _ref_leaf(app_uid_ref, "keeper-ksm:apps:")
+        if not app_uid:
+            raise CapabilityError(
+                reason="KSM token create requires after.app_uid_ref",
+                uid_ref=change.uid_ref or name,
+                resource_type=change.resource_type,
+                next_action="refresh plan from a keeper-ksm.v1 manifest with tokens[].app_uid_ref",
+            )
+        argv = ["secrets-manager", "token", "add", app_uid]
+        if dry_run:
+            return ApplyOutcome(
+                uid_ref=change.uid_ref or name,
+                keeper_uid="",
+                action="create",
+                details={"dry_run": True, "command": argv},
+            )
+        self._run_cmd(argv)
+        return ApplyOutcome(
+            uid_ref=change.uid_ref or name,
+            keeper_uid="",
+            action="create",
+            details={
+                "dry_run": False,
+                "command": argv,
+                "token_created": True,
+            },
+        )
 
     def _apply_vault_plan(self, plan: Plan, *, dry_run: bool = False) -> list[ApplyOutcome]:
         """Apply ``keeper-vault.v1`` slice-1 (``login``) via record-add + marker + ``rm``."""
@@ -4642,6 +4730,63 @@ class CommanderCliProvider(Provider):
 
     def _resolve_project_resources_folder(self, project_name: str) -> str:
         return self._resolve_project_scaffold_folders(project_name)["resources_uid"]
+
+    def export_pam_project_json(self, project_uid: str) -> dict[str, Any]:
+        """Return Commander-shaped PAM project JSON, preferring v18 native export."""
+        native = self._try_native_pam_project_export(project_uid)
+        if native is not None:
+            return native
+        LOGGER.debug("using synthesized PAM project export path for project %s", project_uid)
+        return self._synthesise_pam_project_export(project_uid)
+
+    def _try_native_pam_project_export(self, project_uid: str) -> dict[str, Any] | None:
+        if not _v18_project_export_native():
+            return None
+        try:
+            raw = self._run_cmd(
+                ["pam", "project", "export", "--project-uid", project_uid, "--format", "json"]
+            )
+            data = _load_json(
+                raw,
+                command="pam project export --project-uid <uid> --format json",
+            )
+            if not isinstance(data, dict):
+                raise CapabilityError(
+                    reason="Commander returned non-object JSON from `pam project export`"
+                )
+            LOGGER.debug("using native PAM project export path for project %s", project_uid)
+            return data
+        except (CapabilityError, OSError, ValueError):
+            LOGGER.debug(
+                "native PAM project export failed; falling back to synthesized path",
+                exc_info=True,
+            )
+            return None
+
+    def _synthesise_pam_project_export(self, project_uid: str) -> dict[str, Any]:
+        entries = _load_json(
+            self._run_cmd(["ls", "--format", "json", project_uid]),
+            command=f"ls --format json {project_uid}",
+        )
+        if not isinstance(entries, list):
+            raise CapabilityError(
+                reason="Commander returned non-array JSON from project folder `ls`",
+                next_action="inspect `keeper ls --format json <project_uid>` and retry",
+            )
+        records: list[dict[str, Any]] = []
+        for entry in entries:
+            if not isinstance(entry, Mapping) or entry.get("type") != "record":
+                continue
+            uid = str(entry.get("uid") or "")
+            if not uid:
+                continue
+            payload = _load_json(
+                self._run_cmd(["get", uid, "--format", "json"]),
+                command=f"get {uid} --format json",
+            )
+            if isinstance(payload, dict):
+                records.append(payload)
+        return {"records": records}
 
     def _resolve_project_scaffold_folders(self, project_name: str) -> dict[str, str]:
         # Commander's `ls <path>` returns the CHILDREN of that path, not the
