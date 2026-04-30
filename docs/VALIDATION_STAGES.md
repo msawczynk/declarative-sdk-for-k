@@ -74,6 +74,14 @@ as an unresolved reference and exits `3`.
   shared-folder binding missing (stage 5). Fix the tenant or shrink
   the manifest.
 
+  **Upstream-gap pattern:** when Commander itself lacks a required surface
+  (e.g. `pam rotation info --format=json`, `mode: create` gateway, KSM
+  token mutations, MSP apply without tenant MSP permit), the provider raises
+  `CapabilityError` and DSK exits 5. The `next_action` string printed on
+  stderr tells the operator the exact workaround (e.g. "use Keeper admin
+  console" or "upgrade Commander"). This is expected behavior — exit 5 does
+  **not** mean the manifest is malformed.
+
 The numeric values are part of the **binding CLI contract**: CI
 pipelines depend on them. Do not reorder without a major version bump.
 

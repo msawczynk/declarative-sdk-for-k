@@ -15,17 +15,17 @@ Declarative lifecycle management for Keeper Security tenants.
 | `pam-environment.v1` | PAM gateways, configurations, machines, databases, directories, users, and remote browsers | supported | Full lifecycle for supported PAM resources |
 | `keeper-vault.v1` | Vault records, including the `login` type | supported | Login L1 lifecycle |
 | `keeper-vault-sharing.v1` | Shared folders and record shares | supported | Shared-folder and record-share lifecycle |
-| `keeper-ksm.v1` | KSM applications, tokens, and shares | supported | App create plus offline token/share coverage |
-| `keeper-enterprise.v1` | Teams, roles, and nodes | upstream-gap | Read/validate surfaces are available |
-| `msp-environment.v1` | MSP managed companies | upstream-gap | Read/validate/plan are available; apply is pending |
+| `keeper-ksm.v1` | KSM applications | supported | App create wired (Commander + ownership marker); tokens/shares/app-updates are upstream-gap (exit 5 with next_action) |
+| `keeper-enterprise.v1` | Teams, roles, nodes, enterprise-info | supported | Online validate/plan/diff supported; apply is read-only for enterprise roles/teams |
+| `msp-environment.v1` | MSP managed companies | preview-gated | Discover/validate/plan supported; apply blocked — tenant MSP product permit required |
 
 ## Install
 
-Requires Python 3.11+ and `keepercommander>=17.2.16,<18` for the
+Requires Python 3.11+ (tested on 3.11, 3.12, 3.13) and `keepercommander>=17.2.16,<18` for the
 `commander` provider. The mock provider runs offline.
 
 ```bash
-pip install git+https://github.com/msawczynk/declarative-sdk-for-k.git
+pip install git+https://github.com/msawczynk/declarative-sdk-for-k.git@v2.1.0
 pip install -e ".[dev]"
 ```
 
@@ -42,6 +42,19 @@ dsk --provider mock apply examples/pamMachine.yaml --dry-run
 dsk --provider mock apply examples/pamMachine.yaml --auto-approve
 dsk --provider mock plan examples/pamMachine.yaml
 ```
+
+## Known Limitations
+
+The following capabilities are **not yet available** in this release:
+
+| Limitation | Detail | Workaround |
+|---|---|---|
+| MSP managed-company apply | `CommanderCliProvider.apply_msp_plan` exits 5 — tenant requires MSP product permit (`msp_permits.allowed_mc_products`). Not a DSK or Commander bug. | Use `dsk plan` to verify intent; apply via Keeper admin console. |
+| `pam rotation info --format=json` | Not implemented in Commander (upstream backlog). DSK can model `rotation_settings` in manifests; live rotation scheduling is blocked upstream. | Use `keeper pam rotation info` (human-readable output only). |
+| Gateway create (`mode: create`) | Not implemented. DSK has no Commander surface to create a gateway. | Import existing gateways with `dsk import`; create new gateways via Keeper admin console. |
+| KSM mutations beyond app create | `keeper-ksm.v1` supports app creation only. Token provisioning, record shares, app updates, and app deletion exit 5 with `next_action` on stderr. | Perform KSM token/share operations via Keeper Commander or Secrets Manager console. |
+| JIT access, project creation | Upstream-gap — no Commander API available. Roadmap item for v2.x. | Use Keeper admin console. |
+| Enterprise apply (roles/teams write) | `keeper-enterprise.v1` online validate/plan/diff are supported; apply for role and team mutations is read-only (Commander ACL limitation). | Apply enterprise changes via Keeper admin console. |
 
 ## CLI Commands
 

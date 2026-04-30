@@ -56,8 +56,6 @@ AUDIT.md
 REVIEW.md
 RECONCILIATION.md
 docs/DSK_NEXT_WORK.md
-docs/SDK_DA_COMPLETION_PLAN.md
-docs/SDK_COMPLETION_PLAN.md
 docs/V2_DECISIONS.md
 scripts/rocky/
 # `scripts/daybook/` ships publicly as a thin forwarder to

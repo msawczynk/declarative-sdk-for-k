@@ -38,7 +38,7 @@ pip install git+https://github.com/msawczynk/declarative-sdk-for-k.git@main
 # or a release tag / wheel from GitHub Releases — see docs/RELEASING.md
 ```
 
-Python 3.11+. Requires `keepercommander>=17.2.16,<18` installed and a
+Python 3.11+ (tested on 3.11, 3.12, 3.13). Requires `keepercommander>=17.2.16,<18` installed and a
 reachable Keeper tenant for the `commander` provider. The `mock`
 provider runs fully offline and is the recommended starting point for
 agents.
@@ -312,6 +312,15 @@ See `docs/LOGIN.md` for the 30-line helper skeleton.
    Exit 5 is a provider capability signal — rotation not implemented,
    login failed, gateway missing. The `next_action` string on
    `stderr` is the fix; retrying without addressing it loops forever.
+
+   **Known upstream-gap exits (do not retry):**
+   - `mode: create` gateway — no Commander surface; use admin console.
+   - `pam rotation info --format=json` — not in Commander `17.x`; use human-readable output.
+   - KSM token/share/update/delete — no stable Commander API; use Secrets Manager console.
+   - MSP apply without tenant permit — tenant configuration issue; use admin console.
+
+   These are expected `CapabilityError` patterns documented in
+   [`docs/SDK_DA_COMPLETION_PLAN.md`](./docs/SDK_DA_COMPLETION_PLAN.md).
 4. **Never commit a manifest that has `rotation_settings`,
    `jit_settings`, or `gateway.mode: create` until this SDK implements
    them.** Validation passes; `apply` converts them to CONFLICT rows;

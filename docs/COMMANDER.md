@@ -223,6 +223,21 @@ If any of these fail, `keeper-sdk apply --provider commander` will raise a
 - **Major bumps** (`17.x → 18.x`): full review sweep — expect renames of the
   in-process classes we import by qualified path.
 
+
+## Known Commander gaps affecting DSK
+
+These are upstream Commander limitations that affect DSK capabilities. They are
+not DSK bugs — the SDK detects them and exits with code 5 plus a `next_action`
+string on stderr.
+
+| Gap | Commander version | Impact | Workaround |
+|-----|------------------|--------|------------|
+| `pam rotation info --format=json` | Not available in any `17.x` release | DSK can model `rotation_settings` in manifests; live rotation scheduling emits exit 5 | Use `keeper pam rotation info` (human-readable); rotation scheduling via admin console |
+| MSP apply (MC create/update/delete) | `msp-add`, `msp-update`, `msp-remove` present in `17.2.16` but require tenant `msp_permits.allowed_mc_products` | `apply_msp_plan` → `CapabilityError` when tenant lacks MSP permit | Run `dsk plan --json` to validate intent; apply via Keeper admin console |
+| Gateway create | No `pam gateway create` equivalent in Commander | `mode: create` in manifests exits 5 | Import existing gateways via `dsk import`; create gateways via admin console |
+| KSM token provisioning | `secrets-manager token add` is not a stable programmatic Commander surface | Token create/share/update/delete → exit 5 with `next_action` | Use Secrets Manager console or `keeper sm token add` interactively |
+| `pam project export` | Does **not exist** in `17.2.16+` | DSK synthesises export by iterating `get` + `ls` | `dsk export <project.json>` covers the use case |
+
 ## Automated capability mirror
 
 The sibling [`keeper-pam-declarative`](../../keeper-pam-declarative) repo used
