@@ -22,6 +22,7 @@ Declarative lifecycle management for Keeper Security tenants.
 ## Install
 
 Requires Python 3.11+ (tested on 3.11, 3.12, 3.13) and `keepercommander>=17.2.16,<18` for the
+See [COMPATIBILITY.md](docs/COMPATIBILITY.md) for the full version matrix.
 `commander` provider. The mock provider runs offline.
 
 ```bash

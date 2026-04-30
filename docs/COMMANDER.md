@@ -1,5 +1,7 @@
 # Commander dependency pin
 
+> Full compatibility matrix (Python / OS / tenant): [docs/COMPATIBILITY.md](COMPATIBILITY.md)
+
 The SDK shells out to the **Keeper Commander** CLI (`keeper`) and imports its
 Python module in-process for a handful of commands. This page documents the
 exact version we target, the deltas vs older binaries operators may still
