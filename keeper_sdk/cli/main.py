@@ -97,7 +97,11 @@ try:
     )
 except ImportError:
     PAM_EXTENDED_FAMILY = "keeper-pam-extended.v1"  # type: ignore[assignment]
-    PamExtendedManifestV1 = None  # type: ignore[assignment]
+
+    class PamExtendedManifestV1:  # type: ignore[no-redef]  # stripped in public build
+        """Stub for stripped private module."""
+
+
 from keeper_sdk.core.models_siem import SiemManifestV1
 from keeper_sdk.core.models_terraform import TERRAFORM_FAMILY, TerraformIntegrationManifestV1
 

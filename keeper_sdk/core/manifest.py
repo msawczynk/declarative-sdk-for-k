@@ -249,6 +249,7 @@ def load_declarative_manifest_string(
     from keeper_sdk.core.models_integrations_identity import load_identity_manifest
     from keeper_sdk.core.models_k8s_eso import load_k8s_eso_manifest
     from keeper_sdk.core.models_ksm import KSM_FAMILY, load_ksm_manifest
+
     try:
         from keeper_sdk.core.models_nhi import load_nhi_manifest  # stripped in public build
     except ImportError:

@@ -57,7 +57,11 @@ try:
     )
 except ImportError:
     AI_AGENT_FAMILY = "ai-agent.v1"  # type: ignore[assignment]
-    AiAgentManifest = None  # type: ignore[assignment]
+
+    class AiAgentManifest:  # type: ignore[no-redef]  # stripped in public build
+        """Stub for stripped private module."""
+
+
 from keeper_sdk.core.models_integrations_events import EVENTS_FAMILY, EventsManifestV1
 from keeper_sdk.core.models_ksm import KSM_FAMILY, KsmManifestV1
 
@@ -65,7 +69,11 @@ try:
     from keeper_sdk.core.models_nhi import NHI_FAMILY, NhiAgentManifest  # stripped in public build
 except ImportError:
     NHI_FAMILY = "nhi-agent.v1"  # type: ignore[assignment]
-    NhiAgentManifest = None  # type: ignore[assignment]
+
+    class NhiAgentManifest:  # type: ignore[no-redef]  # stripped in public build
+        """Stub for stripped private module."""
+
+
 try:
     from keeper_sdk.core.models_pam_extended import (  # stripped in public build
         PAM_EXTENDED_FAMILY,
@@ -73,7 +81,11 @@ try:
     )
 except ImportError:
     PAM_EXTENDED_FAMILY = "keeper-pam-extended.v1"  # type: ignore[assignment]
-    PamExtendedManifestV1 = None  # type: ignore[assignment]
+
+    class PamExtendedManifestV1:  # type: ignore[no-redef]  # stripped in public build
+        """Stub for stripped private module."""
+
+
 try:
     from keeper_sdk.core.pam_extended_diff import (
         compute_pam_extended_diff,  # stripped in public build
