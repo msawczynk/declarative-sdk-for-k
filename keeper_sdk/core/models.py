@@ -54,6 +54,19 @@ class Script(_Model):
     additional_credentials_uid_refs: list[str] = Field(default_factory=list)
 
 
+class RotationScript(_Model):
+    """One rotation script attachment for a pamUser.
+
+    Maps to ``pam rotation script add <user-uid> --script-uid <uid>``.
+    Readback is not available (no ``pam rotation info --format=json`` in
+    Commander 17.x).  A plan-time warning NOOP row is emitted when this
+    field is present; the attachment step runs unconditionally on apply.
+    """
+
+    script_uid: str
+    script_name: str | None = None
+
+
 class SftpBlock(_Model):
     enable_sftp: bool | None = None
     sftp_resource_uid_ref: str | None = None
@@ -324,6 +337,7 @@ class PamUser(_Model):
     scripts: list[dict[str, Any]] | None = None
     rotation_settings: RotationSettings | None = None
     saas_plugins: list[SaasPluginConfig] = Field(default_factory=list)
+    rotation_scripts: list[RotationScript] = Field(default_factory=list)
 
 
 class LoginRecord(_Model):

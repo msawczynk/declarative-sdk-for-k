@@ -6,13 +6,26 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-04-30
+
 ### Added
-- feat: Commander 17.2.16 gateway lifecycle wiring for `pam gateway new/edit/remove`.
-- feat: KSM app delete and existing app-share editable update wiring via `KSMCommand`.
-- feat: public-eligible schema/model scaffolds for workflow, privileged access, tunnel, and SaaS rotation families.
+- feat(mcp): `dsk mcp serve` CLI command starts a stdio JSON-RPC MCP server that exposes manifest tooling to AI agents (gated by optional `mcp` extra).
+- feat(pam): `rotation_scripts` field on `pamUser` for declarative `pam rotation script add` attachments, with plan-time warning when readback would require unavailable `pam rotation info --format=json`.
+- feat(ksm): `update_app` now wired in `CommanderCliProvider` — KSM app metadata drift triggers an in-place rename instead of delete+recreate.
+- feat(diff): `pam_configuration.options` permission-flag drift (connections, tunneling, rotation, remote_browser_isolation, graphical_session_recording, text_session_recording, ai_threat_detection, ai_terminate_session_on_detection) now surfaces as UPDATE rows; previously silently dropped post-import.
+- test(live): KSM app lifecycle (token / share / config-output) live-proof accepted against the lab tenant — 3/3 lifecycle ops verified.
+- test(live): enterprise teams/roles online-validate live-proof accepted — 18 enterprise objects.
+- test(live): `ksm-usage` report live-proof accepted; CLI table + JSON envelope verified end-to-end.
+- test(live): KSM bootstrap (`acquire/release/publish/consume`) inter-agent bus live-proof accepted — concurrent-writer CAS verified.
 
 ### Changed
-- docs: reclassify JIT import/extend, gateway lifecycle, KSM app delete, and KSM app-share update as Commander 17.2.16 supported surfaces.
+- docs(DA plan): KSM bootstrap, KSM bus, ksm-usage, enterprise validate, and KSM lifecycle reclassified to **Live proof ACCEPTED**.
+- docs(commander coverage): `update_app` correctly documented as Commander 17.2.16 stable; previous "no update_v5_app" wording corrected.
+- docs(scope): `pam_access` (privileged-access) and `pam_tunnel` are operation-only and out of scope for declarative management.
+- chore(publish): hardened publish gate scrubs internal-only references from public-facing docs and refuses to push if any reappear.
+
+### Fixed
+- fix(diff): `pamConfiguration` permission flags no longer silently ignored — overlay diff against the manifest `options` block (Commander-injected defaults remain unmanaged).
 
 ## [2.1.0] - 2026-04-30
 

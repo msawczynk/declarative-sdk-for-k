@@ -156,6 +156,35 @@ def compute_diff(
         if change.kind in (ChangeKind.UPDATE, ChangeKind.NOOP) and live is not None:
             matched.add(live.keeper_uid)
 
+    # Emit a NOOP warning row for every desired pamUser that carries rotation_scripts
+    # so the plan surface notes that script attachment cannot be verified (no readback).
+    data_for_warn = manifest.model_dump(mode="python", exclude_none=True)
+    for resource in data_for_warn.get("resources") or []:
+        if not isinstance(resource, dict):
+            continue
+        for user in resource.get("users") or []:
+            if not isinstance(user, dict):
+                continue
+            if user.get("type") != "pamUser":
+                continue
+            scripts = user.get("rotation_scripts") or []
+            if not scripts:
+                continue
+            changes.append(
+                Change(
+                    kind=ChangeKind.NOOP,
+                    uid_ref=user.get("uid_ref") or None,
+                    resource_type="pamUser",
+                    title=str(user.get("title") or ""),
+                    reason=(
+                        "rotation_scripts present: attachment will run on apply but "
+                        "cannot be verified (no pam rotation info --format=json in "
+                        "Commander 17.x)"
+                    ),
+                    manifest_name=manifest_name,
+                )
+            )
+
     changes.extend(
         _classify_orphans(
             live_records,
@@ -396,6 +425,45 @@ def _field_diff_pam_user(
                 changed.append(key)
         elif key == "managed":
             if not _pam_user_managed_flag_equivalent(live.get(key), desired.get(key)):
+                changed.append(key)
+        elif key == "rotation_scripts":
+            # No readback available (Commander 17.x lacks pam rotation info --format=json
+            # for script attachments).  Exclude from field diff to prevent spurious UPDATE
+            # rows; apply handles attachment unconditionally.
+            pass
+        elif live.get(key) != desired.get(key):
+            changed.append(key)
+    return sorted(changed)
+
+
+def _field_diff_pam_configuration(live: dict[str, Any], desired: dict[str, Any]) -> list[str]:
+    """Field diff for ``pam_configuration`` records with overlay semantics on ``options``.
+
+    Uses overlay matching for the top-level ``options`` block so that
+    Commander-injected default option flags (e.g. ``connections``,
+    ``tunneling``, ``ai_threat_detection``) that are absent from the manifest
+    do not cause spurious UPDATE rows.  Every key the manifest *does* declare
+    in ``options`` is compared exactly against the live value.
+
+    All other top-level fields (``title``, ``environment``, ``network_id``,
+    etc.) are compared with strict equality, identical to :func:`_field_diff`.
+    """
+    keys: set[str] = set(live) | set(desired)
+    changed: list[str] = []
+    for key in keys:
+        if key in _DIFF_IGNORED_FIELDS:
+            continue
+        if key not in desired:
+            continue
+        if key == "options":
+            desired_opts = desired.get("options")
+            if not isinstance(desired_opts, dict):
+                if live.get("options") != desired_opts:
+                    changed.append(key)
+                continue
+            live_opts = live.get("options")
+            live_opts = live_opts if isinstance(live_opts, dict) else {}
+            if not _dict_overlay_matches(live_opts, desired_opts):
                 changed.append(key)
         elif live.get(key) != desired.get(key):
             changed.append(key)
@@ -677,6 +745,8 @@ def _classify_desired(
             marker=live.marker,
             uid_ref=uid_ref,
         )
+    elif resource_type == "pam_configuration":
+        diff_fields = _field_diff_pam_configuration(live.payload, payload)
     else:
         diff_fields = _field_diff(live.payload, payload)
     if not diff_fields:

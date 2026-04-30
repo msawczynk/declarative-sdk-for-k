@@ -181,7 +181,7 @@ login path.
 | Operation | Status | Commander surface | Notes |
 |---|---|---|---|
 | App create | ✅ Supported | In-process `KSMCommand.add_new_v5_app(params, name)` | Requires `17.2.16+` |
-| App metadata update | ❌ Not supported | No `update_v5_app`; no DSK app-metadata contract | Raises `CapabilityError` |
+| App rename / metadata update (`update_app`) | ❌ `missing_apply` | In-process `KSMCommand.update_app` (stable Commander **17.2.16**+) | Not yet wired into `CommanderCliProvider` — pending implementation; classification `missing_apply` (model exists, Commander API exists, wiring not done); raises `CapabilityError` |
 | App delete | ✅ Supported | In-process `KSMCommand.remove_v5_app(params, app_name_or_uid, purge, force)` | Requires delete row from owned live state |
 | Token add | ❌ Upstream-gap | None | Not a stable programmatic surface |
 | Existing share editable update | ✅ Supported | In-process `KSMCommand.update_app_share(params, secret_uids, app_uid, editable)` | Existing shares only |
@@ -254,7 +254,8 @@ per-report flags.
 |---|---|---|---|
 | `pam rotation info --format=json` | Not available in any `17.x` release | `keeper pam rotation info` (human-readable); rotation scheduling via admin console | Upstream backlog |
 | Rotation scheduling apply | `DSK_EXPERIMENTAL_ROTATION_APPLY` must be set; readback partial | Do not use in production without live proof | Experimental gate |
-| KSM token / new share / config-output / app-metadata update management | Not a stable programmatic Commander surface in this family | Keeper Secrets Manager console; `keeper sm token add` interactively | v2+ roadmap |
+| KSM token / new share / config-output management | Not a stable programmatic Commander surface in the `keeper-ksm.v1` family | Keeper Secrets Manager console; `keeper sm token add` interactively | v2+ roadmap |
+| KSM app rename / metadata update (`update_app`) | Classification `missing_apply`: `KSMCommand.update_app` is stable on Commander **17.2.16**; model + Commander API exist; DSK wiring in `CommanderCliProvider` not done yet | — | Pending DSK implementation |
 | MSP apply without tenant permit | `msp_permits.allowed_mc_products` required on tenant | Request MSP permit from Keeper; validate-only with `dsk plan` | Upstream tenant-capability |
 | MSP import marker write | No stable marker anchor for managed-company records | Use mock provider for full lifecycle testing | Design pending (`docs/MSP_FAMILY_DESIGN.md`) |
 | Enterprise write operations | Commander enterprise API is read-only via DSK | Use Keeper admin console for node/user/role/team mutations | By design (read-only family) |

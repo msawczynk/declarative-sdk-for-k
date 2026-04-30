@@ -146,10 +146,10 @@ _MSP_UNLIMITED_SEATS = 1_000_000_000
 _KSM_APP_RESOURCE_TYPE = "ksm_app"
 _KSM_BLOCKS = ("apps", "tokens", "record_shares", "config_outputs")
 _KSM_CREATE_ONLY_UNSUPPORTED_REASON = (
-    "CommanderCliProvider KSM apply supports application create/delete via "
-    "`KSMCommand.add_new_v5_app` / `KSMCommand.remove_v5_app` and existing "
-    "share editable updates via `KSMCommand.update_app_share`; tokens, new "
-    "record shares, config outputs, and app metadata updates remain unsupported"
+    "CommanderCliProvider KSM apply supports application create/delete/rename via "
+    "`KSMCommand.add_new_v5_app` / `KSMCommand.remove_v5_app` / `KSMCommand.update_app` "
+    "and existing share editable updates via `KSMCommand.update_app_share`; tokens, new "
+    "record shares, and config outputs remain unsupported"
 )
 _ENTERPRISE_BLOCKS = ("nodes", "users", "roles", "teams", "enforcements", "aliases")
 _ENTERPRISE_STATUS = {
@@ -1750,6 +1750,15 @@ class CommanderCliProvider(Provider):
                         context={**exc.context, "partial_outcomes": list(outcomes)},
                     ) from exc
 
+                try:
+                    outcomes.extend(self._apply_rotation_scripts(live_records))
+                except CapabilityError as exc:
+                    raise CapabilityError(
+                        reason=f"rotation script attach failed: {exc.reason}",
+                        next_action=exc.next_action,
+                        context={**exc.context, "partial_outcomes": list(outcomes)},
+                    ) from exc
+
         if gateway_deletes:
             outcomes.extend(
                 self._apply_gateway_lifecycle_changes(plan, gateway_deletes, dry_run=dry_run)
@@ -1923,6 +1932,81 @@ class CommanderCliProvider(Provider):
                         )
                     )
                     continue
+                if (
+                    change.kind is ChangeKind.UPDATE
+                    and change.resource_type == _KSM_APP_RESOURCE_TYPE
+                ):
+                    # Metadata update (name change) — delegate to KSMCommand.update_app.
+                    new_name = str(change.after.get("name") or "").strip()
+                    app_uid_or_name = change.keeper_uid or name
+                    if not new_name:
+                        raise CapabilityError(
+                            reason="KSM app UPDATE change has no new 'name' in after-dict",
+                            uid_ref=change.uid_ref or name,
+                            resource_type=change.resource_type,
+                            next_action="refresh plan from live KSM state",
+                        )
+                    try:
+                        from keepercommander.commands.ksm import (
+                            KSMCommand,  # type: ignore  # noqa: PLC0415
+                        )
+                    except (ImportError, AttributeError) as exc:
+                        raise CapabilityError(
+                            reason=f"Commander KSMCommand is unavailable: {exc}",
+                            uid_ref=change.uid_ref or name,
+                            resource_type=change.resource_type,
+                            next_action="upgrade keepercommander",
+                        ) from exc
+                    if dry_run:
+                        outcomes.append(
+                            ApplyOutcome(
+                                uid_ref=change.uid_ref or name,
+                                keeper_uid=change.keeper_uid or "",
+                                action="update",
+                                details={
+                                    "dry_run": True,
+                                    "new_name": new_name,
+                                },
+                            )
+                        )
+                        continue
+                    if not hasattr(KSMCommand, "update_app"):
+                        raise CapabilityError(
+                            reason="Commander KSMCommand has no update_app API",
+                            uid_ref=change.uid_ref or name,
+                            resource_type=change.resource_type,
+                            next_action="need KSMCommand.update_app(params, app_name_or_uid, new_name)",
+                        )
+
+                    def _run_update_app() -> None:
+                        params = self._get_keeper_params()
+                        KSMCommand.update_app(params, app_uid_or_name, new_name)
+
+                    try:
+                        self._with_keeper_session_refresh(_run_update_app)
+                    except CapabilityError:
+                        raise
+                    except Exception as exc:
+                        raise CapabilityError(
+                            reason=f"KSM app rename failed: {type(exc).__name__}: {exc}",
+                            uid_ref=change.uid_ref or name,
+                            resource_type=change.resource_type,
+                            next_action="verify the app exists and the new name is unique",
+                        ) from exc
+                    self._ksm_app_rows_cache = None
+                    outcomes.append(
+                        ApplyOutcome(
+                            uid_ref=change.uid_ref or name,
+                            keeper_uid=change.keeper_uid or "",
+                            action="update",
+                            details={
+                                "dry_run": False,
+                                "new_name": new_name,
+                            },
+                        )
+                    )
+                    continue
+
                 if change.kind in (ChangeKind.UPDATE, ChangeKind.DELETE):
                     raise CapabilityError(
                         reason=_KSM_CREATE_ONLY_UNSUPPORTED_REASON,
@@ -3688,6 +3772,89 @@ class CommanderCliProvider(Provider):
                     details={"command": argv},
                 )
             )
+        return outcomes
+
+    def _apply_rotation_scripts(
+        self,
+        live_records: list[LiveRecord],
+    ) -> list[ApplyOutcome]:
+        """Apply ``rotation_scripts`` attachments for nested pamUser records.
+
+        Calls ``pam rotation script add <user-uid> --script-uid <script_uid>``
+        for every entry.  Readback is unavailable in Commander 17.x so the
+        attachment is unconditional (idempotent on the Commander side).
+        """
+        source = self._manifest_source
+        live_by_title: dict[tuple[str, str], LiveRecord] = {
+            (r.resource_type, str((r.marker or {}).get("title") or "")): r for r in live_records
+        }
+        outcomes: list[ApplyOutcome] = []
+        for resource in source.get("resources") or []:
+            if not isinstance(resource, dict):
+                continue
+            for user in resource.get("users") or []:
+                if not isinstance(user, dict):
+                    continue
+                if user.get("type") != "pamUser":
+                    continue
+                scripts = user.get("rotation_scripts") or []
+                if not scripts:
+                    continue
+                # Resolve user UID from live records
+                user_uid_ref = _non_empty_str(user.get("uid_ref"))
+                user_title = _non_empty_str(user.get("title")) or ""
+                live = None
+                if user_uid_ref:
+                    live = next(
+                        (
+                            r
+                            for r in live_records
+                            if (r.marker or {}).get("uid_ref") == user_uid_ref
+                        ),
+                        None,
+                    )
+                if live is None:
+                    live = live_by_title.get(("pamUser", user_title))
+                if live is None or not live.keeper_uid:
+                    raise CapabilityError(
+                        reason=(
+                            f"rotation_scripts: cannot resolve pamUser '{user_title}' "
+                            "to a live Keeper UID — run plan/import first"
+                        ),
+                        uid_ref=user_uid_ref or "",
+                        resource_type="pamUser",
+                        next_action=(
+                            "ensure the pamUser exists in the vault before applying "
+                            "rotation_scripts"
+                        ),
+                    )
+                user_uid = live.keeper_uid
+                for script_entry in scripts:
+                    script_uid = (
+                        script_entry.get("script_uid")
+                        if isinstance(script_entry, dict)
+                        else getattr(script_entry, "script_uid", None)
+                    )
+                    if not script_uid:
+                        continue
+                    argv = [
+                        "pam",
+                        "rotation",
+                        "script",
+                        "add",
+                        user_uid,
+                        "--script-uid",
+                        script_uid,
+                    ]
+                    self._run_cmd(argv)
+                    outcomes.append(
+                        ApplyOutcome(
+                            uid_ref=user_uid_ref or "",
+                            keeper_uid=user_uid,
+                            action="rotation_script",
+                            details={"command": argv, "script_uid": script_uid},
+                        )
+                    )
         return outcomes
 
     # ------------------------------------------------------------------

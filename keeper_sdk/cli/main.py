@@ -2606,5 +2606,31 @@ def live_smoke(
     sys.exit(EXIT_OK)
 
 
+_MCP_HELP = "Run the DSK MCP (Model Context Protocol) server."
+
+
+@main.group("mcp", help=_MCP_HELP)
+def mcp_cli() -> None:
+    """MCP server commands."""
+
+
+@mcp_cli.command("serve")
+def mcp_serve() -> None:
+    """Start the DSK MCP stdio server (JSON-RPC).
+
+    Requires the 'mcp' extra: pip install 'declarative-sdk-for-k[mcp]'
+    """
+    try:
+        from keeper_sdk.mcp.server import main as mcp_main  # noqa: PLC0415
+    except ImportError as exc:
+        click.echo(
+            f"mcp extra not installed: {exc}\n"
+            "Install with: pip install 'declarative-sdk-for-k[mcp]'",
+            err=True,
+        )
+        sys.exit(EXIT_GENERIC)
+    mcp_main()
+
+
 if __name__ == "__main__":
     main()
