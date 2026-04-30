@@ -6,6 +6,21 @@ Versioning: [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-04-30
+
+### Fixed (security + usability review)
+- fix(security): `oneTimeCode` / `one_time_code` / `onetime` added to `redact._SECRET_TOKENS` — KSM field names for one-time codes that don't contain the `otp` substring were previously unredacted in plan/diff JSON output.
+- fix(v18): `commander_version.get_commander_version()` now strips pre-release suffixes (`rc1`, `dev0`, `a1`, `b2`) before parsing — `18.0.0rc1` and `18.0.0.dev0` now correctly gate as v18 rather than falling back to `(0,0,0)`.
+- fix(cli): exit-code table added to `dsk --help` docstring — exit 2 overload (schema-invalid vs changes-present) is now visible without reading `docs/VALIDATION_STAGES.md`.
+- fix(publish): `Gate6` added to `scripts/check_public_content.sh` — scans `keeper_sdk/` Python source (comments + strings) for private family references, not just Markdown docs.
+
+### Added
+- docs: `docs/ARCHITECTURE_GAPS.md` — honest engineering memo covering the two known design gaps (no distributed apply lock, no partial-apply rollback) with concrete remediation paths and "Keeper will ask about this" framing for the internal pitch.
+
+### Tests
+- 3 new pre-release version parse tests (`18.0.0rc1`, `18.0.0.dev0`, `17.3.0a1`)
+- Total: **1523 pass**, 11 skip, 1 xfail
+
 ## [2.4.0] - 2026-04-30
 
 ### Added

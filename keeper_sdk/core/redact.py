@@ -20,6 +20,10 @@ _SECRET_TOKENS = (
     "service_account_key",
     "admin_private_key",
     "otp",
+    # KSM / Keeper field names for one-time codes that don't contain "otp"
+    "onetimecode",
+    "one_time_code",
+    "onetime",
 )
 
 _SECRET_FIELD_TYPES = {

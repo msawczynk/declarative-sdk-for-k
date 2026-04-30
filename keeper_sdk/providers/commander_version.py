@@ -13,11 +13,23 @@ except ImportError:
 
 @lru_cache(maxsize=1)
 def get_commander_version() -> tuple[int, int, int]:
-    """Return (major, minor, patch) of installed keepercommander, or (0, 0, 0) on error."""
+    """Return (major, minor, patch) of installed keepercommander, or (0, 0, 0) on error.
+
+    Pre-release suffixes (``rc1``, ``dev0``, ``a1``, ``b2``) are stripped from each
+    segment before parsing so ``18.0.0rc1`` correctly gates as v18, not v0.
+    """
+    import re as _re
+
     try:
         ver = _meta.version("keepercommander")
         parts = ver.split(".")
-        return (int(parts[0]), int(parts[1]), int(parts[2]))
+        nums = []
+        for p in parts[:3]:
+            m = _re.match(r"(\d+)", p)
+            nums.append(int(m.group(1)) if m else 0)
+        while len(nums) < 3:
+            nums.append(0)
+        return (nums[0], nums[1], nums[2])
     except Exception:
         return (0, 0, 0)
 

@@ -59,3 +59,22 @@ def test_project_import_server_dedup_predicate() -> None:
 def test_project_export_native_predicate() -> None:
     with patch("importlib.metadata.version", return_value="18.0.0"):
         assert commander_version.v18_project_export_native() is True
+
+
+def test_prerelease_version_rc_parses_as_v18() -> None:
+    """18.0.0rc1 must gate as v18, not fall back to (0,0,0)."""
+    with patch("importlib.metadata.version", return_value="18.0.0rc1"):
+        assert commander_version.get_commander_version() == (18, 0, 0)
+        assert commander_version.v18_or_later() is True
+
+
+def test_prerelease_version_dev_parses_as_v18() -> None:
+    with patch("importlib.metadata.version", return_value="18.0.0.dev0"):
+        assert commander_version.get_commander_version() == (18, 0, 0)
+        assert commander_version.v18_or_later() is True
+
+
+def test_prerelease_version_alpha_parses_correctly() -> None:
+    with patch("importlib.metadata.version", return_value="17.3.0a1"):
+        assert commander_version.get_commander_version() == (17, 3, 0)
+        assert commander_version.v18_or_later() is False

@@ -292,7 +292,7 @@ class PlanLoadBundle:
 
 
 @click.group(context_settings={"help_option_names": ["-h", "--help"]})
-@click.version_option()
+@click.version_option(package_name="declarative-sdk-for-k")
 @click.option(
     "--provider",
     type=click.Choice(["mock", "commander", "service"]),
@@ -304,7 +304,17 @@ class PlanLoadBundle:
 )
 @click.pass_context
 def main(ctx: click.Context, provider: str, folder_uid: str | None) -> None:
-    """Keeper PAM Declarative SDK."""
+    """Keeper PAM Declarative SDK.
+
+    \b
+    Exit codes:
+      0  success / clean plan (no changes)
+      1  unexpected error
+      2  schema invalid (validate) OR changes present (plan/diff) — disambiguate by subcommand
+      3  unresolved uid_ref or dependency cycle
+      4  plan has conflicts (use --json to inspect changes[*].reason)
+      5  provider / capability error (stderr carries next_action)
+    """
     ctx.ensure_object(dict)
     ctx.obj["provider"] = provider
     ctx.obj["folder_uid"] = folder_uid

@@ -93,6 +93,24 @@ for f in "${PUBLIC_SCANNED_DOCS[@]}"; do
   fi
 done
 
+# --- Gate 6: scan Python source for private family refs (excluding known guarded stubs) ---
+# manifest.py / __init__.py intentionally contain try/except fallback stubs (correct public-build guards)
+# e.g. "except ImportError: FAMILY = \"ai-agent.v1\"" -- not a leak. __pycache__ .pyc also excluded.
+GATE6_ALLOWLIST="keeper_sdk/core/manifest[.]py|keeper_sdk/core/__init__[.]py|keeper_sdk/core/schema[.]py|keeper_sdk/core/models_terraform[.]py|keeper_sdk/mcp/server[.]py|keeper_sdk/cli/main[.]py"
+echo "==> check_public_content: Gate6 — scanning Python source for private refs (excl guarded stubs)"
+if command -v rg &>/dev/null; then
+  LEAKED=$(rg -l --glob '*.py' "$PRIVATE_PATTERN" keeper_sdk/ 2>/dev/null \
+    | { grep -vE "$GATE6_ALLOWLIST" || true; } | head -5)
+else
+  LEAKED=$(grep -rlE "$PRIVATE_PATTERN" --include='*.py' keeper_sdk/ 2>/dev/null \
+    | { grep -vE "$GATE6_ALLOWLIST" || true; } | head -5)
+fi
+if [[ -n "$LEAKED" ]]; then
+  echo "ERROR [Gate6]: Private family ref outside guarded stubs:" >&2
+  echo "$LEAKED" >&2
+  FAIL=1
+fi
+
 if [[ $FAIL -eq 1 ]]; then
   echo ""
   echo "==> check_public_content: FAILED — run publish.sh to strip before checking," >&2
