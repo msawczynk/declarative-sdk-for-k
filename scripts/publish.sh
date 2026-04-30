@@ -44,6 +44,7 @@ OPERATOR_EXCLUDES=(
   "tests/test_pam_extended_schema.py"
   "tests/test_pam_extended.py"
   "tests/test_pam_extended_plan.py"
+  "tests/test_daybook_harness.py"
   "tests/test_keeper_pam_extended_schema.py"
   "tests/fixtures/examples/pam-extended"
   # KeeperDrive is in PR #1975 which is not in Commander 17.2.16.

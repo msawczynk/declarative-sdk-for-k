@@ -132,6 +132,7 @@ def test_mcp_plan_registers_nhi_ai_agent_families_as_upstream_gap(
     family: str,
     manifest_yaml: str,
 ) -> None:
+    pytest.importorskip("keeper_sdk.core.models_nhi")  # skip in public build (private family)
     response = _run(
         mcp_server.server.handle(
             {
