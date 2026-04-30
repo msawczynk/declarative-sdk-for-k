@@ -164,7 +164,7 @@ For the `commander` provider, set `KEEPER_EMAIL`, `KEEPER_PASSWORD`, and
 Public issues and pull requests are welcome on
 `github.com/msawczynk/declarative-sdk-for-k`. Maintainers may mirror accepted
 changes through the private development repository before publication. The
-current full test gate is 1453 passed.
+current full test gate is 1375 passed.
 
 ## License
 
