@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/msawczynk/declarative-sdk-for-k/schemas/epm/epm.v1.schema.json",
+  "title": "keeper-epm.v1",
+  "description": "Offline schema foundation for Keeper Endpoint Privilege Management policy intent. MSP managed-company context with augenblik.eu lab users is the planned PEDM test path; live apply/readback remains upstream-gap until a PEDM tenant writer is proven.",
+  "x-keeper-live-proof": {
+    "status": "upstream-gap",
+    "evidence": "memo:W18_keeper-epm-v1-schema-foundation",
+    "since_pin": "89047920a0df857e01fb59adcb0bfb9fa6db70bf",
+    "notes": "W18 ships offline schema, typed models, and field-level diff for watchlists, policies, approvers, and audit_config. Commander/PEDM apply awaits live proof in an MSP managed company tenant, planned against augenblik.eu test users."
+  },
+  "type": "object",
+  "required": ["schema"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "keeper-epm.v1"
+    },
+    "watchlists": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/watchlist"
+      }
+    },
+    "policies": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/policy"
+      }
+    },
+    "approvers": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/approver"
+      }
+    },
+    "audit_config": {
+      "$ref": "#/$defs/audit_config"
+    }
+  },
+  "$defs": {
+    "uid_ref": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "non_empty_string": {
+      "type": "string",
+      "minLength": 1
+    },
+    "email": {
+      "type": "string",
+      "minLength": 3,
+      "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+    },
+    "string_list": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/non_empty_string"
+      },
+      "default": []
+    },
+    "uid_ref_list": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/uid_ref"
+      },
+      "default": []
+    },
+    "watchlist": {
+      "type": "object",
+      "required": ["uid_ref", "name", "description", "policy_type", "entries"],
+      "additionalProperties": false,
+      "properties": {
+        "uid_ref": {
+          "$ref": "#/$defs/uid_ref"
+        },
+        "name": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "policy_type": {
+          "type": "string",
+          "enum": ["allowlist", "blocklist"]
+        },
+        "entries": {
+          "$ref": "#/$defs/string_list"
+        }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "required": [
+        "uid_ref",
+        "name",
+        "elevation_type",
+        "target_users",
+        "target_groups",
+        "application_patterns"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "uid_ref": {
+          "$ref": "#/$defs/uid_ref"
+        },
+        "name": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "elevation_type": {
+          "type": "string",
+          "enum": ["auto", "approval", "denied"]
+        },
+        "target_users": {
+          "$ref": "#/$defs/string_list"
+        },
+        "target_groups": {
+          "$ref": "#/$defs/string_list"
+        },
+        "application_patterns": {
+          "$ref": "#/$defs/string_list"
+        }
+      }
+    },
+    "approver": {
+      "type": "object",
+      "required": ["uid_ref", "name", "email", "scope_uid_refs"],
+      "additionalProperties": false,
+      "properties": {
+        "uid_ref": {
+          "$ref": "#/$defs/uid_ref"
+        },
+        "name": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "email": {
+          "$ref": "#/$defs/email"
+        },
+        "scope_uid_refs": {
+          "$ref": "#/$defs/uid_ref_list"
+        }
+      }
+    },
+    "audit_config": {
+      "type": "object",
+      "required": ["retention_days", "alert_on_denied", "export_format"],
+      "additionalProperties": false,
+      "properties": {
+        "retention_days": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "alert_on_denied": {
+          "type": "boolean"
+        },
+        "export_format": {
+          "type": "string",
+          "enum": ["json", "siem", "csv"]
+        }
+      }
+    }
+  }
+}

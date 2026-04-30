@@ -1,0 +1,18 @@
+schema: keeper-vault.v1
+
+# keeper-vault.v1 does not expose a manager field in the manifest schema.
+# Example ownership marker label for apply/import flows: dsk-example.
+records:
+  - uid_ref: ex.login-1
+    type: login
+    title: "Example Login"
+    fields:
+      - type: login
+        label: Login
+        value: ["user@example.com"]
+      - type: password
+        label: Password
+        value: ["example-password"]
+      - type: url
+        label: URL
+        value: ["https://example.invalid/login"]

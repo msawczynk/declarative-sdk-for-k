@@ -1,0 +1,19 @@
+# keeper-enterprise.v1 minimal fixture: teams + roles offline validate smoke test.
+# uid_ref and node_uid_ref are required by the schema; visible_below (not
+# visible_below_node) is the canonical field name in EnterpriseManifestV1.
+schema: keeper-enterprise.v1
+nodes:
+  - uid_ref: node.root
+    name: Root
+teams:
+  - uid_ref: team.engineering
+    name: Engineering
+    node_uid_ref: keeper-enterprise:nodes:node.root
+    restrict_edit: false
+    restrict_share: true
+roles:
+  - uid_ref: role.developer
+    name: Developer
+    node_uid_ref: keeper-enterprise:nodes:node.root
+    visible_below: true
+    new_user_inherit: false

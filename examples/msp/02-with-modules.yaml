@@ -1,0 +1,12 @@
+schema: msp-environment.v1
+name: example-partner-modules
+manager: dsk-example
+
+# Schema-valid equivalent of requested modules: ["businessPlus", "secrets_manager"].
+managed_companies:
+  - name: "Example Partner"
+    plan: businessPlus
+    seats: 25
+    addons:
+      - name: secrets_manager
+        seats: 25

@@ -1,0 +1,78 @@
+version: "1"
+name: acme-lab-minimal
+
+projects:
+  - uid_ref: acme-lab
+    project: "Acme Lab"
+
+shared_folders:
+  users:
+    uid_ref: acme-lab-sf-users
+    manage_users: true
+    manage_records: true
+    can_edit: true
+    can_share: true
+  resources:
+    uid_ref: acme-lab-sf-resources
+    manage_users: true
+    manage_records: true
+    can_edit: true
+    can_share: true
+
+gateways:
+  - uid_ref: acme-lab-gw
+    name: "Acme Lab Gateway"
+    mode: reference_existing
+
+pam_configurations:
+  - uid_ref: acme-lab-cfg
+    environment: local
+    title: "Acme Lab Local PAM Configuration"
+    gateway_uid_ref: acme-lab-gw
+    options:
+      connections: "on"
+      rotation: "on"
+      tunneling: "on"
+      remote_browser_isolation: "off"
+      graphical_session_recording: "off"
+      text_session_recording: "off"
+      ai_threat_detection: "off"
+      ai_terminate_session_on_detection: "off"
+    network_id: acme-lab-net
+    network_cidr: 10.16.9.0/28
+
+resources:
+  - uid_ref: acme-lab-linux1
+    type: pamMachine
+    title: "lab-linux-1"
+    pam_configuration_uid_ref: acme-lab-cfg
+    shared_folder: resources
+    host: 10.16.9.10
+    port: "22"
+    ssl_verification: true
+    operating_system: Linux
+    pam_settings:
+      options:
+        rotation: "on"
+        connections: "on"
+        tunneling: "on"
+      allow_supply_host: false
+      port_forward:
+        port: "2222"
+        reuse_port: true
+      connection:
+        protocol: ssh
+        port: "22"
+        allow_supply_user: true
+        administrative_credentials_uid_ref: acme-lab-linux1-root
+    users:
+      - uid_ref: acme-lab-linux1-root
+        type: pamUser
+        title: "lab-linux-1-root"
+        login: root
+        password: "REPLACE_ME"
+        rotation_settings:
+          rotation: general
+          enabled: "on"
+          schedule: { type: on-demand }
+          password_complexity: "32,5,5,5,5"

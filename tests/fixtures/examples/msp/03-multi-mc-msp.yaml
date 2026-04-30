@@ -1,0 +1,24 @@
+schema: msp-environment.v1
+name: enterprise-msp
+manager: keeper-msp-declarative
+managed_companies:
+  - name: "Subsidiary A"
+    plan: business
+    seats: 50
+    addons: []
+  - name: "Subsidiary B"
+    plan: businessPlus
+    seats: 100
+    file_plan: storage_1tb
+    addons:
+      - name: secure_addon_pam
+        seats: 10
+  - name: "Subsidiary C"
+    plan: enterprise
+    seats: 250
+    file_plan: storage_unlimited
+    addons:
+      - name: secure_addon_compliance
+        seats: 250
+      - name: secure_addon_pam
+        seats: 50

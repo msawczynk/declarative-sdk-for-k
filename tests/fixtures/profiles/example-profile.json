@@ -1,0 +1,15 @@
+{
+  "_README": "Copy this file to ~/.config/dsk/profiles/default.json and fill in your tenant's values. Never commit a filled-in copy.",
+  "id": "default",
+  "admin_email": "admin@example.com",
+  "target_email": "target@example.com",
+  "ksm_config": "~/.config/dsk/profiles/default/ksm-config.json",
+  "admin_commander_config": "~/.config/dsk/profiles/default/commander-config.json",
+  "sdktest_commander_config": "~/.config/dsk/profiles/default/target-commander-config.json",
+  "keeper_server": "keepersecurity.com",
+  "channel_name": "sdk-declarative",
+  "default_admin_record_uid": "<ADMIN_RECORD_UID>",
+  "sdk_test_login_record_title": "<target-login-record-title>",
+  "gateway_name": "<gateway-name>",
+  "pam_config_title": "<pam-config-name>"
+}

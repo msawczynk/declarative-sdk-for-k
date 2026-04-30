@@ -1,0 +1,25 @@
+Diff for acme-lab-minimal
+───────────────────────────────────────── update · pamUser · lab-linux-1-root ──────────────────────────────────────────
+before:
+{'password': '***redacted***'}
+after:
+{'password': '***redacted***'}
+────────────────────────────────────────── create · pamMachine · lab-linux-2 ───────────────────────────────────────────
+after:
+{
+    'uid_ref': 'acme-lab-linux2',
+    'title': 'lab-linux-2',
+    'pam_configuration_uid_ref': 'acme-lab-cfg',
+    'shared_folder': 'resources',
+    'users': [],
+    'type': 'pamMachine',
+    'host': '10.16.9.11',
+    'port': '22',
+    'ssl_verification': True,
+    'operating_system': 'Linux'
+}
+───────────────────────────────────────── conflict · pamMachine · lab-linux-3 ──────────────────────────────────────────
+unmanaged record with matching title; pass --adopt or use an import workflow to claim it
+──────────────────────────────────────────── delete · pamDatabase · old-db ─────────────────────────────────────────────
+before:
+{'title': 'old-db', 'database_type': 'mysql', 'host': 'old-db.example.com', 'port': '3306'}

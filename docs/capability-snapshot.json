@@ -1,0 +1,1921 @@
+{
+  "commander_branch": "master",
+  "commander_sha": "6574827c",
+  "commands": [
+    {
+      "class": "GetEnterpriseDataCommand",
+      "flags": [
+        {
+          "aliases": [
+            "--force"
+          ],
+          "dest": "force",
+          "help": "full data sync",
+          "name": "-f",
+          "required": false,
+          "type": "flag"
+        }
+      ],
+      "group_command": "enterprise-down",
+      "module": "keepercommander.commands.enterprise"
+    },
+    {
+      "class": "EnterpriseInfoCommand",
+      "flags": [
+        {
+          "aliases": [],
+          "dest": "columns",
+          "help": "comma-separated list of available columns per argument:\n for `nodes` (parent_node, parent_id, user_count, users, team_count, teams, role_count, roles, provisioning, isolated)\n for `users` (name, status, transfer_status, node, team_count, teams, role_count, roles, alias, 2fa_enabled, job_title)\n for `teams` (restricts, node, user_count, users, queued_user_count, queued_users, role_count, roles)\n for `roles` (visible_below, default_role, admin, node, user_count, users, team_count, teams, enforcement_count, enforcements, managed_node_count, managed_nodes, managed_nodes_permissions)",
+          "name": "--columns",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "format",
+          "help": "format of output",
+          "name": "--format",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "node",
+          "help": "limit results to node (name or ID)",
+          "name": "--node",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "output",
+          "help": "path to resulting output file (ignored for \"table\" format)",
+          "name": "--output",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "--nodes"
+          ],
+          "dest": "nodes",
+          "help": "print node tree",
+          "name": "-n",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "--quiet"
+          ],
+          "dest": "quiet",
+          "help": "minimize screen output",
+          "name": "-q",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "--roles"
+          ],
+          "dest": "roles",
+          "help": "print role list",
+          "name": "-r",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "--teams"
+          ],
+          "dest": "teams",
+          "help": "print team list",
+          "name": "-t",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "--users"
+          ],
+          "dest": "users",
+          "help": "print user list",
+          "name": "-u",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "--verbose"
+          ],
+          "dest": "verbose",
+          "help": "print ids",
+          "name": "-v",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "pattern",
+          "help": "search pattern. applicable to users, teams, and roles.",
+          "name": "<pattern>",
+          "required": false,
+          "type": "str"
+        }
+      ],
+      "group_command": "enterprise-info",
+      "module": "keepercommander.commands.enterprise"
+    },
+    {
+      "class": "EnterpriseNodeCommand",
+      "flags": [
+        {
+          "aliases": [],
+          "dest": "add",
+          "help": "create node",
+          "name": "--add",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "delete",
+          "help": "delete node",
+          "name": "--delete",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "invite_email",
+          "help": "Sets invite email template from file. Saves current template if file does not exist. dash (-) use stdout",
+          "name": "--invite-email",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "logo_file",
+          "help": "Sets company logo using local image file (max size: 500 kB, min dimensions: 10x10, max dimensions: 320x320)",
+          "name": "--logo-file",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "displayname",
+          "help": "set node display name",
+          "name": "--name",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "parent",
+          "help": "Parent Node Name or ID",
+          "name": "--parent",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "toggle_isolated",
+          "help": "Render node invisible",
+          "name": "--toggle-isolated",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "wipe_out",
+          "help": "wipe out node content",
+          "name": "--wipe-out",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "--force"
+          ],
+          "dest": "force",
+          "help": "do not prompt for confirmation",
+          "name": "-f",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "node",
+          "help": "Node Name or ID. Can be repeated.",
+          "name": "<node>",
+          "required": true,
+          "type": "str"
+        }
+      ],
+      "group_command": "enterprise-node",
+      "module": "keepercommander.commands.enterprise"
+    },
+    {
+      "class": "EnterpriseRoleCommand",
+      "flags": [
+        {
+          "aliases": [],
+          "dest": "add",
+          "help": "create role",
+          "name": "--add",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "cascade",
+          "help": "apply to the children nodes. 'add-admin' only",
+          "name": "--cascade",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "clone",
+          "help": "copy role with users and enforcements",
+          "name": "--clone",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "copy",
+          "help": "copy role with enforcements",
+          "name": "--copy",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "delete",
+          "help": "delete role",
+          "name": "--delete",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "enforcements",
+          "help": "sets role enforcement",
+          "name": "--enforcement",
+          "required": false,
+          "type": "append[str]"
+        },
+        {
+          "aliases": [],
+          "dest": "format",
+          "help": "output format.",
+          "name": "--format",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "name",
+          "help": "role's new name",
+          "name": "--name",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "new_user",
+          "help": "assign this role to new users. 'add' only",
+          "name": "--new-user",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "node",
+          "help": "node Name or ID",
+          "name": "--node",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "output",
+          "help": "output file name. (ignored for table format)",
+          "name": "--output",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "--add-admin"
+          ],
+          "dest": "add_admin",
+          "help": "add managed node to role",
+          "name": "-aa",
+          "required": false,
+          "type": "append[str]"
+        },
+        {
+          "aliases": [
+            "--add-privilege"
+          ],
+          "dest": "add_privilege",
+          "help": "add privilege to managed node",
+          "name": "-ap",
+          "required": false,
+          "type": "append[str]"
+        },
+        {
+          "aliases": [
+            "--add-team"
+          ],
+          "dest": "add_team",
+          "help": "add team to role",
+          "name": "-at",
+          "required": false,
+          "type": "append[str]"
+        },
+        {
+          "aliases": [
+            "--add-user"
+          ],
+          "dest": "add_user",
+          "help": "add user to role",
+          "name": "-au",
+          "required": false,
+          "type": "append[str]"
+        },
+        {
+          "aliases": [
+            "--force"
+          ],
+          "dest": "force",
+          "help": "do not prompt for confirmation",
+          "name": "-f",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "--remove-admin"
+          ],
+          "dest": "remove_admin",
+          "help": "remove managed node from role",
+          "name": "-ra",
+          "required": false,
+          "type": "append[str]"
+        },
+        {
+          "aliases": [
+            "--remove-privilege"
+          ],
+          "dest": "remove_privilege",
+          "help": "remove privilege from managed node",
+          "name": "-rp",
+          "required": false,
+          "type": "append[str]"
+        },
+        {
+          "aliases": [
+            "--remove-team"
+          ],
+          "dest": "remove_team",
+          "help": "remove team from role",
+          "name": "-rt",
+          "required": false,
+          "type": "append[str]"
+        },
+        {
+          "aliases": [
+            "--remove-user"
+          ],
+          "dest": "remove_user",
+          "help": "remove user from role",
+          "name": "-ru",
+          "required": false,
+          "type": "append[str]"
+        },
+        {
+          "aliases": [
+            "--verbose"
+          ],
+          "dest": "verbose",
+          "help": "print ids",
+          "name": "-v",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "role",
+          "help": "Role Name or ID. Can be repeated.",
+          "name": "<role>",
+          "required": true,
+          "type": "str"
+        }
+      ],
+      "group_command": "enterprise-role",
+      "module": "keepercommander.commands.enterprise"
+    },
+    {
+      "class": "EnterpriseTeamCommand",
+      "flags": [
+        {
+          "aliases": [],
+          "dest": "add",
+          "help": "create team",
+          "name": "--add",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "approve",
+          "help": "approve queued team",
+          "name": "--approve",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "delete",
+          "help": "delete team",
+          "name": "--delete",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "name",
+          "help": "team's new name",
+          "name": "--name",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "node",
+          "help": "node name or node ID",
+          "name": "--node",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "restrict_edit",
+          "help": "disable record edits",
+          "name": "--restrict-edit",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "restrict_share",
+          "help": "disable record re-shares",
+          "name": "--restrict-share",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "restrict_view",
+          "help": "disable view/copy passwords",
+          "name": "--restrict-view",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "--add-role"
+          ],
+          "dest": "add_role",
+          "help": "add user to team",
+          "name": "-ar",
+          "required": false,
+          "type": "append[str]"
+        },
+        {
+          "aliases": [
+            "--add-user"
+          ],
+          "dest": "add_user",
+          "help": "add user to team",
+          "name": "-au",
+          "required": false,
+          "type": "append[str]"
+        },
+        {
+          "aliases": [
+            "--force"
+          ],
+          "dest": "force",
+          "help": "do not prompt for confirmation",
+          "name": "-f",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "--hide-shared-folders"
+          ],
+          "dest": "hide_shared_folders",
+          "help": "User does not see shared folders. --add-user only",
+          "name": "-hsf",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "--remove-role"
+          ],
+          "dest": "remove_role",
+          "help": "remove user from team",
+          "name": "-rr",
+          "required": false,
+          "type": "append[str]"
+        },
+        {
+          "aliases": [
+            "--remove-user"
+          ],
+          "dest": "remove_user",
+          "help": "remove user from team",
+          "name": "-ru",
+          "required": false,
+          "type": "append[str]"
+        },
+        {
+          "aliases": [
+            "--verbose"
+          ],
+          "dest": "verbose",
+          "help": "print ids",
+          "name": "-v",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "team",
+          "help": "Team Name or UID",
+          "name": "<team>",
+          "required": true,
+          "type": "str"
+        }
+      ],
+      "group_command": "enterprise-team",
+      "module": "keepercommander.commands.enterprise"
+    },
+    {
+      "class": "EnterpriseUserCommand",
+      "flags": [
+        {
+          "aliases": [],
+          "dest": "add",
+          "help": "invite user. same as --invite",
+          "name": "--add",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "add_alias",
+          "help": "new email alias for a user",
+          "name": "--add-alias",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "add_role",
+          "help": "role name or role ID",
+          "name": "--add-role",
+          "required": false,
+          "type": "append[str]"
+        },
+        {
+          "aliases": [],
+          "dest": "add_team",
+          "help": "team name or team UID",
+          "name": "--add-team",
+          "required": false,
+          "type": "append[str]"
+        },
+        {
+          "aliases": [],
+          "dest": "delete",
+          "help": "delete user",
+          "name": "--delete",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "delete_alias",
+          "help": "delete email alias",
+          "name": "--delete-alias",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "disable_2fa",
+          "help": "disable 2fa for user",
+          "name": "--disable-2fa",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "expire",
+          "help": "expire master password",
+          "name": "--expire",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "extend",
+          "help": "extend vault transfer consent by 7 days. Supports the following pseudo users: @all",
+          "name": "--extend",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "invite",
+          "help": "invite user",
+          "name": "--invite",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "jobtitle",
+          "help": "set user job title",
+          "name": "--job-title",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "lock",
+          "help": "lock user",
+          "name": "--lock",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "displayname",
+          "help": "set user display name",
+          "name": "--name",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "node",
+          "help": "node name or node ID",
+          "name": "--node",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "remove_role",
+          "help": "role name or role ID",
+          "name": "--remove-role",
+          "required": false,
+          "type": "append[str]"
+        },
+        {
+          "aliases": [],
+          "dest": "remove_team",
+          "help": "team name or team UID",
+          "name": "--remove-team",
+          "required": false,
+          "type": "append[str]"
+        },
+        {
+          "aliases": [],
+          "dest": "unlock",
+          "help": "unlock user. Supports the following pseudo users: @all",
+          "name": "--unlock",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "--force"
+          ],
+          "dest": "force",
+          "help": "do not prompt for confirmation",
+          "name": "-f",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "--hide-shared-folders"
+          ],
+          "dest": "hide_shared_folders",
+          "help": "User does not see shared folders. --add-team only",
+          "name": "-hsf",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "--verbose"
+          ],
+          "dest": "verbose",
+          "help": "print ids",
+          "name": "-v",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "email",
+          "help": "User Email or ID. Can be repeated.",
+          "name": "<email>",
+          "required": true,
+          "type": "str"
+        }
+      ],
+      "group_command": "enterprise-user",
+      "module": "keepercommander.commands.enterprise"
+    },
+    {
+      "class": "RecordGetUidCommand",
+      "flags": [
+        {
+          "aliases": [],
+          "dest": "format",
+          "help": "output format",
+          "name": "--format",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "include_dag",
+          "help": "include DAG/GraphSync information in json output",
+          "name": "--include-dag",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "legacy",
+          "help": "json output: display typed records as legacy",
+          "name": "--legacy",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "unmask",
+          "help": "display hidden field content",
+          "name": "--unmask",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "uid",
+          "help": "UID or title to search for",
+          "name": "<uid>",
+          "required": true,
+          "type": "str"
+        }
+      ],
+      "group_command": "get",
+      "module": "keepercommander.commands.record"
+    },
+    {
+      "class": "RecordListSfCommand",
+      "flags": [
+        {
+          "aliases": [],
+          "dest": "format",
+          "help": "format of output",
+          "name": "--format",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "output",
+          "help": "path to resulting output file (ignored for \"table\" format)",
+          "name": "--output",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "pattern",
+          "help": "search pattern",
+          "name": "<pattern>",
+          "required": false,
+          "type": "str"
+        }
+      ],
+      "group_command": "list-sf",
+      "module": "keepercommander.commands.record"
+    },
+    {
+      "class": "FolderListCommand",
+      "flags": [
+        {
+          "aliases": [],
+          "dest": "format",
+          "help": "format of output",
+          "name": "--format",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "output",
+          "help": "path to resulting output file (ignored for \"table\" format)",
+          "name": "--output",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "--recursive"
+          ],
+          "dest": "recursive",
+          "help": "list all folders/records in subfolders",
+          "name": "-R",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "--folders"
+          ],
+          "dest": "folders_only",
+          "help": "display folders only",
+          "name": "-f",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "--list"
+          ],
+          "dest": "detail",
+          "help": "show detailed list",
+          "name": "-l",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "--records"
+          ],
+          "dest": "records_only",
+          "help": "display records only",
+          "name": "-r",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "--short"
+          ],
+          "dest": "short",
+          "help": "Do not display record details. (Not used)",
+          "name": "-s",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "--verbose"
+          ],
+          "dest": "verbose",
+          "help": "verbose output",
+          "name": "-v",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "pattern",
+          "help": "search pattern",
+          "name": "<pattern>",
+          "required": false,
+          "type": "str"
+        }
+      ],
+      "group_command": "ls",
+      "module": "keepercommander.commands.folder"
+    },
+    {
+      "class": "PAMConnectionEditCommand",
+      "flags": [
+        {
+          "aliases": [
+            "-a"
+          ],
+          "dest": "admin",
+          "help": "The record path or UID of the PAM User record to configure the admin credential on the PAM Resource",
+          "name": "--admin-user",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-c"
+          ],
+          "dest": "config",
+          "help": "The PAM Configuration UID or path to use for connections. Use command `pam config list` to view available PAM Configurations.",
+          "name": "--configuration",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-cn"
+          ],
+          "dest": "connections",
+          "help": "Set connections permissions",
+          "name": "--connections",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-cop"
+          ],
+          "dest": "connections_override_port",
+          "help": "Port to use for connections. If not provided, the port from the record will be used.",
+          "name": "--connections-override-port",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-cr"
+          ],
+          "dest": "recording",
+          "help": "Set recording connections permissions for the resource",
+          "name": "--connections-recording",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-k"
+          ],
+          "dest": "key_events",
+          "help": "Toggle Key Events settings",
+          "name": "--key-events",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-lu"
+          ],
+          "dest": "launch_user",
+          "help": "The record path or UID of the PAM User record to configure as the launch credential on the PAM Resource",
+          "name": "--launch-user",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-p"
+          ],
+          "dest": "protocol",
+          "help": "Set connection protocol",
+          "name": "--protocol",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-s"
+          ],
+          "dest": "silent",
+          "help": "Silent mode - don't print PAM User, PAM Config etc.",
+          "name": "--silent",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "-tr"
+          ],
+          "dest": "typescriptrecording",
+          "help": "Set TypeScript recording permissions for the resource",
+          "name": "--typescript-recording",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "record",
+          "help": "The record UID or path of the PAM resource record with network information to use for connections",
+          "name": "<record>",
+          "required": true,
+          "type": "str"
+        }
+      ],
+      "group_command": "pam connection edit",
+      "module": "keepercommander.commands.tunnel_and_connections"
+    },
+    {
+      "class": "PAMProjectExtendCommand",
+      "flags": [
+        {
+          "aliases": [
+            "-c"
+          ],
+          "dest": "config",
+          "help": "PAM Configuration UID or Title",
+          "name": "--config",
+          "required": true,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-d"
+          ],
+          "dest": "dry_run",
+          "help": "Test import without modifying vault.",
+          "name": "--dry-run",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "-f"
+          ],
+          "dest": "file_name",
+          "help": "File to load import data from.",
+          "name": "--filename",
+          "required": true,
+          "type": "str"
+        }
+      ],
+      "group_command": "pam project extend",
+      "module": "keepercommander.commands.pam_import.extend"
+    },
+    {
+      "class": "PAMProjectImportCommand",
+      "flags": [
+        {
+          "aliases": [
+            "-d"
+          ],
+          "dest": "dry_run",
+          "help": "Test import without modifying vault.",
+          "name": "--dry-run",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "-f"
+          ],
+          "dest": "file_name",
+          "help": "File to load import data from.",
+          "name": "--filename",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-n"
+          ],
+          "dest": "project_name",
+          "help": "Project name.",
+          "name": "--name",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-o"
+          ],
+          "dest": "output",
+          "help": "Output format (token: one-time token, config: base64/json/k8s)",
+          "name": "--output",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-s"
+          ],
+          "dest": "sample_data",
+          "help": "Generate sample data.",
+          "name": "--sample-data",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "-t"
+          ],
+          "dest": "show_template",
+          "help": "Print JSON template required for manual import.",
+          "name": "--show-template",
+          "required": false,
+          "type": "flag"
+        }
+      ],
+      "group_command": "pam project import",
+      "module": "keepercommander.commands.pam_import.edit"
+    },
+    {
+      "class": "PAMRbiEditCommand",
+      "flags": [
+        {
+          "aliases": [
+            "-cpy"
+          ],
+          "dest": "allow_copy",
+          "help": "Allow copying to clipboard (on/off/default)",
+          "name": "--allow-copy",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-p"
+          ],
+          "dest": "allow_paste",
+          "help": "Allow pasting from clipboard (on/off/default)",
+          "name": "--allow-paste",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-nav"
+          ],
+          "dest": "allow_url_navigation",
+          "help": "Allow navigation via direct URL manipulation (on/off/default)",
+          "name": "--allow-url-navigation",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-aru"
+          ],
+          "dest": "allowed_resource_urls",
+          "help": "Allowed resource URL patterns (can specify multiple times)",
+          "name": "--allowed-resource-urls",
+          "required": false,
+          "type": "append[str]"
+        },
+        {
+          "aliases": [
+            "-au"
+          ],
+          "dest": "allowed_urls",
+          "help": "Allowed URL patterns (can specify multiple times)",
+          "name": "--allowed-urls",
+          "required": false,
+          "type": "append[str]"
+        },
+        {
+          "aliases": [
+            "-bd"
+          ],
+          "dest": "audio_bit_depth",
+          "help": "Audio bit depth (8 or 16)",
+          "name": "--audio-bit-depth",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "aliases": [
+            "-ac"
+          ],
+          "dest": "audio_channels",
+          "help": "Number of audio channels (e.g., 1 for mono, 2 for stereo)",
+          "name": "--audio-channels",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "aliases": [
+            "-sr"
+          ],
+          "dest": "audio_sample_rate",
+          "help": "Audio sample rate in Hz (e.g., 44100, 48000)",
+          "name": "--audio-sample-rate",
+          "required": false,
+          "type": "int"
+        },
+        {
+          "aliases": [
+            "-a"
+          ],
+          "dest": "autofill",
+          "help": "The record UID or path of the RBI Autofill Credentials record.",
+          "name": "--autofill-credentials",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-at"
+          ],
+          "dest": "autofill_targets",
+          "help": "Autofill target selectors (can specify multiple times)",
+          "name": "--autofill-targets",
+          "required": false,
+          "type": "append[str]"
+        },
+        {
+          "aliases": [
+            "-c"
+          ],
+          "dest": "config",
+          "help": "The PAM Configuration UID or path to use for connections. Use command `pam config list` to view available PAM Configurations.",
+          "name": "--configuration",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-cr"
+          ],
+          "dest": "recording",
+          "help": "Set recording connections permissions for the resource",
+          "name": "--connections-recording",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-da"
+          ],
+          "dest": "disable_audio",
+          "help": "Disable audio for RBI sessions (on/off/default)",
+          "name": "--disable-audio",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-isc"
+          ],
+          "dest": "ignore_server_cert",
+          "help": "Ignore server certificate errors (on/off/default)",
+          "name": "--ignore-server-cert",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-k"
+          ],
+          "dest": "key_events",
+          "help": "Toggle Key Events settings",
+          "name": "--key-events",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-r"
+          ],
+          "dest": "record",
+          "help": "The record UID or path of the RBI record.",
+          "name": "--record",
+          "required": true,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-rbi"
+          ],
+          "dest": "rbi",
+          "help": "Set RBI permissions",
+          "name": "--remote-browser-isolation",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "-s"
+          ],
+          "dest": "silent",
+          "help": "Silent mode - don't print PAM User, PAM Config etc.",
+          "name": "--silent",
+          "required": false,
+          "type": "flag"
+        }
+      ],
+      "group_command": "pam rbi edit",
+      "module": "keepercommander.commands.tunnel_and_connections"
+    },
+    {
+      "class": "RecordAddCommand",
+      "flags": [
+        {
+          "aliases": [],
+          "dest": "email_config",
+          "help": "Email configuration name to use for sending (required with --send-email)",
+          "name": "--email-config",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "email_message",
+          "help": "Custom message to include in onboarding email",
+          "name": "--email-message",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "folder",
+          "help": "folder name or UID to store record",
+          "name": "--folder",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "pam_config",
+          "help": "PAM configuration UID or name to sync password to cloud provider (Azure AD, AWS IAM)",
+          "name": "--pam-config",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "self_destruct",
+          "help": "Time period record share URL is valid. The record will be deleted in your vault in 5 minutes since open",
+          "name": "--self-destruct",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "send_email",
+          "help": "Email address to send onboarding email with share URL (requires --self-destruct)",
+          "name": "--send-email",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "syntax_help",
+          "help": "Display help on field parameters.",
+          "name": "--syntax-help",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "--force"
+          ],
+          "dest": "force",
+          "help": "ignore warnings",
+          "name": "-f",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "--notes"
+          ],
+          "dest": "notes",
+          "help": "record notes",
+          "name": "-n",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "--record-type"
+          ],
+          "dest": "record_type",
+          "help": "record type",
+          "name": "-rt",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "--title"
+          ],
+          "dest": "title",
+          "help": "record title",
+          "name": "-t",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "fields",
+          "help": "load record type data from strings with dot notation",
+          "name": "<fields>",
+          "required": false,
+          "type": "str"
+        }
+      ],
+      "group_command": "record-add",
+      "module": "keepercommander.commands.record_edit"
+    },
+    {
+      "class": "RecordUpdateCommand",
+      "flags": [
+        {
+          "aliases": [],
+          "dest": "syntax_help",
+          "help": "Display help on field parameters.",
+          "name": "--syntax-help",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "--force"
+          ],
+          "dest": "force",
+          "help": "ignore warnings",
+          "name": "-f",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "--notes"
+          ],
+          "dest": "notes",
+          "help": "append/modify record notes",
+          "name": "-n",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "--record"
+          ],
+          "dest": "record",
+          "help": "record path or UID",
+          "name": "-r",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "--record-type"
+          ],
+          "dest": "record_type",
+          "help": "record type",
+          "name": "-rt",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "--title"
+          ],
+          "dest": "title",
+          "help": "modify record title",
+          "name": "-t",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "fields",
+          "help": "load record type data from strings with dot notation",
+          "name": "<fields>",
+          "required": false,
+          "type": "str"
+        }
+      ],
+      "group_command": "record-update",
+      "module": "keepercommander.commands.record_edit"
+    },
+    {
+      "class": "SearchCommand",
+      "flags": [
+        {
+          "aliases": [],
+          "dest": "format",
+          "help": "output format",
+          "name": "--format",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [],
+          "dest": "regex",
+          "help": "treat pattern as a regular expression instead of space-separated search terms",
+          "name": "--regex",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [
+            "--categories"
+          ],
+          "dest": "categories",
+          "help": "One or more of these letters for categories to search: \"r\" = records, \"s\" = shared folders, \"t\" = teams",
+          "name": "-c",
+          "required": false,
+          "type": "str"
+        },
+        {
+          "aliases": [
+            "--verbose"
+          ],
+          "dest": "verbose",
+          "help": "verbose output",
+          "name": "-v",
+          "required": false,
+          "type": "flag"
+        },
+        {
+          "aliases": [],
+          "dest": "pattern",
+          "help": "search terms (space-separated, order independent)",
+          "name": "<pattern>",
+          "required": false,
+          "type": "str"
+        }
+      ],
+      "group_command": "search",
+      "module": "keepercommander.commands.record"
+    }
+  ],
+  "enforcements": [
+    {
+      "category": "ACCOUNT_ENFORCEMENTS",
+      "id": 226,
+      "name": "ALLOW_CONFIGURE_ROTATION_SETTINGS",
+      "type": "BOOLEAN"
+    },
+    {
+      "category": "ACCOUNT_ENFORCEMENTS",
+      "id": 219,
+      "name": "ALLOW_PAM_DISCOVERY",
+      "type": "BOOLEAN"
+    },
+    {
+      "category": "ACCOUNT_ENFORCEMENTS",
+      "id": 225,
+      "name": "ALLOW_PAM_GATEWAY",
+      "type": "BOOLEAN"
+    },
+    {
+      "category": "ACCOUNT_ENFORCEMENTS",
+      "id": 218,
+      "name": "ALLOW_PAM_ROTATION",
+      "type": "BOOLEAN"
+    },
+    {
+      "category": "ACCOUNT_ENFORCEMENTS",
+      "id": 227,
+      "name": "ALLOW_ROTATE_CREDENTIALS",
+      "type": "BOOLEAN"
+    },
+    {
+      "category": "VAULT_FEATURES",
+      "id": 212,
+      "name": "ALLOW_SECRETS_MANAGER",
+      "type": "BOOLEAN"
+    }
+  ],
+  "generated_at": "2026-04-29T11:11:41+00:00",
+  "groups": [
+    {
+      "class": "AutomatorCommand",
+      "group": "automator",
+      "subcommands": [
+        {
+          "class": "AutomatorCertificateCommand",
+          "help": "Display certificate information.",
+          "module": "keepercommander.commands.automator",
+          "name": "certificate"
+        },
+        {
+          "class": "AutomatorCreateCommand",
+          "help": "Creates automator endpoint.",
+          "module": "keepercommander.commands.automator",
+          "name": "create"
+        },
+        {
+          "class": "AutomatorDeleteCommand",
+          "help": "Deletes automator.",
+          "module": "keepercommander.commands.automator",
+          "name": "delete"
+        },
+        {
+          "class": "AutomatorActionCommand",
+          "help": "Disables automator.",
+          "module": "keepercommander.commands.automator",
+          "name": "disable"
+        },
+        {
+          "class": "AutomatorEditCommand",
+          "help": "Changes automator configuration.",
+          "module": "keepercommander.commands.automator",
+          "name": "edit"
+        },
+        {
+          "class": "AutomatorActionCommand",
+          "help": "Enables automator.",
+          "module": "keepercommander.commands.automator",
+          "name": "enable"
+        },
+        {
+          "class": "AutomatorActionCommand",
+          "help": "Initializes automator.",
+          "module": "keepercommander.commands.automator",
+          "name": "init"
+        },
+        {
+          "class": "AutomatorListCommand",
+          "help": "Displays a list of available automators.",
+          "module": "keepercommander.commands.automator",
+          "name": "list"
+        },
+        {
+          "class": "AutomatorLogCommand",
+          "help": "Retrieves automator logs.",
+          "module": "keepercommander.commands.automator",
+          "name": "log"
+        },
+        {
+          "class": "AutomatorLogCommand",
+          "help": "Clears automator logs.",
+          "module": "keepercommander.commands.automator",
+          "name": "log-clear"
+        },
+        {
+          "class": "AutomatorActionCommand",
+          "help": "Resets automator configuration to the default values.",
+          "module": "keepercommander.commands.automator",
+          "name": "reset"
+        },
+        {
+          "class": "AutomatorSetupCommand",
+          "help": "Sets up automator.",
+          "module": "keepercommander.commands.automator",
+          "name": "setup"
+        },
+        {
+          "class": "AutomatorViewCommand",
+          "help": "Prints automator details.",
+          "module": "keepercommander.commands.automator",
+          "name": "view"
+        }
+      ]
+    },
+    {
+      "class": "PAMProjectCommand",
+      "group": "pam project",
+      "subcommands": [
+        {
+          "class": "PAMProjectExtendCommand",
+          "help": "Extend PAM Project by importing additional data",
+          "module": "keepercommander.commands.pam_import.extend",
+          "name": "extend"
+        },
+        {
+          "class": "PAMProjectImportCommand",
+          "help": "Import PAM Project",
+          "module": "keepercommander.commands.pam_import.edit",
+          "name": "import"
+        }
+      ]
+    },
+    {
+      "class": "PAMRbiCommand",
+      "group": "pam rbi",
+      "subcommands": [
+        {
+          "class": "PAMRbiEditCommand",
+          "help": "Edit Remote Browser Isolation settings",
+          "module": "keepercommander.commands.tunnel_and_connections",
+          "name": "edit"
+        }
+      ]
+    },
+    {
+      "class": "ScimCommand",
+      "group": "scim",
+      "subcommands": [
+        {
+          "class": "ScimCreateCommand",
+          "help": "Create SCIM endpoint.",
+          "module": "keepercommander.commands.scim",
+          "name": "create"
+        },
+        {
+          "class": "ScimDeleteCommand",
+          "help": "Delete SCIM endpoint.",
+          "module": "keepercommander.commands.scim",
+          "name": "delete"
+        },
+        {
+          "class": "ScimEditCommand",
+          "help": "Edit SCIM endpoint.",
+          "module": "keepercommander.commands.scim",
+          "name": "edit"
+        },
+        {
+          "class": "ScimListCommand",
+          "help": "Display a list of available SCIM endpoints.",
+          "module": "keepercommander.commands.scim",
+          "name": "list"
+        },
+        {
+          "class": "ScimPushCommand",
+          "help": "Push data to SCIM endpoint.",
+          "module": "keepercommander.commands.scim",
+          "name": "push"
+        },
+        {
+          "class": "ScimViewCommand",
+          "help": "Display a SCIM endpoint details.",
+          "module": "keepercommander.commands.scim",
+          "name": "view"
+        }
+      ]
+    },
+    {
+      "class": "TrashCommand",
+      "group": "trash",
+      "subcommands": [
+        {
+          "class": "TrashGetCommand",
+          "help": "Get the details of a deleted record",
+          "module": "keepercommander.commands.record",
+          "name": "get"
+        },
+        {
+          "class": "TrashListCommand",
+          "help": "Displays a list of deleted records",
+          "module": "keepercommander.commands.record",
+          "name": "list"
+        },
+        {
+          "class": "TrashPurgeCommand",
+          "help": "Removes all deleted records from the trash bin",
+          "module": "keepercommander.commands.record",
+          "name": "purge"
+        },
+        {
+          "class": "TrashRestoreCommand",
+          "help": "Restores deleted records",
+          "module": "keepercommander.commands.record",
+          "name": "restore"
+        },
+        {
+          "class": "TrashUnshareCommand",
+          "help": "Remove shares from deleted records",
+          "module": "keepercommander.commands.record",
+          "name": "unshare"
+        }
+      ]
+    }
+  ],
+  "record_types": {
+    "login": {
+      "pam_settings": {
+        "connection": [],
+        "options": [],
+        "port_forward": []
+      },
+      "top_level_keys": [
+        "pam_data"
+      ]
+    },
+    "pamDatabase": {
+      "pam_settings": {
+        "connection": [],
+        "options": [],
+        "port_forward": []
+      },
+      "top_level_keys": [
+        "pam_data"
+      ]
+    },
+    "pamDirectory": {
+      "pam_settings": {
+        "connection": [],
+        "options": [],
+        "port_forward": []
+      },
+      "top_level_keys": [
+        "pam_data"
+      ]
+    },
+    "pamMachine": {
+      "pam_settings": {
+        "connection": [
+          "administrative_credentials",
+          "allow_supply_user",
+          "ca_certificate",
+          "client_certificate",
+          "client_key",
+          "color_scheme",
+          "command",
+          "container",
+          "destination_host",
+          "destination_port",
+          "disable_audio",
+          "disable_authentication",
+          "disable_copy",
+          "disable_dynamic_resizing",
+          "disable_paste",
+          "enable_full_window_drag",
+          "enable_wallpaper",
+          "font_size",
+          "ignore_server_cert",
+          "launch_credentials",
+          "load_balance_info",
+          "login_failure_regex",
+          "login_success_regex",
+          "namespace",
+          "password_regex",
+          "pod_name",
+          "port",
+          "preconnection_blob",
+          "preconnection_id",
+          "protocol",
+          "public_host_key",
+          "recording_include_keys",
+          "security",
+          "sftp",
+          "username_regex"
+        ],
+        "options": [
+          "ai_settings",
+          "ai_terminate_session_on_detection",
+          "ai_threat_detection",
+          "connections",
+          "graphical_session_recording",
+          "jit_settings",
+          "remote_browser_isolation",
+          "rotation",
+          "text_session_recording",
+          "tunneling"
+        ],
+        "port_forward": [
+          "port",
+          "reuse_port"
+        ]
+      },
+      "top_level_keys": [
+        "attachments",
+        "host",
+        "instance_id",
+        "instance_name",
+        "notes",
+        "operating_system",
+        "otp",
+        "pam_settings",
+        "port",
+        "provider_group",
+        "provider_region",
+        "scripts",
+        "ssl_verification",
+        "title",
+        "type"
+      ]
+    },
+    "pamRemoteBrowser": {
+      "pam_settings": {
+        "connection": [],
+        "options": [],
+        "port_forward": []
+      },
+      "top_level_keys": [
+        "pam_data"
+      ]
+    },
+    "pamUser": {
+      "pam_settings": {
+        "connection": [],
+        "options": [],
+        "port_forward": []
+      },
+      "top_level_keys": [
+        "pam_data"
+      ]
+    }
+  }
+}

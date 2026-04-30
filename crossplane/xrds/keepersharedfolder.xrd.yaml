@@ -1,0 +1,69 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: keepersharedfolders.keeper.dsk.io
+  annotations:
+    dsk.keeper.io/status: preview-gated
+    dsk.keeper.io/maps-to: keeper-vault-sharing.v1 shared_folders[]
+spec:
+  group: keeper.dsk.io
+  names:
+    kind: KeeperSharedFolder
+    plural: keepersharedfolders
+  versions:
+    - name: v1alpha1
+      served: true
+      referenceable: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          description: Preview XRD for a Keeper shared folder reconciled by DSK.
+          properties:
+            spec:
+              type: object
+              properties:
+                parameters:
+                  type: object
+                  required:
+                    - uidRef
+                    - path
+                  properties:
+                    uidRef:
+                      type: string
+                      minLength: 1
+                      description: Maps to keeper-vault-sharing.v1 shared_folders[].uid_ref.
+                    path:
+                      type: string
+                      minLength: 1
+                      description: Maps to keeper-vault-sharing.v1 shared_folders[].path.
+                    defaults:
+                      type: object
+                      description: Optional shared folder default permissions.
+                      properties:
+                        manageUsers:
+                          type: boolean
+                        manageRecords:
+                          type: boolean
+                        canEdit:
+                          type: boolean
+                        canShare:
+                          type: boolean
+              required:
+                - parameters
+            status:
+              type: object
+              properties:
+                keeperUid:
+                  type: string
+                observedGeneration:
+                  type: integer
+                  format: int64
+                manifestFamily:
+                  type: string
+                  enum:
+                    - keeper-vault-sharing.v1
+                conditions:
+                  type: array
+                  x-kubernetes-preserve-unknown-fields: true
+                  items:
+                    type: object

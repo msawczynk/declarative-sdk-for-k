@@ -1,0 +1,48 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: keeperrecord.dsk-cli
+  labels:
+    crossplane.io/xrd: keeperrecords.keeper.dsk.io
+  annotations:
+    dsk.keeper.io/status: preview-gated
+    dsk.keeper.io/reconciler: dsk-cli
+spec:
+  compositeTypeRef:
+    apiVersion: keeper.dsk.io/v1alpha1
+    kind: KeeperRecord
+  mode: Pipeline
+  pipeline:
+    - step: reconcile-with-dsk
+      functionRef:
+        name: function-dsk-cli
+      input:
+        apiVersion: dsk.keeper.io/v1alpha1
+        kind: DskCliReconcile
+        spec:
+          preview: true
+          command: dsk
+          lifecycle:
+            observe: plan
+            create: apply
+            update: apply
+            delete: apply --allow-delete
+          manifestTemplate:
+            schema: keeper-vault.v1
+            records:
+              - uid_ref: "$(spec.parameters.uidRef)"
+                type: login
+                title: "$(spec.parameters.title)"
+                folder_ref: "$(spec.parameters.folderRef)"
+                notes: "$(spec.parameters.notes)"
+                fields:
+                  - type: login
+                    value:
+                      - "$(spec.parameters.login)"
+                  - type: password
+                    value:
+                      - "$(secrets.passwordSecretRef)"
+                  - type: url
+                    value:
+                      - "$(spec.parameters.url)"
+                custom: "$(spec.parameters.custom)"

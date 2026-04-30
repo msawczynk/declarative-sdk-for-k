@@ -1,0 +1,66 @@
+# State files (contain UIDs, environment-specific)
+.keeper-sdk-state.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Live smoke logs (operator-side; never commit)
+.smoke-runs/
+.live-smoke/
+.dsk-smoke-locks/
+# Raw transcript artefacts before they are reviewed and promoted into
+# docs/live-proof/. Keep raw outputs out of git; only the sanitized,
+# pin-stamped copy under docs/live-proof/ is committed.
+evidence/
+
+# Codex CLI worker scratch dirs (operator-side; never commit)
+# Workers occasionally write run artefacts here; keep them out of the SDK delivery.
+.codex-runs/
+
+# Daybook orchestration content that does NOT belong in the SDK delivery.
+# Workers have repeatedly leaked these files into the repo despite explicit
+# prompts; ignoring them by default makes scope leaks self-healing.
+WORKTREES.md
+scripts/agent/
+# If copied to repo root by mistake (canonical: ~/Downloads + daybook sync).
+/JOURNAL.md
+/LESSONS.md
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Operator-private — never publish
+AUDIT.md
+REVIEW.md
+RECONCILIATION.md
+docs/DSK_NEXT_WORK.md
+docs/SDK_DA_COMPLETION_PLAN.md
+docs/SDK_COMPLETION_PLAN.md
+docs/V2_DECISIONS.md
+scripts/rocky/
+scripts/daybook/
+scripts/dsk_orchestrator_loop.sh
+scripts/dsk_wave_next.sh
+.live-smoke/

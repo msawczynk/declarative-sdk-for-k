@@ -1,0 +1,162 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://keeper.io/sdk/schemas/keeper-siem/keeper-siem.v1.schema.json",
+  "title": "keeper-siem.v1",
+  "description": "Declarative schema for Keeper audit event streaming configuration to SIEM and object-storage targets. This family validates event sinks and routing intent offline; plan and apply remain an upstream gap until Keeper exposes supported SIEM configuration writer/discover hooks.",
+  "x-keeper-live-proof": {
+    "status": "upstream-gap",
+    "evidence": "docs/SIEM_INTEGRATION.md",
+    "since_pin": "6574827cf2993d2a54484516c2f4cc33238f98c9",
+    "notes": "Offline schema/model/diff only; no Commander SIEM event streaming writer/discover hook is modeled."
+  },
+  "type": "object",
+  "required": [
+    "schema"
+  ],
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "keeper-siem.v1"
+    },
+    "name": {
+      "$ref": "#/$defs/non_empty_string"
+    },
+    "manager": {
+      "$ref": "#/$defs/non_empty_string"
+    },
+    "sinks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/sink"
+      },
+      "default": []
+    },
+    "routes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/route"
+      },
+      "default": []
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "uid_ref": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "non_empty_string": {
+      "type": "string",
+      "minLength": 1
+    },
+    "vault_record_ref": {
+      "type": "string",
+      "pattern": "^keeper-vault:records:[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ]
+    },
+    "filter": {
+      "type": "object",
+      "required": [],
+      "properties": {
+        "event_types": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/non_empty_string"
+          },
+          "uniqueItems": true,
+          "default": []
+        },
+        "severity_min": {
+          "$ref": "#/$defs/severity"
+        }
+      },
+      "additionalProperties": false
+    },
+    "sink": {
+      "type": "object",
+      "required": [
+        "uid_ref",
+        "name",
+        "type",
+        "endpoint"
+      ],
+      "properties": {
+        "uid_ref": {
+          "$ref": "#/$defs/uid_ref"
+        },
+        "name": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "splunk",
+            "datadog",
+            "elk",
+            "webhook",
+            "s3"
+          ]
+        },
+        "endpoint": {
+          "$ref": "#/$defs/non_empty_string"
+        },
+        "token": {
+          "$ref": "#/$defs/vault_record_ref"
+        },
+        "filter": {
+          "$ref": "#/$defs/filter"
+        },
+        "batch_size": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 500
+        },
+        "flush_interval_sec": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 30
+        }
+      },
+      "additionalProperties": false
+    },
+    "route": {
+      "type": "object",
+      "required": [
+        "uid_ref",
+        "event_type_patterns",
+        "sink_uid_refs"
+      ],
+      "properties": {
+        "uid_ref": {
+          "$ref": "#/$defs/uid_ref"
+        },
+        "event_type_patterns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/non_empty_string"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "sink_uid_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/uid_ref"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

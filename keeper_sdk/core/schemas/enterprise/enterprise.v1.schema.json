@@ -1,0 +1,216 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/msawczynk/declarative-sdk-for-k/schemas/enterprise/v1.json",
+  "title": "keeper-enterprise.v1",
+  "description": "Enterprise declarative manifest v1 for offline modeling of nodes, users, roles, teams, role enforcements, and user aliases. The schema, typed loader, graph, and diff are supported offline; online validate and provider apply remain future slices.",
+  "x-keeper-live-proof": {
+    "status": "preview-gated",
+    "evidence": "pending",
+    "since_pin": "89047920a0df857e01fb59adcb0bfb9fa6db70bf",
+    "notes": "P11 offline foundation: JSON Schema + typed models + uid_ref graph + field-level diff. Commander validate --online and apply are not supported until a live discovery/write contract lands."
+  },
+  "type": "object",
+  "required": ["schema"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "keeper-enterprise.v1"
+    },
+    "nodes": {
+      "type": "array",
+      "default": [],
+      "items": { "$ref": "#/$defs/node" }
+    },
+    "users": {
+      "type": "array",
+      "default": [],
+      "items": { "$ref": "#/$defs/user" }
+    },
+    "roles": {
+      "type": "array",
+      "default": [],
+      "items": { "$ref": "#/$defs/role" }
+    },
+    "teams": {
+      "type": "array",
+      "default": [],
+      "items": { "$ref": "#/$defs/team" }
+    },
+    "enforcements": {
+      "type": "array",
+      "default": [],
+      "items": { "$ref": "#/$defs/enforcement" }
+    },
+    "aliases": {
+      "type": "array",
+      "default": [],
+      "items": { "$ref": "#/$defs/alias" }
+    }
+  },
+  "$defs": {
+    "uid_ref": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "node_ref": {
+      "type": "string",
+      "pattern": "^keeper-enterprise:nodes:[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "user_ref": {
+      "type": "string",
+      "pattern": "^keeper-enterprise:users:[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "role_ref": {
+      "type": "string",
+      "pattern": "^keeper-enterprise:roles:[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "scalar": {
+      "type": ["string", "number", "integer", "boolean", "null"]
+    },
+    "enforcement_value": {
+      "oneOf": [
+        { "$ref": "#/$defs/scalar" },
+        {
+          "type": "array",
+          "items": { "$ref": "#/$defs/scalar" }
+        },
+        {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/scalar" }
+        }
+      ]
+    },
+    "node": {
+      "type": "object",
+      "required": ["uid_ref", "name"],
+      "additionalProperties": false,
+      "properties": {
+        "uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parent_uid_ref": { "$ref": "#/$defs/node_ref" }
+      }
+    },
+    "user": {
+      "type": "object",
+      "required": ["uid_ref", "email"],
+      "additionalProperties": false,
+      "properties": {
+        "uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "minLength": 3
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "node_uid_ref": { "$ref": "#/$defs/node_ref" },
+        "status": {
+          "type": "string",
+          "enum": ["active", "invited", "disabled", "locked"],
+          "default": "active"
+        },
+        "lock_status": {
+          "type": "string",
+          "enum": ["locked", "unlocked"]
+        },
+        "pending_approval": {
+          "type": "boolean"
+        }
+      }
+    },
+    "role": {
+      "type": "object",
+      "required": ["uid_ref", "name", "node_uid_ref"],
+      "additionalProperties": false,
+      "properties": {
+        "uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "node_uid_ref": { "$ref": "#/$defs/node_ref" },
+        "user_uid_refs": {
+          "type": "array",
+          "default": [],
+          "items": { "$ref": "#/$defs/user_ref" }
+        },
+        "visible_below": {
+          "type": "boolean"
+        },
+        "new_user_inherit": {
+          "type": "boolean"
+        },
+        "manage_nodes": {
+          "type": "boolean"
+        }
+      }
+    },
+    "team": {
+      "type": "object",
+      "required": ["uid_ref", "name", "node_uid_ref"],
+      "additionalProperties": false,
+      "properties": {
+        "uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "node_uid_ref": { "$ref": "#/$defs/node_ref" },
+        "user_uid_refs": {
+          "type": "array",
+          "default": [],
+          "items": { "$ref": "#/$defs/user_ref" }
+        },
+        "role_uid_refs": {
+          "type": "array",
+          "default": [],
+          "items": { "$ref": "#/$defs/role_ref" }
+        },
+        "restrict_edit": {
+          "type": "boolean"
+        },
+        "restrict_share": {
+          "type": "boolean"
+        },
+        "restrict_view": {
+          "type": "boolean"
+        }
+      }
+    },
+    "enforcement": {
+      "type": "object",
+      "required": ["uid_ref", "role_uid_ref", "key", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "role_uid_ref": { "$ref": "#/$defs/role_ref" },
+        "key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value": { "$ref": "#/$defs/enforcement_value" }
+      }
+    },
+    "alias": {
+      "type": "object",
+      "required": ["uid_ref", "user_uid_ref", "email"],
+      "additionalProperties": false,
+      "properties": {
+        "uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "user_uid_ref": { "$ref": "#/$defs/user_ref" },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "minLength": 3
+        }
+      }
+    }
+  }
+}

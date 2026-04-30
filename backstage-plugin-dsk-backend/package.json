@@ -1,0 +1,32 @@
+{
+  "name": "@internal/plugin-dsk-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Backstage backend plugin for running DSK plan requests.",
+  "main": "dist/index.cjs.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "backstage-cli package build",
+    "lint": "backstage-cli package lint",
+    "test": "backstage-cli package test",
+    "clean": "backstage-cli package clean"
+  },
+  "dependencies": {
+    "@backstage/backend-plugin-api": "workspace:^",
+    "@backstage/config": "workspace:^",
+    "express": "workspace:^",
+    "express-promise-router": "workspace:^"
+  },
+  "devDependencies": {
+    "@backstage/cli": "workspace:^",
+    "@types/express": "workspace:^",
+    "@types/node": "workspace:^",
+    "typescript": "workspace:^"
+  },
+  "backstage": {
+    "role": "backend-plugin"
+  }
+}

@@ -1,0 +1,60 @@
+# Minimal PAM env for `tests/test_diff.py` — single `pamDatabase` + `pam_settings` overlay.
+version: "1"
+name: acme-pamdb-overlay
+
+projects:
+  - uid_ref: acme-p
+    project: "P"
+
+shared_folders:
+  users:
+    uid_ref: acme-sf-users
+    manage_users: true
+    manage_records: true
+    can_edit: true
+    can_share: true
+  resources:
+    uid_ref: acme-sf-resources
+    manage_users: true
+    manage_records: true
+    can_edit: true
+    can_share: true
+
+gateways:
+  - uid_ref: acme-gw
+    name: "G"
+    mode: reference_existing
+
+pam_configurations:
+  - uid_ref: acme-cfg
+    environment: local
+    title: "Cfg"
+    gateway_uid_ref: acme-gw
+    options:
+      connections: "on"
+      rotation: "on"
+    network_id: n
+    network_cidr: 10.0.0.0/24
+
+resources:
+  - uid_ref: acme-mysql-1
+    type: pamDatabase
+    title: "mysql-1"
+    pam_configuration_uid_ref: acme-cfg
+    shared_folder: resources
+    database_type: mysql
+    host: 10.0.0.1
+    port: "3306"
+    use_ssl: true
+    pam_settings:
+      options:
+        rotation: "on"
+        connections: "on"
+        tunneling: "on"
+      port_forward:
+        port: "33306"
+        reuse_port: true
+      connection:
+        protocol: mysql
+        port: "3306"
+    users: []

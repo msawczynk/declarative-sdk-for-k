@@ -1,0 +1,39 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: keepersharedfolder.dsk-cli
+  labels:
+    crossplane.io/xrd: keepersharedfolders.keeper.dsk.io
+  annotations:
+    dsk.keeper.io/status: preview-gated
+    dsk.keeper.io/reconciler: dsk-cli
+spec:
+  compositeTypeRef:
+    apiVersion: keeper.dsk.io/v1alpha1
+    kind: KeeperSharedFolder
+  mode: Pipeline
+  pipeline:
+    - step: reconcile-with-dsk
+      functionRef:
+        name: function-dsk-cli
+      input:
+        apiVersion: dsk.keeper.io/v1alpha1
+        kind: DskCliReconcile
+        spec:
+          preview: true
+          command: dsk
+          lifecycle:
+            observe: plan
+            create: apply
+            update: apply
+            delete: apply --allow-delete
+          manifestTemplate:
+            schema: keeper-vault-sharing.v1
+            shared_folders:
+              - uid_ref: "$(spec.parameters.uidRef)"
+                path: "$(spec.parameters.path)"
+                defaults:
+                  manage_users: "$(spec.parameters.defaults.manageUsers)"
+                  manage_records: "$(spec.parameters.defaults.manageRecords)"
+                  can_edit: "$(spec.parameters.defaults.canEdit)"
+                  can_share: "$(spec.parameters.defaults.canShare)"

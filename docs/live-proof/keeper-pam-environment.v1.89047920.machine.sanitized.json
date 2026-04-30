@@ -1,0 +1,74 @@
+{
+  "commander_pin_abbrev": "89047920",
+  "commander_version": "17.2.13",
+  "events": [
+    {
+      "event": "auth_source_preflight",
+      "result": "ok",
+      "server": "keepersecurity.com",
+      "source_config_basename": "commander-config.json",
+      "tenant_hash": "67758afb"
+    },
+    {
+      "event": "live_smoke_invocation",
+      "exit_code": 0,
+      "provider": "commander",
+      "raw_log_basename": "pam-machine-l1a-raw-20260427T074933Z.log",
+      "result": "ok"
+    },
+    {
+      "event": "validate",
+      "manifest_family": "pam-environment.v1",
+      "result": "ok"
+    },
+    {
+      "event": "plan_initial",
+      "expected_exit_code": 2,
+      "result": "creates_present"
+    },
+    {
+      "event": "apply",
+      "expected_records": 2,
+      "resource_type": "pamMachine",
+      "result": "ok"
+    },
+    {
+      "event": "discover_verify",
+      "marker_manager": "keeper-pam-declarative",
+      "result": "ok"
+    },
+    {
+      "event": "replan",
+      "expected_exit_code": 0,
+      "result": "clean"
+    },
+    {
+      "event": "destroy_plan",
+      "expected_exit_code": 2,
+      "result": "deletes_present"
+    },
+    {
+      "event": "destroy_apply",
+      "result": "ok"
+    },
+    {
+      "event": "rediscover_empty",
+      "result": "clean"
+    },
+    {
+      "event": "sanitization",
+      "leak_check": "keeper_sdk.cli._live.transcript.secret_leak_check",
+      "result": "ok"
+    }
+  ],
+  "family": "keeper-pam-environment.v1",
+  "generated_at": "2026-04-27T07:53:56Z",
+  "notes": [
+    "Wave2 L1a live pass: pamMachine smoke ran validate -> plan -> apply -> re-discover -> clean re-plan -> destroy through the committed smoke harness.",
+    "No in-run self-fix was needed."
+  ],
+  "scenario": "pamMachine",
+  "smoke_final_line": "SMOKE PASSED: create->verify->destroy cycle clean",
+  "tenant_hash": "67758afb",
+  "worktree_head": "535e03f"
+}

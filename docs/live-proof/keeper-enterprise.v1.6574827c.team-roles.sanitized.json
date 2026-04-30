@@ -1,0 +1,77 @@
+{
+  "schema": "dsk-live-proof.v1",
+  "family": "keeper-enterprise.v1",
+  "surface": "team-role-reports",
+  "date": "2026-04-29",
+  "commander_pin": "6574827cf2993d2a54484516c2f4cc33238f98c9",
+  "preflight": {
+    "command": "bash ~/.cursor-daybook-sync/scripts/ksm_login_preflight.sh",
+    "exit_code": 0,
+    "summary": "ksm helper present; configured record resolvable"
+  },
+  "enterprise_info": {
+    "unqualified_format_json": {
+      "argv": "keeper enterprise-info --format json",
+      "exit_code": 0,
+      "stdout_shape": "tree",
+      "json_parse": "error"
+    },
+    "team_selector": {
+      "argv": "keeper enterprise-info -t -v --format json --columns node,user_count,users,role_count,roles",
+      "exit_code": 0,
+      "row_count": 1,
+      "first_row_keys": [
+        "team_uid",
+        "name",
+        "node",
+        "user_count",
+        "users",
+        "role_count",
+        "roles"
+      ]
+    },
+    "role_selector": {
+      "argv": "keeper enterprise-info -r -v --format json --columns node,user_count,users,team_count,teams",
+      "exit_code": 0,
+      "row_count": 7,
+      "first_row_keys": [
+        "role_id",
+        "name",
+        "node",
+        "user_count",
+        "users",
+        "team_count",
+        "teams"
+      ]
+    }
+  },
+  "dsk_reports": {
+    "team_roles": {
+      "argv": "python3 -m keeper_sdk.cli.main report team-roles",
+      "exit_code": 0,
+      "team_count": 1,
+      "role_count": 7,
+      "row_count": 8
+    },
+    "team_report": {
+      "argv": "python3 -m keeper_sdk.cli.main report team-report --sanitize-uids --quiet",
+      "exit_code": 0,
+      "row_count": 1
+    },
+    "role_report": {
+      "argv": "python3 -m keeper_sdk.cli.main report role-report --sanitize-uids --quiet",
+      "exit_code": 0,
+      "row_count": 7
+    }
+  },
+  "classification": {
+    "team_role_data": "present",
+    "team_role": "supported_read_only",
+    "notes": "SDK report wiring is present and returned live Commander rows. This does not imply team/role mutation or ownership-marker support."
+  },
+  "redaction": {
+    "users": "omitted from artifact",
+    "uids": "omitted or summarized",
+    "secrets": "not captured"
+  }
+}

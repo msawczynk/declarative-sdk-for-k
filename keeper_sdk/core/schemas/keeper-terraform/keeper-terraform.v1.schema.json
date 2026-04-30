@@ -1,0 +1,69 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/msawczynk/declarative-sdk-for-k/schemas/keeper-terraform/keeper-terraform.v1.schema.json",
+  "title": "keeper-terraform.v1",
+  "description": "Offline integration manifest that records how Keeper Terraform provider resource types map to DSK manifest families. This is a coordination schema only: it documents ownership boundaries and migration direction, but DSK does not plan or apply Terraform resources.",
+  "x-keeper-live-proof": {
+    "status": "upstream-gap",
+    "evidence": "docs/TERRAFORM_INTEGRATION.md",
+    "since_pin": "6574827cf2993d2a54484516c2f4cc33238f98c9",
+    "notes": "DSK and Terraform remain complementary declarative engines. This family validates resource mapping intent; plan/apply stay unsupported because Terraform state and DSK ownership markers must not overlap."
+  },
+  "type": "object",
+  "required": ["schema", "resource_mappings"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "keeper-terraform.v1"
+    },
+    "resource_mappings": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/resource_mapping"
+      }
+    }
+  },
+  "definitions": {
+    "dsk_family": {
+      "type": "string",
+      "enum": [
+        "pam-environment.v1",
+        "keeper-vault.v1",
+        "keeper-vault-sharing.v1",
+        "keeper-enterprise.v1",
+        "keeper-ksm.v1",
+        "keeper-epm.v1",
+        "keeper-integrations-identity.v1",
+        "keeper-integrations-events.v1",
+        "msp-environment.v1"
+      ]
+    },
+    "tf_resource_type": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+    },
+    "direction": {
+      "type": "string",
+      "enum": ["dsk_source", "tf_source", "bidirectional"]
+    },
+    "resource_mapping": {
+      "type": "object",
+      "required": ["dsk_family", "tf_resource_type", "direction"],
+      "additionalProperties": false,
+      "properties": {
+        "dsk_family": {
+          "$ref": "#/definitions/dsk_family"
+        },
+        "tf_resource_type": {
+          "$ref": "#/definitions/tf_resource_type"
+        },
+        "direction": {
+          "$ref": "#/definitions/direction"
+        }
+      }
+    }
+  }
+}

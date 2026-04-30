@@ -1,0 +1,560 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://keeper.local/schemas/pam-environment.v1.schema.json",
+  "title": "Keeper PAM Declarative Manifest v1",
+  "description": "Declarative manifest for KeeperPAM. Superset-compatible with the `pam project import` JSON shipped by Commander; see Commander/keepercommander/commands/pam_import/README.md for the authoritative field list.",
+  "x-keeper-live-proof": {
+    "status": "supported",
+    "evidence": [
+      "scripts/smoke/scenarios.py",
+      "docs/live-proof/keeper-pam-environment.v1.89047920.machine.sanitized.json",
+      "docs/live-proof/keeper-pam-environment.v1.89047920.rbi.sanitized.json"
+    ],
+    "since_pin": "89047920a0df857e01fb59adcb0bfb9fa6db70bf",
+    "notes": "PAM lifecycle live-proven via the smoke matrix: pamMachine, pamDatabase, pamDirectory, and pamRemoteBrowser (2026-04-28) run plan -> apply -> clean re-plan -> destroy through the committed harness. `pamUserNestedRotation` / rotation preview paths remain as in scripts/smoke/README.md and docs/SDK_DA_COMPLETION_PLAN.md. Field-level import vs DAG-only labels: docs/SDK_DA_COMPLETION_PLAN.md Phase 3."
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "name"],
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "pam-environment.v1",
+      "description": "Optional explicit family pin (same as other keeper_* families). Legacy manifests omit this key."
+    },
+    "version": { "$ref": "#/$defs/manifest_version" },
+    "name": { "type": "string", "minLength": 1 },
+    "projects": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/project" },
+      "default": [],
+      "maxItems": 1
+    },
+    "shared_folders": { "$ref": "#/$defs/shared_folders_block", "default": {} },
+    "gateways": { "type": "array", "items": { "$ref": "#/$defs/gateway" }, "default": [] },
+    "pam_configurations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/pam_configuration" },
+      "default": []
+    },
+    "resources": { "type": "array", "items": { "$ref": "#/$defs/resource" }, "default": [] },
+    "users": { "type": "array", "items": { "$ref": "#/$defs/user_any" }, "default": [] }
+  },
+  "$defs": {
+    "manifest_version": {
+      "type": "string",
+      "const": "1",
+      "x-keeper-deprecated": {
+        "since-pin": "6574827cf2993d2a54484516c2f4cc33238f98c9",
+        "remove-after-pin": "v2.0.0",
+        "reason": "Legacy PAM manifests use version/name without an explicit schema pin. New manifests should declare schema: pam-environment.v1; the legacy version field is kept only for the v1.x two-version overlap window."
+      }
+    },
+    "on_off": { "type": "string", "enum": ["on", "off"] },
+    "uid_ref": { "type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$" },
+    "port": { "oneOf": [
+      { "type": "integer", "minimum": 1, "maximum": 65535 },
+      { "type": "string", "pattern": "^[0-9]{1,5}$" }
+    ] },
+    "rotation_schedule": {
+      "oneOf": [
+        { "type": "object", "additionalProperties": false, "required": ["type"], "properties": { "type": { "const": "on-demand" } } },
+        { "type": "object", "additionalProperties": false, "required": ["type", "cron"], "properties": { "type": { "const": "CRON" }, "cron": { "type": "string", "minLength": 9 } } }
+      ]
+    },
+
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project"],
+      "properties": {
+        "uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "project": { "type": "string", "minLength": 1 }
+      }
+    },
+
+    "shared_folder_permission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "manage_users": { "type": "boolean" },
+        "manage_records": { "type": "boolean" },
+        "can_edit": { "type": "boolean" },
+        "can_share": { "type": "boolean" }
+      }
+    },
+    "shared_folder_block": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "manage_users": { "type": "boolean" },
+        "manage_records": { "type": "boolean" },
+        "can_edit": { "type": "boolean" },
+        "can_share": { "type": "boolean" },
+        "permissions": { "type": "array", "items": { "$ref": "#/$defs/shared_folder_permission" }, "default": [] }
+      }
+    },
+    "shared_folders_block": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "users": { "$ref": "#/$defs/shared_folder_block" },
+        "resources": { "$ref": "#/$defs/shared_folder_block" }
+      }
+    },
+
+    "gateway": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "name": { "type": "string", "minLength": 1 },
+        "mode": { "type": "string", "enum": ["reference_existing", "create"], "default": "reference_existing" },
+        "ksm_application_name": { "type": "string", "minLength": 1 }
+      }
+    },
+
+    "common_config_options": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "connections": { "$ref": "#/$defs/on_off" },
+        "rotation": { "$ref": "#/$defs/on_off" },
+        "tunneling": { "$ref": "#/$defs/on_off" },
+        "remote_browser_isolation": { "$ref": "#/$defs/on_off" },
+        "graphical_session_recording": { "$ref": "#/$defs/on_off" },
+        "text_session_recording": { "$ref": "#/$defs/on_off" },
+        "ai_threat_detection": { "$ref": "#/$defs/on_off" },
+        "ai_terminate_session_on_detection": { "$ref": "#/$defs/on_off" }
+      }
+    },
+
+    "pam_configuration_base": {
+      "type": "object",
+      "properties": {
+        "uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "title": { "type": "string", "minLength": 1 },
+        "gateway_uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "options": { "$ref": "#/$defs/common_config_options" },
+        "port_mapping": { "type": "array", "items": { "type": "string" } },
+        "default_rotation_schedule": { "$ref": "#/$defs/rotation_schedule" },
+        "scripts": { "type": "array", "items": { "type": "object" } },
+        "attachments": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+
+    "pam_configuration": {
+      "type": "object",
+      "required": ["environment", "uid_ref"],
+      "oneOf": [
+        {
+          "allOf": [
+            { "$ref": "#/$defs/pam_configuration_base" },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "environment": { "const": "local" },
+                "uid_ref": true, "title": true, "gateway_uid_ref": true, "options": true,
+                "port_mapping": true, "default_rotation_schedule": true, "scripts": true, "attachments": true,
+                "network_id": { "type": "string" },
+                "network_cidr": { "type": "string" }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/pam_configuration_base" },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "environment": { "const": "aws" },
+                "uid_ref": true, "title": true, "gateway_uid_ref": true, "options": true,
+                "port_mapping": true, "default_rotation_schedule": true, "scripts": true, "attachments": true,
+                "aws_id": { "type": "string" },
+                "aws_access_key_id": { "type": "string" },
+                "aws_secret_access_key": { "type": "string" },
+                "aws_region_names": { "type": "array", "items": { "type": "string" } }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/pam_configuration_base" },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "environment": { "const": "azure" },
+                "uid_ref": true, "title": true, "gateway_uid_ref": true, "options": true,
+                "port_mapping": true, "default_rotation_schedule": true, "scripts": true, "attachments": true,
+                "az_entra_id": { "type": "string" },
+                "az_client_id": { "type": "string" },
+                "az_client_secret": { "type": "string" },
+                "az_subscription_id": { "type": "string" },
+                "az_tenant_id": { "type": "string" },
+                "az_resource_groups": { "type": "array", "items": { "type": "string" } }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/pam_configuration_base" },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "environment": { "const": "domain" },
+                "uid_ref": true, "title": true, "gateway_uid_ref": true, "options": true,
+                "port_mapping": true, "default_rotation_schedule": true, "scripts": true, "attachments": true,
+                "dom_domain_id": { "type": "string" },
+                "dom_hostname": { "type": "string" },
+                "dom_port": { "$ref": "#/$defs/port" },
+                "dom_use_ssl": { "type": "boolean" },
+                "dom_scan_dc_cidr": { "type": "boolean" },
+                "dom_network_cidr": { "type": "string" },
+                "dom_administrative_credential_uid_ref": { "$ref": "#/$defs/uid_ref" }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/pam_configuration_base" },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "environment": { "const": "gcp" },
+                "uid_ref": true, "title": true, "gateway_uid_ref": true, "options": true,
+                "port_mapping": true, "default_rotation_schedule": true, "scripts": true, "attachments": true,
+                "gcp_id": { "type": "string" },
+                "gcp_service_account_key": { "type": "string" },
+                "gcp_google_admin_email": { "type": "string" },
+                "gcp_region_names": { "type": "array", "items": { "type": "string" } }
+              }
+            }
+          ]
+        },
+        {
+          "allOf": [
+            { "$ref": "#/$defs/pam_configuration_base" },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "environment": { "const": "oci" },
+                "uid_ref": true, "title": true, "gateway_uid_ref": true, "options": true,
+                "port_mapping": true, "default_rotation_schedule": true, "scripts": true, "attachments": true,
+                "oci_id": { "type": "string" },
+                "oci_admin_id": { "type": "string" },
+                "oci_admin_public_key": { "type": "string" },
+                "oci_admin_private_key": { "type": "string" },
+                "oci_tenancy": { "type": "string" },
+                "oci_region": { "type": "string" }
+              }
+            }
+          ]
+        }
+      ]
+    },
+
+    "sftp_block": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enable_sftp": { "type": "boolean" },
+        "sftp_resource_uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "sftp_user_credentials_uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "sftp_root_directory": { "type": "string" },
+        "sftp_upload_directory": { "type": "string" },
+        "sftp_keepalive_interval": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "port_forward_block": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "port": { "$ref": "#/$defs/port" },
+        "reuse_port": { "type": "boolean" }
+      }
+    },
+    "jit_settings": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "create_ephemeral": { "type": "boolean" },
+        "elevate": { "type": "boolean" },
+        "elevation_method": { "type": "string", "enum": ["group", "role"] },
+        "elevation_string": { "type": "string" },
+        "base_distinguished_name": { "type": "string" },
+        "ephemeral_account_type": { "type": "string", "enum": ["linux", "mac", "windows", "domain"] },
+        "pam_directory_uid_ref": { "$ref": "#/$defs/uid_ref" }
+      }
+    },
+    "ai_settings": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "risk_levels": { "type": "object" }
+      }
+    },
+    "resource_options": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "connections": { "$ref": "#/$defs/on_off" },
+        "rotation": { "$ref": "#/$defs/on_off" },
+        "tunneling": { "$ref": "#/$defs/on_off" },
+        "remote_browser_isolation": { "$ref": "#/$defs/on_off" },
+        "graphical_session_recording": { "$ref": "#/$defs/on_off" },
+        "text_session_recording": { "$ref": "#/$defs/on_off" },
+        "ai_threat_detection": { "$ref": "#/$defs/on_off" },
+        "ai_terminate_session_on_detection": { "$ref": "#/$defs/on_off" },
+        "jit_settings": { "$ref": "#/$defs/jit_settings" },
+        "ai_settings": { "$ref": "#/$defs/ai_settings" }
+      }
+    },
+    "connection_base": {
+      "type": "object",
+      "properties": {
+        "protocol": { "type": "string" },
+        "port": { "$ref": "#/$defs/port" },
+        "allow_supply_user": { "type": "boolean" },
+        "administrative_credentials_uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "launch_credentials_uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "autofill_credentials_uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "recording_include_keys": { "type": "boolean" },
+        "disable_copy": { "type": "boolean" },
+        "disable_paste": { "type": "boolean" },
+        "sftp": { "$ref": "#/$defs/sftp_block" },
+
+        "security": { "type": "string", "enum": ["any", "rdp", "nla", "tls", "vmconnect"] },
+        "disable_authentication": { "type": "boolean" },
+        "load_balance_info": { "type": "string" },
+        "preconnection_id": { "type": "string" },
+        "preconnection_blob": { "type": "string" },
+        "disable_audio": { "type": "boolean" },
+        "disable_dynamic_resizing": { "type": "boolean" },
+        "enable_full_window_drag": { "type": "boolean" },
+        "enable_wallpaper": { "type": "boolean" },
+
+        "audio_channels": { "type": "integer", "minimum": 1, "maximum": 2 },
+        "audio_bps": { "type": "integer", "minimum": 8, "maximum": 32 },
+        "audio_sample_rate": { "type": "integer", "minimum": 8000, "maximum": 48000 }
+      }
+    },
+    "pam_settings": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "options": { "$ref": "#/$defs/resource_options" },
+        "allow_supply_host": { "type": "boolean" },
+        "port_forward": { "$ref": "#/$defs/port_forward_block" },
+        "connection": {
+          "allOf": [ { "$ref": "#/$defs/connection_base" } ],
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+
+    "pam_user": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "title"],
+      "properties": {
+        "uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "type": { "const": "pamUser" },
+        "title": { "type": "string", "minLength": 1 },
+        "notes": { "type": "string" },
+        "login": { "type": "string" },
+        "password": { "type": "string" },
+        "private_pem_key": { "type": "string" },
+        "distinguished_name": { "type": "string" },
+        "connect_database": { "type": "string" },
+        "managed": { "type": "boolean" },
+        "otp": { "type": "string" },
+        "attachments": { "type": "array", "items": { "type": "string" } },
+        "scripts": { "type": "array", "items": { "type": "object" } },
+        "rotation_settings": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "rotation": { "type": "string", "enum": ["general", "iam_user", "scripts_only"] },
+            "enabled": { "$ref": "#/$defs/on_off" },
+            "schedule": { "$ref": "#/$defs/rotation_schedule" },
+            "password_complexity": { "type": "string" }
+          }
+        }
+      }
+    },
+    "login_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "title"],
+      "properties": {
+        "uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "type": { "const": "login" },
+        "title": { "type": "string", "minLength": 1 },
+        "notes": { "type": "string" },
+        "login": { "type": "string" },
+        "password": { "type": "string" },
+        "otp": { "type": "string" }
+      }
+    },
+    "user_any": { "oneOf": [ { "$ref": "#/$defs/pam_user" }, { "$ref": "#/$defs/login_record" } ] },
+
+    "resource_base": {
+      "type": "object",
+      "properties": {
+        "uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "title": { "type": "string", "minLength": 1 },
+        "notes": { "type": "string" },
+        "pam_configuration_uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "shared_folder": { "type": "string", "enum": ["users", "resources"] },
+        "otp": { "type": "string" },
+        "attachments": { "type": "array", "items": { "type": "string" } },
+        "scripts": { "type": "array", "items": { "type": "object" } },
+        "pam_settings": { "$ref": "#/$defs/pam_settings" },
+        "users": { "type": "array", "items": { "$ref": "#/$defs/pam_user" } }
+      }
+    },
+
+    "pam_machine": {
+      "allOf": [
+        { "$ref": "#/$defs/resource_base" },
+        {
+          "type": "object",
+          "required": ["type", "title"],
+          "additionalProperties": true,
+          "properties": {
+            "type": { "const": "pamMachine" },
+            "host": { "type": "string" },
+            "port": { "$ref": "#/$defs/port" },
+            "ssl_verification": { "type": "boolean" },
+            "operating_system": { "type": "string", "enum": ["Windows", "Linux", "macOS"] },
+            "instance_name": { "type": "string" },
+            "instance_id": { "type": "string" },
+            "provider_group": { "type": "string" },
+            "provider_region": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "pam_database": {
+      "allOf": [
+        { "$ref": "#/$defs/resource_base" },
+        {
+          "type": "object",
+          "required": ["type", "title", "database_type"],
+          "additionalProperties": true,
+          "properties": {
+            "type": { "const": "pamDatabase" },
+            "database_type": {
+              "type": "string",
+              "enum": [
+                "postgresql", "postgresql-flexible",
+                "mysql", "mysql-flexible",
+                "mariadb", "mariadb-flexible",
+                "mssql", "oracle", "mongodb"
+              ]
+            },
+            "host": { "type": "string" },
+            "port": { "$ref": "#/$defs/port" },
+            "use_ssl": { "type": "boolean" },
+            "database_id": { "type": "string" },
+            "provider_group": { "type": "string" },
+            "provider_region": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "pam_directory": {
+      "allOf": [
+        { "$ref": "#/$defs/resource_base" },
+        {
+          "type": "object",
+          "required": ["type", "title", "directory_type"],
+          "additionalProperties": true,
+          "properties": {
+            "type": { "const": "pamDirectory" },
+            "directory_type": { "type": "string", "enum": ["active_directory", "openldap", "ldap"] },
+            "host": { "type": "string" },
+            "port": { "$ref": "#/$defs/port" },
+            "use_ssl": { "type": "boolean" },
+            "domain_name": { "type": "string" },
+            "alternative_ips": { "type": "array", "items": { "type": "string" } },
+            "directory_id": { "type": "string" },
+            "user_match": { "type": "string" },
+            "provider_group": { "type": "string" },
+            "provider_region": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "pam_remote_browser": {
+      "type": "object",
+      "required": ["type", "title", "url"],
+      "additionalProperties": false,
+      "properties": {
+        "uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "type": { "const": "pamRemoteBrowser" },
+        "title": { "type": "string", "minLength": 1 },
+        "notes": { "type": "string" },
+        "url": { "type": "string", "format": "uri" },
+        "otp": { "type": "string" },
+        "pam_configuration_uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "shared_folder": { "type": "string", "enum": ["users", "resources"] },
+        "attachments": { "type": "array", "items": { "type": "string" } },
+        "pam_settings": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "options": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "remote_browser_isolation": { "$ref": "#/$defs/on_off" },
+                "graphical_session_recording": { "$ref": "#/$defs/on_off" },
+                "text_session_recording": { "$ref": "#/$defs/on_off" }
+              }
+            },
+            "connection": {
+              "type": "object",
+              "additionalProperties": true,
+              "properties": {
+                "protocol": { "const": "http" },
+                "autofill_credentials_uid_ref": { "$ref": "#/$defs/uid_ref" },
+                "autofill_targets": { "type": "string" },
+                "allow_url_manipulation": { "type": "boolean" },
+                "allowed_url_patterns": { "type": "string" },
+                "allowed_resource_url_patterns": { "type": "string" },
+                "recording_include_keys": { "type": "boolean" },
+                "disable_copy": { "type": "boolean" },
+                "disable_paste": { "type": "boolean" },
+                "ignore_server_cert": { "type": "boolean" },
+
+                "disable_audio": { "type": "boolean" },
+                "audio_channels": { "type": "integer", "minimum": 1, "maximum": 2 },
+                "audio_bps": { "type": "integer", "minimum": 8, "maximum": 32 },
+                "audio_sample_rate": { "type": "integer", "minimum": 8000, "maximum": 48000 }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "resource": {
+      "oneOf": [
+        { "$ref": "#/$defs/pam_machine" },
+        { "$ref": "#/$defs/pam_database" },
+        { "$ref": "#/$defs/pam_directory" },
+        { "$ref": "#/$defs/pam_remote_browser" }
+      ]
+    }
+  }
+}

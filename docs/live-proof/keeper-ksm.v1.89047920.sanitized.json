@@ -1,0 +1,154 @@
+{
+  "commander_pin_abbrev": "89047920",
+  "commander_version": "17.2.13",
+  "commit": "8044bb89",
+  "events": [
+    {
+      "event": "ksm_login_preflight",
+      "result": "ok"
+    },
+    {
+      "elapsed_ms": 1198,
+      "event": "ksm_login_helper_load",
+      "fields": [
+        {
+          "has_value": false,
+          "label": "",
+          "type": "passkey"
+        },
+        {
+          "has_value": true,
+          "label": "",
+          "type": "login"
+        },
+        {
+          "has_value": true,
+          "label": "",
+          "type": "password"
+        },
+        {
+          "has_value": true,
+          "label": "",
+          "type": "url"
+        },
+        {
+          "has_value": false,
+          "label": "",
+          "type": "fileRef"
+        },
+        {
+          "has_value": true,
+          "label": "",
+          "type": "oneTimeCode"
+        }
+      ],
+      "record_uid_hash": "<uid:b17b09ec>",
+      "result": "ok",
+      "source_config_basename": "ksm-config.json"
+    },
+    {
+      "elapsed_ms": 1805,
+      "event": "commander_login",
+      "result": "ok",
+      "server": "keepersecurity.com",
+      "session": "established"
+    },
+    {
+      "admin_record_uid_hash": "<uid:b17b09ec>",
+      "app_uid_hash": "<uid:667bcfa5>",
+      "bus_directory_uid_hash": "<uid:bd533580>",
+      "client_token_redeemed": true,
+      "config_out_basename": "dsk-ksm-l1-8044bb89-20260427T064952Z-63317-ksm-config.json",
+      "created_admin_record": false,
+      "created_bus_directory": false,
+      "elapsed_ms": 8646,
+      "event": "bootstrap_ksm_application",
+      "expires_at_present": true,
+      "result": "ok"
+    },
+    {
+      "admin_fields": [
+        {
+          "has_value": false,
+          "label": "",
+          "type": "passkey"
+        },
+        {
+          "has_value": true,
+          "label": "",
+          "type": "login"
+        },
+        {
+          "has_value": true,
+          "label": "",
+          "type": "password"
+        },
+        {
+          "has_value": true,
+          "label": "",
+          "type": "url"
+        },
+        {
+          "has_value": false,
+          "label": "",
+          "type": "fileRef"
+        },
+        {
+          "has_value": true,
+          "label": "",
+          "type": "oneTimeCode"
+        }
+      ],
+      "bus_custom": [
+        {
+          "has_value": true,
+          "label": "topics",
+          "type": "json"
+        }
+      ],
+      "elapsed_ms": 672,
+      "event": "sample_fetch",
+      "result": "ok"
+    },
+    {
+      "elapsed_ms": 591,
+      "event": "write_update",
+      "field_label": "topics",
+      "field_type": "json",
+      "original_len": 2,
+      "record_uid_hash": "<uid:bd533580>",
+      "result": "ok",
+      "updated_hash": "31914dbe",
+      "updated_len": 131
+    },
+    {
+      "elapsed_ms": 297,
+      "event": "fetch_back",
+      "result": "ok",
+      "value_hash": "31914dbe",
+      "value_len": 131
+    },
+    {
+      "elapsed_ms": 3241,
+      "event": "restore",
+      "restored": true,
+      "result": "ok",
+      "value_hash": "44136fa3",
+      "value_len": 2
+    },
+    {
+      "event": "sanitization",
+      "leak_check": "secret_leak_check",
+      "result": "ok"
+    }
+  ],
+  "family": "keeper-ksm.v1",
+  "generated_at": "2026-04-27T06:50:39Z",
+  "keeper_secrets_manager_core_version": "17.2.0",
+  "notes": [
+    "L1 live pass: KsmLoginHelper loaded credentials from KSM, authenticated Commander, bootstrapped a KSM app/config, and redeemed a KSM client.",
+    "Redeemed KSM client fetched the shared admin record, updated the editable bus topics field, fetched back the new value, then restored the original value. In-run self-fix: _redeem_one_time_token now performs a quiet initial get_secrets call so redeemed configs are bound before verification."
+  ],
+  "scenario": "ksmLoginHelperBootstrapRoundTrip",
+  "tenant_hash": "67758afb"
+}

@@ -1,0 +1,10 @@
+# keeper-vault.v1 shared_folder resources are Phase 7 planned and are not yet
+# accepted by the schema. Intended future row:
+#
+# shared_folders:
+#   - uid_ref: ex.sf-1
+#     title: "Example Shared Folder"
+#     members: []
+#     manager: dsk-example
+schema: keeper-vault.v1
+records: []

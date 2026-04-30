@@ -1,0 +1,15 @@
+# Fails: aws_access_key_id is an AWS-only field but environment is local.
+version: "1"
+name: invalid-env-field
+
+gateways:
+  - uid_ref: gw
+    name: "Some Gateway"
+    mode: reference_existing
+
+pam_configurations:
+  - uid_ref: cfg
+    environment: local
+    title: "cfg"
+    gateway_uid_ref: gw
+    aws_access_key_id: "REPLACE_ME_AKIA..."   # not allowed under environment: local

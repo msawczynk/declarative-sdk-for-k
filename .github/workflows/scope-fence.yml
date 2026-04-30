@@ -1,0 +1,103 @@
+name: scope-fence
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Scope-fence — fail PRs that add orchestration, daybook, or per-session
+# scaffolding files into this delivery repository. Rationale:
+#
+#   This repo ships the `declarative-sdk-for-k` Python package + CLI. It is
+#   intended for end users (agents and humans) who want a small, well-scoped
+#   SDK. Multi-session orchestration prose (Codex prompts, parallel runners,
+#   phase-0 gates, daybook journals/lessons, worktree registries) is private
+#   to the maintainer's working environment and lives in a separate repo
+#   (cursor-daybook). Auto-prune operator-side orchestration coordination from
+#   this product repo: WORKTREES.md, scripts/agent/*, .codex-runs/,
+#   docs/ORCHESTRATION_*, docs/CODEX_*, .github/codex/**, and
+#   .github/workflows/codex-*. This workflow makes the rule structural: paths
+#   matching the patterns below cause CI fail.
+#
+# The intent is delivery hygiene, not enforcement against contributors. PRs
+# that legitimately need to discuss orchestration should keep that discussion
+# in the PR body; only ADDED FILES on the listed paths trip this fence.
+
+jobs:
+  scope-fence:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: identify added paths vs base
+        id: diff
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+            head="${{ github.event.pull_request.head.sha }}"
+          else
+            base=$(git rev-parse HEAD~1 2>/dev/null || git rev-parse HEAD)
+            head=$(git rev-parse HEAD)
+          fi
+          echo "base=$base" >> "$GITHUB_OUTPUT"
+          echo "head=$head" >> "$GITHUB_OUTPUT"
+          # Only newly-ADDED files are gated. Modifications to pre-existing
+          # tracked files (if any survived the historical pruning) do not trip.
+          git diff --name-only --diff-filter=A "$base"..."$head" > /tmp/added.txt || true
+          echo "--- added paths ---"
+          cat /tmp/added.txt || true
+
+      - name: enforce forbidden orchestration paths
+        run: |
+          patterns=(
+            'scripts/agent/codex.*'
+            'scripts/agent/run_parallel_.*'
+            'scripts/agent/phase0_.*'
+            'scripts/agent/devil_check\.sh$'
+            'scripts/agent/ksm_login_preflight\.sh$'
+            'docs/CODEX_.*'
+            'docs/ORCHESTRATION_.*'
+            'docs/EXECUTION_PLAN_.*'
+            'docs/NEXT_SPRINT_.*'
+            'docs/SDK_ORCHESTRATED_.*'
+            'docs/sprint-memos/.*'
+            'docs/SDK_DA_COMPLETION_PLAN\..*'
+            'docs/V1_GA_CHECKLIST\..*'
+            'docs/RECONCILIATION\..*'
+            'docs/SDK_COMPLETION_PLAN\..*'
+            'docs/DAYBOOK\..*'
+            'JOURNAL\.md$'
+            'LESSONS\.md$'
+            'WORKTREES\.md$'
+            'AGENTS\.scaffold\..*'
+            '\.codex-runs/.*'
+            '\.parallel-runs/.*'
+            '\.github/codex/.*'
+            '\.github/workflows/codex-.*'
+            'codex-prompts?/.*'
+          )
+          forbidden_re="$(IFS='|'; echo "(${patterns[*]})")"
+          fails=$(grep -E "$forbidden_re" /tmp/added.txt || true)
+          if [ -n "$fails" ]; then
+            echo "::error::scope-fence: orchestration / daybook paths added to delivery repo:"
+            echo "$fails" | sed 's/^/::error::  /'
+            echo ""
+            echo "These paths belong in the orchestrator's private workspace, not in this delivery repo." >&2
+            echo "If the worker prompted you to add them, reject the prompt and move them to:" >&2
+            echo "  - daybook mirror (\`~/.cursor-daybook-sync/\`) for shared scripts / scaffolds" >&2
+            echo "  - workspace SCAFFOLD.md / WORKTREES.md (outside any delivery repo)" >&2
+            echo "Reference: keep operator-side orchestration coordination outside this delivery repo." >&2
+            exit 1
+          fi
+          echo "scope-fence: ok (no forbidden paths added)"
+
+      - name: warn on suspicious doc bloat
+        run: |
+          # Soft signal — multi-completion-plan proliferation has been a recurring failure.
+          plans=$(ls docs/*COMPLETION*.md docs/*CHECKLIST*.md 2>/dev/null | wc -l)
+          if [ "$plans" -gt 1 ]; then
+            echo "::warning::multiple completion-plan / checklist docs detected ($plans). Consolidate to ROADMAP.md per LESSONS 2026-04-26."
+          fi

@@ -1,0 +1,36 @@
+schema: keeper-vault.v1
+
+# Attachment declarations attached to a login record. Paths are examples only;
+# offline validate does not read source_path.
+#
+# Run:
+#   dsk validate examples/vault-attachments.yaml
+
+records:
+  - uid_ref: rec.runbook.login
+    type: login
+    title: "Example Runbook Login"
+    fields:
+      - type: login
+        label: Login
+        value: ["runbook@example.invalid"]
+      - type: password
+        label: Password
+        value: ["example-password"]
+
+attachments:
+  - uid_ref: att.runbook.pdf
+    record_uid_ref: rec.runbook.login
+    source_path: ./attachments/runbook.pdf
+    name: runbook.pdf
+    title: "Operational Runbook"
+    mime_type: application/pdf
+    content_sha256: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+
+  - uid_ref: att.runbook.txt
+    record_uid_ref: rec.runbook.login
+    source_path: ./attachments/recovery-steps.txt
+    name: recovery-steps.txt
+    title: "Recovery Steps"
+    mime_type: text/plain
+    content_sha256: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789

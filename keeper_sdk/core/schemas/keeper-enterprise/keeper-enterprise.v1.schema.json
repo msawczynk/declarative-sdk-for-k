@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/msawczynk/declarative-sdk-for-k/schemas/keeper-enterprise/v1.json",
+  "title": "keeper-enterprise.v1",
+  "description": "Offline schema body for Keeper Enterprise active users and role assignments. Other enterprise blocks remain empty scaffold stubs until future slices populate them.",
+  "$comment": "TODO future slices per memo 2026-04-26_keeper-enterprise-v1-schema-design.md: nodes -> Decision 2; roles -> Decisions 3 and 5; teams -> Commander Surface Teams; enforcements -> Decision 3; aliases -> Decision 5 and Open Parent Calls; enterprise_pushes -> future slice after Commander surface audit.",
+  "x-keeper-live-proof": {
+    "status": "scaffold-only",
+    "evidence": "docs/live-proof/README.md",
+    "since_pin": "89047920a0df857e01fb59adcb0bfb9fa6db70bf",
+    "notes": "memo: 2026-04-26_keeper-enterprise-v1-schema-design.md. Slice S covers active users and role_assignments only; nodes, roles, teams, enforcements, aliases, and enterprise_pushes are empty scaffold stubs pending future live-proof slices. Operator runbook path until L1 transcript exists (CONVENTIONS.md)."
+  },
+  "type": "object",
+  "required": ["schema"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "keeper-enterprise.v1"
+    },
+    "users": {
+      "type": "array",
+      "default": [],
+      "items": { "$ref": "#/$defs/user" }
+    },
+    "role_assignments": {
+      "type": "array",
+      "default": [],
+      "items": { "$ref": "#/$defs/role_assignment" }
+    },
+    "nodes": {
+      "$comment": "TODO future-slice per memo Decision 2: flat nodes[] with uid_ref, name, and parent_uid_ref.",
+      "type": "array",
+      "maxItems": 0,
+      "default": [],
+      "items": {
+        "type": "object",
+        "additionalProperties": false
+      }
+    },
+    "roles": {
+      "$comment": "TODO future-slice per memo Decisions 3 and 5: roles[] owns role identity; assignments and enforcements stay split out.",
+      "type": "array",
+      "maxItems": 0,
+      "default": [],
+      "items": {
+        "type": "object",
+        "additionalProperties": false
+      }
+    },
+    "teams": {
+      "$comment": "TODO future-slice per memo Commander Surface Teams row: teams[] owns team identity and restriction flags.",
+      "type": "array",
+      "maxItems": 0,
+      "default": [],
+      "items": {
+        "type": "object",
+        "additionalProperties": false
+      }
+    },
+    "enforcements": {
+      "$comment": "TODO future-slice per memo Decision 3: role enforcement rows keyed by role reference and enforcement key.",
+      "type": "array",
+      "maxItems": 0,
+      "default": [],
+      "items": {
+        "type": "object",
+        "additionalProperties": false
+      }
+    },
+    "aliases": {
+      "$comment": "TODO future-slice per memo Decision 5 and Open Parent Calls: user alias lifecycle after active-user proof.",
+      "type": "array",
+      "maxItems": 0,
+      "default": [],
+      "items": {
+        "type": "object",
+        "additionalProperties": false
+      }
+    },
+    "enterprise_pushes": {
+      "$comment": "TODO future-slice after Commander enterprise push surface audit; not part of memo slice S live proof.",
+      "type": "array",
+      "maxItems": 0,
+      "default": [],
+      "items": {
+        "type": "object",
+        "additionalProperties": false
+      }
+    }
+  },
+  "$defs": {
+    "uid_ref": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "node_ref": {
+      "type": "string",
+      "pattern": "^keeper-enterprise:nodes:[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "role_ref": {
+      "type": "string",
+      "pattern": "^keeper-enterprise:roles:[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "user_ref": {
+      "type": "string",
+      "pattern": "^keeper-enterprise:users:[A-Za-z0-9][A-Za-z0-9_.:@+-]{0,255}$"
+    },
+    "user": {
+      "type": "object",
+      "required": ["uid_ref", "email"],
+      "additionalProperties": false,
+      "properties": {
+        "uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "email": {
+          "type": "string",
+          "format": "email"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "node_uid_ref": { "$ref": "#/$defs/node_ref" },
+        "status": {
+          "$comment": "TODO future-slice: locked, disabled, and transferred are reserved until user lifecycle proof lands.",
+          "type": "string",
+          "enum": ["active"],
+          "default": "active"
+        },
+        "lock_status": {
+          "$comment": "TODO future-slice: locked states are reserved until lock lifecycle proof lands.",
+          "type": "string",
+          "enum": ["unlocked"]
+        },
+        "pending_approval": {
+          "type": "boolean"
+        }
+      }
+    },
+    "role_assignment": {
+      "type": "object",
+      "required": ["user_uid_ref", "role_uid_ref"],
+      "additionalProperties": false,
+      "properties": {
+        "uid_ref": {
+          "$comment": "Optional row identity retained for semantic uid_ref uniqueness across populated slice-S blocks.",
+          "$ref": "#/$defs/uid_ref"
+        },
+        "user_uid_ref": { "$ref": "#/$defs/user_ref" },
+        "role_uid_ref": { "$ref": "#/$defs/role_ref" },
+        "is_admin": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
+  }
+}

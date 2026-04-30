@@ -1,0 +1,91 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: CompositeResourceDefinition
+metadata:
+  name: keeperrecords.keeper.dsk.io
+  annotations:
+    dsk.keeper.io/status: preview-gated
+    dsk.keeper.io/maps-to: keeper-vault.v1 records[type=login]
+spec:
+  group: keeper.dsk.io
+  names:
+    kind: KeeperRecord
+    plural: keeperrecords
+  versions:
+    - name: v1alpha1
+      served: true
+      referenceable: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          description: Preview XRD for a Keeper Vault login record reconciled by DSK.
+          properties:
+            spec:
+              type: object
+              properties:
+                parameters:
+                  type: object
+                  required:
+                    - uidRef
+                    - title
+                    - login
+                  properties:
+                    uidRef:
+                      type: string
+                      minLength: 1
+                      description: Maps to keeper-vault.v1 records[].uid_ref.
+                    title:
+                      type: string
+                      minLength: 1
+                      description: Maps to keeper-vault.v1 records[].title.
+                    login:
+                      type: string
+                      minLength: 1
+                      description: Maps to the login typed field.
+                    passwordSecretRef:
+                      type: object
+                      description: Kubernetes Secret reference consumed by a future DSK function.
+                      required:
+                        - name
+                        - key
+                      properties:
+                        namespace:
+                          type: string
+                        name:
+                          type: string
+                          minLength: 1
+                        key:
+                          type: string
+                          minLength: 1
+                    url:
+                      type: string
+                      description: Optional url typed field.
+                    folderRef:
+                      type: string
+                      description: Optional keeper-vault-sharing folder_ref.
+                    notes:
+                      type: string
+                    custom:
+                      type: array
+                      description: Optional keeper-vault.v1 custom[] rows.
+                      items:
+                        type: object
+                        x-kubernetes-preserve-unknown-fields: true
+              required:
+                - parameters
+            status:
+              type: object
+              properties:
+                keeperUid:
+                  type: string
+                observedGeneration:
+                  type: integer
+                  format: int64
+                manifestFamily:
+                  type: string
+                  enum:
+                    - keeper-vault.v1
+                conditions:
+                  type: array
+                  x-kubernetes-preserve-unknown-fields: true
+                  items:
+                    type: object

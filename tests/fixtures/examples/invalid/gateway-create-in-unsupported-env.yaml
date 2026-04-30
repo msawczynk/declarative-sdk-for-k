@@ -1,0 +1,15 @@
+# Fails: gateway mode "create" requires ksm_application_name and an online capability pass.
+version: "1"
+name: invalid-gateway-create
+
+gateways:
+  - uid_ref: gw
+    name: "New Gateway"
+    mode: create
+    # ksm_application_name intentionally omitted
+
+pam_configurations:
+  - uid_ref: cfg
+    environment: local
+    title: "cfg"
+    gateway_uid_ref: gw

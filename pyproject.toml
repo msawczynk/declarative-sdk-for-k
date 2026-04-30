@@ -1,0 +1,121 @@
+[build-system]
+requires = ["setuptools>=77.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "declarative-sdk-for-k"
+version = "2.0.0"
+description = "Declarative lifecycle (validate / export / plan / diff / apply) across the full K surface — vault records, shared folders, teams, roles, enterprise config, KSM, PAM, compliance, rotation — agent- and LLM-friendly by design."
+requires-python = ">=3.11"
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "declarative-sdk-for-k contributors" }]
+keywords = [
+    "keeper",
+    "vault",
+    "pam",
+    "ksm",
+    "enterprise",
+    "declarative",
+    "iac",
+    "agents",
+    "llm",
+    "terraform-like",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+    "Topic :: System :: Systems Administration",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+]
+dependencies = [
+    "click>=8.1",
+    "pydantic>=2.0",
+    "networkx>=3.0",
+    "pyyaml>=6.0",
+    "rich>=13.0",
+    "jsonschema>=4.21",
+    "keepercommander>=17.2.16,<18",
+    "pyotp",
+]
+
+[project.urls]
+Homepage = "https://github.com/msawczynk/declarative-sdk-for-k"
+Issues = "https://github.com/msawczynk/declarative-sdk-for-k/issues"
+Documentation = "https://github.com/msawczynk/declarative-sdk-for-k#readme"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov",
+    "mypy",
+    "ruff",
+    "build",
+    "twine",
+    "types-PyYAML",
+    "types-jsonschema",
+]
+ksm = [
+    "keeper-secrets-manager-core>=17.2.0,<18",
+]
+
+[project.scripts]
+# Short, tab-completable, agent-friendly. Primary CLI name.
+dsk = "keeper_sdk.cli:main"
+dsk-mcp = "keeper_sdk.mcp:main"
+# Backwards-compat aliases for pre-1.0 callers + CI scripts. Keep these during
+# the v2.0.0 rename prep window so existing automation does not break.
+pamform = "keeper_sdk.cli:main"
+keeper-sdk = "keeper_sdk.cli:main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+# v2.0.0 prep: ship both import roots; keep keeper_sdk compatible during rename.
+include = ["keeper_sdk*", "declarative_sdk_k*"]
+exclude = ["tests*"]
+
+[tool.setuptools.package-data]
+"keeper_sdk.core.schemas" = ["*.json", "**/*.json"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+check_untyped_defs = true
+# yaml stubs live in types-PyYAML (dev dep); silence on systems where
+# someone runs mypy without installing the dev extra.
+[[tool.mypy.overrides]]
+module = ["yaml", "yaml.*"]
+ignore_missing_imports = true
+follow_imports = "skip"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP"]
+ignore = ["E501"]
+
+[tool.isort]
+profile = "black"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "integration: requires a live Keeper tenant (set KEEPER_CONFIG)",
+    "slow: perf / long tests",
+]
+
+[tool.coverage.run]
+omit = [
+    "keeper_sdk/secrets/bus.py",
+    "keeper_sdk/cli/_live/runbook.py",
+    "keeper_sdk/cli/__main__.py",
+]

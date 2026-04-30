@@ -1,0 +1,96 @@
+name: live-smoke
+
+# Manual-trigger only. Runs the live-tenant smoke loop against the
+# repo-secret-provided KSM record. Skipped on PRs and on push so a
+# malicious contributor can't trigger a live mutation.
+#
+# To run:
+#   gh workflow run live-smoke -f schema_family=pam-environment
+#
+# Required repo secrets (configure under Settings → Secrets):
+#   KEEPER_LIVE_KSM_RECORD_UID   UID of the bootstrap config record
+#   KEEPER_CONFIG_B64            base64-encoded commander config.json
+#                                (workflow decodes to $KEEPER_CONFIG path)
+#
+# Per docs/V2_DECISIONS.md Q4 the resulting transcript artefact gets
+# wired into a schema family's `x-keeper-live-proof.evidence` to graduate
+# it from `preview-gated` to `supported`.
+
+on:
+  workflow_dispatch:
+    inputs:
+      schema_family:
+        description: "schema family being proven (e.g. pam-environment)"
+        required: true
+        default: "pam-environment"
+      schema_version:
+        description: "schema version"
+        required: true
+        default: "v1"
+
+permissions:
+  contents: read
+
+jobs:
+  live-smoke:
+    name: live smoke (${{ inputs.schema_family }}.${{ inputs.schema_version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      KEEPER_LIVE_TENANT: "1"
+      KEEPER_LIVE_KSM_RECORD_UID: ${{ secrets.KEEPER_LIVE_KSM_RECORD_UID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: materialise KEEPER_CONFIG
+        run: |
+          mkdir -p .live-smoke
+          printf '%s' "${{ secrets.KEEPER_CONFIG_B64 }}" | base64 -d > .live-smoke/config.json
+          echo "KEEPER_CONFIG=$PWD/.live-smoke/config.json" >> "$GITHUB_ENV"
+      - name: smoke manifest
+        run: |
+          cat > .live-smoke/manifest.yml <<'YAML'
+          schema: pam-environment.v1
+          identity:
+            tenant_alias: ci-live-smoke
+          YAML
+      - name: run live-smoke
+        env:
+          SCHEMA_FAMILY: ${{ inputs.schema_family }}
+          SCHEMA_VERSION: ${{ inputs.schema_version }}
+        run: |
+          mkdir -p evidence
+          dsk live-smoke \
+            --manifest .live-smoke/manifest.yml \
+            --workdir .live-smoke \
+            --evidence-out "evidence/${SCHEMA_FAMILY}.${SCHEMA_VERSION}.json" \
+            --schema-family "$SCHEMA_FAMILY" \
+            --schema-version "$SCHEMA_VERSION"
+      - name: post-run secret-leak grep (belt + braces)
+        run: |
+          if grep -RIE 'BEGIN (RSA )?PRIVATE KEY' evidence/; then
+            echo "::error::PEM block found in evidence file"
+            exit 1
+          fi
+          if grep -REn '\b[A-Fa-f0-9]{40,}\b' evidence/ ; then
+            echo "::error::long hex run found in evidence — possible leaked key"
+            exit 1
+          fi
+      - name: upload sanitized evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: live-smoke-evidence-${{ inputs.schema_family }}-${{ inputs.schema_version }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 30
+      - name: scrub workspace
+        if: always()
+        run: |
+          rm -rf .live-smoke

@@ -1,0 +1,469 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/msawczynk/declarative-sdk-for-k/schemas/keeper-vault/v1.json",
+  "title": "keeper-vault.v1",
+  "description": "Vault declarative manifest v1 for Keeper Vault records, custom record types, attachments, and KeeperFill settings. Supported record lifecycle coverage has sanitized live-proof transcripts under docs/live-proof/; broader vault surfaces remain governed by provider capability gates.",
+  "x-keeper-live-proof": {
+    "status": "supported",
+    "evidence": "docs/live-proof/keeper-vault.v1.91119c4.sanitized.json",
+    "since_pin": "91119c4e4f08139eec810ea6550abf92f8e79240",
+    "notes": "vaultOneLogin smoke matrix passed live via EnvLoginHelper against keepersecurity.com; sanitized transcript records create, clean re-plan, destroy, and empty re-discover."
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema"],
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "keeper-vault.v1"
+    },
+    "records": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/record" },
+      "uniqueItems": true,
+      "default": []
+    },
+    "record_types": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/record_type" },
+      "uniqueItems": true,
+      "default": []
+    },
+    "attachments": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/attachment" },
+      "uniqueItems": true,
+      "default": []
+    },
+    "keeper_fill": {
+      "$ref": "#/$defs/keeper_fill"
+    }
+  },
+  "$defs": {
+    "uid_ref": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "keeper_uid": {
+      "type": "string",
+      "minLength": 1
+    },
+    "on_off": {
+      "type": "string",
+      "enum": ["on", "off"]
+    },
+    "port": {
+      "oneOf": [
+        {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        {
+          "type": "string",
+          "pattern": "^[0-9]{1,5}$"
+        }
+      ]
+    },
+    "cross_family_ref": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[a-z][a-z0-9-]*:[A-Za-z][A-Za-z0-9_-]*:.+$"
+    },
+    "folder_ref": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^keeper-vault-sharing:folders:.+$"
+    },
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["uid_ref", "type", "title"],
+      "properties": {
+        "uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "folder_ref": { "$ref": "#/$defs/folder_ref" },
+        "notes": {
+          "type": "string"
+        },
+        "fields": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/typed_field" },
+          "default": []
+        },
+        "custom": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              { "$ref": "#/$defs/typed_field" },
+              { "$ref": "#/$defs/custom_key_value" }
+            ]
+          },
+          "default": []
+        },
+        "keeper_uid": { "$ref": "#/$defs/keeper_uid" }
+      }
+    },
+    "typed_field": {
+      "type": "object",
+      "additionalProperties": false,
+      "x-keeper-secret-field-types": [
+        "password",
+        "securityQuestion",
+        "secret_question",
+        "pinCode",
+        "secret",
+        "keyPair",
+        "bankAccount",
+        "paymentCard",
+        "file_ref",
+        "fileRef"
+      ],
+      "required": ["type", "value"],
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/field_type"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/field_value" }
+        }
+      }
+    },
+    "field_type": {
+      "type": "string",
+      "enum": [
+        "login",
+        "password",
+        "url",
+        "email",
+        "phone",
+        "address",
+        "secret_question",
+        "securityQuestion",
+        "multiline",
+        "text",
+        "secret",
+        "pinCode",
+        "name",
+        "paymentCard",
+        "bankAccount",
+        "keyPair",
+        "host",
+        "file_ref",
+        "fileRef"
+      ]
+    },
+    "field_value": {
+      "oneOf": [
+        {
+          "type": ["string", "number", "boolean", "null"]
+        },
+        { "$ref": "#/$defs/security_question_value" },
+        { "$ref": "#/$defs/name_value" },
+        { "$ref": "#/$defs/address_value" },
+        { "$ref": "#/$defs/phone_value" },
+        { "$ref": "#/$defs/payment_card_value" },
+        { "$ref": "#/$defs/bank_account_value" },
+        { "$ref": "#/$defs/key_pair_value" },
+        { "$ref": "#/$defs/host_value" },
+        { "$ref": "#/$defs/file_ref_value" }
+      ]
+    },
+    "custom_key_value": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "value"],
+      "properties": {
+        "key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value": { "$ref": "#/$defs/custom_value" }
+      }
+    },
+    "custom_value": {
+      "oneOf": [
+        {
+          "type": ["string", "number", "boolean", "null"]
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": ["string", "number", "boolean", "null"]
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "type": ["string", "number", "boolean", "null"]
+          }
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": {
+              "type": ["string", "number", "boolean", "null"]
+            }
+          }
+        }
+      ]
+    },
+    "security_question_value": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["question", "answer"],
+      "properties": {
+        "question": {
+          "type": "string",
+          "minLength": 1
+        },
+        "answer": {
+          "type": "string"
+        }
+      }
+    },
+    "name_value": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "first": { "type": "string" },
+        "middle": { "type": "string" },
+        "last": { "type": "string" }
+      }
+    },
+    "address_value": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "street1": { "type": "string" },
+        "street2": { "type": "string" },
+        "city": { "type": "string" },
+        "state": { "type": "string" },
+        "zip": { "type": "string" },
+        "country": { "type": "string" }
+      }
+    },
+    "phone_value": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "region": { "type": "string" },
+        "number": { "type": "string" },
+        "ext": { "type": "string" },
+        "type": { "type": "string" }
+      }
+    },
+    "payment_card_value": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "cardNumber": { "type": "string" },
+        "cardExpirationDate": { "type": "string" },
+        "cardSecurityCode": { "type": "string" }
+      }
+    },
+    "bank_account_value": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "accountType": { "type": "string" },
+        "routingNumber": { "type": "string" },
+        "accountNumber": { "type": "string" },
+        "otherType": { "type": "string" }
+      }
+    },
+    "key_pair_value": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "publicKey": { "type": "string" },
+        "privateKey": { "type": "string" }
+      }
+    },
+    "host_value": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "hostName": { "type": "string" },
+        "port": { "$ref": "#/$defs/port" }
+      }
+    },
+    "file_ref_value": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "keeper_uid": { "$ref": "#/$defs/keeper_uid" },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mime_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "content_sha256": {
+          "type": "string",
+          "pattern": "^[A-Fa-f0-9]{64}$"
+        }
+      },
+      "x-keeper-live-proof": {
+        "status": "upstream-gap",
+        "notes": "file_ref values are declarative attachment stubs only. Plan/diff redacts them; no upload writer is claimed until size, redaction, and Commander upload policy land."
+      }
+    },
+    "record_type": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["uid_ref", "content"],
+      "properties": {
+        "uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "scope": {
+          "type": "string",
+          "enum": ["enterprise"]
+        },
+        "record_type_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "content": { "$ref": "#/$defs/record_type_content" }
+      },
+      "x-keeper-live-proof": {
+        "status": "preview-gated",
+        "notes": "Diff plans record_type changes (W3-AB plumbed live_record_type_defs through plan path); Commander apply path is not yet wired. Plan / dry-run / validate --online surface drift; apply currently no-ops record_type rows. See audit notes/dsk-improvement-audit-2026-04-27.md F1."
+      }
+    },
+    "record_type_content": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["$id"],
+      "properties": {
+        "$id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "categories": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true,
+          "default": []
+        },
+        "description": {
+          "type": "string"
+        },
+        "fields": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/record_type_field" },
+          "default": []
+        }
+      }
+    },
+    "record_type_field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["$ref"],
+      "properties": {
+        "$ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "required": {
+          "type": "boolean"
+        }
+      }
+    },
+    "attachment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["uid_ref", "record_uid_ref", "source_path"],
+      "properties": {
+        "uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "record_uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "source_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mime_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "content_sha256": {
+          "type": "string",
+          "pattern": "^[A-Fa-f0-9]{64}$"
+        }
+      }
+    },
+    "keeper_fill": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["settings"],
+      "properties": {
+        "settings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/keeper_fill_setting" },
+          "uniqueItems": true,
+          "default": []
+        }
+      },
+      "x-keeper-live-proof": {
+        "status": "scaffold-only",
+        "notes": "Diff plans keeper_fill changes but apply has no Commander writer in pinned upstream (17.2.x). _vault_apply_keeper_fill_create/update raise CapabilityError; manifest must omit keeper_fill until upstream lands a typed writer. See audit notes/dsk-improvement-audit-2026-04-27.md F2 + W3-AB sprint."
+      }
+    },
+    "keeper_fill_setting": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["record_uid_ref"],
+      "properties": {
+        "record_uid_ref": { "$ref": "#/$defs/uid_ref" },
+        "auto_fill": { "$ref": "#/$defs/on_off" },
+        "auto_submit": { "$ref": "#/$defs/on_off" }
+      }
+    }
+  }
+}

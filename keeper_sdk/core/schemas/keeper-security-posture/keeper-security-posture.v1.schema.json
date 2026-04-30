@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/msawczynk/declarative-sdk-for-k/schemas/keeper-security-posture/v1.json",
+  "title": "keeper-security-posture.v1 (dropped-design)",
+  "description": "Dropped-design schema family. The 2026-04-26 design memo concluded that posture surface (BreachWatch / compliance / security-audit / weak-password / reused-password / expired-record reports) is intrinsically read-only and one-shot; declarative manifests cannot create a breach or assert a posture invariant idempotently. Surface ships instead as `dsk report <name>` runtime verbs per docs/V2_DECISIONS.md Q3. Scaffold retained (not deleted) so any manifest that pins this family fails validation with an explicit dropped-design status rather than a confusing 'no provider' error.",
+  "x-keeper-live-proof": {
+    "status": "dropped-design",
+    "evidence": "memo:2026-04-26_keeper-security-posture-v1-schema-design.md",
+    "since_pin": "89047920a0df857e01fb59adcb0bfb9fa6db70bf",
+    "notes": "Replaced by `dsk report` verbs: compliance-report, security-audit-report, password-report, breachwatch-list, record-totp, enterprise-reports. See docs/V2_DECISIONS.md Q3 + the design memo (in daybook-sync repo: codex-prompts/_memos/2026-04-26_keeper-security-posture-v1-schema-design.md)."
+  },
+  "type": "object",
+  "required": [
+    "schema"
+  ],
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "keeper-security-posture.v1"
+    }
+  },
+  "additionalProperties": false
+}

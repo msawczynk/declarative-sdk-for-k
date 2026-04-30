@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/msawczynk/declarative-sdk-for-k/schemas/keeper-ksm/v1.json",
+  "title": "keeper-ksm.v1",
+  "description": "Supported schema marker for the keeper-ksm family. Declarative KSM body fields remain closed until ksm_apps, ksm_clients, and ksm_shares are modeled.",
+  "x-keeper-live-proof": {
+    "status": "supported",
+    "evidence": "docs/live-proof/keeper-ksm.v1.89047920.sanitized.json",
+    "since_pin": "89047920a0df857e01fb59adcb0bfb9fa6db70bf",
+    "notes": "KsmLoginHelper authenticated Commander, bootstrapped/redeemed KSM config, and proved KSM fetch-write-fetch restore on the editable bus record."
+  },
+  "type": "object",
+  "required": [
+    "schema"
+  ],
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "keeper-ksm.v1"
+    }
+  },
+  "additionalProperties": false
+}

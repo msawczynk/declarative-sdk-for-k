@@ -1,0 +1,25 @@
+# Fails: pam_configuration_uid_ref points at a uid_ref not declared in the manifest.
+version: "1"
+name: invalid-missing-ref
+
+gateways:
+  - uid_ref: gw
+    name: "Some Gateway"
+    mode: reference_existing
+
+pam_configurations:
+  - uid_ref: cfg
+    environment: local
+    title: "cfg"
+    gateway_uid_ref: gw
+
+resources:
+  - uid_ref: lonely-machine
+    type: pamMachine
+    title: "lonely"
+    pam_configuration_uid_ref: does-not-exist     # missing ref
+    shared_folder: resources
+    host: 10.0.0.1
+    operating_system: Linux
+    pam_settings:
+      connection: { protocol: ssh }

@@ -1,0 +1,6 @@
+# Minimal keeper-vault.v1 sample — `dsk validate` / `dsk validate --json` (offline graph).
+# `dsk plan` / `dsk apply --provider mock` supported via load_declarative_manifest (PR-V4).
+# Plan/diff: `compute_vault_diff` matches manifest `login` `fields[]` to Commander-flattened scalars (tests: `tests/test_vault_diff.py`).
+# See docs/PAM_PARITY_PROGRAM.md Phase 1.
+schema: keeper-vault.v1
+records: []

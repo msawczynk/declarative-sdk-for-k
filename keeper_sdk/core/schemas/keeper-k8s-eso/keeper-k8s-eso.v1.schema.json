@@ -1,0 +1,96 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/msawczynk/declarative-sdk-for-k/schemas/keeper-k8s-eso/keeper-k8s-eso.v1.schema.json",
+  "title": "keeper-k8s-eso.v1",
+  "description": "Offline integration manifest for rendering Kubernetes External Secrets Operator resources that read Keeper records through the Keeper Secrets Manager provider. DSK validates the boundary and can manage related KSM lifecycle manifests, but does not apply Kubernetes resources.",
+  "x-keeper-live-proof": {
+    "status": "upstream-gap",
+    "evidence": "docs/K8S_ESO_INTEGRATION.md",
+    "since_pin": "d89e9b4",
+    "notes": "Offline scaffold only: JSON Schema, typed models, and deterministic Kubernetes YAML generation. plan/apply remain capability-gated until DSK has live KSM app lifecycle and Kubernetes apply/readback proof."
+  },
+  "type": "object",
+  "required": ["schema"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "keeper-k8s-eso.v1"
+    },
+    "eso_stores": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/definitions/eso_store"
+      }
+    },
+    "external_secrets": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/definitions/external_secret"
+      }
+    }
+  },
+  "definitions": {
+    "non_empty_string": {
+      "type": "string",
+      "minLength": 1
+    },
+    "eso_store": {
+      "type": "object",
+      "required": ["name", "ks_uid", "namespace"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "ks_uid": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "namespace": {
+          "$ref": "#/definitions/non_empty_string"
+        }
+      }
+    },
+    "external_secret_data": {
+      "type": "object",
+      "required": ["keeper_uid_ref", "remote_key"],
+      "additionalProperties": false,
+      "properties": {
+        "keeper_uid_ref": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "remote_key": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "property": {
+          "$ref": "#/definitions/non_empty_string"
+        }
+      }
+    },
+    "external_secret": {
+      "type": "object",
+      "required": ["name", "store_ref", "target_k8s_secret", "data"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "store_ref": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "target_k8s_secret": {
+          "$ref": "#/definitions/non_empty_string"
+        },
+        "data": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/external_secret_data"
+          }
+        }
+      }
+    }
+  }
+}

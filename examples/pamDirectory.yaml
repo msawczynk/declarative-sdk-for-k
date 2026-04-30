@@ -1,0 +1,55 @@
+version: "1"
+name: example-pam-directory
+
+# Minimal pamDirectory manifest (OpenLDAP). No preview keys.
+#
+# Run:
+#   dsk validate examples/pamDirectory.yaml
+#   dsk plan     examples/pamDirectory.yaml --provider mock --json
+#
+# Live equivalent: scripts/smoke/scenarios.py::pamDirectory.
+
+shared_folders:
+  resources:
+    uid_ref: example-sf-resources
+    manage_users: true
+    manage_records: true
+    can_edit: true
+    can_share: true
+
+gateways:
+  - uid_ref: example-gw
+    name: "Example Gateway"
+    mode: reference_existing
+
+pam_configurations:
+  - uid_ref: example-cfg
+    environment: local
+    title: "Example Local PAM Configuration"
+    gateway_uid_ref: example-gw
+    options:
+      connections: "on"
+      tunneling: "on"
+    network_id: example-net
+    network_cidr: 10.16.9.0/28
+
+resources:
+  - uid_ref: example-dir-1
+    type: pamDirectory
+    title: "example-dir-1"
+    pam_configuration_uid_ref: example-cfg
+    shared_folder: resources
+    directory_type: openldap
+    directory_id: example-dir
+    host: 10.16.9.30
+    port: "389"
+    use_ssl: false
+    domain_name: example.local
+    pam_settings:
+      options:
+        connections: "on"
+        tunneling: "on"
+      connection:
+        protocol: ssh
+        port: "22"
+        allow_supply_user: true

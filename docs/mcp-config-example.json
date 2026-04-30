@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "dsk": {
+      "command": "dsk-mcp",
+      "env": {
+        "KEEPER_SERVICE_URL": "http://localhost:4020",
+        "KEEPER_SERVICE_API_KEY": "${DSK_API_KEY}"
+      }
+    }
+  }
+}

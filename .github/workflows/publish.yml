@@ -1,0 +1,41 @@
+# GitHub-only distribution: attach sdist + wheels to the GitHub Release.
+# This project is not published to PyPI; consumers install from git or from
+# release assets. See docs/RELEASING.md.
+name: Release assets
+
+on:
+  release:
+    types: [published]
+
+concurrency:
+  group: release-assets-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  attach-dist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tools
+        run: pip install build twine
+
+      - name: Build distributions
+        run: python -m build
+
+      - name: Twine check
+        run: twine check dist/*
+
+      - name: Upload dist to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eux
+          gh release upload "${{ github.ref_name }}" dist/* --clobber

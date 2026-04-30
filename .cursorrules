@@ -1,0 +1,107 @@
+# Keeper Declarative SDK — Cursor Rules
+
+This file is intentionally thin. The old copy drifted from the real tree and
+misled agents toward removed modules. Use these repo-local sources instead:
+
+- `AGENTS.md` — agent operating manual, command table, exit codes, guardrails.
+- `SCAFFOLD.md` — current folder map, where to land work, design reconciliation.
+- `docs/SDK_COMPLETION_PLAN.md` — roadmap and live-proof gates.
+- `docs/SDK_DA_COMPLETION_PLAN.md` — devil's-advocate completion contract; classifies every modeled capability as `supported` / `preview-gated` / `upstream-gap`.
+- `docs/VALIDATION_STAGES.md` — validation stages and exit-code contract.
+- `~/.cursor-daybook-sync/scripts/phase_runner.sh` — workspace-global phase-runner harness; **default** for any multi-step delegated worker task in this repo (≥2 file edits, gate run, or commit draft). Spec template: `~/.cursor-daybook-sync/scripts/templates/phase_spec.example.yaml`. See `AGENTS.md` § "Phase runner harness".
+- `~/.cursor-daybook-sync/docs/orchestration/dsk/` — **multi-session orchestration** (sprint memos, Codex prompts, coordination). **Not** copied into this repo; `AGENTS.md` § "Where orchestration lives" is the index. `docs/ORCHESTRATION_*` in-tree is **blocked** by `scope-fence` CI.
+- `scripts/phase_harness/` — in-repo **merge gate** (`run_local_gates.sh`) + **example** `phase-spec.dsk.example.yaml` for the workspace `phase_runner.sh` (harness still lives in daybook; see `scripts/phase_harness/README.md`).
+- `scripts/daybook/` — **forwards** to `~/.cursor-daybook-sync` (boot, `doctor` path check, sync, append). JOURNAL/LESSONS do **not** live in this repo; do not mix with product commits. See `scripts/daybook/README.md`.
+
+Current architecture:
+
+- Python 3.11+.
+- `keeper_sdk/core/` — manifest, schema, models, graph, diff, planner, preview, redact.
+- `keeper_sdk/cli/` — `dsk` Click entrypoint and Rich renderer.
+- `keeper_sdk/providers/` — `MockProvider` and Commander-backed live provider.
+- `scripts/smoke/` — committed live-smoke harness; no ad hoc Keeper mutation commands.
+
+Hard rules:
+
+- Prefer long autonomous completion passes over step-by-step status narration;
+  only surface outcomes when blocked, scope shifts, or the user asks.
+- Preserve preview/provider gates until reviewed live proof passes.
+- Do not write direct Keeper DAG state from SDK or lab scripts; route live mutation through Commander surfaces.
+- Keep tests focused to the touched area first; run broad checks only when risk or release scope requires it.
+
+## Grandparent / parent / child hierarchy (enforced 2026-04-28)
+
+| Tier | Who | Owns |
+|------|-----|------|
+| **Grandparent** | Human user | Strategic only: GA tag, public GH issue close, irresolvable design fork |
+| **Parent** | Cursor chat primary | Full loop: queue dispatch, phase_runner, pre-claim, `git push`, live smoke routing, amber triage |
+| **Child** | T0 Codex workers (offline + `codex_live.sh` live) | Code/test/doc/gate/live smoke execution |
+
+Parent escalates to grandparent ONLY at those three triggers. T0 child via `codex_live.sh` owns live smoke (`smoke.py`) — network + KSM env fully available. Parent never waits for user on routine work.
+
+See `AGENT_PREAMBLE.md` §0b for full contract.
+
+## Router-mode (Sonnet executor + Opus advisor, 2026-04-28)
+
+**Parent chat primary: `claude-sonnet-4-6`** (Sonnet 4.6 executor). Sonnet drives
+end-to-end — faster, cheaper ($3/$15), no adaptive-thinking underestimate problem.
+Target: T0 + T1 ≥ 95% of session spend. T3 Opus = advisor only (one-shot when stuck).
+
+**Worker routing order** (cheapest viable wins):
+
+1. **T0 free** — Codex CLI (`codex_offline_bg.sh` / `codex_live.sh`), local
+   scripts, built-in `explore`. **First reflex** for all child work including
+   live smoke (`smoke.py` via `codex_live.sh` — network + KSM env available).
+2. **T1 cheap** — `fmt-fixer` (nano), `bulk-reader` (nano), `schema-dumper`
+   (nano), `pytest-writer` (composer-2), `cheap-writer` (composer-2),
+   `verifier` (fast, distinct vendor from Sonnet parent).
+3. **T2 managed** — Cursor `Auto` pool when T0/T1 don't fit.
+4. **T3 advisor** — `/advisor` or `Task` → `advisor` subagent (`claude-4-7-opus`,
+   `~/.cursor/agents/advisor.md`) with consult envelope when parent is stuck.
+   Returns `ADVICE` (continue) or `ESCALATE` (needs grandparent). See `AGENT_PREAMBLE.md §0b`.
+
+**Multi-step delegation default:** `~/.cursor-daybook-sync/scripts/phase_runner.sh`
+with YAML spec (`--author-spec` so cheap-writer authors the YAML from an outcome stub).
+
+**Hard-fail drift gates (wired into `stop` hook):**
+
+- `parent_action_check.sh` → exits 1 if parent emits >30-line YAML or >50-line
+  spec without prior delegate, >3 consecutive `Read` calls without delegate,
+  or **GH-issue trivial-fix bait** without `bulk-reader` first.
+- `agent_pre_claim.sh` → wraps above + clobber-risk; ≥2 axes → advisor consult
+  before "done"/gate-lift/support claim hits chat.
+
+**Stuck triggers** (any one → invoke `/advisor` first, not grandparent):
+
+- 3-patch trip on same failure mode.
+- Worker `BLOCKER` / cross-rule reconciliation needed.
+- Pre-claim ≥2 axes flagged.
+- Novel error with no LESSONS tag match after one `bulk-reader` pass.
+- Iterative debug >3 round-trips on same bug.
+- User intent: `why|should-I|architect|gate-lift|support claim|recommend|trade-off`.
+- **GH-issue trivial-fix bait** spanning >1 module / schema / contract / test.
+
+**Grandparent (human) only when advisor returns ESCALATE** or: GA tag,
+public GH issue close, irresolvable design fork with external impact.
+
+**Router lockdown:** single-file write >30 lines → `cheap-writer`. >2 files →
+`phase_runner.sh`. Direct edits to `keeper_sdk/`/`tests/` from chat primary
+without prior `Task`/`codex` call = parent-as-implementer drift (audit checklist #17).
+
+**Target queue (not `V1_GA_CHECKLIST.md` — that shipped 2026-04-24):**
+[`docs/DSK_NEXT_WORK.md`](./docs/DSK_NEXT_WORK.md) priority stack +
+[`docs/SDK_DA_COMPLETION_PLAN.md`](./docs/SDK_DA_COMPLETION_PLAN.md)
+support classifications.
+
+## Parent hard-stop (enforced every session)
+
+Parent chat = orchestrator only. Allowed: read files, check status, dispatch subagents, synthesise results.
+NEVER allowed from parent chat directly:
+- git add / commit / push / rebase
+- ruff / mypy / pytest / bash scripts/phase_harness/*
+- codex_offline_bg.sh / codex_live.sh (launch these from shell subagents)
+- Any multi-command sequence
+
+Every sequence of ≥2 commands → Task tool, subagent_type="shell", run_in_background=true.
+Single-read exceptions: `git log --oneline -4`, `git status --short`, `cat marker`, `head log`.
+Boot sequence itself runs agent_session_boot.sh as the ONE allowed parent shell call per session start.

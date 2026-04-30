@@ -1,0 +1,76 @@
+{
+  "commander_pin_abbrev": "89047920",
+  "commander_version": "17.2.13",
+  "events": [
+    {
+      "event": "auth_source_preflight",
+      "result": "ok",
+      "server": "keepersecurity.com",
+      "source_config_basename": "commander-config.json",
+      "tenant_hash": "67758afb"
+    },
+    {
+      "event": "live_smoke_invocation",
+      "exit_code": 0,
+      "provider": "commander",
+      "raw_log_basename": "redacted-pamrbi-20260428T2255Z",
+      "result": "ok",
+      "scenario": "pamRemoteBrowser"
+    },
+    {
+      "event": "validate",
+      "manifest_family": "pam-environment.v1",
+      "result": "ok"
+    },
+    {
+      "event": "plan_initial",
+      "expected_exit_code": 2,
+      "result": "creates_present"
+    },
+    {
+      "event": "apply",
+      "expected_records": 1,
+      "resource_type": "pamRemoteBrowser",
+      "result": "ok"
+    },
+    {
+      "event": "discover_verify",
+      "marker_manager": "keeper-pam-declarative",
+      "result": "ok"
+    },
+    {
+      "event": "replan",
+      "expected_exit_code": 0,
+      "result": "clean"
+    },
+    {
+      "event": "destroy_plan",
+      "expected_exit_code": 2,
+      "result": "deletes_present"
+    },
+    {
+      "event": "destroy_apply",
+      "result": "ok"
+    },
+    {
+      "event": "rediscover_empty",
+      "result": "clean"
+    },
+    {
+      "event": "sanitization",
+      "leak_check": "keeper_sdk.cli._live.transcript.secret_leak_check",
+      "result": "ok"
+    }
+  ],
+  "family": "keeper-pam-environment.v1",
+  "generated_at": "2026-04-28T00:00:00Z",
+  "notes": [
+    "2026-04-28 Acme-lab: committed smoke `python3 scripts/smoke/smoke.py --scenario pamRemoteBrowser` → SMOKE PASSED (exit 0).",
+    "Pre-requisite for clean re-plan: `discover()` maps Commander `rbiUrl` field to manifest `url` (commit 975c777 on main).",
+    "For field-level support labels (import vs DAG-only RBI toggles), see `docs/SDK_DA_COMPLETION_PLAN.md` Phase 3 — this artifact attests the harnessed E2E only."
+  ],
+  "scenario": "pamRemoteBrowser",
+  "smoke_final_line": "SMOKE PASSED: create->verify->destroy cycle clean",
+  "tenant_hash": "67758afb",
+  "worktree_head": "3c43247"
+}

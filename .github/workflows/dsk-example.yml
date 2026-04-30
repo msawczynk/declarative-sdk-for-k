@@ -1,0 +1,49 @@
+name: dsk GitOps example
+
+on:
+  pull_request:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  dsk-plan:
+    name: dsk plan PR check
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/dsk-plan
+        with:
+          manifest_path: examples/pamMachine.yaml
+          provider: mock
+          allow_delete: "false"
+          post_comment: "true"
+
+  dsk-drift:
+    name: dsk scheduled drift
+    if: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && vars.DSK_DRIFT_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/dsk-drift
+        with:
+          manifest_path: ${{ vars.DSK_DRIFT_MANIFEST || 'env.yaml' }}
+          issue_label: ${{ vars.DSK_DRIFT_ISSUE_LABEL || 'dsk-drift' }}
+          assignees: ${{ vars.DSK_DRIFT_ASSIGNEES }}
+        env:
+          DSK_PROVIDER: ${{ vars.DSK_PROVIDER || 'commander' }}
+          KEEPER_SERVICE_URL: ${{ secrets.KEEPER_SERVICE_URL }}
+          KEEPER_SERVICE_API_KEY: ${{ secrets.KEEPER_SERVICE_API_KEY }}
+          KEEPER_SDK_LOGIN_HELPER: ${{ vars.KEEPER_SDK_LOGIN_HELPER }}
+          KEEPER_SDK_KSM_CONFIG: ${{ secrets.KSM_CONFIG }}
+          KSM_CONFIG: ${{ secrets.KSM_CONFIG }}
+          KEEPER_EMAIL: ${{ secrets.KEEPER_EMAIL }}
+          KEEPER_PASSWORD: ${{ secrets.KEEPER_PASSWORD }}
+          KEEPER_TOTP_SECRET: ${{ secrets.KEEPER_TOTP_SECRET }}
+          KEEPER_DECLARATIVE_FOLDER: ${{ secrets.KEEPER_DECLARATIVE_FOLDER }}

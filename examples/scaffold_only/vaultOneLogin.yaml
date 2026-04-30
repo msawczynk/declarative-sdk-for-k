@@ -1,0 +1,12 @@
+# Single `login` row for lab L1 / V8 (`dsk validate --online`, `plan`, `apply`).
+# Redact tenant-specific values before any transcript; see `docs/live-proof/README.md`
+# and `docs/live-proof/keeper-vault.v1.sanitized.template.json`.
+schema: keeper-vault.v1
+records:
+  - uid_ref: lab.login.demo
+    type: login
+    title: Lab Demo Login
+    fields:
+      - type: login
+        label: Login
+        value: ["replace-with-nonproduction-username"]

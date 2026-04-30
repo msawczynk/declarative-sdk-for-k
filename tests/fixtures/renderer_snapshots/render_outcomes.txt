@@ -1,0 +1,11 @@
+                                                     Apply results                                                      
+┏━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Action   ┃ uid_ref              ┃ Keeper UID       ┃ Details                                                         ┃
+┡━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ create   │ acme-lab-linux2      │ UID-CREATE-001   │ dry_run=True                                                    │
+│ update   │ acme-lab-linux1-root │ UID-USER-001     │ dry_run=True                                                    │
+│ delete   │ old-db               │ UID-DELETE-001   │ dry_run=True                                                    │
+│ conflict │ acme-lab-linux3      │ UID-CONFLICT-001 │ reason=unmanaged record with matching title; pass --adopt or    │
+│          │                      │                  │ use an import workflow to claim it                              │
+│ noop     │ acme-lab-cfg         │ UID-NOOP-001     │                                                                 │
+└──────────┴──────────────────────┴──────────────────┴─────────────────────────────────────────────────────────────────┘
