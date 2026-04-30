@@ -60,7 +60,8 @@ docs/SDK_DA_COMPLETION_PLAN.md
 docs/SDK_COMPLETION_PLAN.md
 docs/V2_DECISIONS.md
 scripts/rocky/
-scripts/daybook/
+# `scripts/daybook/` ships publicly as a thin forwarder to
+# `~/.cursor-daybook-sync` (per `.cursorrules`); do NOT exclude it.
 scripts/dsk_orchestrator_loop.sh
 scripts/dsk_wave_next.sh
 .live-smoke/

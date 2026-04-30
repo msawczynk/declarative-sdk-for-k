@@ -39,8 +39,16 @@ jobs:
             base="${{ github.event.pull_request.base.sha }}"
             head="${{ github.event.pull_request.head.sha }}"
           else
-            base=$(git rev-parse HEAD~1 2>/dev/null || git rev-parse HEAD)
             head=$(git rev-parse HEAD)
+            # On orphan / single-commit histories `git rev-parse HEAD~1` exits
+            # non-zero AND prints "HEAD~1" on stdout before erroring; using `||`
+            # inside a command substitution captures both, contaminating $base.
+            # Resolve safely with an explicit existence probe.
+            if git rev-parse --verify -q HEAD~1 >/dev/null; then
+              base=$(git rev-parse HEAD~1)
+            else
+              base="$head"
+            fi
           fi
           echo "base=$base" >> "$GITHUB_OUTPUT"
           echo "head=$head" >> "$GITHUB_OUTPUT"
