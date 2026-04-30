@@ -35,14 +35,23 @@ from typing import TYPE_CHECKING, Any
 
 from keeper_sdk.core.errors import ManifestError, SchemaError, UnsupportedFamilyError
 from keeper_sdk.core.models import Manifest
-from keeper_sdk.core.models_ai_agent import AI_AGENT_FAMILY
+try:
+    from keeper_sdk.core.models_ai_agent import AI_AGENT_FAMILY
+except ImportError:  # stripped in public build
+    AI_AGENT_FAMILY = "ai-agent.v1"  # type: ignore[assignment]
 from keeper_sdk.core.models_enterprise import ENTERPRISE_FAMILY
 from keeper_sdk.core.models_epm import EPM_FAMILY
 from keeper_sdk.core.models_integrations_events import EVENTS_FAMILY
 from keeper_sdk.core.models_integrations_identity import IDENTITY_FAMILY
 from keeper_sdk.core.models_k8s_eso import K8S_ESO_FAMILY
-from keeper_sdk.core.models_nhi import NHI_FAMILY
-from keeper_sdk.core.models_pam_extended import PAM_EXTENDED_FAMILY
+try:
+    from keeper_sdk.core.models_nhi import NHI_FAMILY
+except ImportError:  # stripped in public build
+    NHI_FAMILY = "nhi-agent.v1"  # type: ignore[assignment]
+try:
+    from keeper_sdk.core.models_pam_extended import PAM_EXTENDED_FAMILY
+except ImportError:  # stripped in public build
+    PAM_EXTENDED_FAMILY = "keeper-pam-extended.v1"  # type: ignore[assignment]
 from keeper_sdk.core.models_privileged_access import PRIVILEGED_ACCESS_FAMILY
 from keeper_sdk.core.models_saas_rotation import SAAS_ROTATION_FAMILY
 from keeper_sdk.core.models_siem import SIEM_FAMILY

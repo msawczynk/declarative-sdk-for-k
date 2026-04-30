@@ -91,17 +91,20 @@ from keeper_sdk.core.models_k8s_eso import (
     K8sEsoManifestV1,
     load_k8s_eso_manifest,
 )
-from keeper_sdk.core.models_pam_extended import (
-    PAM_EXTENDED_FAMILY,
-    PamExtendedDiscoveryRule,
-    PamExtendedGatewayConfig,
-    PamExtendedManifest,
-    PamExtendedManifestV1,
-    PamExtendedResource,
-    PamExtendedRotationSchedule,
-    PamExtendedServiceMapping,
-    load_pam_extended_manifest,
-)
+try:
+    from keeper_sdk.core.models_pam_extended import (  # stripped in public build
+        PAM_EXTENDED_FAMILY,
+        PamExtendedDiscoveryRule,
+        PamExtendedGatewayConfig,
+        PamExtendedManifest,
+        PamExtendedManifestV1,
+        PamExtendedResource,
+        PamExtendedRotationSchedule,
+        PamExtendedServiceMapping,
+        load_pam_extended_manifest,
+    )
+except ImportError:
+    pass
 from keeper_sdk.core.models_privileged_access import (
     PRIVILEGED_ACCESS_FAMILY,
     PrivilegedAccessManifestV1,

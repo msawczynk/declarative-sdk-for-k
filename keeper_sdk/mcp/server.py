@@ -49,12 +49,27 @@ from keeper_sdk.core import (
 )
 from keeper_sdk.core.interfaces import ApplyOutcome, LiveRecord
 from keeper_sdk.core.manifest import load_manifest_string
-from keeper_sdk.core.models_ai_agent import AI_AGENT_FAMILY, AiAgentManifest
+try:
+    from keeper_sdk.core.models_ai_agent import AI_AGENT_FAMILY, AiAgentManifest  # stripped in public build
+except ImportError:
+    AI_AGENT_FAMILY = "ai-agent.v1"  # type: ignore[assignment]
+    AiAgentManifest = None  # type: ignore[assignment]
 from keeper_sdk.core.models_integrations_events import EVENTS_FAMILY, EventsManifestV1
 from keeper_sdk.core.models_ksm import KSM_FAMILY, KsmManifestV1
-from keeper_sdk.core.models_nhi import NHI_FAMILY, NhiAgentManifest
-from keeper_sdk.core.models_pam_extended import PAM_EXTENDED_FAMILY, PamExtendedManifestV1
-from keeper_sdk.core.pam_extended_diff import compute_pam_extended_diff
+try:
+    from keeper_sdk.core.models_nhi import NHI_FAMILY, NhiAgentManifest  # stripped in public build
+except ImportError:
+    NHI_FAMILY = "nhi-agent.v1"  # type: ignore[assignment]
+    NhiAgentManifest = None  # type: ignore[assignment]
+try:
+    from keeper_sdk.core.models_pam_extended import PAM_EXTENDED_FAMILY, PamExtendedManifestV1  # stripped in public build
+except ImportError:
+    PAM_EXTENDED_FAMILY = "keeper-pam-extended.v1"  # type: ignore[assignment]
+    PamExtendedManifestV1 = None  # type: ignore[assignment]
+try:
+    from keeper_sdk.core.pam_extended_diff import compute_pam_extended_diff  # stripped in public build
+except ImportError:
+    compute_pam_extended_diff = None  # type: ignore[assignment]
 from keeper_sdk.core.planner import Plan
 from keeper_sdk.core.sharing_models import SharingManifestV1
 from keeper_sdk.core.vault_models import VaultManifestV1

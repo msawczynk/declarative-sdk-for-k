@@ -89,10 +89,17 @@ from keeper_sdk.core.models_enterprise import (
 from keeper_sdk.core.models_epm import EPM_FAMILY, EpmManifestV1
 from keeper_sdk.core.models_integrations_events import EVENTS_FAMILY, EventsManifestV1
 from keeper_sdk.core.models_ksm import KSM_FAMILY, KsmManifestV1
-from keeper_sdk.core.models_pam_extended import PAM_EXTENDED_FAMILY, PamExtendedManifestV1
+try:
+    from keeper_sdk.core.models_pam_extended import PAM_EXTENDED_FAMILY, PamExtendedManifestV1  # stripped in public build
+except ImportError:
+    PAM_EXTENDED_FAMILY = "keeper-pam-extended.v1"  # type: ignore[assignment]
+    PamExtendedManifestV1 = None  # type: ignore[assignment]
 from keeper_sdk.core.models_siem import SiemManifestV1
 from keeper_sdk.core.models_terraform import TERRAFORM_FAMILY, TerraformIntegrationManifestV1
-from keeper_sdk.core.pam_extended_diff import compute_pam_extended_diff
+try:
+    from keeper_sdk.core.pam_extended_diff import compute_pam_extended_diff  # stripped in public build
+except ImportError:
+    compute_pam_extended_diff = None  # type: ignore[assignment]
 from keeper_sdk.core.planner import Plan
 from keeper_sdk.core.preview import assert_preview_keys_allowed
 from keeper_sdk.core.schema import PAM_FAMILY, SHARING_FAMILY, validate_manifest
